@@ -8,6 +8,7 @@ function Sidebar() {
     { path: '/filing/new', label: 'New Filing' },
     { path: '/filings', label: 'My Filings' },
     { path: '/cases/search', label: 'Case Search' },
+    { path: '/favorites', label: 'Favorites' },
     { path: '/clerk/queue', label: 'Clerk Queue' },
   ];
 
@@ -29,7 +30,7 @@ function Sidebar() {
       </nav>
       <div className="sidebar-info">
         <h4>Quick Info</h4>
-        <p>Courts: 242+</p>
+        <p>Courts: 256</p>
         <p>Counties: 83</p>
         <p>MCR 1.109 Compliant</p>
       </div>

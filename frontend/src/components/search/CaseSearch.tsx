@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { searchCases } from '../../api/documents';
+import { listFavorites, addFavorite, removeFavorite } from '../../api/favorites';
 
 interface CaseResult {
   id: number;
@@ -21,6 +22,21 @@ function CaseSearch() {
   const [total, setTotal] = useState(0);
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [favoritedIds, setFavoritedIds] = useState<Set<number>>(new Set());
+  const [togglingFav, setTogglingFav] = useState<number | null>(null);
+
+  // Load user's favorites on mount
+  useEffect(() => {
+    async function loadFavorites() {
+      try {
+        const data = await listFavorites();
+        setFavoritedIds(new Set(data.favorites.map(f => f.case_id)));
+      } catch {
+        // API not available or not authenticated
+      }
+    }
+    loadFavorites();
+  }, []);
 
   const handleSearch = async () => {
     setSearching(true);
@@ -40,12 +56,37 @@ function CaseSearch() {
     }
   };
 
+  const toggleFavorite = async (caseId: number) => {
+    setTogglingFav(caseId);
+    try {
+      if (favoritedIds.has(caseId)) {
+        await removeFavorite(caseId);
+        setFavoritedIds(prev => {
+          const next = new Set(prev);
+          next.delete(caseId);
+          return next;
+        });
+      } else {
+        await addFavorite(caseId);
+        setFavoritedIds(prev => new Set(prev).add(caseId));
+      }
+    } catch {
+      // Silently fail - might not be authenticated
+    } finally {
+      setTogglingFav(null);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSearch();
+  };
+
   return (
     <div className="case-search">
       <h2>Case Search</h2>
       <p className="info-text">
         Search for cases across all Michigan courts. You can search by case number
-        or party name.
+        or party name. Click the star to add a case to your favorites.
       </p>
 
       <div className="search-form">
@@ -57,6 +98,7 @@ function CaseSearch() {
               type="text"
               value={caseNumber}
               onChange={(e) => setCaseNumber(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder="e.g., MI-1-2024-000001"
             />
           </div>
@@ -67,6 +109,7 @@ function CaseSearch() {
               type="text"
               value={partyName}
               onChange={(e) => setPartyName(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder="e.g., Smith"
             />
           </div>
@@ -83,6 +126,7 @@ function CaseSearch() {
             <table>
               <thead>
                 <tr>
+                  <th className="th-fav"></th>
                   <th>Case Number</th>
                   <th>Title</th>
                   <th>Status</th>
@@ -93,6 +137,17 @@ function CaseSearch() {
               <tbody>
                 {results.map((c) => (
                   <tr key={c.id}>
+                    <td className="td-fav">
+                      <button
+                        className={`fav-btn ${favoritedIds.has(c.id) ? 'favorited' : ''}`}
+                        onClick={() => toggleFavorite(c.id)}
+                        disabled={togglingFav === c.id}
+                        title={favoritedIds.has(c.id) ? 'Remove from favorites' : 'Add to favorites'}
+                        aria-label={favoritedIds.has(c.id) ? 'Remove from favorites' : 'Add to favorites'}
+                      >
+                        {favoritedIds.has(c.id) ? '\u2605' : '\u2606'}
+                      </button>
+                    </td>
                     <td><a href={`/cases/${c.id}`}>{c.case_number}</a></td>
                     <td>{c.title}</td>
                     <td>

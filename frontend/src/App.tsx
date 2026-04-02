@@ -6,6 +6,7 @@ import FilingWizard from './components/filing/FilingWizard';
 import MyFilings from './components/filing/MyFilings';
 import ReviewQueue from './components/clerk/ReviewQueue';
 import CaseSearch from './components/search/CaseSearch';
+import Favorites from './components/search/Favorites';
 
 function Dashboard() {
   return (
@@ -18,7 +19,7 @@ function Dashboard() {
       {/* Quick Stats */}
       <div className="dashboard-stats">
         <div className="stat-card accent">
-          <span className="stat-number">255</span>
+          <span className="stat-number">256</span>
           <span className="stat-label">Courts Available</span>
         </div>
         <div className="stat-card">
@@ -103,6 +104,7 @@ function App() {
             <Route path="/filing/new" element={<FilingWizard />} />
             <Route path="/filings" element={<MyFilings />} />
             <Route path="/cases/search" element={<CaseSearch />} />
+            <Route path="/favorites" element={<Favorites />} />
             <Route path="/clerk/queue" element={<ReviewQueue />} />
           </Routes>
         </main>
