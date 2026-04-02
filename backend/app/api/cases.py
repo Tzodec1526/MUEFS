@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.api.auth import get_current_user_id
 from app.database import get_db
 from app.models.case import Case, CaseStatus
 from app.models.filing import FilingEnvelope
@@ -38,7 +39,11 @@ async def search_cases(
 
 
 @router.get("/{case_id}", response_model=CaseResponse)
-async def get_case(case_id: int, db: AsyncSession = Depends(get_db)):
+async def get_case(
+    case_id: int,
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
     result = await db.execute(
         select(Case).options(selectinload(Case.participants)).where(Case.id == case_id)
     )
@@ -49,11 +54,19 @@ async def get_case(case_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{case_id}/filings", response_model=list[FilingEnvelopeResponse])
-async def get_case_filings(case_id: int, db: AsyncSession = Depends(get_db)):
+async def get_case_filings(
+    case_id: int,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
     result = await db.execute(
         select(FilingEnvelope)
         .options(selectinload(FilingEnvelope.documents))
         .where(FilingEnvelope.case_id == case_id)
         .order_by(FilingEnvelope.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
     return list(result.scalars().all())

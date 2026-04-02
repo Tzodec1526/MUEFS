@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.auth import get_current_user_id
 from app.database import get_db
@@ -36,16 +37,16 @@ async def list_favorites(
     user_id: int = Depends(get_current_user_id),
 ):
     result = await db.execute(
-        select(FavoriteCase).where(FavoriteCase.user_id == user_id).order_by(
-            FavoriteCase.created_at.desc()
-        )
+        select(FavoriteCase)
+        .options(selectinload(FavoriteCase.case))
+        .where(FavoriteCase.user_id == user_id)
+        .order_by(FavoriteCase.created_at.desc())
     )
     favorites = list(result.scalars().all())
 
     items = []
     for fav in favorites:
-        case_result = await db.execute(select(Case).where(Case.id == fav.case_id))
-        case = case_result.scalar_one_or_none()
+        case = fav.case
         items.append(FavoriteCaseResponse(
             id=fav.id,
             case_id=fav.case_id,

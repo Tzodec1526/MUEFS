@@ -1,22 +1,22 @@
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 from app.models.user import UserType
 
 
 class UserBase(BaseModel):
     email: EmailStr
-    first_name: str
-    last_name: str
-    bar_number: str | None = None
+    first_name: str = Field(..., max_length=100)
+    last_name: str = Field(..., max_length=100)
+    bar_number: str | None = Field(None, max_length=20)
     user_type: UserType
-    phone: str | None = None
-    firm_name: str | None = None
+    phone: str | None = Field(None, max_length=20)
+    firm_name: str | None = Field(None, max_length=255)
 
 
 class UserCreate(UserBase):
-    keycloak_id: str | None = None
+    keycloak_id: str | None = Field(None, max_length=255)
 
 
 class UserResponse(UserBase):

@@ -1,17 +1,17 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.case import CaseStatus, ParticipantRole
 
 
 class CaseParticipantBase(BaseModel):
     role: ParticipantRole
-    party_name: str
-    attorney_bar_number: str | None = None
-    contact_email: str | None = None
-    contact_phone: str | None = None
-    contact_address: str | None = None
+    party_name: str = Field(..., max_length=255)
+    attorney_bar_number: str | None = Field(None, max_length=20)
+    contact_email: str | None = Field(None, max_length=255)
+    contact_phone: str | None = Field(None, max_length=20)
+    contact_address: str | None = Field(None, max_length=500)
 
 
 class CaseParticipantCreate(CaseParticipantBase):

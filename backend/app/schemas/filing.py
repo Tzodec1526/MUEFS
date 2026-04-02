@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.filing import FilingStatus
 
@@ -24,14 +24,14 @@ class FilingEnvelopeCreate(BaseModel):
     court_id: int
     case_id: int | None = None  # None for new case initiation
     case_type_id: int
-    filing_type: str = "subsequent"  # "initial", "subsequent", "service_only"
-    case_title: str | None = None
-    filing_description: str | None = None
+    filing_type: str = Field("subsequent", max_length=20)  # "initial", "subsequent", "service_only"
+    case_title: str | None = Field(None, max_length=500)
+    filing_description: str | None = Field(None, max_length=5000)
 
 
 class FilingEnvelopeUpdate(BaseModel):
-    case_title: str | None = None
-    filing_description: str | None = None
+    case_title: str | None = Field(None, max_length=500)
+    filing_description: str | None = Field(None, max_length=5000)
 
 
 class FilingEnvelopeResponse(BaseModel):
@@ -69,7 +69,7 @@ class FilingSubmitRequest(BaseModel):
 
 class ClerkReviewRequest(BaseModel):
     action: str  # "accept", "reject", "return"
-    reason: str | None = None
+    reason: str | None = Field(None, max_length=5000)
 
 
 class FilingValidationResult(BaseModel):
