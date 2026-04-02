@@ -1,6 +1,39 @@
 import { useState, useEffect } from 'react';
 import { getCaseTypes, getFilingRequirements, CaseType, FilingRequirement } from '../../api/courts';
 
+// Maps MCR/MCL references to official Michigan Courts URLs
+function getRuleUrl(ref: string): string | null {
+  const base = 'https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702';
+  const rules: Record<string, string> = {
+    'MCR 2.102': `${base}/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2102-commencement-of-actions-and-service`,
+    'MCR 2.104': `${base}/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2104-proof-of-service`,
+    'MCR 2.107': `${base}/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2107-service-and-filing-of-pleadings-and-other-papers`,
+    'MCR 2.111': `${base}/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2111-general-rules-of-pleading`,
+    'MCR 2.116': `${base}/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2116-summary-disposition`,
+    'MCR 2.119': `${base}/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2119-motion-practice`,
+    'MCR 2.506': `${base}/chapter-2-civil-procedure/subchapter-2500-discovery/rule-2506-subpoena-order-to-attend`,
+    'MCR 2.508': `${base}/chapter-2-civil-procedure/subchapter-2500-discovery/rule-2508-demand-for-jury-trial`,
+    'MCR 8.119': `${base}/chapter-8-administrative-rules-of-court/subchapter-8100-general-administrative-orders/rule-8119-court-records-and-reports`,
+    'MCR 1.109': `${base}/chapter-1-applicability-and-definitions/rule-1109-court-records-defined-documents`,
+    'MCR 2.002': `${base}/chapter-2-civil-procedure/subchapter-2000-general-provisions/rule-2002-waiver-suspension-of-fees-and-costs`,
+  };
+
+  // Direct match
+  if (rules[ref]) return rules[ref];
+
+  // Match base rule (e.g., "MCR 2.119(A)(2)" -> "MCR 2.119")
+  const baseRef = ref.replace(/\(.*/, '').trim();
+  if (rules[baseRef]) return rules[baseRef];
+
+  // MCL references go to legislature
+  if (ref.startsWith('MCL ')) {
+    const section = ref.replace('MCL ', '').replace(/\s/g, '');
+    return `http://www.legislature.mi.gov/doc.aspx?mcl-${section}`;
+  }
+
+  return null;
+}
+
 interface Props {
   courtId: number;
   selectedCaseTypeId: number | null;
@@ -147,9 +180,16 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
                   <div key={req.id} className="requirement-card required">
                     <div className="req-card-header">
                       <span className="req-badge required">Required</span>
-                      {req.mcr_reference && (
-                        <span className="mcr-ref">{req.mcr_reference}</span>
-                      )}
+                      {req.mcr_reference && (() => {
+                        const url = getRuleUrl(req.mcr_reference);
+                        return url ? (
+                          <a href={url} target="_blank" rel="noopener noreferrer" className="mcr-ref mcr-link">
+                            {req.mcr_reference}
+                          </a>
+                        ) : (
+                          <span className="mcr-ref">{req.mcr_reference}</span>
+                        );
+                      })()}
                     </div>
                     <h5>{req.description}</h5>
                     <code className="req-code">{req.document_type_code}</code>
@@ -176,9 +216,16 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
                   <div key={req.id} className="requirement-card optional">
                     <div className="req-card-header">
                       <span className="req-badge optional">Optional</span>
-                      {req.mcr_reference && (
-                        <span className="mcr-ref">{req.mcr_reference}</span>
-                      )}
+                      {req.mcr_reference && (() => {
+                        const url = getRuleUrl(req.mcr_reference);
+                        return url ? (
+                          <a href={url} target="_blank" rel="noopener noreferrer" className="mcr-ref mcr-link">
+                            {req.mcr_reference}
+                          </a>
+                        ) : (
+                          <span className="mcr-ref">{req.mcr_reference}</span>
+                        );
+                      })()}
                     </div>
                     <h5>{req.description}</h5>
                     <code className="req-code">{req.document_type_code}</code>
@@ -190,6 +237,33 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
               </div>
             </div>
           )}
+          {/* Court Rules Quick Reference */}
+          <div className="court-rules-reference">
+            <h5>Michigan Court Rules - Quick Reference</h5>
+            <div className="rules-links">
+              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-1-applicability-and-definitions/rule-1109-court-records-defined-documents" target="_blank" rel="noopener noreferrer">
+                MCR 1.109 - E-Filing & Document Standards
+              </a>
+              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2111-general-rules-of-pleading" target="_blank" rel="noopener noreferrer">
+                MCR 2.111 - General Rules of Pleading
+              </a>
+              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2116-summary-disposition" target="_blank" rel="noopener noreferrer">
+                MCR 2.116 - Summary Disposition
+              </a>
+              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2119-motion-practice" target="_blank" rel="noopener noreferrer">
+                MCR 2.119 - Motion Practice
+              </a>
+              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2500-discovery/rule-2506-subpoena-order-to-attend" target="_blank" rel="noopener noreferrer">
+                MCR 2.506 - Subpoenas
+              </a>
+              <a href="http://www.legislature.mi.gov/doc.aspx?mcl-600-2163a" target="_blank" rel="noopener noreferrer">
+                MCL 600.2163a - Uniform Interstate Depositions Act
+              </a>
+              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702" target="_blank" rel="noopener noreferrer">
+                Full Michigan Court Rules
+              </a>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -97,7 +97,7 @@ function FilingWizard() {
     const caseTypeId = searchParams.get('case_type_id');
     const caseTitle = searchParams.get('case_title');
 
-    if (caseId && courtId) {
+    if (caseId && courtId && caseTypeId) {
       clearDraft();
       setIsMotionMode(true);
       setFilingData({
@@ -105,8 +105,10 @@ function FilingWizard() {
         caseId: Number(caseId),
         courtId: Number(courtId),
         courtName: `Court #${courtId}`,
-        caseTypeId: caseTypeId ? Number(caseTypeId) : null,
+        caseTypeId: Number(caseTypeId),
+        caseTypeName: '',
         caseTitle: caseTitle || '',
+        filingDescription: '',
       });
       // Skip to details step since court and case are pre-filled
       setCurrentStep('details');
@@ -162,8 +164,11 @@ function FilingWizard() {
           filing_description: filingData.filingDescription,
         });
         updateData({ filingId: envelope.id });
-      } catch {
-        setErrors(['Failed to create filing. Please try again.']);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        const axiosErr = err as { response?: { data?: { detail?: string } } };
+        const detail = axiosErr?.response?.data?.detail;
+        setErrors([`Failed to create filing: ${detail || msg}`]);
         setSaving(false);
         return;
       }
@@ -314,9 +319,19 @@ function FilingWizard() {
 
         {currentStep === 'details' && (
           <div className="form-section">
-            <h3>Case Details</h3>
+            <h3>{isMotionMode ? 'Motion Details' : 'Case Details'}</h3>
+
+            {isMotionMode && filingData.caseTitle && (
+              <div className="motion-case-info">
+                <strong>Filing motion to:</strong> {filingData.caseTitle}
+              </div>
+            )}
+
             <p className="info-text">
-              Enter the case information. Fields marked with <span className="required-marker">*</span> are required.
+              {isMotionMode
+                ? 'Describe your motion. The case title is pre-filled from the existing case.'
+                : <>Enter the case information. Fields marked with <span className="required-marker">*</span> are required.</>
+              }
             </p>
             <div className="form-group">
               <label htmlFor="caseTitle">
@@ -329,19 +344,28 @@ function FilingWizard() {
                 onChange={(e) => updateData({ caseTitle: e.target.value })}
                 placeholder="e.g., Smith v. Jones"
                 aria-required="true"
-                autoFocus
+                readOnly={isMotionMode}
+                autoFocus={!isMotionMode}
               />
-              <span className="field-hint">
-                Format: Plaintiff name v. Defendant name (e.g., "Smith v. Jones")
-              </span>
+              {!isMotionMode && (
+                <span className="field-hint">
+                  Format: Plaintiff name v. Defendant name (e.g., "Smith v. Jones")
+                </span>
+              )}
             </div>
             <div className="form-group">
-              <label htmlFor="filingDesc">Filing Description</label>
+              <label htmlFor="filingDesc">
+                {isMotionMode ? 'Motion Description' : 'Filing Description'} <span className="required-marker">*</span>
+              </label>
               <textarea
                 id="filingDesc"
                 value={filingData.filingDescription}
                 onChange={(e) => updateData({ filingDescription: e.target.value })}
-                placeholder="Brief description of this filing (e.g., Initial complaint for breach of contract)..."
+                placeholder={isMotionMode
+                  ? "e.g., Motion for Summary Disposition under MCR 2.116(C)(10)"
+                  : "Brief description of this filing (e.g., Initial complaint for breach of contract)..."
+                }
+                autoFocus={isMotionMode}
                 rows={4}
               />
             </div>
