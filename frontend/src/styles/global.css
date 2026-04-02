@@ -791,3 +791,740 @@ tr.selected {
     flex-direction: column;
   }
 }
+
+/* ============================================
+   NEW STYLES - UI Improvements
+   ============================================ */
+
+/* Draft Banner */
+.draft-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.draft-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Wizard Header */
+.wizard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.filing-id-badge {
+  background: var(--primary);
+  color: var(--white);
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* Filing Summary Bar */
+.filing-summary-bar {
+  display: flex;
+  gap: 1.5rem;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-left: 3px solid var(--primary);
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+  overflow-x: auto;
+}
+
+.filing-summary-bar strong {
+  color: var(--gray-500);
+  margin-right: 0.25rem;
+}
+
+/* Clickable Wizard Steps */
+.wizard-steps button.wizard-step {
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  font-family: var(--font-sans);
+}
+
+.wizard-steps button.wizard-step:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.wizard-steps button.wizard-step.completed {
+  cursor: pointer;
+}
+
+.wizard-step .step-number {
+  font-size: 0.8rem;
+}
+
+/* Wizard Nav Right */
+.wizard-nav-right {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Required marker */
+.required-marker {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+/* Field hints */
+.field-hint {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  margin-top: 0.25rem;
+}
+
+/* Alert info */
+.alert-info {
+  background: #cce5ff;
+  color: #004085;
+  border: 1px solid #b8daff;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+/* Requirements Cards (replacing table) */
+.requirements-group {
+  margin-bottom: 1.25rem;
+}
+
+.req-group-header {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  padding: 0.5rem 0;
+  border-bottom: 2px solid var(--gray-200);
+  margin-bottom: 0.5rem;
+}
+
+.req-group-header.req-required { color: var(--danger); border-color: var(--danger); }
+.req-group-header.req-optional { color: var(--gray-500); }
+
+.requirements-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+}
+
+.requirement-card {
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  padding: 0.75rem;
+  background: var(--white);
+}
+
+.requirement-card.required {
+  border-left: 3px solid var(--danger);
+  background: #fff8f8;
+}
+
+.requirement-card.optional {
+  border-left: 3px solid var(--gray-300);
+}
+
+.req-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.req-badge {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.req-badge.required { background: #f8d7da; color: #721c24; }
+.req-badge.optional { background: var(--gray-100); color: var(--gray-700); }
+
+.requirement-card h5 {
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+}
+
+.req-code {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
+
+.req-detail {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  margin-top: 0.25rem;
+}
+
+/* Case Type Selector Improvements */
+.case-type-meta {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.25rem;
+}
+
+.case-type-code {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
+
+.case-type-desc {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  margin-top: 0.25rem;
+}
+
+.fee-free {
+  color: var(--success) !important;
+}
+
+/* Success Section Improvements */
+.success-icon {
+  font-size: 3rem;
+  color: var(--success);
+  margin-bottom: 0.5rem;
+}
+
+.success-details {
+  max-width: 400px;
+  margin: 1.5rem auto;
+  text-align: left;
+}
+
+.success-detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.success-note {
+  color: var(--gray-500);
+  font-size: 0.85rem;
+  margin: 1rem 0;
+}
+
+.success-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+/* Review Cards */
+.review-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.review-card h4 {
+  font-size: 0.95rem;
+  color: var(--primary);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.review-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.review-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.review-item label {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.review-item.full-width {
+  grid-column: 1 / -1;
+  margin-top: 0.5rem;
+}
+
+.review-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.review-table th, .review-table td {
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.warning-text { color: var(--danger); font-weight: 600; }
+
+.btn-large {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+}
+
+.submit-disclaimer {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  text-align: center;
+  margin-top: 1rem;
+  font-style: italic;
+}
+
+/* Payment Improvements */
+.payment-confirmed {
+  text-align: center;
+  padding: 2rem;
+}
+
+.payment-check {
+  display: inline-block;
+  width: 48px;
+  height: 48px;
+  line-height: 48px;
+  border-radius: 50%;
+  background: var(--success);
+  color: white;
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.payment-option-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.payment-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.payment-option:hover { border-color: var(--accent); }
+.payment-option.selected { border-color: var(--primary); background: #f0f5ff; }
+.payment-option input[type="radio"] { margin: 0; }
+.payment-option div { display: flex; flex-direction: column; }
+.payment-option span { font-size: 0.8rem; color: var(--gray-500); }
+.payment-note { margin: 1rem 0; }
+
+/* Clerk Review Improvements */
+.clerk-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.clerk-header-stats {
+  display: flex;
+  gap: 1rem;
+}
+
+.stat-card {
+  text-align: center;
+  padding: 0.5rem 1rem;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  min-width: 80px;
+}
+
+.stat-card.accent {
+  background: var(--primary);
+  color: var(--white);
+  border-color: var(--primary);
+}
+
+.stat-number {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+/* Batch Actions */
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: #e8f0fe;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+}
+
+/* Age Badges */
+.age-badge {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.age-badge.fresh { background: #d4edda; color: #155724; }
+.age-badge.normal { background: var(--gray-100); color: var(--gray-700); }
+.age-badge.aging { background: #fff3cd; color: #856404; }
+.age-badge.overdue { background: #f8d7da; color: #721c24; }
+
+.row-overdue { background: #fff5f5 !important; }
+.th-checkbox, .td-checkbox { width: 30px; text-align: center; }
+.empty-queue { text-align: center; color: var(--gray-500); padding: 2rem !important; }
+.queue-meta { font-size: 0.8rem; color: var(--gray-500); align-self: center; }
+
+/* Detail Panel Improvements */
+.detail-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.detail-grid > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-grid label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--gray-500);
+  font-weight: 600;
+}
+
+.detail-description {
+  margin-top: 0.5rem;
+}
+
+.doc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.doc-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--gray-50);
+  border-radius: 4px;
+}
+
+.doc-info strong { font-size: 0.85rem; display: block; }
+.doc-meta { font-size: 0.75rem; color: var(--gray-500); }
+.doc-flags { display: flex; gap: 0.25rem; }
+.flag-badge { font-size: 0.65rem; padding: 0.1rem 0.3rem; border-radius: 3px; font-weight: 600; }
+.flag-badge.warning { background: #fff3cd; color: #856404; }
+.flag-badge.confidential { background: #d4edda; color: #155724; }
+
+.empty-detail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gray-500);
+  min-height: 200px;
+}
+
+/* My Filings Page */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.status-summary {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.status-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--white);
+  cursor: pointer;
+  transition: border-color 0.2s;
+  min-width: 80px;
+}
+
+.status-card:hover { border-color: var(--accent); }
+.status-card.active { border-color: var(--primary); background: #f0f5ff; }
+.status-card-count { font-size: 1.2rem; font-weight: 700; }
+
+.filings-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.results-count {
+  font-size: 0.85rem;
+  color: var(--gray-500);
+}
+
+.filings-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.filing-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.filing-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.filing-card-id {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--gray-500);
+}
+
+.filing-card-title {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.filing-card-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  margin-bottom: 0.5rem;
+}
+
+.filing-card-reason {
+  background: #fff3cd;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.filing-card-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: var(--gray-500);
+}
+
+.empty-state h3 { margin-bottom: 0.5rem; color: var(--gray-700); }
+.empty-state p { margin-bottom: 1rem; }
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  font-size: 0.85rem;
+}
+
+.loading {
+  text-align: center;
+  color: var(--gray-500);
+  padding: 2rem;
+}
+
+/* Dashboard Improvements */
+.dashboard-welcome {
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-welcome h2 {
+  margin-bottom: 0.25rem;
+}
+
+.dashboard-welcome p {
+  color: var(--gray-500);
+}
+
+.dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.card-primary {
+  border-color: var(--primary);
+  border-width: 2px;
+}
+
+.card-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Advantages Section */
+.advantages-section {
+  margin-top: 2rem;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.advantages-section h3 {
+  font-size: 1rem;
+  color: var(--primary);
+  margin-bottom: 1rem;
+}
+
+.advantage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.advantage {
+  display: flex;
+  flex-direction: column;
+}
+
+.advantage strong {
+  font-size: 0.9rem;
+  color: var(--gray-900);
+}
+
+.advantage span {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+}
+
+/* Focus styles for accessibility */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Skip to main content link (accessibility) */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--primary);
+  color: var(--white);
+  padding: 0.5rem 1rem;
+  z-index: 100;
+  transition: top 0.2s;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+  .dashboard-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .review-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filing-summary-bar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .clerk-header {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .batch-actions {
+    flex-wrap: wrap;
+  }
+
+  .status-summary {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+
+  .advantage-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .success-actions {
+    flex-direction: column;
+  }
+}
