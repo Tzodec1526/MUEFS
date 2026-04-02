@@ -7,6 +7,7 @@ import MyFilings from './components/filing/MyFilings';
 import ReviewQueue from './components/clerk/ReviewQueue';
 import CaseSearch from './components/search/CaseSearch';
 import Favorites from './components/search/Favorites';
+import CaseDetailPage from './components/search/CaseDetailPage';
 
 function Dashboard() {
   return (
@@ -104,6 +105,7 @@ function App() {
             <Route path="/filing/new" element={<FilingWizard />} />
             <Route path="/filings" element={<MyFilings />} />
             <Route path="/cases/search" element={<CaseSearch />} />
+            <Route path="/cases/:caseId" element={<CaseDetailPage />} />
             <Route path="/favorites" element={<Favorites />} />
             <Route path="/clerk/queue" element={<ReviewQueue />} />
           </Routes>

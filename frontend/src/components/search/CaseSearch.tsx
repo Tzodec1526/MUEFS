@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { searchCases } from '../../api/documents';
 import { listFavorites, addFavorite, removeFavorite } from '../../api/favorites';
 
@@ -148,7 +149,7 @@ function CaseSearch() {
                         {favoritedIds.has(c.id) ? '\u2605' : '\u2606'}
                       </button>
                     </td>
-                    <td><a href={`/cases/${c.id}`}>{c.case_number}</a></td>
+                    <td><Link to={`/cases/${c.id}`}>{c.case_number}</Link></td>
                     <td>{c.title}</td>
                     <td>
                       <span className={`status-badge ${c.status}`}>{c.status}</span>
