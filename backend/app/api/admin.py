@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import get_current_user_id
 from app.database import get_db
 from app.models.audit import AuditLog
 from app.models.case import Case
@@ -13,7 +14,10 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
 @router.get("/stats")
-async def get_system_stats(db: AsyncSession = Depends(get_db)):
+async def get_system_stats(
+    db: AsyncSession = Depends(get_db),
+    _user_id: int = Depends(get_current_user_id),
+):
     total_courts = (await db.execute(select(func.count()).select_from(Court))).scalar() or 0
     total_users = (await db.execute(select(func.count()).select_from(User))).scalar() or 0
     total_cases = (await db.execute(select(func.count()).select_from(Case))).scalar() or 0
@@ -49,6 +53,7 @@ async def get_audit_log(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
+    _current_user_id: int = Depends(get_current_user_id),
 ):
     query = select(AuditLog).order_by(AuditLog.timestamp.desc())
 

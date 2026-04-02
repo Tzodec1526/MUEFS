@@ -1,14 +1,14 @@
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 
 function Sidebar() {
   const location = useLocation();
 
   const links = [
-    { path: '/', label: 'Dashboard', icon: 'home' },
-    { path: '/filing/new', label: 'New Filing', icon: 'file-plus' },
-    { path: '/filings', label: 'My Filings', icon: 'files' },
-    { path: '/cases/search', label: 'Case Search', icon: 'search' },
-    { path: '/clerk/queue', label: 'Clerk Queue', icon: 'inbox' },
+    { path: '/', label: 'Dashboard' },
+    { path: '/filing/new', label: 'New Filing' },
+    { path: '/filings', label: 'My Filings' },
+    { path: '/cases/search', label: 'Case Search' },
+    { path: '/clerk/queue', label: 'Clerk Queue' },
   ];
 
   return (
@@ -17,12 +17,12 @@ function Sidebar() {
         <ul>
           {links.map((link) => (
             <li key={link.path}>
-              <a
-                href={link.path}
+              <Link
+                to={link.path}
                 className={location.pathname === link.path ? 'active' : ''}
               >
                 {link.label}
-              </a>
+              </Link>
             </li>
           ))}
         </ul>

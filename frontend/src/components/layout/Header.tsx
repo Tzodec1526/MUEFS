@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 function Header() {
   return (
     <header className="app-header">
@@ -6,10 +8,10 @@ function Header() {
         <span className="header-subtitle">State Court Administrative Office</span>
       </div>
       <nav className="header-nav">
-        <a href="/">Dashboard</a>
-        <a href="/filing/new">New Filing</a>
-        <a href="/cases/search">Case Search</a>
-        <a href="/clerk/queue">Clerk Review</a>
+        <Link to="/">Dashboard</Link>
+        <Link to="/filing/new">New Filing</Link>
+        <Link to="/cases/search">Case Search</Link>
+        <Link to="/clerk/queue">Clerk Review</Link>
       </nav>
       <div className="header-user">
         <span>Demo Attorney</span>
