@@ -12,6 +12,7 @@ class CourtType(str, enum.Enum):
     CIRCUIT = "circuit"
     DISTRICT = "district"
     PROBATE = "probate"
+    COURT_OF_CLAIMS = "court_of_claims"
     COURT_OF_APPEALS = "court_of_appeals"
     SUPREME_COURT = "supreme_court"
     MUNICIPAL = "municipal"
