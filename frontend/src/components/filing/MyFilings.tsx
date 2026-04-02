@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { listFilings, FilingEnvelope } from '../../api/filings';
 
@@ -61,10 +61,12 @@ function MyFilings() {
     }
   };
 
-  const statusCounts = filings.reduce((acc, f) => {
-    acc[f.status] = (acc[f.status] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const statusCounts = useMemo(() =>
+    filings.reduce((acc, f) => {
+      acc[f.status] = (acc[f.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>),
+  [filings]);
 
   return (
     <div className="my-filings">

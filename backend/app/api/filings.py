@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user_id
+from app.config import settings
 from app.database import get_db
 from app.models.filing import FilingDocument, FilingStatus
 from app.schemas.document import DocumentUploadResponse
@@ -164,6 +165,14 @@ async def upload_document(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot upload documents to this filing",
+        )
+
+    # Pre-check file size from Content-Length header before reading into memory
+    max_bytes = settings.max_file_size_mb * 1024 * 1024
+    if file.size and file.size > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File exceeds maximum size of {settings.max_file_size_mb}MB",
         )
 
     file_data = await file.read()

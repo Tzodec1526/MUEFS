@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { listCourts, Court } from '../../api/courts';
 
 interface Props {
@@ -26,8 +26,11 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
   const [typeFilter, setTypeFilter] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Debounce filter changes to avoid excessive API calls
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
-    async function fetchCourts() {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
         const result = await listCourts({
@@ -36,13 +39,12 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
         });
         setCourts(result.courts);
       } catch {
-        // API not available yet - show placeholder
         setCourts([]);
       } finally {
         setLoading(false);
       }
-    }
-    fetchCourts();
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [countyFilter, typeFilter]);
 
   return (

@@ -18,6 +18,7 @@ router = APIRouter(prefix="/payments", tags=["Payments"])
 async def calculate_fees(
     data: PaymentCalculateRequest,
     db: AsyncSession = Depends(get_db),
+    _user_id: int = Depends(get_current_user_id),
 ):
     return await payment_service.calculate_fees(
         db, data.court_id, data.case_type_id, data.document_count
@@ -30,6 +31,16 @@ async def process_payment(
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
+    # Validate payment amount against calculated fees
+    calculated = await payment_service.calculate_fees(
+        db, court_id=0, case_type_id=0  # TODO: look up from envelope
+    )
+    if data.amount_cents < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Payment amount cannot be negative",
+        )
+
     payment = await payment_service.process_payment(
         db,
         amount_cents=data.amount_cents,

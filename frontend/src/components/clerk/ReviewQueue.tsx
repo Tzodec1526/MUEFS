@@ -31,9 +31,11 @@ function ReviewQueue() {
     fetchQueue();
   }, [fetchQueue]);
 
-  // Auto-refresh every 30 seconds
+  // Auto-refresh every 30 seconds, only when tab is visible
   useEffect(() => {
-    const interval = setInterval(fetchQueue, 30000);
+    const interval = setInterval(() => {
+      if (!document.hidden) fetchQueue();
+    }, 30000);
     return () => clearInterval(interval);
   }, [fetchQueue]);
 
