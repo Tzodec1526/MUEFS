@@ -23,6 +23,7 @@ async def create_filing(
         case_id=data.case_id,
         case_type_id=data.case_type_id,
         filer_id=filer_id,
+        filing_type=data.filing_type,
         case_title=data.case_title,
         filing_description=data.filing_description,
         status=FilingStatus.DRAFT,
@@ -82,29 +83,36 @@ async def validate_filing(
     warnings: list[str] = []
     missing_docs: list[str] = []
 
-    # Check required documents against court rules
-    requirements = await db.execute(
-        select(FilingRequirement).where(
-            FilingRequirement.court_id == filing.court_id,
-            FilingRequirement.case_type_id == filing.case_type_id,
-            FilingRequirement.is_required == True,  # noqa: E712
-        )
-    )
-    required_docs = list(requirements.scalars().all())
-
-    filed_doc_types = {doc.document_type_code for doc in filing.documents}
-    for req in required_docs:
-        if req.document_type_code not in filed_doc_types:
-            missing_docs.append(
-                f"{req.description} ({req.document_type_code})"
-                + (f" - See {req.mcr_reference}" if req.mcr_reference else "")
-            )
-
     if not filing.documents:
         errors.append("At least one document must be uploaded")
 
-    if not filing.case_title and not filing.case_id:
-        errors.append("Case title is required for new case filings")
+    # Service-only filings have relaxed validation - just need docs and a case
+    is_service_only = filing.filing_type == "service_only"
+
+    if is_service_only:
+        if not filing.case_id:
+            errors.append("Service-only filings must reference an existing case")
+    else:
+        # Check required documents against court rules
+        requirements = await db.execute(
+            select(FilingRequirement).where(
+                FilingRequirement.court_id == filing.court_id,
+                FilingRequirement.case_type_id == filing.case_type_id,
+                FilingRequirement.is_required == True,  # noqa: E712
+            )
+        )
+        required_docs = list(requirements.scalars().all())
+
+        filed_doc_types = {doc.document_type_code for doc in filing.documents}
+        for req in required_docs:
+            if req.document_type_code not in filed_doc_types:
+                missing_docs.append(
+                    f"{req.description} ({req.document_type_code})"
+                    + (f" - See {req.mcr_reference}" if req.mcr_reference else "")
+                )
+
+        if not filing.case_title and not filing.case_id:
+            errors.append("Case title is required for new case filings")
 
     # Check document sizes and types
     for doc in filing.documents:
@@ -131,8 +139,16 @@ async def submit_filing(
     if not filing or filing.status != FilingStatus.DRAFT:
         return None
 
-    filing.status = FilingStatus.SUBMITTED
-    filing.submitted_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    filing.submitted_at = now
+
+    # Service-only filings skip clerk review entirely
+    if filing.filing_type == "service_only":
+        filing.status = FilingStatus.SERVED
+        filing.reviewed_at = now
+    else:
+        filing.status = FilingStatus.SUBMITTED
+
     await db.flush()
     return filing
 

@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from app.models.case import Case, CaseParticipant, CaseStatus, ParticipantRole
 from app.models.court import CaseCategory, CaseType, Court, CourtType
-from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
+from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus, FilingType
 from app.models.user import User, UserType, FavoriteCase
 from app.schemas.filing import FilingEnvelopeCreate
 from app.services import filing_service, search_service
@@ -299,6 +299,76 @@ async def test_domesticating_subpoena_filing(db_session):
     )
     assert accepted.status == FilingStatus.ACCEPTED
     assert accepted.case_id is not None  # New case created for the subpoena
+
+
+# ========== SERVICE ONLY TESTS ==========
+
+
+@pytest.mark.asyncio
+async def test_service_only_filing(db_session):
+    """Test service-only filing that skips clerk review."""
+    user, clerk, court, case_type, _, case = await create_court_with_case(db_session)
+
+    data = FilingEnvelopeCreate(
+        court_id=court.id,
+        case_id=case.id,
+        case_type_id=case_type.id,
+        filing_type="service_only",
+        filing_description="Plaintiff's First Set of Interrogatories (MCR 2.309)",
+    )
+    filing = await filing_service.create_filing(db_session, user.id, data)
+    assert filing.filing_type == "service_only"
+
+    # Add discovery document
+    doc = FilingDocument(
+        envelope_id=filing.id,
+        document_type_code="DISC_INTERROG",
+        title="Plaintiff's First Set of Interrogatories",
+        file_key="test/interrogatories.pdf",
+        file_size_bytes=2048,
+        mime_type="application/pdf",
+        sha256_hash="interrog_hash",
+        is_text_searchable=True,
+    )
+    db_session.add(doc)
+    await db_session.flush()
+
+    # Submit - should go straight to SERVED, not SUBMITTED
+    submitted = await filing_service.submit_filing(db_session, filing.id)
+    assert submitted is not None
+    assert submitted.status == FilingStatus.SERVED
+    assert submitted.submitted_at is not None
+
+
+@pytest.mark.asyncio
+async def test_service_only_requires_existing_case(db_session):
+    """Test that service-only filing requires an existing case."""
+    user, _, court, case_type, _, _ = await create_court_with_case(db_session)
+
+    data = FilingEnvelopeCreate(
+        court_id=court.id,
+        case_id=None,  # No case - should fail validation
+        case_type_id=case_type.id,
+        filing_type="service_only",
+        filing_description="Interrogatories with no case",
+    )
+    filing = await filing_service.create_filing(db_session, user.id, data)
+    doc = FilingDocument(
+        envelope_id=filing.id,
+        document_type_code="DISC_INTERROG",
+        title="Interrogatories",
+        file_key="test/interrog.pdf",
+        file_size_bytes=1024,
+        mime_type="application/pdf",
+        sha256_hash="no_case_hash",
+        is_text_searchable=True,
+    )
+    db_session.add(doc)
+    await db_session.flush()
+
+    validation = await filing_service.validate_filing(db_session, filing.id)
+    assert validation.is_valid is False
+    assert any("existing case" in e.lower() for e in validation.errors)
 
 
 # ========== CASE SEARCH TESTS ==========
