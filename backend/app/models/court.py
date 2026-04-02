@@ -2,7 +2,7 @@ import enum
 from datetime import datetime
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -106,7 +106,7 @@ class FilingChecklist(Base):
     court_id: Mapped[int] = mapped_column(ForeignKey("courts.id"), index=True)
     case_type_id: Mapped[int | None] = mapped_column(ForeignKey("case_types.id"), index=True)
     motion_type: Mapped[str] = mapped_column(String(100))
-    checklist_items: Mapped[dict] = mapped_column(JSONB, default=dict)
+    checklist_items: Mapped[dict] = mapped_column(JSON, default=dict)
     help_text: Mapped[str | None] = mapped_column(Text)
     mcr_url: Mapped[str | None] = mapped_column(String(500))
 

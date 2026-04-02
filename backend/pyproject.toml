@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "muefs-backend"
 version = "0.1.0"
 description = "Michigan Unified E-Filing System - Backend API"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
@@ -37,6 +37,9 @@ dev = [
     "mypy>=1.10.0",
     "factory-boy>=3.3.0",
 ]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
