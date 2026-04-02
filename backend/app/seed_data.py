@@ -442,6 +442,17 @@ PROBATE_CASE_TYPES = [
     ("PR-MI", "Probate - Mentally Ill", CaseCategory.PROBATE, 0),
 ]
 
+# Court of Claims case types (MCL 600.6401 et seq.)
+COURT_OF_CLAIMS_CASE_TYPES = [
+    ("COC-TORT", "Tort Claim Against State of Michigan", CaseCategory.CIVIL, 17500),
+    ("COC-CONT", "Contract Claim Against State of Michigan", CaseCategory.CIVIL, 17500),
+    ("COC-CONST", "Constitutional Claim Against State", CaseCategory.CIVIL, 17500),
+    ("COC-TAX", "Tax-Related Claim Against State", CaseCategory.CIVIL, 17500),
+    ("COC-HWY", "Highway Defect Claim (MCL 691.1402)", CaseCategory.CIVIL, 17500),
+    ("COC-PROP", "Property/Takings Claim Against State", CaseCategory.CIVIL, 17500),
+    ("COC-APPREV", "Appeal of Administrative Agency Decision", CaseCategory.CIVIL, 17500),
+]
+
 APPEALS_CASE_TYPES = [
     ("APP-CIV", "Appeal - Civil", CaseCategory.APPEALS, 37500),
     ("APP-CR", "Appeal - Criminal", CaseCategory.APPEALS, 37500),
@@ -676,6 +687,34 @@ def seed_database():
             pc_count += 1
 
         print(f"  Created {pc_count} probate courts")
+
+        # --- Court of Claims ---
+        # Statewide jurisdiction for claims against State of Michigan
+        # Administratively part of 30th Circuit Court (Ingham County)
+        # Per MCL 600.6401 et seq.
+        coc = Court(
+            name="Michigan Court of Claims",
+            county="Ingham",
+            court_type=CourtType.COURT_OF_CLAIMS,
+            division="Statewide Jurisdiction",
+            city="Lansing",
+            state="MI",
+            cms_type="JIS",
+            is_efiling_enabled=True,
+        )
+        session.add(coc)
+        session.flush()
+
+        for code, type_name, category, fee in COURT_OF_CLAIMS_CASE_TYPES:
+            session.add(CaseType(
+                court_id=coc.id,
+                code=code,
+                name=type_name,
+                category=category,
+                filing_fee_cents=fee,
+            ))
+
+        print("  Created Michigan Court of Claims")
 
         # --- Court of Appeals (4 districts) ---
         for district in range(1, 5):
