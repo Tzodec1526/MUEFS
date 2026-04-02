@@ -1528,3 +1528,88 @@ textarea:focus-visible {
     flex-direction: column;
   }
 }
+
+/* ============================================
+   FAVORITES
+   ============================================ */
+
+.th-fav, .td-fav { width: 40px; text-align: center; }
+
+.fav-btn {
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+  color: var(--gray-300);
+  transition: color 0.2s;
+  padding: 0;
+  line-height: 1;
+}
+
+.fav-btn:hover { color: #f0ad4e; }
+.fav-btn.favorited { color: #f0ad4e; }
+.fav-btn:disabled { opacity: 0.5; cursor: wait; }
+
+.favorites-page { }
+
+.favorites-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.favorite-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.favorite-card-star {
+  font-size: 1.5rem;
+  color: #f0ad4e;
+  flex-shrink: 0;
+}
+
+.favorite-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.favorite-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.favorite-card-header h4 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.favorite-card-number {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  flex-shrink: 0;
+}
+
+.favorite-card-notes {
+  font-size: 0.85rem;
+  color: var(--gray-700);
+  margin: 0.25rem 0;
+}
+
+.favorite-card-date {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
+
+.favorite-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
