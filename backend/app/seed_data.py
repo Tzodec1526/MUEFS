@@ -400,13 +400,24 @@ PROBATE_COUNTIES = [
 ]
 
 # Common case types
-CIVIL_CASE_TYPES = [
+# Circuit courts have general jurisdiction (no small claims - those go to district)
+CIRCUIT_CIVIL_CASE_TYPES = [
     ("CIV-GEN", "Civil - General", CaseCategory.CIVIL, 17500),
     ("CIV-TORT", "Civil - Tort", CaseCategory.CIVIL, 17500),
     ("CIV-CONT", "Civil - Contract", CaseCategory.CIVIL, 17500),
     ("CIV-PROP", "Civil - Property", CaseCategory.CIVIL, 17500),
     ("CIV-COND", "Civil - Condemnation", CaseCategory.CIVIL, 17500),
+    ("CIV-SUBP", "Domesticating Subpoena - MI Uniform Depositions Act", CaseCategory.CIVIL, 17500),
+]
+
+# District courts have limited jurisdiction (includes small claims)
+DISTRICT_CIVIL_CASE_TYPES = [
+    ("CIV-GEN", "Civil - General", CaseCategory.CIVIL, 17500),
+    ("CIV-TORT", "Civil - Tort", CaseCategory.CIVIL, 17500),
+    ("CIV-CONT", "Civil - Contract", CaseCategory.CIVIL, 17500),
+    ("CIV-PROP", "Civil - Property", CaseCategory.CIVIL, 17500),
     ("SM-CLM", "Small Claims", CaseCategory.SMALL_CLAIMS, 3000),
+    ("CIV-SUBP", "Domesticating Subpoena - MI Uniform Depositions Act", CaseCategory.CIVIL, 17500),
 ]
 
 FAMILY_CASE_TYPES = [
@@ -446,6 +457,18 @@ CIVIL_FILING_REQUIREMENTS = [
     ("FILING_FEE", True, "Filing Fee or Fee Waiver", "MCR 2.002", None, None),
     ("EXHIBIT", False, "Exhibits", None, None, "Attach separately; label clearly"),
     ("JURY_DEMAND", False, "Jury Demand", "MCR 2.508", None, None),
+]
+
+# Filing requirements for domesticating subpoena (Michigan Uniform Depositions Act, MCL 600.2163a)
+SUBPOENA_FILING_REQUIREMENTS = [
+    ("SUBPOENA", True, "Out-of-State Subpoena (authenticated copy)", "MCL 600.2163a", None,
+     "Must be issued by court of record in another state"),
+    ("COVER_LETTER", True, "Cover Letter / Request to Domesticate", None, None,
+     "Letter requesting issuance of Michigan subpoena"),
+    ("AFFIDAVIT", False, "Affidavit of Compliance", None, None, None),
+    ("PROPOSED_SUBP", True, "Proposed Michigan Subpoena", "MCR 2.506", None,
+     "Michigan subpoena incorporating terms of out-of-state subpoena"),
+    ("FILING_FEE", True, "Filing Fee", None, None, None),
 ]
 
 # Filing requirements for motions
@@ -527,8 +550,8 @@ def seed_database():
             session.add(court)
             session.flush()
 
-            # Add case types
-            for code, type_name, category, fee in CIVIL_CASE_TYPES + FAMILY_CASE_TYPES + CRIMINAL_CASE_TYPES:
+            # Add case types (circuit courts: no small claims)
+            for code, type_name, category, fee in CIRCUIT_CIVIL_CASE_TYPES + FAMILY_CASE_TYPES + CRIMINAL_CASE_TYPES:
                 ct = CaseType(
                     court_id=court.id,
                     code=code,
@@ -577,6 +600,23 @@ def seed_database():
                     mcr_url="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2116-summary-disposition",
                 ))
 
+            # Add filing requirements for domesticating subpoena
+            subp_ct = session.query(CaseType).filter_by(
+                court_id=court.id, code="CIV-SUBP"
+            ).first()
+            if subp_ct:
+                for doc_code, required, desc, mcr, page_limit, notes in SUBPOENA_FILING_REQUIREMENTS:
+                    session.add(FilingRequirement(
+                        court_id=court.id,
+                        case_type_id=subp_ct.id,
+                        document_type_code=doc_code,
+                        is_required=required,
+                        description=desc,
+                        mcr_reference=mcr,
+                        page_limit=page_limit,
+                        format_notes=notes,
+                    ))
+
             court_count += 1
 
         print(f"  Created {court_count} circuit courts")
@@ -596,7 +636,7 @@ def seed_database():
             session.add(court)
             session.flush()
 
-            for code, type_name, category, fee in CIVIL_CASE_TYPES + CRIMINAL_CASE_TYPES:
+            for code, type_name, category, fee in DISTRICT_CIVIL_CASE_TYPES + CRIMINAL_CASE_TYPES:
                 session.add(CaseType(
                     court_id=court.id,
                     code=code,
