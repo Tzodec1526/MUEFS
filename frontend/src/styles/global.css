@@ -1613,3 +1613,196 @@ textarea:focus-visible {
   gap: 0.5rem;
   flex-shrink: 0;
 }
+
+/* ============================================
+   CASE DETAIL PAGE
+   ============================================ */
+
+.case-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.case-detail-number {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--gray-500);
+  margin-bottom: 0.25rem;
+}
+
+.case-detail-header h2 {
+  font-size: 1.4rem;
+}
+
+.case-detail-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.fav-btn-large {
+  background: none;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--gray-700);
+  transition: all 0.2s;
+}
+
+.fav-btn-large:hover { border-color: #f0ad4e; color: #f0ad4e; }
+.fav-btn-large.favorited { border-color: #f0ad4e; color: #f0ad4e; background: #fff8e1; }
+
+.case-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.case-detail-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.case-detail-card h3 {
+  font-size: 0.95rem;
+  color: var(--primary);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.parties-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.party-item {
+  padding: 0.5rem;
+  background: var(--gray-50);
+  border-radius: 4px;
+}
+
+.party-role {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--gray-500);
+}
+
+.party-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.party-meta {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+}
+
+/* Docket */
+.docket-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.docket-header h3 {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.docket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.docket-entry {
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  padding: 0.75rem;
+  border-left: 3px solid var(--primary);
+}
+
+.docket-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.docket-entry-id {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--gray-500);
+}
+
+.docket-entry-date {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  margin-left: auto;
+}
+
+.docket-entry-desc {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.docket-entry-reason {
+  background: #fff3cd;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.docket-entry-docs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.docket-doc {
+  display: inline-block;
+  background: var(--gray-50);
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  color: var(--gray-700);
+}
+
+/* Motion badge */
+.wizard-header-badges {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.motion-badge {
+  background: #e8f0fe;
+  color: var(--accent);
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .case-detail-grid { grid-template-columns: 1fr; }
+  .case-detail-header { flex-direction: column; }
+  .case-detail-actions { width: 100%; }
+  .docket-header { flex-direction: column; gap: 0.5rem; }
+}

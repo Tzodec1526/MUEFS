@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import CourtSelector from './CourtSelector';
 import CaseTypeSelector from './CaseTypeSelector';
 import DocumentUpload from './DocumentUpload';
@@ -12,6 +13,7 @@ type WizardStep = 'court' | 'case-type' | 'details' | 'documents' | 'service' | 
 interface FilingData {
   courtId: number | null;
   courtName: string;
+  caseId: number | null;  // existing case (for motions)
   caseTypeId: number | null;
   caseTypeName: string;
   filingFeeCents: number;
@@ -66,6 +68,7 @@ function clearDraft() {
 const defaultFilingData: FilingData = {
   courtId: null,
   courtName: '',
+  caseId: null,
   caseTypeId: null,
   caseTypeName: '',
   filingFeeCents: 0,
@@ -78,12 +81,38 @@ const defaultFilingData: FilingData = {
 };
 
 function FilingWizard() {
+  const [searchParams] = useSearchParams();
   const draft = loadDraft();
   const [currentStep, setCurrentStep] = useState<WizardStep>(draft ? 'court' : 'court');
   const [filingData, setFilingData] = useState<FilingData>(draft || defaultFilingData);
   const [showDraftBanner, setShowDraftBanner] = useState(!!draft);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [isMotionMode, setIsMotionMode] = useState(false);
+
+  // Pre-fill from URL params (e.g., "File a Motion" from case detail page)
+  useEffect(() => {
+    const caseId = searchParams.get('case_id');
+    const courtId = searchParams.get('court_id');
+    const caseTypeId = searchParams.get('case_type_id');
+    const caseTitle = searchParams.get('case_title');
+
+    if (caseId && courtId) {
+      clearDraft();
+      setIsMotionMode(true);
+      setFilingData({
+        ...defaultFilingData,
+        caseId: Number(caseId),
+        courtId: Number(courtId),
+        courtName: `Court #${courtId}`,
+        caseTypeId: caseTypeId ? Number(caseTypeId) : null,
+        caseTitle: caseTitle || '',
+      });
+      // Skip to details step since court and case are pre-filled
+      setCurrentStep('details');
+      setShowDraftBanner(false);
+    }
+  }, [searchParams]);
 
   const currentStepIndex = STEPS.findIndex((s) => s.key === currentStep);
 
@@ -127,6 +156,7 @@ function FilingWizard() {
       try {
         const envelope = await createFiling({
           court_id: filingData.courtId!,
+          case_id: filingData.caseId || undefined,
           case_type_id: filingData.caseTypeId!,
           case_title: filingData.caseTitle,
           filing_description: filingData.filingDescription,
@@ -186,10 +216,15 @@ function FilingWizard() {
   return (
     <div className="filing-wizard">
       <div className="wizard-header">
-        <h2>New E-Filing</h2>
-        {filingData.filingId && (
-          <span className="filing-id-badge">Filing #{filingData.filingId}</span>
-        )}
+        <h2>{isMotionMode ? 'File a Motion' : 'New E-Filing'}</h2>
+        <div className="wizard-header-badges">
+          {isMotionMode && filingData.caseId && (
+            <span className="motion-badge">Motion to Case #{filingData.caseId}</span>
+          )}
+          {filingData.filingId && (
+            <span className="filing-id-badge">Filing #{filingData.filingId}</span>
+          )}
+        </div>
       </div>
 
       {/* Draft Recovery Banner */}

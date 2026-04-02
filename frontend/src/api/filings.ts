@@ -39,6 +39,7 @@ export interface FilingValidation {
 
 export async function createFiling(data: {
   court_id: number;
+  case_id?: number;
   case_type_id: number;
   case_title?: string;
   filing_description?: string;
