@@ -42,5 +42,8 @@ coverage/
 frontend/dist/
 backend/dist/
 
+# Demo database
+backend/demo.db
+
 # MinIO data (local dev)
 minio_data/
