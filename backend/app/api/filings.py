@@ -12,7 +12,6 @@ from app.schemas.filing import (
     FilingEnvelopeResponse,
     FilingEnvelopeUpdate,
     FilingListResponse,
-    FilingSubmitRequest,
     FilingValidationResult,
 )
 from app.services import filing_service, document_service, audit_service
@@ -105,13 +104,16 @@ async def submit_filing(
     # Validate before submitting
     validation = await filing_service.validate_filing(db, filing_id)
     if not validation.is_valid:
+        error_parts = []
+        if validation.errors:
+            error_parts.append("Errors: " + "; ".join(validation.errors))
+        if validation.missing_required_documents:
+            error_parts.append(
+                "Missing documents: " + "; ".join(validation.missing_required_documents)
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "message": "Filing validation failed",
-                "errors": validation.errors,
-                "missing_documents": validation.missing_required_documents,
-            },
+            detail="Filing validation failed. " + " | ".join(error_parts),
         )
 
     filing = await filing_service.submit_filing(db, filing_id)

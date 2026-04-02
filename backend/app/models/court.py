@@ -72,7 +72,7 @@ class FeeSchedule(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     court_id: Mapped[int] = mapped_column(ForeignKey("courts.id"), index=True)
-    case_type_id: Mapped[int | None] = mapped_column(ForeignKey("case_types.id"))
+    case_type_id: Mapped[int | None] = mapped_column(ForeignKey("case_types.id"), index=True)
     fee_type: Mapped[str] = mapped_column(String(100))
     amount_cents: Mapped[int] = mapped_column(Integer)
     description: Mapped[str | None] = mapped_column(Text)
@@ -87,7 +87,7 @@ class FilingRequirement(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     court_id: Mapped[int] = mapped_column(ForeignKey("courts.id"), index=True)
-    case_type_id: Mapped[int | None] = mapped_column(ForeignKey("case_types.id"))
+    case_type_id: Mapped[int | None] = mapped_column(ForeignKey("case_types.id"), index=True)
     document_type_code: Mapped[str] = mapped_column(String(50))
     is_required: Mapped[bool] = mapped_column(default=True)
     description: Mapped[str] = mapped_column(Text)
@@ -104,7 +104,7 @@ class FilingChecklist(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     court_id: Mapped[int] = mapped_column(ForeignKey("courts.id"), index=True)
-    case_type_id: Mapped[int | None] = mapped_column(ForeignKey("case_types.id"))
+    case_type_id: Mapped[int | None] = mapped_column(ForeignKey("case_types.id"), index=True)
     motion_type: Mapped[str] = mapped_column(String(100))
     checklist_items: Mapped[dict] = mapped_column(JSONB, default=dict)
     help_text: Mapped[str | None] = mapped_column(Text)

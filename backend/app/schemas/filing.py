@@ -3,7 +3,6 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from app.models.filing import FilingStatus
-from app.schemas.case import CaseParticipantCreate
 
 
 class FilingDocumentResponse(BaseModel):
@@ -27,7 +26,6 @@ class FilingEnvelopeCreate(BaseModel):
     case_type_id: int
     case_title: str | None = None
     filing_description: str | None = None
-    participants: list[CaseParticipantCreate] = []
 
 
 class FilingEnvelopeUpdate(BaseModel):

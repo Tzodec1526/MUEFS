@@ -1,6 +1,7 @@
 import enum
 from datetime import datetime
 
+import sqlalchemy as sa
 from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -30,12 +31,16 @@ class Case(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     court_id: Mapped[int] = mapped_column(ForeignKey("courts.id"), index=True)
-    case_number: Mapped[str] = mapped_column(String(50), unique=True, index=True)
-    case_type_id: Mapped[int] = mapped_column(ForeignKey("case_types.id"))
+    case_number: Mapped[str] = mapped_column(String(50), index=True)
+    case_type_id: Mapped[int] = mapped_column(ForeignKey("case_types.id"), index=True)
     title: Mapped[str] = mapped_column(String(500))
     status: Mapped[CaseStatus] = mapped_column(Enum(CaseStatus), default=CaseStatus.OPEN)
     filed_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    judge_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    judge_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
+
+    __table_args__ = (
+        sa.UniqueConstraint("court_id", "case_number", name="uq_case_court_number"),
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -51,7 +56,7 @@ class CaseParticipant(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     case_id: Mapped[int] = mapped_column(ForeignKey("cases.id"), index=True)
-    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
     role: Mapped[ParticipantRole] = mapped_column(Enum(ParticipantRole))
     party_name: Mapped[str] = mapped_column(String(255))
     attorney_bar_number: Mapped[str | None] = mapped_column(String(20))

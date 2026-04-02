@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Link } from 'react-router-dom';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Footer from './components/layout/Footer';
@@ -14,17 +14,17 @@ function Dashboard() {
         <div className="card">
           <h3>New Filing</h3>
           <p>File a new document with any Michigan court</p>
-          <a href="/filing/new" className="btn btn-primary">Start Filing</a>
+          <Link to="/filing/new" className="btn btn-primary">Start Filing</Link>
         </div>
         <div className="card">
           <h3>My Filings</h3>
           <p>View and manage your submitted filings</p>
-          <a href="/filings" className="btn btn-secondary">View Filings</a>
+          <Link to="/filings" className="btn btn-secondary">View Filings</Link>
         </div>
         <div className="card">
           <h3>Case Search</h3>
           <p>Search for cases across Michigan courts</p>
-          <a href="/cases/search" className="btn btn-secondary">Search Cases</a>
+          <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>
         </div>
       </div>
     </div>

@@ -22,7 +22,7 @@ class FilingEnvelope(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     court_id: Mapped[int] = mapped_column(ForeignKey("courts.id"), index=True)
     case_id: Mapped[int | None] = mapped_column(ForeignKey("cases.id"), index=True)
-    case_type_id: Mapped[int] = mapped_column(ForeignKey("case_types.id"))
+    case_type_id: Mapped[int] = mapped_column(ForeignKey("case_types.id"), index=True)
     filer_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     status: Mapped[FilingStatus] = mapped_column(
         Enum(FilingStatus), default=FilingStatus.DRAFT, index=True
@@ -31,9 +31,9 @@ class FilingEnvelope(Base):
     filing_description: Mapped[str | None] = mapped_column(Text)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
     rejection_reason: Mapped[str | None] = mapped_column(Text)
-    payment_id: Mapped[int | None] = mapped_column(ForeignKey("payments.id"))
+    payment_id: Mapped[int | None] = mapped_column(ForeignKey("payments.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

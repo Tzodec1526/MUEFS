@@ -11,8 +11,7 @@ from app.database import Base
 from app.models import *  # noqa: F401, F403
 
 
-# Use SQLite for testing (in-memory)
-TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
 @pytest.fixture(scope="session")

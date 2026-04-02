@@ -6,6 +6,7 @@ filing requirements, and demo users.
 Usage: python -m app.seed_data
 """
 
+import os
 from datetime import datetime, timezone
 
 from sqlalchemy import create_engine
@@ -23,7 +24,10 @@ from app.models.court import (
 )
 from app.models.user import User, UserType
 
-DATABASE_URL = "postgresql://muefs:muefs_dev@localhost:5432/muefs"
+DATABASE_URL = os.getenv(
+    "DATABASE_URL_SYNC",
+    "postgresql://muefs:muefs_dev@localhost:5432/muefs",
+)
 
 # Michigan Circuit Courts (57 circuits)
 CIRCUIT_COURTS = [

@@ -31,7 +31,14 @@ const DOCUMENT_TYPES = [
   { code: 'OTHER', label: 'Other' },
 ];
 
-function DocumentUpload({ filingId, documents, onDocumentsChange }: Props) {
+// courtId and caseTypeId reserved for future filing requirements display
+function DocumentUpload({
+  filingId,
+  courtId: _courtId,
+  caseTypeId: _caseTypeId,
+  documents,
+  onDocumentsChange,
+}: Props) {
   const [uploading, setUploading] = useState(false);
   const [docType, setDocType] = useState('COMPLAINT');
   const [docTitle, setDocTitle] = useState('');
