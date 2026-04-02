@@ -41,6 +41,7 @@ export async function createFiling(data: {
   court_id: number;
   case_id?: number;
   case_type_id: number;
+  filing_type?: string;
   case_title?: string;
   filing_description?: string;
 }): Promise<FilingEnvelope> {

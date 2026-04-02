@@ -14,6 +14,13 @@ class FilingStatus(str, enum.Enum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     RETURNED = "returned"
+    SERVED = "served"  # Service-only filings go straight to served
+
+
+class FilingType(str, enum.Enum):
+    INITIAL = "initial"          # New case initiation
+    SUBSEQUENT = "subsequent"    # Filing to existing case
+    SERVICE_ONLY = "service_only"  # Serve on parties, not filed with court
 
 
 class FilingEnvelope(Base):
@@ -24,6 +31,7 @@ class FilingEnvelope(Base):
     case_id: Mapped[int | None] = mapped_column(ForeignKey("cases.id"), index=True)
     case_type_id: Mapped[int] = mapped_column(ForeignKey("case_types.id"), index=True)
     filer_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    filing_type: Mapped[str] = mapped_column(String(20), default="subsequent")
     status: Mapped[FilingStatus] = mapped_column(
         Enum(FilingStatus), default=FilingStatus.DRAFT, index=True
     )

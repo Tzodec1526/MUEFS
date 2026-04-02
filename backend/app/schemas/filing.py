@@ -24,6 +24,7 @@ class FilingEnvelopeCreate(BaseModel):
     court_id: int
     case_id: int | None = None  # None for new case initiation
     case_type_id: int
+    filing_type: str = "subsequent"  # "initial", "subsequent", "service_only"
     case_title: str | None = None
     filing_description: str | None = None
 
@@ -39,6 +40,7 @@ class FilingEnvelopeResponse(BaseModel):
     case_id: int | None
     case_type_id: int
     filer_id: int
+    filing_type: str
     status: FilingStatus
     case_title: str | None
     filing_description: str | None

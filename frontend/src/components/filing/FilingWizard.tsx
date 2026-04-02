@@ -14,6 +14,7 @@ interface FilingData {
   courtId: number | null;
   courtName: string;
   caseId: number | null;  // existing case (for motions)
+  filingType: 'initial' | 'subsequent' | 'service_only';
   caseTypeId: number | null;
   caseTypeName: string;
   filingFeeCents: number;
@@ -69,6 +70,7 @@ const defaultFilingData: FilingData = {
   courtId: null,
   courtName: '',
   caseId: null,
+  filingType: 'initial',
   caseTypeId: null,
   caseTypeName: '',
   filingFeeCents: 0,
@@ -97,6 +99,8 @@ function FilingWizard() {
     const caseTypeId = searchParams.get('case_type_id');
     const caseTitle = searchParams.get('case_title');
 
+    const serviceOnly = searchParams.get('service_only') === 'true';
+
     if (caseId && courtId && caseTypeId) {
       clearDraft();
       setIsMotionMode(true);
@@ -105,10 +109,12 @@ function FilingWizard() {
         caseId: Number(caseId),
         courtId: Number(courtId),
         courtName: `Court #${courtId}`,
+        filingType: serviceOnly ? 'service_only' : 'subsequent',
         caseTypeId: Number(caseTypeId),
         caseTypeName: '',
         caseTitle: caseTitle || '',
         filingDescription: '',
+        paymentComplete: serviceOnly, // No payment for service-only
       });
       // Skip to details step since court and case are pre-filled
       setCurrentStep('details');
@@ -160,6 +166,7 @@ function FilingWizard() {
           court_id: filingData.courtId!,
           case_id: filingData.caseId || undefined,
           case_type_id: filingData.caseTypeId!,
+          filing_type: filingData.filingType,
           case_title: filingData.caseTitle,
           filing_description: filingData.filingDescription,
         });
@@ -327,8 +334,45 @@ function FilingWizard() {
               </div>
             )}
 
+            {/* Filing type selector - shown when filing to existing case */}
+            {isMotionMode && (
+              <div className="form-group">
+                <label htmlFor="filingType">Filing Type <span className="required-marker">*</span></label>
+                <div className="filing-type-options">
+                  <label className={`filing-type-option ${filingData.filingType === 'subsequent' ? 'selected' : ''}`}>
+                    <input
+                      type="radio"
+                      name="filingType"
+                      value="subsequent"
+                      checked={filingData.filingType === 'subsequent'}
+                      onChange={() => updateData({ filingType: 'subsequent' })}
+                    />
+                    <div>
+                      <strong>File with Court</strong>
+                      <span>Document is filed with the court and reviewed by the clerk. Appears on the docket.</span>
+                    </div>
+                  </label>
+                  <label className={`filing-type-option ${filingData.filingType === 'service_only' ? 'selected' : ''}`}>
+                    <input
+                      type="radio"
+                      name="filingType"
+                      value="service_only"
+                      checked={filingData.filingType === 'service_only'}
+                      onChange={() => updateData({ filingType: 'service_only', paymentComplete: true })}
+                    />
+                    <div>
+                      <strong>Service Only (No Court Filing)</strong>
+                      <span>Document is served on other parties only. Not filed with the court, no clerk review, no filing fee. Common for discovery requests, interrogatories, and other party-to-party documents.</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
+
             <p className="info-text">
-              {isMotionMode
+              {filingData.filingType === 'service_only'
+                ? 'Describe the documents you are serving. These will be delivered to the service contacts but not filed with the court.'
+                : isMotionMode
                 ? 'Describe your motion. The case title is pre-filled from the existing case.'
                 : <>Enter the case information. Fields marked with <span className="required-marker">*</span> are required.</>
               }
@@ -355,13 +399,15 @@ function FilingWizard() {
             </div>
             <div className="form-group">
               <label htmlFor="filingDesc">
-                {isMotionMode ? 'Motion Description' : 'Filing Description'} <span className="required-marker">*</span>
+                {filingData.filingType === 'service_only' ? 'Service Description' : isMotionMode ? 'Motion Description' : 'Filing Description'} <span className="required-marker">*</span>
               </label>
               <textarea
                 id="filingDesc"
                 value={filingData.filingDescription}
                 onChange={(e) => updateData({ filingDescription: e.target.value })}
-                placeholder={isMotionMode
+                placeholder={filingData.filingType === 'service_only'
+                  ? "e.g., Plaintiff's First Set of Interrogatories (MCR 2.309)"
+                  : isMotionMode
                   ? "e.g., Motion for Summary Disposition under MCR 2.116(C)(10)"
                   : "Brief description of this filing (e.g., Initial complaint for breach of contract)..."
                 }
