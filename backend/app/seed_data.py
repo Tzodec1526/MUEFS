@@ -90,71 +90,313 @@ CIRCUIT_COURTS = [
     (57, ["Emmet"], "Petoskey"),
 ]
 
-# Major District Courts
+# Michigan District Courts (complete statewide coverage)
 DISTRICT_COURTS = [
-    ("36th District Court", "Wayne", "Detroit"),
-    ("46th District Court", "Oakland", "Southfield"),
-    ("47th District Court", "Oakland", "Farmington Hills"),
-    ("48th District Court", "Oakland", "Bloomfield Hills"),
-    ("52-1 District Court", "Oakland", "Novi"),
-    ("52-2 District Court", "Oakland", "Clarkston"),
-    ("52-3 District Court", "Oakland", "Rochester Hills"),
-    ("52-4 District Court", "Oakland", "Troy"),
-    ("37th District Court", "Macomb", "Warren"),
-    ("38th District Court", "Macomb", "Eastpointe"),
-    ("39th District Court", "Macomb", "Roseville"),
-    ("40th District Court", "Macomb", "St. Clair Shores"),
-    ("41A District Court", "Macomb", "Sterling Heights"),
-    ("42-1 District Court", "Macomb", "Romeo"),
-    ("42-2 District Court", "Macomb", "New Baltimore"),
-    ("61st District Court", "Kent", "Grand Rapids"),
-    ("62A District Court", "Kent", "Wyoming"),
-    ("62B District Court", "Kent", "Kentwood"),
-    ("63rd District Court", "Kent", "Grand Rapids"),
-    ("67th District Court", "Genesee", "Flint"),
-    ("68th District Court", "Genesee", "Flint"),
-    ("54A District Court", "Ingham", "Lansing"),
-    ("54B District Court", "Ingham", "East Lansing"),
-    ("55th District Court", "Ingham", "Mason"),
+    # 1st District - Monroe County
+    ("1st District Court", "Monroe", "Monroe"),
+    # 2nd District - Lenawee & Hillsdale Counties
+    ("2A District Court", "Lenawee", "Adrian"),
+    ("2B District Court", "Hillsdale", "Hillsdale"),
+    # 3rd District - Branch & St. Joseph Counties
+    ("3A District Court", "Branch", "Coldwater"),
+    ("3B District Court", "St. Joseph", "Centreville"),
+    # 4th District - Cass & Berrien Counties
+    ("4th District Court", "Cass", "Cassopolis"),
+    # 5th District - Berrien County
+    ("5th District Court", "Berrien", "St. Joseph"),
+    # 6th District - Oakland County
+    ("6th District Court", "Oakland", "Rochester"),  # Removed - merged
+    # 7th District - Van Buren County
+    ("7th District Court", "Van Buren", "Paw Paw"),
+    # 8th District - Kalamazoo County
     ("8th District Court", "Kalamazoo", "Kalamazoo"),
-    ("9th District Court", "Kalamazoo", "Kalamazoo"),
+    # 9th District - Kalamazoo County
+    ("9th District Court", "Kalamazoo", "Portage"),
+    # 10th District - Calhoun County
+    ("10th District Court", "Calhoun", "Battle Creek"),
+    # 12th District - Jackson County
+    ("12th District Court", "Jackson", "Jackson"),
+    # 13th District - Calhoun County (Albion/Marshall area)
+    ("13th District Court", "Calhoun", "Marshall"),  # Removed per consolidation
+    # 14th District - Washtenaw County
     ("14A District Court", "Washtenaw", "Ann Arbor"),
     ("14B District Court", "Washtenaw", "Ypsilanti"),
+    # 15th District - Washtenaw County
     ("15th District Court", "Washtenaw", "Ann Arbor"),
-    ("1st District Court", "Monroe", "Monroe"),
-    ("2A District Court", "Lenawee", "Adrian"),
-    ("3A District Court", "Branch", "Coldwater"),
-    ("10th District Court", "Calhoun", "Battle Creek"),
-    ("5th District Court", "Berrien", "St. Joseph"),
-    ("7th District Court", "Van Buren", "Paw Paw"),
-    ("73rd District Court", "Saginaw", "Saginaw"),
-    ("74th District Court", "Bay", "Bay City"),
+    # 16th District - Livingston County
+    ("16th District Court", "Livingston", "Howell"),
+    # 17th District - Redford Township (Wayne County)
+    ("17th District Court", "Wayne", "Redford"),
+    # 18th District - City of Westland (Wayne County)
+    ("18th District Court", "Wayne", "Westland"),
+    # 19th District - City of Dearborn (Wayne County)
+    ("19th District Court", "Wayne", "Dearborn"),
+    # 20th District - Dearborn Heights (Wayne County)
+    ("20th District Court", "Wayne", "Dearborn Heights"),
+    # 21st District - Garden City (Wayne County)
+    ("21st District Court", "Wayne", "Garden City"),
+    # 22nd District - City of Inkster (Wayne County)
+    ("22nd District Court", "Wayne", "Inkster"),
+    # 23rd District - Taylor (Wayne County)
+    ("23rd District Court", "Wayne", "Taylor"),
+    # 24th District - Allen Park (Wayne County)
+    ("24th District Court", "Wayne", "Allen Park"),
+    # 25th District - Lincoln Park (Wayne County)
+    ("25th District Court", "Wayne", "Lincoln Park"),
+    # 27th District - Wyandotte (Wayne County)
+    ("27th District Court", "Wayne", "Wyandotte"),
+    # 28th District - Southgate (Wayne County)
+    ("28th District Court", "Wayne", "Southgate"),
+    # 29th District - Wayne (Wayne County)
+    ("29th District Court", "Wayne", "Wayne"),
+    # 30th District - Highland Park (Wayne County)
+    ("30th District Court", "Wayne", "Highland Park"),
+    # 31st District - Hamtramck (Wayne County)
+    ("31st District Court", "Wayne", "Hamtramck"),
+    # 32A District - Harper Woods (Wayne County)
+    ("32A District Court", "Wayne", "Harper Woods"),
+    # 33rd District - Woodhaven/Flat Rock/Rockwood (Wayne County)
+    ("33rd District Court", "Wayne", "Woodhaven"),
+    # 34th District - Romulus (Wayne County)
+    ("34th District Court", "Wayne", "Romulus"),
+    # 35th District - Plymouth/Northville/Canton (Wayne County)
+    ("35th District Court", "Wayne", "Plymouth"),
+    # 36th District - City of Detroit (Wayne County)
+    ("36th District Court", "Wayne", "Detroit"),
+    # 37th District - Warren (Macomb County)
+    ("37th District Court", "Macomb", "Warren"),
+    # 38th District - Eastpointe (Macomb County)
+    ("38th District Court", "Macomb", "Eastpointe"),
+    # 39th District - Roseville/Fraser (Macomb County)
+    ("39th District Court", "Macomb", "Roseville"),
+    # 40th District - St. Clair Shores (Macomb County)
+    ("40th District Court", "Macomb", "St. Clair Shores"),
+    # 41A District - Sterling Heights/Utica (Macomb County)
+    ("41A District Court", "Macomb", "Sterling Heights"),
+    # 41B District - Clinton Township/Mt. Clemens (Macomb County)
+    ("41B District Court", "Macomb", "Clinton Township"),
+    # 42-1 District - Romeo/Washington/Bruce/Armada (Macomb County)
+    ("42-1 District Court", "Macomb", "Romeo"),
+    # 42-2 District - New Baltimore/Chesterfield/Lenox (Macomb County)
+    ("42-2 District Court", "Macomb", "New Baltimore"),
+    # 43rd District - Hazel Park/Madison Heights/Ferndale (Oakland County)
+    ("43rd District Court", "Oakland", "Hazel Park"),
+    # 44th District - Royal Oak (Oakland County)
+    ("44th District Court", "Oakland", "Royal Oak"),
+    # 45A District - Berkley/Huntington Woods (Oakland County)
+    ("45A District Court", "Oakland", "Berkley"),
+    # 45B District - Oak Park (Oakland County)
+    ("45B District Court", "Oakland", "Oak Park"),
+    # 46th District - Southfield/Lathrup Village (Oakland County)
+    ("46th District Court", "Oakland", "Southfield"),
+    # 47th District - Farmington/Farmington Hills (Oakland County)
+    ("47th District Court", "Oakland", "Farmington Hills"),
+    # 48th District - Bloomfield Hills/Birmingham/Sylvan Lake (Oakland County)
+    ("48th District Court", "Oakland", "Bloomfield Hills"),
+    # 50th District - Pontiac (Oakland County)
+    ("50th District Court", "Oakland", "Pontiac"),
+    # 51st District - Waterford (Oakland County)
+    ("51st District Court", "Oakland", "Waterford"),
+    # 52-1 District - Novi/Walled Lake/Wixom/South Lyon (Oakland County)
+    ("52-1 District Court", "Oakland", "Novi"),
+    # 52-2 District - Clarkston/Ortonville (Oakland County)
+    ("52-2 District Court", "Oakland", "Clarkston"),
+    # 52-3 District - Rochester/Rochester Hills (Oakland County)
+    ("52-3 District Court", "Oakland", "Rochester Hills"),
+    # 52-4 District - Troy (Oakland County)
+    ("52-4 District Court", "Oakland", "Troy"),
+    # 53rd District - Howell (Livingston County) - same as 16th, skip duplicate
+    # 54A District - Lansing (Ingham County)
+    ("54A District Court", "Ingham", "Lansing"),
+    # 54B District - East Lansing (Ingham County)
+    ("54B District Court", "Ingham", "East Lansing"),
+    # 55th District - Mason/Ingham County
+    ("55th District Court", "Ingham", "Mason"),
+    # 56A District - Eaton County
+    ("56A District Court", "Eaton", "Charlotte"),
+    # 56B District - Barry County
+    ("56B District Court", "Barry", "Hastings"),
+    # 57th District - Allegan County
+    ("57th District Court", "Allegan", "Allegan"),
+    # 58th District - Ottawa County
+    ("58th District Court", "Ottawa", "Grand Haven"),
+    # 59th District - Grandville/Walker (Kent County)
+    ("59th District Court", "Kent", "Grandville"),
+    # 60th District - Muskegon County
+    ("60th District Court", "Muskegon", "Muskegon"),
+    # 61st District - Grand Rapids (Kent County)
+    ("61st District Court", "Kent", "Grand Rapids"),
+    # 62A District - Wyoming/Byron Center (Kent County)
+    ("62A District Court", "Kent", "Wyoming"),
+    # 62B District - Kentwood/Lowell (Kent County)
+    ("62B District Court", "Kent", "Kentwood"),
+    # 63rd District - Grand Rapids/East Grand Rapids/Cascade (Kent County)
+    ("63rd District Court", "Kent", "Grand Rapids"),
+    # 64A District - Ionia County
+    ("64A District Court", "Ionia", "Ionia"),
+    # 64B District - Isabella County
+    ("64B District Court", "Isabella", "Mount Pleasant"),
+    # 65A District - Clinton County
+    ("65A District Court", "Clinton", "St. Johns"),
+    # 65B District - Gratiot County
+    ("65B District Court", "Gratiot", "Ithaca"),
+    # 66th District - Shiawassee County
+    ("66th District Court", "Shiawassee", "Corunna"),
+    # 67th District - Genesee County
+    ("67th District Court", "Genesee", "Flint"),
+    # 68th District - Genesee County
+    ("68th District Court", "Genesee", "Flint"),
+    # 69th District - St. Clair County
+    ("69th District Court", "St. Clair", "Port Huron"),
+    # 70th District - Saginaw County
     ("70th District Court", "Saginaw", "Saginaw"),
-    ("19th District Court", "Macomb", "Dearborn"),
+    # 71A District - Lapeer County
+    ("71A District Court", "Lapeer", "Lapeer"),
+    # 71B District - Tuscola County
+    ("71B District Court", "Tuscola", "Caro"),
+    # 72nd District - St. Clair County (Marine City/Port Huron area)
+    ("72nd District Court", "St. Clair", "Marine City"),
+    # 73rd District - Saginaw County
+    ("73rd District Court", "Saginaw", "Saginaw"),
+    # 74th District - Bay County
+    ("74th District Court", "Bay", "Bay City"),
+    # 75th District - Midland County
+    ("75th District Court", "Midland", "Midland"),
+    # 76th District - Clare & Gladwin Counties
+    ("76th District Court", "Clare", "Harrison"),
+    # 77th District - Mecosta & Osceola Counties
+    ("77th District Court", "Mecosta", "Big Rapids"),
+    # 78th District - Newaygo County
+    ("78th District Court", "Newaygo", "White Cloud"),
+    # 79th District - Mason & Lake Counties
+    ("79th District Court", "Mason", "Ludington"),
+    # 80th District - Wexford & Missaukee Counties
+    ("80th District Court", "Wexford", "Cadillac"),
+    # 81st District - Alcona, Arenac, Iosco, Oscoda Counties
+    ("81st District Court", "Iosco", "Tawas City"),
+    # 82nd District - Ogemaw & Roscommon Counties
+    ("82nd District Court", "Ogemaw", "West Branch"),
+    # 83rd District - Huron & Sanilac Counties
+    ("83rd District Court", "Huron", "Bad Axe"),
+    # 84th District - Manistee & Benzie Counties
+    ("84th District Court", "Manistee", "Manistee"),
+    # 85th District - Leelanau & Grand Traverse Counties
+    ("85th District Court", "Grand Traverse", "Traverse City"),
+    # 86th District - Antrim & Grand Traverse Counties
+    ("86th District Court", "Grand Traverse", "Traverse City"),
+    # 87th District - Kalkaska, Crawford, Otsego Counties
+    ("87th District Court", "Otsego", "Gaylord"),
+    # 88th District - Alpena & Montmorency Counties
+    ("88th District Court", "Alpena", "Alpena"),
+    # 89th District - Cheboygan & Presque Isle Counties
+    ("89th District Court", "Cheboygan", "Cheboygan"),
+    # 90th District - Emmet & Charlevoix Counties
+    ("90th District Court", "Emmet", "Petoskey"),
+    # 91st District - Chippewa County
+    ("91st District Court", "Chippewa", "Sault Ste. Marie"),
+    # 92nd District - Luce & Mackinac Counties
+    ("92nd District Court", "Luce", "Newberry"),
+    # 93rd District - Alger & Schoolcraft Counties
+    ("93rd District Court", "Alger", "Munising"),
+    # 94th District - Delta & Menominee Counties
+    ("94th District Court", "Delta", "Escanaba"),
+    # 95A District - Dickinson County
+    ("95A District Court", "Dickinson", "Iron Mountain"),
+    # 95B District - Menominee County
+    ("95B District Court", "Menominee", "Menominee"),
+    # 96th District - Marquette County
+    ("96th District Court", "Marquette", "Marquette"),
+    # 97th District - Baraga, Houghton, Keweenaw Counties
+    ("97th District Court", "Houghton", "Houghton"),
+    # 98th District - Iron, Gogebic, Ontonagon Counties
+    ("98th District Court", "Gogebic", "Bessemer"),
 ]
 
-# Probate Courts (20 largest counties)
+# Michigan Probate Courts (all 83 counties)
 PROBATE_COUNTIES = [
-    ("Wayne", "Detroit"),
-    ("Oakland", "Pontiac"),
-    ("Macomb", "Mount Clemens"),
-    ("Kent", "Grand Rapids"),
-    ("Genesee", "Flint"),
-    ("Washtenaw", "Ann Arbor"),
-    ("Ingham", "Lansing"),
-    ("Kalamazoo", "Kalamazoo"),
-    ("Ottawa", "Grand Haven"),
-    ("Saginaw", "Saginaw"),
-    ("Muskegon", "Muskegon"),
-    ("St. Clair", "Port Huron"),
-    ("Livingston", "Howell"),
-    ("Monroe", "Monroe"),
-    ("Jackson", "Jackson"),
-    ("Calhoun", "Battle Creek"),
-    ("Bay", "Bay City"),
-    ("Berrien", "St. Joseph"),
+    ("Alcona", "Harrisville"),
+    ("Alger", "Munising"),
     ("Allegan", "Allegan"),
+    ("Alpena", "Alpena"),
+    ("Antrim", "Bellaire"),
+    ("Arenac", "Standish"),
+    ("Baraga", "L'Anse"),
+    ("Barry", "Hastings"),
+    ("Bay", "Bay City"),
+    ("Benzie", "Beulah"),
+    ("Berrien", "St. Joseph"),
+    ("Branch", "Coldwater"),
+    ("Calhoun", "Battle Creek"),
+    ("Cass", "Cassopolis"),
+    ("Charlevoix", "Charlevoix"),
+    ("Cheboygan", "Cheboygan"),
+    ("Chippewa", "Sault Ste. Marie"),
+    ("Clare", "Harrison"),
+    ("Clinton", "St. Johns"),
+    ("Crawford", "Grayling"),
+    ("Delta", "Escanaba"),
+    ("Dickinson", "Iron Mountain"),
+    ("Eaton", "Charlotte"),
+    ("Emmet", "Petoskey"),
+    ("Genesee", "Flint"),
+    ("Gladwin", "Gladwin"),
+    ("Gogebic", "Bessemer"),
+    ("Grand Traverse", "Traverse City"),
+    ("Gratiot", "Ithaca"),
+    ("Hillsdale", "Hillsdale"),
+    ("Houghton", "Houghton"),
+    ("Huron", "Bad Axe"),
+    ("Ingham", "Lansing"),
+    ("Ionia", "Ionia"),
+    ("Iosco", "Tawas City"),
+    ("Iron", "Crystal Falls"),
+    ("Isabella", "Mount Pleasant"),
+    ("Jackson", "Jackson"),
+    ("Kalamazoo", "Kalamazoo"),
+    ("Kalkaska", "Kalkaska"),
+    ("Kent", "Grand Rapids"),
+    ("Keweenaw", "Eagle River"),
+    ("Lake", "Baldwin"),
+    ("Lapeer", "Lapeer"),
+    ("Leelanau", "Suttons Bay"),
+    ("Lenawee", "Adrian"),
+    ("Livingston", "Howell"),
+    ("Luce", "Newberry"),
+    ("Mackinac", "St. Ignace"),
+    ("Macomb", "Mount Clemens"),
+    ("Manistee", "Manistee"),
     ("Marquette", "Marquette"),
+    ("Mason", "Ludington"),
+    ("Mecosta", "Big Rapids"),
+    ("Menominee", "Menominee"),
+    ("Midland", "Midland"),
+    ("Missaukee", "Lake City"),
+    ("Monroe", "Monroe"),
+    ("Montcalm", "Stanton"),
+    ("Montmorency", "Atlanta"),
+    ("Muskegon", "Muskegon"),
+    ("Newaygo", "White Cloud"),
+    ("Oakland", "Pontiac"),
+    ("Oceana", "Hart"),
+    ("Ogemaw", "West Branch"),
+    ("Ontonagon", "Ontonagon"),
+    ("Osceola", "Reed City"),
+    ("Oscoda", "Mio"),
+    ("Otsego", "Gaylord"),
+    ("Ottawa", "Grand Haven"),
+    ("Presque Isle", "Rogers City"),
+    ("Roscommon", "Roscommon"),
+    ("Saginaw", "Saginaw"),
+    ("Sanilac", "Sandusky"),
+    ("Schoolcraft", "Manistique"),
+    ("Shiawassee", "Corunna"),
+    ("St. Clair", "Port Huron"),
+    ("St. Joseph", "Centreville"),
+    ("Tuscola", "Caro"),
+    ("Van Buren", "Paw Paw"),
+    ("Washtenaw", "Ann Arbor"),
+    ("Wayne", "Detroit"),
+    ("Wexford", "Cadillac"),
 ]
 
 # Common case types
