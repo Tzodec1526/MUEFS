@@ -765,6 +765,267 @@ def seed_database():
 
         print("  Created Michigan Supreme Court")
 
+        # --- Demo Cases & Filings for frontend testing ---
+        from app.models.case import Case, CaseParticipant, CaseStatus, ParticipantRole
+        from app.models.filing import FilingEnvelope, FilingDocument, FilingStatus
+        from app.models.user import FavoriteCase
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        attorney = users[0]  # Jane Doe, P12345
+        clerk_user = users[1]  # Robert Johnson
+
+        # Get the 3rd Circuit Court (Wayne County - Detroit)
+        wayne_circuit = session.query(Court).filter_by(
+            name="3rd Circuit Court"
+        ).first()
+
+        if wayne_circuit:
+            wayne_civil = session.query(CaseType).filter_by(
+                court_id=wayne_circuit.id, code="CIV-GEN"
+            ).first()
+            wayne_tort = session.query(CaseType).filter_by(
+                court_id=wayne_circuit.id, code="CIV-TORT"
+            ).first()
+            wayne_contract = session.query(CaseType).filter_by(
+                court_id=wayne_circuit.id, code="CIV-CONT"
+            ).first()
+            wayne_divorce = session.query(CaseType).filter_by(
+                court_id=wayne_circuit.id, code="FAM-DIV"
+            ).first()
+            wayne_subp = session.query(CaseType).filter_by(
+                court_id=wayne_circuit.id, code="CIV-SUBP"
+            ).first()
+
+            # --- Case 1: Active breach of contract case ---
+            case1 = Case(
+                court_id=wayne_circuit.id,
+                case_number=f"MI-{wayne_circuit.id}-2025-000001",
+                case_type_id=wayne_contract.id if wayne_contract else wayne_civil.id,
+                title="Johnson v. Smith Industries LLC",
+                status=CaseStatus.OPEN,
+                filed_date=now,
+            )
+            session.add(case1)
+            session.flush()
+
+            session.add(CaseParticipant(
+                case_id=case1.id, role=ParticipantRole.PLAINTIFF,
+                party_name="Robert Johnson", contact_email="rjohnson@example.com",
+            ))
+            session.add(CaseParticipant(
+                case_id=case1.id, role=ParticipantRole.DEFENDANT,
+                party_name="Smith Industries LLC", contact_email="legal@smithindustries.com",
+            ))
+            session.add(CaseParticipant(
+                case_id=case1.id, user_id=attorney.id,
+                role=ParticipantRole.ATTORNEY_PLAINTIFF,
+                party_name="Jane Doe", attorney_bar_number="P12345",
+            ))
+
+            # Initial complaint filing (accepted)
+            filing1 = FilingEnvelope(
+                court_id=wayne_circuit.id, case_id=case1.id,
+                case_type_id=wayne_contract.id if wayne_contract else wayne_civil.id,
+                filer_id=attorney.id,
+                case_title="Johnson v. Smith Industries LLC",
+                filing_description="Initial complaint for breach of contract - failure to deliver goods per Purchase Order #2024-8891",
+                status=FilingStatus.ACCEPTED,
+                submitted_at=now, reviewed_at=now, reviewer_id=clerk_user.id,
+            )
+            session.add(filing1)
+            session.flush()
+            session.add(FilingDocument(
+                envelope_id=filing1.id, document_type_code="COMPLAINT",
+                title="Complaint for Breach of Contract",
+                file_key="demo/case1/complaint.pdf", file_size_bytes=45056,
+                mime_type="application/pdf", sha256_hash="demo_hash_001",
+                page_count=12, is_text_searchable=True,
+            ))
+
+            # Motion filing (submitted, pending review)
+            filing1_motion = FilingEnvelope(
+                court_id=wayne_circuit.id, case_id=case1.id,
+                case_type_id=wayne_contract.id if wayne_contract else wayne_civil.id,
+                filer_id=attorney.id,
+                case_title="Johnson v. Smith Industries LLC",
+                filing_description="Motion for Summary Disposition under MCR 2.116(C)(10) - No genuine issue of material fact",
+                status=FilingStatus.SUBMITTED,
+                submitted_at=now,
+            )
+            session.add(filing1_motion)
+            session.flush()
+            session.add(FilingDocument(
+                envelope_id=filing1_motion.id, document_type_code="MOTION",
+                title="Motion for Summary Disposition",
+                file_key="demo/case1/motion_sd.pdf", file_size_bytes=28672,
+                mime_type="application/pdf", sha256_hash="demo_hash_002",
+                page_count=8, is_text_searchable=True,
+            ))
+            session.add(FilingDocument(
+                envelope_id=filing1_motion.id, document_type_code="BRIEF",
+                title="Brief in Support of Motion for Summary Disposition",
+                file_key="demo/case1/brief_sd.pdf", file_size_bytes=61440,
+                mime_type="application/pdf", sha256_hash="demo_hash_003",
+                page_count=18, is_text_searchable=True,
+            ))
+
+            # --- Case 2: Personal injury tort case ---
+            case2 = Case(
+                court_id=wayne_circuit.id,
+                case_number=f"MI-{wayne_circuit.id}-2025-000002",
+                case_type_id=wayne_tort.id if wayne_tort else wayne_civil.id,
+                title="Williams v. City of Detroit",
+                status=CaseStatus.OPEN,
+                filed_date=now,
+            )
+            session.add(case2)
+            session.flush()
+
+            session.add(CaseParticipant(
+                case_id=case2.id, role=ParticipantRole.PLAINTIFF,
+                party_name="Maria Williams",
+            ))
+            session.add(CaseParticipant(
+                case_id=case2.id, role=ParticipantRole.DEFENDANT,
+                party_name="City of Detroit",
+            ))
+            session.add(CaseParticipant(
+                case_id=case2.id, user_id=attorney.id,
+                role=ParticipantRole.ATTORNEY_PLAINTIFF,
+                party_name="Jane Doe", attorney_bar_number="P12345",
+            ))
+
+            filing2 = FilingEnvelope(
+                court_id=wayne_circuit.id, case_id=case2.id,
+                case_type_id=wayne_tort.id if wayne_tort else wayne_civil.id,
+                filer_id=attorney.id,
+                case_title="Williams v. City of Detroit",
+                filing_description="Complaint for personal injury - sidewalk defect on Michigan Ave",
+                status=FilingStatus.ACCEPTED,
+                submitted_at=now, reviewed_at=now, reviewer_id=clerk_user.id,
+            )
+            session.add(filing2)
+            session.flush()
+            session.add(FilingDocument(
+                envelope_id=filing2.id, document_type_code="COMPLAINT",
+                title="Complaint for Personal Injury",
+                file_key="demo/case2/complaint.pdf", file_size_bytes=38912,
+                mime_type="application/pdf", sha256_hash="demo_hash_004",
+                page_count=10, is_text_searchable=True,
+            ))
+
+            # --- Case 3: Divorce case ---
+            if wayne_divorce:
+                case3 = Case(
+                    court_id=wayne_circuit.id,
+                    case_number=f"MI-{wayne_circuit.id}-2025-000003",
+                    case_type_id=wayne_divorce.id,
+                    title="Thompson v. Thompson",
+                    status=CaseStatus.OPEN,
+                    filed_date=now,
+                )
+                session.add(case3)
+                session.flush()
+
+                session.add(CaseParticipant(
+                    case_id=case3.id, role=ParticipantRole.PETITIONER,
+                    party_name="Sarah Thompson",
+                ))
+                session.add(CaseParticipant(
+                    case_id=case3.id, role=ParticipantRole.RESPONDENT,
+                    party_name="Michael Thompson",
+                ))
+
+                filing3 = FilingEnvelope(
+                    court_id=wayne_circuit.id, case_id=case3.id,
+                    case_type_id=wayne_divorce.id,
+                    filer_id=attorney.id,
+                    case_title="Thompson v. Thompson",
+                    filing_description="Complaint for Divorce",
+                    status=FilingStatus.ACCEPTED,
+                    submitted_at=now, reviewed_at=now, reviewer_id=clerk_user.id,
+                )
+                session.add(filing3)
+                session.flush()
+                session.add(FilingDocument(
+                    envelope_id=filing3.id, document_type_code="COMPLAINT",
+                    title="Complaint for Divorce",
+                    file_key="demo/case3/divorce_complaint.pdf", file_size_bytes=22528,
+                    mime_type="application/pdf", sha256_hash="demo_hash_005",
+                    page_count=6, is_text_searchable=True,
+                ))
+
+            # --- Case 4: Domesticating subpoena ---
+            if wayne_subp:
+                case4 = Case(
+                    court_id=wayne_circuit.id,
+                    case_number=f"MI-{wayne_circuit.id}-2025-000004",
+                    case_type_id=wayne_subp.id,
+                    title="In re: Subpoena from State of Ohio, Case No. CV-2025-4412",
+                    status=CaseStatus.OPEN,
+                    filed_date=now,
+                )
+                session.add(case4)
+                session.flush()
+
+                filing4 = FilingEnvelope(
+                    court_id=wayne_circuit.id, case_id=case4.id,
+                    case_type_id=wayne_subp.id,
+                    filer_id=attorney.id,
+                    case_title="In re: Subpoena from State of Ohio, Case No. CV-2025-4412",
+                    filing_description="Domesticating out-of-state subpoena per Michigan Uniform Depositions Act (MCL 600.2163a)",
+                    status=FilingStatus.SUBMITTED,
+                    submitted_at=now,
+                )
+                session.add(filing4)
+                session.flush()
+                session.add(FilingDocument(
+                    envelope_id=filing4.id, document_type_code="SUBPOENA",
+                    title="Ohio Subpoena - Authenticated Copy",
+                    file_key="demo/case4/ohio_subpoena.pdf", file_size_bytes=15360,
+                    mime_type="application/pdf", sha256_hash="demo_hash_006",
+                    page_count=4, is_text_searchable=True,
+                ))
+                session.add(FilingDocument(
+                    envelope_id=filing4.id, document_type_code="PROPOSED_SUBP",
+                    title="Proposed Michigan Subpoena",
+                    file_key="demo/case4/proposed_mi_subpoena.pdf", file_size_bytes=12288,
+                    mime_type="application/pdf", sha256_hash="demo_hash_007",
+                    page_count=3, is_text_searchable=True,
+                ))
+
+            # --- Case 5: Rejected filing (returned for correction) ---
+            filing5 = FilingEnvelope(
+                court_id=wayne_circuit.id,
+                case_type_id=wayne_civil.id,
+                filer_id=attorney.id,
+                case_title="Anderson v. Metro Health Systems",
+                filing_description="Complaint for medical malpractice",
+                status=FilingStatus.RETURNED,
+                submitted_at=now, reviewed_at=now, reviewer_id=clerk_user.id,
+                rejection_reason="Missing Affidavit of Merit required by MCL 600.2912d for medical malpractice cases. Please attach and resubmit.",
+            )
+            session.add(filing5)
+            session.flush()
+            session.add(FilingDocument(
+                envelope_id=filing5.id, document_type_code="COMPLAINT",
+                title="Complaint for Medical Malpractice",
+                file_key="demo/case5/complaint.pdf", file_size_bytes=51200,
+                mime_type="application/pdf", sha256_hash="demo_hash_008",
+                page_count=15, is_text_searchable=True,
+            ))
+
+            # Auto-favorite case 1 for the demo attorney
+            session.add(FavoriteCase(
+                user_id=attorney.id, case_id=case1.id,
+                notes="Key breach of contract case - motion for SD pending",
+            ))
+
+            demo_cases = session.query(Case).count()
+            demo_filings = session.query(FilingEnvelope).count()
+            print(f"  Created {demo_cases} demo cases with {demo_filings} filings")
+
         session.commit()
 
         total = session.query(Court).count()
