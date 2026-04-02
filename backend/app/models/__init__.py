@@ -1,4 +1,4 @@
-from app.models.user import User, UserCourtRole
+from app.models.user import User, UserCourtRole, FavoriteCase
 from app.models.court import Court, CaseType, FeeSchedule, FilingRequirement, FilingChecklist
 from app.models.case import Case, CaseParticipant
 from app.models.filing import FilingEnvelope, FilingDocument, DocumentVersion
@@ -9,6 +9,7 @@ from app.models.audit import AuditLog
 __all__ = [
     "User",
     "UserCourtRole",
+    "FavoriteCase",
     "Court",
     "CaseType",
     "FeeSchedule",
