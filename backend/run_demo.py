@@ -107,14 +107,16 @@ if __name__ == "__main__":
 
     # Install frontend deps if needed
     frontend_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend")
+    # On Windows, npm is npm.cmd; use shell=True for cross-platform compatibility
+    npm_cmd = "npm.cmd" if sys.platform == "win32" else "npm"
     if not os.path.exists(os.path.join(frontend_dir, "node_modules")):
         print("\nInstalling frontend dependencies (first time only)...")
-        subprocess.run(["npm", "install"], cwd=frontend_dir, capture_output=True)
+        subprocess.run([npm_cmd, "install"], cwd=frontend_dir, capture_output=True)
 
     # Start frontend
     print("Starting frontend on http://localhost:3000 ...")
     frontend = subprocess.Popen(
-        ["npm", "run", "dev"],
+        [npm_cmd, "run", "dev"],
         cwd=frontend_dir,
         env=os.environ.copy(),
     )
