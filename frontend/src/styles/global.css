@@ -1839,6 +1839,16 @@ textarea:focus-visible {
 }
 
 /* Motion mode info */
+/* Document type MCR hint */
+.doc-type-mcr-hint {
+  background: #e8f0fe;
+  padding: 0.4rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: var(--accent);
+  margin-bottom: 0.75rem;
+}
+
 .motion-case-info {
   background: #e8f0fe;
   border: 1px solid var(--accent);
