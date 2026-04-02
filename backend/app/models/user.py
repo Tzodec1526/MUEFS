@@ -80,3 +80,4 @@ class FavoriteCase(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="favorite_cases")
+    case: Mapped["Case"] = relationship()  # No back_populates needed

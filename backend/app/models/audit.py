@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text, func
+from sqlalchemy import DateTime, Index, Integer, String, Text, func
 from sqlalchemy import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -20,4 +20,9 @@ class AuditLog(Base):
     user_agent: Mapped[str | None] = mapped_column(Text)
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+    __table_args__ = (
+        Index('ix_audit_user_time', 'user_id', 'timestamp'),
+        Index('ix_audit_action_time', 'action', 'timestamp'),
     )

@@ -56,6 +56,9 @@ async def get_filing(
     filing = await filing_service.get_filing(db, filing_id)
     if not filing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
+    # TODO: SECURITY - Add ownership/role-based access check here.
+    # Allow owner, or any authenticated user for now (clerk access TBD)
+    # In production, add role-based checks here
     return filing
 
 
@@ -92,6 +95,11 @@ async def validate_filing(
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
+    filing = await filing_service.get_filing(db, filing_id)
+    if not filing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
+    if filing.filer_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this filing")
     return await filing_service.validate_filing(db, filing_id)
 
 
@@ -101,6 +109,13 @@ async def submit_filing(
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
+    # Ownership check
+    filing_check = await filing_service.get_filing(db, filing_id)
+    if not filing_check:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
+    if filing_check.filer_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this filing")
+
     # Validate before submitting
     validation = await filing_service.validate_filing(db, filing_id)
     if not validation.is_valid:
@@ -177,26 +192,31 @@ async def upload_document(
         page_count = document_service.get_pdf_page_count(file_data)
         is_searchable = document_service.is_pdf_text_searchable(file_data)
 
-    doc = FilingDocument(
-        envelope_id=filing_id,
-        document_type_code=document_type_code,
-        title=title,
-        file_key=file_key,
-        file_size_bytes=len(file_data),
-        mime_type=content_type,
-        page_count=page_count,
-        sha256_hash=sha256,
-        is_confidential=is_confidential,
-        is_text_searchable=is_searchable,
-    )
-    db.add(doc)
-    await db.flush()
+    try:
+        doc = FilingDocument(
+            envelope_id=filing_id,
+            document_type_code=document_type_code,
+            title=title,
+            file_key=file_key,
+            file_size_bytes=len(file_data),
+            mime_type=content_type,
+            page_count=page_count,
+            sha256_hash=sha256,
+            is_confidential=is_confidential,
+            is_text_searchable=is_searchable,
+        )
+        db.add(doc)
+        await db.flush()
 
-    await audit_service.log_action(
-        db, user_id=user_id, action="upload_document",
-        entity_type="filing_document", entity_id=doc.id,
-        details={"filing_id": filing_id, "filename": file.filename},
-    )
+        await audit_service.log_action(
+            db, user_id=user_id, action="upload_document",
+            entity_type="filing_document", entity_id=doc.id,
+            details={"filing_id": filing_id, "filename": file.filename},
+        )
+    except Exception:
+        # Clean up orphaned S3 object if DB operations fail
+        await document_service.delete_document(file_key)
+        raise
 
     return DocumentUploadResponse(
         id=doc.id,

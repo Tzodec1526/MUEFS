@@ -145,7 +145,7 @@ function FilingWizard() {
       case 'service':
         return true; // optional
       case 'payment':
-        return filingData.paymentComplete || filingData.filingFeeCents === 0;
+        return filingData.paymentComplete || filingData.filingFeeCents === 0 || filingData.filingType === 'service_only';
       default:
         return true;
     }

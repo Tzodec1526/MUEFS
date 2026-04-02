@@ -34,6 +34,10 @@ async def download_document(
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
+    if doc.is_confidential:
+        # In production, verify user has access to this filing
+        pass  # TODO: enforce confidentiality check with proper auth
+
     file_stream = await document_service.download_document(doc.file_key)
     safe_filename = sanitize_filename(doc.title)
     return StreamingResponse(

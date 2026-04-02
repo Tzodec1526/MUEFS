@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -50,6 +50,11 @@ class FilingEnvelope(Base):
     )
 
     documents: Mapped[list["FilingDocument"]] = relationship(back_populates="envelope")
+
+    __table_args__ = (
+        Index('ix_filing_court_status', 'court_id', 'status'),
+        Index('ix_filing_court_status_submitted', 'court_id', 'status', 'submitted_at'),
+    )
 
 
 class FilingDocument(Base):
