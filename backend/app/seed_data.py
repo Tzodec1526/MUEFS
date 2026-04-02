@@ -41,7 +41,7 @@ CIRCUIT_COURTS = [
     (8, ["Ionia", "Montcalm"], "Ionia"),
     (9, ["Kalamazoo"], "Kalamazoo"),
     (10, ["Saginaw"], "Saginaw"),
-    (11, ["Alger", "Luce", "Schoolcraft"], "Munising"),
+    (11, ["Alger", "Luce", "Mackinac", "Schoolcraft"], "Munising"),
     (12, ["Baraga", "Houghton", "Keweenaw"], "Houghton"),
     (13, ["Antrim", "Grand Traverse", "Leelanau"], "Traverse City"),
     (14, ["Muskegon"], "Muskegon"),
