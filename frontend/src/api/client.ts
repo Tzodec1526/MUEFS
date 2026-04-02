@@ -10,6 +10,9 @@ export const apiClient = axios.create({
 });
 
 // Request interceptor for auth token
+// SECURITY NOTE: In production, use httpOnly cookies set by Keycloak
+// instead of localStorage to prevent XSS-based token theft.
+// This localStorage approach is for MVP/demo only.
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('auth_token');
   if (token) {
