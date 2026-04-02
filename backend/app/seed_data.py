@@ -470,6 +470,26 @@ CIVIL_FILING_REQUIREMENTS = [
     ("JURY_DEMAND", False, "Jury Demand", "MCR 2.508", None, None),
 ]
 
+# Filing requirements for motions (MCR 2.119)
+MOTION_REQUIREMENTS = [
+    ("MOT_SD", True, "Motion (any type)", "MCR 2.119", 20, "Brief must not exceed 20 pages unless leave granted"),
+    ("BRIEF_SUPPORT", True, "Brief in Support of Motion", "MCR 2.119(A)(2)", 20, None),
+    ("PROPOSED_ORDER", True, "Proposed Order", "MCR 2.602", None, None),
+    ("POS_ELECTRONIC", True, "Proof of Service", "MCR 2.107", None, None),
+    ("NOT_HEARING", True, "Notice of Hearing", "MCR 2.119(C)", None, "Must be served at least 9 days before hearing"),
+    ("AFFIDAVIT", False, "Supporting Affidavit(s)", None, None, None),
+    ("EXHIBIT", False, "Exhibits", None, None, "Attach separately; label clearly"),
+]
+
+# Filing requirements for discovery filings
+DISCOVERY_REQUIREMENTS = [
+    ("DISC_INTERROG", False, "Interrogatories", "MCR 2.309", None, "Limited to 35 interrogatories including subparts"),
+    ("DISC_RFP", False, "Request for Production", "MCR 2.310", None, None),
+    ("DISC_RFA", False, "Request for Admissions", "MCR 2.312", None, "Deemed admitted if not responded to within 28 days"),
+    ("DISC_SUBPOENA", False, "Subpoena / Subpoena Duces Tecum", "MCR 2.506", None, None),
+    ("POS_ELECTRONIC", True, "Proof of Service", "MCR 2.107", None, None),
+]
+
 # Filing requirements for domesticating subpoena (Michigan Uniform Depositions Act, MCL 600.2163a)
 SUBPOENA_FILING_REQUIREMENTS = [
     ("SUBPOENA", True, "Out-of-State Subpoena (authenticated copy)", "MCL 600.2163a", None,
