@@ -1,3 +1,4 @@
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
@@ -200,8 +201,6 @@ async def upload_document(
         )
 
     sha256 = document_service.compute_sha256(file_data)
-    # Sanitize filename to prevent path traversal in storage key
-    import re
     safe_name = re.sub(r'[^\w\s\-.]', '', file.filename or 'document') or 'document'
     file_key = f"filings/{filing_id}/{uuid.uuid4()}/{safe_name}"
 

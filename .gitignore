@@ -44,6 +44,7 @@ backend/dist/
 
 # Demo database
 backend/demo.db
+backend/test_verify.db
 
 # Demo uploads (local file storage)
 backend/demo_uploads/

@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # App
     secret_key: str = "change-this-to-a-random-secret-in-production"
     debug: bool = True
-    allowed_origins: str = "http://localhost:3000,http://localhost:5173"
+    allowed_origins: str = "http://localhost:3000,http://localhost:5173,http://0.0.0.0:3000"
 
     # Email
     smtp_host: str = "localhost"

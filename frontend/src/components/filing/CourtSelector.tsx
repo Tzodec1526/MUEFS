@@ -105,7 +105,7 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
         ))}
         {!loading && courts.length === 0 && (
           <p className="no-results">
-            No courts found. Try adjusting your filters or ensure the backend is running.
+            No courts found. Try adjusting your filters.
           </p>
         )}
       </div>

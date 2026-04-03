@@ -72,15 +72,6 @@ function Dashboard() {
   );
 }
 
-function StatsPlaceholder() {
-  return (
-    <div className="dashboard">
-      <h2>System Statistics</h2>
-      <p>Statistics dashboard coming soon.</p>
-    </div>
-  );
-}
-
 function App() {
   return (
     <Routes>
@@ -103,7 +94,6 @@ function App() {
                     <Route path="/favorites" element={<Favorites />} />
                     <Route path="/clerk/queue" element={<ReviewQueue />} />
                     <Route path="/stats" element={<CoverageStats />} />
-                    <Route path="/stats" element={<StatsPlaceholder />} />
                   </Routes>
                 </main>
               </div>

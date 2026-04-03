@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { listFilings, FilingEnvelope } from '../../api/filings';
+import { getCourt } from '../../api/courts';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -19,6 +20,7 @@ function MyFilings() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [courtNames, setCourtNames] = useState<Record<number, string>>({});
 
   useEffect(() => {
     async function fetchFilings() {
@@ -30,6 +32,16 @@ function MyFilings() {
         });
         setFilings(result.filings);
         setTotal(result.total);
+        // Fetch court names for display
+        const courtIds = [...new Set(result.filings.map(f => f.court_id))];
+        const names: Record<number, string> = {};
+        await Promise.all(courtIds.map(async (id) => {
+          try {
+            const court = await getCourt(id);
+            names[id] = court.name;
+          } catch { /* ignore */ }
+        }));
+        setCourtNames(prev => ({ ...prev, ...names }));
       } catch {
         setFilings([]);
       } finally {
@@ -135,7 +147,7 @@ function MyFilings() {
                 </div>
                 <h4 className="filing-card-title">{filing.case_title || 'Untitled Filing'}</h4>
                 <div className="filing-card-meta">
-                  <span>Court #{filing.court_id}</span>
+                  <span>{courtNames[filing.court_id] || `Court #${filing.court_id}`}</span>
                   <span>{filing.documents.length} document(s)</span>
                   <span>{formatDate(filing.submitted_at || filing.created_at)}</span>
                 </div>

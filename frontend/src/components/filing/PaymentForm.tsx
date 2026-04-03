@@ -17,6 +17,7 @@ function PaymentForm({ courtId, caseTypeId, onPaymentComplete }: Props) {
   const [loading, setLoading] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState('credit_card');
   const [completed, setCompleted] = useState(false);
+  const [waiverReason, setWaiverReason] = useState('');
 
   useEffect(() => {
     async function fetchFees() {
@@ -140,8 +141,9 @@ function PaymentForm({ courtId, caseTypeId, onPaymentComplete }: Props) {
                 <textarea
                   id="waiverReason"
                   rows={3}
+                  value={waiverReason}
                   placeholder="Describe why you are unable to pay the filing fee (e.g., receiving public assistance, income below poverty guidelines, financial hardship)..."
-                  onChange={() => {/* stored in parent via onPaymentComplete */}}
+                  onChange={(e) => setWaiverReason(e.target.value)}
                 />
               </div>
             </div>

@@ -7,6 +7,7 @@ import ServiceList from './ServiceList';
 import PaymentForm from './PaymentForm';
 import FilingReview from './FilingReview';
 import { createFiling } from '../../api/filings';
+import { getCourt } from '../../api/courts';
 
 type WizardStep = 'court' | 'case-type' | 'details' | 'documents' | 'service' | 'payment' | 'review';
 
@@ -108,21 +109,27 @@ function FilingWizard() {
     if (caseId && courtId && caseTypeId) {
       clearDraft();
       setIsMotionMode(true);
+      const numCourtId = Number(courtId);
       setFilingData({
         ...defaultFilingData,
         caseId: Number(caseId),
-        courtId: Number(courtId),
-        courtName: `Court #${courtId}`,
+        courtId: numCourtId,
+        courtName: '',
         filingType: serviceOnly ? 'service_only' : 'subsequent',
         caseTypeId: Number(caseTypeId),
         caseTypeName: '',
         caseTitle: caseTitle || '',
         filingDescription: '',
-        paymentComplete: serviceOnly, // No payment for service-only
+        paymentComplete: serviceOnly,
       });
-      // Skip to details step since court and case are pre-filled
       setCurrentStep('details');
       setShowDraftBanner(false);
+      // Fetch actual court name
+      getCourt(numCourtId).then(court => {
+        setFilingData(prev => ({ ...prev, courtName: court.name }));
+      }).catch(() => {
+        setFilingData(prev => ({ ...prev, courtName: `Court #${courtId}` }));
+      });
     }
   }, [searchParams]);
 
