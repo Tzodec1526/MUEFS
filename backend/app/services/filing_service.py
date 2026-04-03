@@ -30,6 +30,7 @@ async def create_filing(
     )
     db.add(envelope)
     await db.flush()
+    await db.refresh(envelope)
     return envelope
 
 

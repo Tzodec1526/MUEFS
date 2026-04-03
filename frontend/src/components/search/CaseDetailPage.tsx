@@ -189,7 +189,7 @@ function CaseDetailPage() {
             to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&case_title=${encodeURIComponent(caseData.title)}`}
             className="btn btn-primary btn-small"
           >
-            + File New Motion
+            + Create New Filing
           </Link>
         </div>
 
