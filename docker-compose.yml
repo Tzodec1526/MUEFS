@@ -92,6 +92,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://muefs:muefs_dev@postgres:5432/muefs}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -131,7 +132,13 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    restart: unless-stopped
     command: celery -A app.tasks worker --loglevel=info
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.tasks", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://muefs:muefs_dev@postgres:5432/muefs}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -152,6 +159,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:

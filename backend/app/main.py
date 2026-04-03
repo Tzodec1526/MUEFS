@@ -42,17 +42,27 @@ import time
 from collections import defaultdict
 
 _rate_limit_store: dict[str, list[float]] = defaultdict(list)
+_rate_limit_last_cleanup = 0.0
 RATE_LIMIT_REQUESTS = 60  # per window
 RATE_LIMIT_WINDOW = 60  # seconds
+RATE_LIMIT_MAX_IPS = 10000  # Prevent unbounded memory growth
 
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     """Basic rate limiting per IP address."""
+    global _rate_limit_last_cleanup
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()
 
-    # Clean old entries
+    # Periodic cleanup of stale IPs (every 5 minutes)
+    if now - _rate_limit_last_cleanup > 300:
+        stale_ips = [ip for ip, ts in _rate_limit_store.items() if not ts or now - ts[-1] > RATE_LIMIT_WINDOW]
+        for ip in stale_ips:
+            del _rate_limit_store[ip]
+        _rate_limit_last_cleanup = now
+
+    # Clean old entries for this IP
     _rate_limit_store[client_ip] = [
         t for t in _rate_limit_store[client_ip] if now - t < RATE_LIMIT_WINDOW
     ]
