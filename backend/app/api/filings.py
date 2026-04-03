@@ -188,10 +188,11 @@ async def upload_document(
             detail=f"File exceeds maximum size of {document_service.settings.max_file_size_mb}MB",
         )
 
-    # Validate MIME type from actual file content, fall back to HTTP header
-    content_type = document_service.detect_mime_type(file_data)
-    if content_type == "application/octet-stream":
-        content_type = file.content_type or "application/octet-stream"
+    # Validate MIME type: try content detection first, fall back to HTTP header
+    detected_type = document_service.detect_mime_type(file_data)
+    http_type = file.content_type or "application/octet-stream"
+    # Use detected type if it's specific, otherwise trust the HTTP header
+    content_type = detected_type if detected_type != "application/octet-stream" else http_type
     if not document_service.validate_mime_type(content_type):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,

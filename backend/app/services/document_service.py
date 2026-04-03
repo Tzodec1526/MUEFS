@@ -40,7 +40,7 @@ def detect_mime_type(file_data: bytes) -> str:
     try:
         import magic
         return magic.from_buffer(file_data[:2048], mime=True)
-    except Exception:
+    except BaseException:
         return "application/octet-stream"
 
 
