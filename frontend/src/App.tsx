@@ -59,13 +59,13 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Advantages over MiFILE */}
+      {/* Platform highlights */}
       <div className="advantages-section">
-        <h3>Better Than MiFILE</h3>
+        <h3>Platform Highlights</h3>
         <div className="advantage-grid">
           <div className="advantage">
             <strong>100MB file limit</strong>
-            <span>vs MiFILE's 25MB cap</span>
+            <span>Large document support</span>
           </div>
           <div className="advantage">
             <strong>Auto-save drafts</strong>
