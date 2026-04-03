@@ -150,6 +150,7 @@ async def submit_filing(
         filing.status = FilingStatus.SUBMITTED
 
     await db.flush()
+    await db.refresh(filing)
     return filing
 
 
