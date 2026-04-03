@@ -2372,3 +2372,12 @@ textarea:focus-visible {
   .impact-grid { grid-template-columns: 1fr; }
   .problem-comparison { grid-template-columns: 1fr; }
 }
+
+/* Clerk court label (replaces dropdown) */
+.clerk-court-label {
+  font-weight: 600;
+  color: var(--primary);
+  font-size: 1rem;
+  padding: 0.4rem 0;
+  display: inline-block;
+}

@@ -9,6 +9,8 @@ function Header() {
   const handleSwitchRole = () => {
     localStorage.removeItem('demo_role');
     localStorage.removeItem('demo_user_name');
+    localStorage.removeItem('demo_court_id');
+    localStorage.removeItem('demo_court_name');
     navigate('/login');
   };
 
@@ -28,9 +30,9 @@ function Header() {
       </div>
       <nav className="header-nav">
         <Link to="/">Dashboard</Link>
-        <Link to="/filing/new">New Filing</Link>
+        {role !== 'clerk' && <Link to="/filing/new">New Filing</Link>}
         <Link to="/cases/search">Case Search</Link>
-        <Link to="/clerk/queue">Clerk Review</Link>
+        {role === 'clerk' && <Link to="/clerk/queue">Review Queue</Link>}
       </nav>
       <div className="header-user">
         <span>{userName || 'Guest'}</span>

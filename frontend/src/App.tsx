@@ -9,7 +9,7 @@ import CaseSearch from './components/search/CaseSearch';
 import Favorites from './components/search/Favorites';
 import CaseDetailPage from './components/search/CaseDetailPage';
 import CoverageStats from './components/stats/CoverageStats';
-import LoginScreen, { getDemoRole } from './components/auth/LoginScreen';
+import LoginScreen, { getDemoRole, getDemoCourtName } from './components/auth/LoginScreen';
 
 function RequireRole({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -19,7 +19,21 @@ function RequireRole({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function Dashboard() {
+function RequireClerk({ children }: { children: React.ReactNode }) {
+  if (getDemoRole() !== 'clerk') {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
+
+function RequireFiler({ children }: { children: React.ReactNode }) {
+  if (getDemoRole() === 'clerk') {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
+
+function FilerDashboard() {
   return (
     <div className="dashboard">
       <div className="dashboard-welcome">
@@ -27,7 +41,6 @@ function Dashboard() {
         <p>File court documents electronically with any Michigan court, 24/7.</p>
       </div>
 
-      {/* Quick Stats */}
       <div className="dashboard-stats">
         <div className="stat-card accent">
           <span className="stat-number">256</span>
@@ -47,7 +60,6 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Action Cards */}
       <div className="dashboard-cards">
         <div className="card card-primary">
           <div className="card-icon">+</div>
@@ -72,6 +84,47 @@ function Dashboard() {
   );
 }
 
+function ClerkDashboard() {
+  const courtName = getDemoCourtName() || '3rd Circuit Court - Wayne County';
+  return (
+    <div className="dashboard">
+      <div className="dashboard-welcome">
+        <h2>{courtName}</h2>
+        <p>Clerk Review Dashboard</p>
+      </div>
+
+      <div className="dashboard-cards">
+        <div className="card card-primary">
+          <div className="card-icon">&#128203;</div>
+          <h3>Review Queue</h3>
+          <p>Review and process pending filings for your court.</p>
+          <Link to="/clerk/queue" className="btn btn-primary">Open Queue</Link>
+        </div>
+        <div className="card">
+          <div className="card-icon">&#128269;</div>
+          <h3>Case Search</h3>
+          <p>Search cases across all Michigan courts.</p>
+          <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>
+        </div>
+        <div className="card">
+          <div className="card-icon">&#128202;</div>
+          <h3>Coverage Stats</h3>
+          <p>View statewide court coverage data.</p>
+          <Link to="/stats" className="btn btn-secondary">View Stats</Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Dashboard() {
+  const role = getDemoRole();
+  if (role === 'clerk') {
+    return <ClerkDashboard />;
+  }
+  return <FilerDashboard />;
+}
+
 function App() {
   return (
     <Routes>
@@ -87,12 +140,12 @@ function App() {
                 <main className="main-content">
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
-                    <Route path="/filing/new" element={<FilingWizard />} />
-                    <Route path="/filings" element={<MyFilings />} />
+                    <Route path="/filing/new" element={<RequireFiler><FilingWizard /></RequireFiler>} />
+                    <Route path="/filings" element={<RequireFiler><MyFilings /></RequireFiler>} />
                     <Route path="/cases/search" element={<CaseSearch />} />
                     <Route path="/cases/:caseId" element={<CaseDetailPage />} />
-                    <Route path="/favorites" element={<Favorites />} />
-                    <Route path="/clerk/queue" element={<ReviewQueue />} />
+                    <Route path="/favorites" element={<RequireFiler><Favorites /></RequireFiler>} />
+                    <Route path="/clerk/queue" element={<RequireClerk><ReviewQueue /></RequireClerk>} />
                     <Route path="/stats" element={<CoverageStats />} />
                   </Routes>
                 </main>

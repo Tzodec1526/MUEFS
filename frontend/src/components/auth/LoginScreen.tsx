@@ -8,6 +8,15 @@ export function getDemoUserName(): string | null {
   return localStorage.getItem('demo_user_name');
 }
 
+export function getDemoCourtId(): number | null {
+  const id = localStorage.getItem('demo_court_id');
+  return id ? parseInt(id, 10) : null;
+}
+
+export function getDemoCourtName(): string | null {
+  return localStorage.getItem('demo_court_name');
+}
+
 interface RoleOption {
   role: string;
   name: string;
@@ -46,6 +55,13 @@ function LoginScreen() {
   const handleSignIn = (option: RoleOption) => {
     localStorage.setItem('demo_role', option.role);
     localStorage.setItem('demo_user_name', option.name);
+    if (option.role === 'clerk') {
+      localStorage.setItem('demo_court_id', '3');
+      localStorage.setItem('demo_court_name', '3rd Circuit Court - Wayne County');
+    } else {
+      localStorage.removeItem('demo_court_id');
+      localStorage.removeItem('demo_court_name');
+    }
     navigate('/');
   };
 

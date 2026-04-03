@@ -1,17 +1,21 @@
 import { useLocation, Link } from 'react-router-dom';
+import { getDemoRole } from '../auth/LoginScreen';
 
 function Sidebar() {
   const location = useLocation();
+  const role = getDemoRole();
 
-  const links = [
-    { path: '/', label: 'Dashboard' },
-    { path: '/filing/new', label: 'New Filing' },
-    { path: '/filings', label: 'My Filings' },
-    { path: '/cases/search', label: 'Case Search' },
-    { path: '/favorites', label: 'Favorites' },
-    { path: '/clerk/queue', label: 'Clerk Queue' },
-    { path: '/stats', label: 'Coverage Stats' },
+  const allLinks = [
+    { path: '/', label: 'Dashboard', roles: ['attorney', 'clerk', 'srl'] },
+    { path: '/filing/new', label: 'New Filing', roles: ['attorney', 'srl'] },
+    { path: '/filings', label: 'My Filings', roles: ['attorney', 'srl'] },
+    { path: '/cases/search', label: 'Case Search', roles: ['attorney', 'clerk', 'srl'] },
+    { path: '/favorites', label: 'Favorites', roles: ['attorney', 'srl'] },
+    { path: '/clerk/queue', label: 'Review Queue', roles: ['clerk'] },
+    { path: '/stats', label: 'Coverage Stats', roles: ['attorney', 'clerk', 'srl'] },
   ];
+
+  const links = allLinks.filter(link => !role || link.roles.includes(role));
 
   return (
     <aside className="sidebar">

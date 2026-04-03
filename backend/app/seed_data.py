@@ -22,7 +22,7 @@ from app.models.court import (
     FilingChecklist,
     FilingRequirement,
 )
-from app.models.user import User, UserType
+from app.models.user import CourtRole, User, UserCourtRole, UserType
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL_SYNC",
@@ -791,6 +791,19 @@ def seed_database():
             ))
 
         print("  Created Michigan Supreme Court")
+
+        # --- Assign clerk to 3rd Circuit Court ---
+        third_circuit = session.query(Court).filter(
+            Court.name == "3rd Circuit Court"
+        ).first()
+        if third_circuit:
+            session.add(UserCourtRole(
+                user_id=users[1].id,  # Robert Johnson (clerk)
+                court_id=third_circuit.id,
+                role=CourtRole.CLERK,
+            ))
+            session.flush()
+            print(f"  Assigned clerk to {third_circuit.name} (court_id={third_circuit.id})")
 
         # --- Demo Cases & Filings for frontend testing ---
         from app.models.case import Case, CaseParticipant, CaseStatus, ParticipantRole
