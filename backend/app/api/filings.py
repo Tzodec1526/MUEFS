@@ -87,7 +87,7 @@ async def update_filing(
         filing.filing_description = data.filing_description
 
     await db.flush()
-    await db.refresh(filing)
+    await db.refresh(filing, ["documents"])
     return filing
 
 
@@ -139,7 +139,7 @@ async def submit_filing(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Filing cannot be submitted (not in draft status)",
         )
-    await db.refresh(filing)
+    await db.refresh(filing, ["documents"])
 
     await audit_service.log_action(
         db, user_id=user_id, action="submit_filing",
