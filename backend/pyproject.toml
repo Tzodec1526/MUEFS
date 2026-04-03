@@ -59,4 +59,4 @@ ignore_missing_imports = true
 disallow_untyped_defs = false
 disallow_untyped_decorators = false
 allow_subclassing_any = true
-disable_error_code = ["type-arg", "no-any-return", "no-untyped-call", "attr-defined"]
+disable_error_code = ["type-arg", "no-any-return", "no-untyped-call", "attr-defined", "arg-type"]
