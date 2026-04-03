@@ -6,7 +6,7 @@ import DocumentUpload from './DocumentUpload';
 import ServiceList from './ServiceList';
 import PaymentForm from './PaymentForm';
 import FilingReview from './FilingReview';
-import { createFiling, FilingEnvelope } from '../../api/filings';
+import { createFiling } from '../../api/filings';
 
 type WizardStep = 'court' | 'case-type' | 'details' | 'documents' | 'service' | 'payment' | 'review';
 
