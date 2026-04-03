@@ -52,6 +52,7 @@ async def review_filing(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Filing cannot be reviewed (not in submitted/under_review status)",
         )
+    await db.refresh(filing, ["documents"])
 
     await audit_service.log_action(
         db, user_id=user_id, action=f"review_filing_{data.action}",

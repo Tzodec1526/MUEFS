@@ -12,6 +12,7 @@ function ReviewQueue() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   const fetchQueue = useCallback(async () => {
     setLoading(true);
@@ -41,13 +42,15 @@ function ReviewQueue() {
 
   async function handleReview(filingId: number, action: 'accept' | 'reject' | 'return') {
     setActionInProgress(true);
+    setReviewError(null);
     try {
       await reviewFiling(filingId, action, action !== 'accept' ? reviewReason : undefined);
       setSelectedFiling(null);
       setReviewReason('');
-      fetchQueue();
+      await fetchQueue();
     } catch (err) {
-      console.error('Review failed:', err);
+      const msg = err instanceof Error ? err.message : 'Review failed';
+      setReviewError(`Failed to ${action} filing #${filingId}: ${msg}`);
     } finally {
       setActionInProgress(false);
     }
@@ -56,16 +59,21 @@ function ReviewQueue() {
   async function handleBatchAccept() {
     if (selectedIds.size === 0) return;
     setActionInProgress(true);
+    setReviewError(null);
+    const failed: number[] = [];
     for (const id of selectedIds) {
       try {
         await reviewFiling(id, 'accept');
-      } catch (err) {
-        console.error(`Failed to accept filing ${id}:`, err);
+      } catch {
+        failed.push(id);
       }
+    }
+    if (failed.length > 0) {
+      setReviewError(`Failed to accept filing(s): ${failed.map(id => `#${id}`).join(', ')}`);
     }
     setSelectedIds(new Set());
     setActionInProgress(false);
-    fetchQueue();
+    await fetchQueue();
   }
 
   const toggleSelect = (id: number) => {
@@ -169,6 +177,13 @@ function ReviewQueue() {
           Last updated: {lastRefresh.toLocaleTimeString()}
         </span>
       </div>
+
+      {reviewError && (
+        <div className="alert alert-error" role="alert">
+          {reviewError}
+          <button className="btn btn-small" onClick={() => setReviewError(null)} style={{ marginLeft: '1rem' }}>Dismiss</button>
+        </div>
+      )}
 
       {/* Batch actions */}
       {selectedIds.size > 0 && (

@@ -35,6 +35,15 @@ def get_s3_client():
     )
 
 
+def detect_mime_type(file_data: bytes) -> str:
+    """Detect MIME type from file content using python-magic."""
+    try:
+        import magic
+        return magic.from_buffer(file_data[:2048], mime=True)
+    except Exception:
+        return "application/octet-stream"
+
+
 def compute_sha256(file_data: bytes) -> str:
     return hashlib.sha256(file_data).hexdigest()
 

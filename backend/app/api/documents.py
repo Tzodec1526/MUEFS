@@ -25,7 +25,7 @@ def sanitize_filename(filename: str) -> str:
 async def download_document(
     document_id: int,
     db: AsyncSession = Depends(get_db),
-    _user_id: int = Depends(get_current_user_id),
+    user_id: int = Depends(get_current_user_id),
 ):
     result = await db.execute(
         select(FilingDocument).where(FilingDocument.id == document_id)
@@ -34,9 +34,22 @@ async def download_document(
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    if doc.is_confidential:
-        # In production, verify user has access to this filing
-        pass  # TODO: enforce confidentiality check with proper auth
+    # Ownership check: verify user owns the filing containing this document
+    from app.models.filing import FilingEnvelope
+    filing_result = await db.execute(
+        select(FilingEnvelope).where(FilingEnvelope.id == doc.envelope_id)
+    )
+    filing = filing_result.scalar_one_or_none()
+    if not filing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
+    # Allow owner, or any authenticated user for clerk access in MVP
+    # TODO: In production, add role-based check (clerk/judge can access their court's filings)
+
+    if doc.is_confidential and filing.filer_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: this document is sealed/confidential",
+        )
 
     file_stream = await document_service.download_document(doc.file_key)
     safe_filename = sanitize_filename(doc.title)

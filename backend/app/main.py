@@ -1,11 +1,15 @@
+import logging
 from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -28,8 +32,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -65,6 +69,16 @@ async def rate_limit_middleware(request: Request, call_next):
 
 
 app.include_router(api_router, prefix="/api/v1")
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Catch unhandled exceptions — log details server-side, return generic message to client."""
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
 
 
 @app.get("/health")

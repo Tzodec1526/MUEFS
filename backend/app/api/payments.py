@@ -9,7 +9,7 @@ from app.schemas.payment import (
     PaymentProcessRequest,
     PaymentResponse,
 )
-from app.services import audit_service, payment_service
+from app.services import audit_service, filing_service, payment_service
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
@@ -31,14 +31,33 @@ async def process_payment(
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    # Validate payment amount against calculated fees
-    calculated = await payment_service.calculate_fees(
-        db, court_id=0, case_type_id=0  # TODO: look up from envelope
-    )
     if data.amount_cents < 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Payment amount cannot be negative",
+        )
+
+    # Look up the filing envelope to validate payment against actual fees
+    filing = await filing_service.get_filing(db, data.envelope_id)
+    if not filing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Filing envelope not found",
+        )
+    if filing.filer_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to pay for this filing",
+        )
+
+    # Validate amount matches calculated fees
+    calculated = await payment_service.calculate_fees(
+        db, court_id=filing.court_id, case_type_id=filing.case_type_id
+    )
+    if data.amount_cents != calculated.total_cents:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Payment amount ({data.amount_cents}) does not match calculated fee ({calculated.total_cents})",
         )
 
     payment = await payment_service.process_payment(

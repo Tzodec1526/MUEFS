@@ -221,6 +221,9 @@ function FilingWizard() {
     setFilingData(defaultFilingData);
     setShowDraftBanner(false);
     setCurrentStep('court');
+    setErrors([]);
+    setSaving(false);
+    setIsMotionMode(false);
   };
 
   const formatFee = (cents: number) => cents === 0 ? 'No fee' : `$${(cents / 100).toFixed(2)}`;

@@ -35,7 +35,8 @@ function PaymentForm({ courtId, caseTypeId, onPaymentComplete }: Props) {
       }
     }
     fetchFees();
-  }, [courtId, caseTypeId, onPaymentComplete]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onPaymentComplete is stable from parent
+  }, [courtId, caseTypeId]);
 
   const formatCurrency = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 

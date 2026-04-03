@@ -185,7 +185,8 @@ async def upload_document(
             detail=f"File exceeds maximum size of {document_service.settings.max_file_size_mb}MB",
         )
 
-    content_type = file.content_type or "application/octet-stream"
+    # Validate MIME type from actual file content (not just HTTP header)
+    content_type = document_service.detect_mime_type(file_data)
     if not document_service.validate_mime_type(content_type):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
@@ -193,7 +194,10 @@ async def upload_document(
         )
 
     sha256 = document_service.compute_sha256(file_data)
-    file_key = f"filings/{filing_id}/{uuid.uuid4()}/{file.filename}"
+    # Sanitize filename to prevent path traversal in storage key
+    import re
+    safe_name = re.sub(r'[^\w\s\-.]', '', file.filename or 'document') or 'document'
+    file_key = f"filings/{filing_id}/{uuid.uuid4()}/{safe_name}"
 
     await document_service.upload_document(file_data, file_key, content_type)
 
@@ -218,6 +222,7 @@ async def upload_document(
         )
         db.add(doc)
         await db.flush()
+        await db.refresh(doc)
 
         await audit_service.log_action(
             db, user_id=user_id, action="upload_document",
@@ -257,6 +262,8 @@ async def remove_document(
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    await document_service.delete_document(doc.file_key)
+    # Delete from DB first, then storage — if DB fails, storage is intact
+    file_key = doc.file_key
     await db.delete(doc)
     await db.flush()
+    await document_service.delete_document(file_key)
