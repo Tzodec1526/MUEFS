@@ -239,6 +239,92 @@ const FILING_CATEGORIES = [
 // Flatten for quick lookup
 const ALL_TYPES = FILING_CATEGORIES.flatMap(cat => cat.types);
 
+// MCR 2.119(A)(2): All motions must be accompanied by a brief (or combined motion+brief).
+// MCR 2.313(A): Discovery motions require a meet-and-confer certification.
+// MCR 2.119(A)(2): All motions must include a proposed order.
+const COMPANION_RULES: {
+  trigger: string[];
+  required: { code: string; label: string; rule: string }[];
+  recommended: { code: string; label: string; rule: string }[];
+}[] = [
+  {
+    // All motions require a brief per MCR 2.119(A)(2)
+    trigger: [
+      'MOT_SD', 'MOT_DISMISS', 'MOT_COMPEL', 'MOT_PROTECTIVE', 'MOT_SANCTIONS',
+      'MOT_DEFAULT', 'MOT_SJ', 'MOT_LIMINE', 'MOT_RECONSIDER', 'MOT_RELIEF',
+      'MOT_STAY', 'MOT_ADJOURN', 'MOT_INTERVENE', 'MOT_AMEND', 'MOT_QUASH',
+      'MOT_TRANSFER', 'MOT_CONSOLIDATE', 'MOT_WITHDRAW', 'MOT_TRO',
+      'MOT_PRELIM_INJ', 'MOT_FEES', 'MOT_OTHER',
+    ],
+    required: [
+      { code: 'BRIEF_SUPPORT', label: 'Brief in Support of Motion', rule: 'MCR 2.119(A)(2)' },
+      { code: 'PROPOSED_ORDER', label: 'Proposed Order', rule: 'MCR 2.119(A)(2)' },
+    ],
+    recommended: [
+      { code: 'NOT_HEARING', label: 'Notice of Hearing', rule: 'MCR 2.119(C)' },
+      { code: 'POS_ELECTRONIC', label: 'Proof of Service', rule: 'MCR 1.109(G)(6)' },
+    ],
+  },
+  {
+    // Discovery motions also require meet-and-confer certification
+    trigger: ['MOT_COMPEL', 'MOT_PROTECTIVE', 'MOT_SANCTIONS'],
+    required: [
+      { code: 'DISC_CERT_GF', label: 'Certification of Good Faith Discovery Effort', rule: 'MCR 2.313(A)' },
+    ],
+    recommended: [],
+  },
+  {
+    // Summary disposition motions benefit from affidavits
+    trigger: ['MOT_SD', 'MOT_SJ'],
+    required: [],
+    recommended: [
+      { code: 'AFFIDAVIT', label: 'Supporting Affidavit(s)', rule: 'MCR 2.116(G)(4)' },
+    ],
+  },
+  {
+    // Default judgment motions
+    trigger: ['MOT_DEFAULT'],
+    required: [
+      { code: 'AFF_DEFAULT', label: 'Affidavit of Default', rule: 'MCR 2.603(A)' },
+    ],
+    recommended: [],
+  },
+  {
+    // TRO/Preliminary injunction
+    trigger: ['MOT_TRO', 'MOT_PRELIM_INJ'],
+    required: [
+      { code: 'AFFIDAVIT', label: 'Verified Complaint or Affidavit', rule: 'MCR 3.310(B)' },
+    ],
+    recommended: [],
+  },
+];
+
+function getCompanionRequirements(uploadedTypeCodes: string[]) {
+  const required: { code: string; label: string; rule: string }[] = [];
+  const recommended: { code: string; label: string; rule: string }[] = [];
+  const seenRequired = new Set<string>();
+  const seenRecommended = new Set<string>();
+
+  for (const rule of COMPANION_RULES) {
+    const triggered = rule.trigger.some(t => uploadedTypeCodes.includes(t));
+    if (!triggered) continue;
+
+    for (const r of rule.required) {
+      if (!seenRequired.has(r.code) && !uploadedTypeCodes.includes(r.code)) {
+        required.push(r);
+        seenRequired.add(r.code);
+      }
+    }
+    for (const r of rule.recommended) {
+      if (!seenRecommended.has(r.code) && !uploadedTypeCodes.includes(r.code) && !seenRequired.has(r.code)) {
+        recommended.push(r);
+        seenRecommended.add(r.code);
+      }
+    }
+  }
+  return { required, recommended };
+}
+
 function DocumentUpload({
   filingId,
   courtId: _courtId,
@@ -473,6 +559,44 @@ function DocumentUpload({
           </table>
         </div>
       )}
+
+      {/* MCR Companion Document Requirements */}
+      {documents.length > 0 && (() => {
+        const uploadedCodes = documents.map(d => d.type);
+        const { required, recommended } = getCompanionRequirements(uploadedCodes);
+        if (required.length === 0 && recommended.length === 0) return null;
+        return (
+          <div className="companion-requirements">
+            {required.length > 0 && (
+              <div className="alert alert-error">
+                <strong>Required companion documents (Michigan Court Rules):</strong>
+                <ul>
+                  {required.map(r => (
+                    <li key={r.code}>
+                      <strong>{r.label}</strong> &mdash; {r.rule}
+                      {r.code === 'BRIEF_SUPPORT' && (
+                        <span className="companion-hint"> (may be combined with the motion as a single document)</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {recommended.length > 0 && (
+              <div className="alert alert-info">
+                <strong>Recommended:</strong>
+                <ul>
+                  {recommended.map(r => (
+                    <li key={r.code}>
+                      {r.label} &mdash; {r.rule}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

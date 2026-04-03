@@ -1,17 +1,30 @@
 import hashlib
 import io
 import logging
+import os
+from pathlib import Path
 from typing import BinaryIO
-
-import boto3
-from botocore.config import Config
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 
+def _is_demo_mode() -> bool:
+    """Check if running in demo mode (SQLite / no S3)."""
+    return "sqlite" in settings.database_url
+
+
+def _local_storage_path() -> Path:
+    """Get local document storage directory for demo mode."""
+    p = Path("demo_uploads")
+    p.mkdir(exist_ok=True)
+    return p
+
+
 def get_s3_client():
+    import boto3
+    from botocore.config import Config
     return boto3.client(
         "s3",
         endpoint_url=settings.s3_endpoint_url,
@@ -50,6 +63,12 @@ async def upload_document(
     file_key: str,
     content_type: str,
 ) -> str:
+    if _is_demo_mode():
+        local_path = _local_storage_path() / file_key
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+        local_path.write_bytes(file_data)
+        return file_key
+
     client = get_s3_client()
     client.upload_fileobj(
         io.BytesIO(file_data),
@@ -61,12 +80,22 @@ async def upload_document(
 
 
 async def download_document(file_key: str) -> BinaryIO:
+    if _is_demo_mode():
+        local_path = _local_storage_path() / file_key
+        return io.BytesIO(local_path.read_bytes())
+
     client = get_s3_client()
     response = client.get_object(Bucket=settings.s3_bucket_name, Key=file_key)
     return response["Body"]
 
 
 async def delete_document(file_key: str) -> None:
+    if _is_demo_mode():
+        local_path = _local_storage_path() / file_key
+        if local_path.exists():
+            local_path.unlink()
+        return
+
     client = get_s3_client()
     client.delete_object(Bucket=settings.s3_bucket_name, Key=file_key)
 
