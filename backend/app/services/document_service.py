@@ -114,7 +114,7 @@ def get_pdf_page_count(file_data: bytes) -> int | None:
         from pypdf import PdfReader
         reader = PdfReader(io.BytesIO(file_data))
         return len(reader.pages)
-    except Exception as e:
+    except BaseException as e:
         logger.warning("Failed to extract PDF page count: %s", e)
         return None
 
@@ -127,6 +127,6 @@ def is_pdf_text_searchable(file_data: bytes) -> bool:
             return False
         text = reader.pages[0].extract_text()
         return bool(text and text.strip())
-    except Exception as e:
+    except BaseException as e:
         logger.warning("Failed to check PDF text searchability: %s", e)
         return False

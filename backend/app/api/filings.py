@@ -87,6 +87,7 @@ async def update_filing(
         filing.filing_description = data.filing_description
 
     await db.flush()
+    await db.refresh(filing)
     await db.refresh(filing, ["documents"])
     return filing
 
@@ -139,6 +140,8 @@ async def submit_filing(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Filing cannot be submitted (not in draft status)",
         )
+    # Full refresh to get updated_at, then load documents relationship
+    await db.refresh(filing)
     await db.refresh(filing, ["documents"])
 
     await audit_service.log_action(
@@ -185,8 +188,10 @@ async def upload_document(
             detail=f"File exceeds maximum size of {document_service.settings.max_file_size_mb}MB",
         )
 
-    # Validate MIME type from actual file content (not just HTTP header)
+    # Validate MIME type from actual file content, fall back to HTTP header
     content_type = document_service.detect_mime_type(file_data)
+    if content_type == "application/octet-stream":
+        content_type = file.content_type or "application/octet-stream"
     if not document_service.validate_mime_type(content_type):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,

@@ -32,6 +32,7 @@ async def create_filing(
     )
     db.add(envelope)
     await db.flush()
+    await db.refresh(envelope)
     await db.refresh(envelope, ["documents"])
     return envelope
 
@@ -153,6 +154,7 @@ async def submit_filing(
         filing.status = FilingStatus.SUBMITTED
 
     await db.flush()
+    await db.refresh(filing)
     await db.refresh(filing, ["documents"])
     return filing
 
@@ -197,6 +199,8 @@ async def review_filing(
         return None
 
     await db.flush()
+    await db.refresh(filing)
+    await db.refresh(filing, ["documents"])
     return filing
 
 
