@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 
-class FilingStatus(str, enum.Enum):
+class FilingStatus(enum.StrEnum):
     DRAFT = "draft"
     SUBMITTED = "submitted"
     UNDER_REVIEW = "under_review"
@@ -17,7 +17,7 @@ class FilingStatus(str, enum.Enum):
     SERVED = "served"  # Service-only filings go straight to served
 
 
-class FilingType(str, enum.Enum):
+class FilingType(enum.StrEnum):
     INITIAL = "initial"          # New case initiation
     SUBSEQUENT = "subsequent"    # Filing to existing case
     SERVICE_ONLY = "service_only"  # Serve on parties, not filed with court

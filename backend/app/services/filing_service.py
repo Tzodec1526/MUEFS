@@ -1,12 +1,12 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.case import Case, CaseParticipant, CaseStatus
+from app.models.case import Case, CaseStatus
 from app.models.court import FilingRequirement
-from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
+from app.models.filing import FilingEnvelope, FilingStatus
 from app.schemas.filing import (
     FilingEnvelopeCreate,
     FilingValidationResult,
@@ -143,7 +143,7 @@ async def submit_filing(
     if not filing or filing.status != FilingStatus.DRAFT:
         return None
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     filing.submitted_at = now
 
     # Service-only filings skip clerk review entirely
@@ -170,7 +170,7 @@ async def review_filing(
     if not filing or filing.status not in (FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW):
         return None
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     filing.reviewer_id = reviewer_id
     filing.reviewed_at = now
 

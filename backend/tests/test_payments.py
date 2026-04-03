@@ -1,10 +1,9 @@
 """Tests for payment-related functionality."""
 
 import pytest
-from sqlalchemy import select
 
 from app.models.court import CaseCategory, CaseType, Court, CourtType
-from app.models.payment import Payment, PaymentMethod, PaymentStatus
+from app.models.payment import PaymentMethod, PaymentStatus
 from app.services import payment_service
 
 

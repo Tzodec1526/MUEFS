@@ -1,10 +1,9 @@
 """Tests for filing-related functionality."""
 
 import pytest
-from sqlalchemy import select
 
 from app.models.court import CaseCategory, CaseType, Court, CourtType
-from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
+from app.models.filing import FilingDocument, FilingStatus
 from app.models.user import User, UserType
 from app.schemas.filing import FilingEnvelopeCreate
 from app.services import filing_service

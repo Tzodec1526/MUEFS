@@ -1,6 +1,5 @@
 """Tests for document-related functionality."""
 
-import pytest
 
 from app.services.document_service import (
     compute_sha256,

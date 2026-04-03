@@ -1,6 +1,8 @@
 import logging
-from contextlib import asynccontextmanager
+import time
+from collections import defaultdict
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,9 +40,6 @@ app.add_middleware(
 
 
 # Simple in-memory rate limiter (use Redis-backed in production)
-import time
-from collections import defaultdict
-
 _rate_limit_store: dict[str, list[float]] = defaultdict(list)
 _rate_limit_last_cleanup = 0.0
 RATE_LIMIT_REQUESTS = 60  # per window
@@ -57,7 +56,10 @@ async def rate_limit_middleware(request: Request, call_next):
 
     # Periodic cleanup of stale IPs (every 5 minutes)
     if now - _rate_limit_last_cleanup > 300:
-        stale_ips = [ip for ip, ts in _rate_limit_store.items() if not ts or now - ts[-1] > RATE_LIMIT_WINDOW]
+        stale_ips = [
+            ip for ip, ts in _rate_limit_store.items()
+            if not ts or now - ts[-1] > RATE_LIMIT_WINDOW
+        ]
         for ip in stale_ips:
             del _rate_limit_store[ip]
         _rate_limit_last_cleanup = now

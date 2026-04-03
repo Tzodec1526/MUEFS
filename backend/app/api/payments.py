@@ -57,7 +57,10 @@ async def process_payment(
     if data.amount_cents != calculated.total_cents:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Payment amount ({data.amount_cents}) does not match calculated fee ({calculated.total_cents})",
+            detail=(
+                f"Payment amount ({data.amount_cents}) does not match "
+                f"calculated fee ({calculated.total_cents})"
+            ),
         )
 
     payment = await payment_service.process_payment(

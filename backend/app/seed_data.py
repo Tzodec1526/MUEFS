@@ -7,7 +7,7 @@ Usage: python -m app.seed_data
 """
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -16,9 +16,8 @@ from app.database import Base
 from app.models.court import (
     CaseCategory,
     CaseType,
-    CourtType,
     Court,
-    FeeSchedule,
+    CourtType,
     FilingChecklist,
     FilingRequirement,
 )
@@ -472,20 +471,32 @@ CIVIL_FILING_REQUIREMENTS = [
 
 # Filing requirements for motions (MCR 2.119)
 MOTION_REQUIREMENTS = [
-    ("MOT_SD", True, "Motion (any type)", "MCR 2.119", 20, "Brief must not exceed 20 pages unless leave granted"),
+    (
+        "MOT_SD", True, "Motion (any type)", "MCR 2.119", 20,
+        "Brief must not exceed 20 pages unless leave granted",
+    ),
     ("BRIEF_SUPPORT", True, "Brief in Support of Motion", "MCR 2.119(A)(2)", 20, None),
     ("PROPOSED_ORDER", True, "Proposed Order", "MCR 2.602", None, None),
     ("POS_ELECTRONIC", True, "Proof of Service", "MCR 2.107", None, None),
-    ("NOT_HEARING", True, "Notice of Hearing", "MCR 2.119(C)", None, "Must be served at least 9 days before hearing"),
+    (
+        "NOT_HEARING", True, "Notice of Hearing", "MCR 2.119(C)",
+        None, "Must be served at least 9 days before hearing",
+    ),
     ("AFFIDAVIT", False, "Supporting Affidavit(s)", None, None, None),
     ("EXHIBIT", False, "Exhibits", None, None, "Attach separately; label clearly"),
 ]
 
 # Filing requirements for discovery filings
 DISCOVERY_REQUIREMENTS = [
-    ("DISC_INTERROG", False, "Interrogatories", "MCR 2.309", None, "Limited to 35 interrogatories including subparts"),
+    (
+        "DISC_INTERROG", False, "Interrogatories", "MCR 2.309",
+        None, "Limited to 35 interrogatories including subparts",
+    ),
     ("DISC_RFP", False, "Request for Production", "MCR 2.310", None, None),
-    ("DISC_RFA", False, "Request for Admissions", "MCR 2.312", None, "Deemed admitted if not responded to within 28 days"),
+    (
+        "DISC_RFA", False, "Request for Admissions", "MCR 2.312",
+        None, "Deemed admitted if not responded to within 28 days",
+    ),
     ("DISC_SUBPOENA", False, "Subpoena / Subpoena Duces Tecum", "MCR 2.506", None, None),
     ("POS_ELECTRONIC", True, "Proof of Service", "MCR 2.107", None, None),
 ]
@@ -569,7 +580,13 @@ def seed_database():
         # --- Circuit Courts ---
         for circuit_num, counties, city in CIRCUIT_COURTS:
             county = counties[0]
-            name = f"{circuit_num}{'st' if circuit_num == 1 else 'nd' if circuit_num == 2 else 'rd' if circuit_num == 3 else 'th'} Circuit Court"
+            suffix = (
+                "st" if circuit_num == 1
+                else "nd" if circuit_num == 2
+                else "rd" if circuit_num == 3
+                else "th"
+            )
+            name = f"{circuit_num}{suffix} Circuit Court"
             if len(counties) > 1:
                 division = ", ".join(counties) + " Counties"
             else:
@@ -589,7 +606,12 @@ def seed_database():
             session.flush()
 
             # Add case types (circuit courts: no small claims)
-            for code, type_name, category, fee in CIRCUIT_CIVIL_CASE_TYPES + FAMILY_CASE_TYPES + CRIMINAL_CASE_TYPES:
+            all_types = (
+                CIRCUIT_CIVIL_CASE_TYPES
+                + FAMILY_CASE_TYPES
+                + CRIMINAL_CASE_TYPES
+            )
+            for code, type_name, category, fee in all_types:
                 ct = CaseType(
                     court_id=court.id,
                     code=code,
@@ -634,8 +656,14 @@ def seed_database():
                             {"label": "Exhibits", "required": False},
                         ]
                     },
-                    help_text="Filed under MCR 2.116. Brief limited to 20 pages. Response due 21 days after service.",
-                    mcr_url="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2116-summary-disposition",
+                    help_text=(
+                        "Filed under MCR 2.116. Brief limited"
+                        " to 20 pages. Response due 21 days"
+                        " after service."
+                    ),
+                    mcr_url=(  # noqa: E501
+                        "https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2116-summary-disposition"
+                    ),
                 ))
 
             # Add filing requirements for domesticating subpoena
@@ -643,7 +671,8 @@ def seed_database():
                 court_id=court.id, code="CIV-SUBP"
             ).first()
             if subp_ct:
-                for doc_code, required, desc, mcr, page_limit, notes in SUBPOENA_FILING_REQUIREMENTS:
+                for (doc_code, required, desc,
+                     mcr, page_limit, notes) in SUBPOENA_FILING_REQUIREMENTS:
                     session.add(FilingRequirement(
                         court_id=court.id,
                         case_type_id=subp_ct.id,
@@ -806,12 +835,13 @@ def seed_database():
             print(f"  Assigned clerk to {third_circuit.name} (court_id={third_circuit.id})")
 
         # --- Demo Cases & Filings for frontend testing ---
-        from app.models.case import Case, CaseParticipant, CaseStatus, ParticipantRole
-        from app.models.filing import FilingEnvelope, FilingDocument, FilingStatus
-        from app.models.user import FavoriteCase
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        now = datetime.now(timezone.utc)
+        from app.models.case import Case, CaseParticipant, CaseStatus, ParticipantRole
+        from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
+        from app.models.user import FavoriteCase
+
+        now = datetime.now(UTC)
         attorney = users[0]  # Jane Doe, P12345
         clerk_user = users[1]  # Robert Johnson
 
@@ -869,7 +899,11 @@ def seed_database():
                 case_type_id=wayne_contract.id if wayne_contract else wayne_civil.id,
                 filer_id=attorney.id,
                 case_title="Johnson v. Smith Industries LLC",
-                filing_description="Initial complaint for breach of contract - failure to deliver goods per Purchase Order #2024-8891",
+                filing_description=(
+                    "Initial complaint for breach of contract"
+                    " - failure to deliver goods per"
+                    " Purchase Order #2024-8891"
+                ),
                 status=FilingStatus.ACCEPTED,
                 submitted_at=now, reviewed_at=now, reviewer_id=clerk_user.id,
             )
@@ -889,7 +923,11 @@ def seed_database():
                 case_type_id=wayne_contract.id if wayne_contract else wayne_civil.id,
                 filer_id=attorney.id,
                 case_title="Johnson v. Smith Industries LLC",
-                filing_description="Motion for Summary Disposition under MCR 2.116(C)(10) - No genuine issue of material fact",
+                filing_description=(
+                    "Motion for Summary Disposition under"
+                    " MCR 2.116(C)(10) - No genuine issue"
+                    " of material fact"
+                ),
                 status=FilingStatus.SUBMITTED,
                 submitted_at=now,
             )
@@ -941,7 +979,10 @@ def seed_database():
                 case_type_id=wayne_tort.id if wayne_tort else wayne_civil.id,
                 filer_id=attorney.id,
                 case_title="Williams v. City of Detroit",
-                filing_description="Complaint for personal injury - sidewalk defect on Michigan Ave",
+                filing_description=(
+                    "Complaint for personal injury"
+                    " - sidewalk defect on Michigan Ave"
+                ),
                 status=FilingStatus.ACCEPTED,
                 submitted_at=now, reviewed_at=now, reviewer_id=clerk_user.id,
             )
@@ -1014,7 +1055,11 @@ def seed_database():
                     case_type_id=wayne_subp.id,
                     filer_id=attorney.id,
                     case_title="In re: Subpoena from State of Ohio, Case No. CV-2025-4412",
-                    filing_description="Domesticating out-of-state subpoena per Michigan Uniform Depositions Act (MCL 600.2163a)",
+                    filing_description=(
+                        "Domesticating out-of-state subpoena"
+                        " per Michigan Uniform Depositions"
+                        " Act (MCL 600.2163a)"
+                    ),
                     status=FilingStatus.SUBMITTED,
                     submitted_at=now,
                 )
@@ -1044,7 +1089,11 @@ def seed_database():
                 filing_description="Complaint for medical malpractice",
                 status=FilingStatus.RETURNED,
                 submitted_at=now, reviewed_at=now, reviewer_id=clerk_user.id,
-                rejection_reason="Missing Affidavit of Merit required by MCL 600.2912d for medical malpractice cases. Please attach and resubmit.",
+                rejection_reason=(
+                    "Missing Affidavit of Merit required by"
+                    " MCL 600.2912d for medical malpractice"
+                    " cases. Please attach and resubmit."
+                ),
             )
             session.add(filing5)
             session.flush()
@@ -1071,7 +1120,11 @@ def seed_database():
         total = session.query(Court).count()
         total_types = session.query(CaseType).count()
         total_reqs = session.query(FilingRequirement).count()
-        print(f"\nSeed complete: {total} courts, {total_types} case types, {total_reqs} filing requirements")
+        print(
+            f"\nSeed complete: {total} courts,"
+            f" {total_types} case types,"
+            f" {total_reqs} filing requirements"
+        )
 
 
 if __name__ == "__main__":

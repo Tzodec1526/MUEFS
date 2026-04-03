@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
-class NotificationType(str, enum.Enum):
+class NotificationType(enum.StrEnum):
     FILING_SUBMITTED = "filing_submitted"
     FILING_ACCEPTED = "filing_accepted"
     FILING_REJECTED = "filing_rejected"
@@ -16,14 +16,14 @@ class NotificationType(str, enum.Enum):
     CASE_UPDATE = "case_update"
 
 
-class DeliveryStatus(str, enum.Enum):
+class DeliveryStatus(enum.StrEnum):
     PENDING = "pending"
     SENT = "sent"
     DELIVERED = "delivered"
     FAILED = "failed"
 
 
-class ServiceMethod(str, enum.Enum):
+class ServiceMethod(enum.StrEnum):
     ELECTRONIC = "electronic"
     MAIL = "mail"
     HAND_DELIVERY = "hand_delivery"

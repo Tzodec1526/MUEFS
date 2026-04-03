@@ -90,5 +90,9 @@ async def verify_document(
         document_id=document_id,
         sha256_hash=doc.sha256_hash,
         is_valid=is_valid,
-        message="Document integrity verified" if is_valid else "Document integrity check failed - hash mismatch",
+        message=(
+            "Document integrity verified"
+            if is_valid
+            else "Document integrity check failed - hash mismatch"
+        ),
     )

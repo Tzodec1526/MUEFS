@@ -3,10 +3,10 @@
 import pytest
 from sqlalchemy import select
 
-from app.models.case import Case, CaseParticipant, CaseStatus, ParticipantRole
+from app.models.case import Case, CaseParticipant, ParticipantRole
 from app.models.court import CaseCategory, CaseType, Court, CourtType
-from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus, FilingType
-from app.models.user import User, UserType, FavoriteCase
+from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
+from app.models.user import FavoriteCase, User, UserType
 from app.schemas.filing import FilingEnvelopeCreate
 from app.services import filing_service, search_service
 

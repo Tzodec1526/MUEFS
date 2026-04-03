@@ -16,7 +16,7 @@ from app.schemas.filing import (
     FilingListResponse,
     FilingValidationResult,
 )
-from app.services import filing_service, document_service, audit_service
+from app.services import audit_service, document_service, filing_service
 
 router = APIRouter(prefix="/filings", tags=["Filings"])
 
@@ -103,7 +103,10 @@ async def validate_filing(
     if not filing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
     if filing.filer_id != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this filing")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this filing",
+        )
     return await filing_service.validate_filing(db, filing_id)
 
 
@@ -118,7 +121,10 @@ async def submit_filing(
     if not filing_check:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
     if filing_check.filer_id != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this filing")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this filing",
+        )
 
     # Validate before submitting
     validation = await filing_service.validate_filing(db, filing_id)

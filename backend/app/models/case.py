@@ -8,14 +8,14 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 
-class CaseStatus(str, enum.Enum):
+class CaseStatus(enum.StrEnum):
     OPEN = "open"
     CLOSED = "closed"
     DISMISSED = "dismissed"
     PENDING = "pending"
 
 
-class ParticipantRole(str, enum.Enum):
+class ParticipantRole(enum.StrEnum):
     PLAINTIFF = "plaintiff"
     DEFENDANT = "defendant"
     PETITIONER = "petitioner"

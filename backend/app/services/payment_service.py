@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -61,8 +61,11 @@ async def process_payment(
         payment_method=payment_method,
         payer_id=payer_id,
         description=description,
-        transaction_ref=f"MUEFS-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{payer_id}",
-        processed_at=datetime.now(timezone.utc),
+        transaction_ref=(
+            f"MUEFS-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
+            f"-{payer_id}"
+        ),
+        processed_at=datetime.now(UTC),
     )
     db.add(payment)
     await db.flush()

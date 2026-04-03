@@ -1,13 +1,19 @@
+from __future__ import annotations
+
 import enum
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Enum, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+if TYPE_CHECKING:
+    from app.models.case import Case  # noqa: F401
+
 from app.database import Base
 
 
-class UserType(str, enum.Enum):
+class UserType(enum.StrEnum):
     ATTORNEY = "attorney"
     CLERK = "clerk"
     JUDGE = "judge"
@@ -15,7 +21,7 @@ class UserType(str, enum.Enum):
     ADMIN = "admin"
 
 
-class CourtRole(str, enum.Enum):
+class CourtRole(enum.StrEnum):
     FILER = "filer"
     CLERK = "clerk"
     JUDGE = "judge"
@@ -42,8 +48,8 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    court_roles: Mapped[list["UserCourtRole"]] = relationship(back_populates="user")
-    favorite_cases: Mapped[list["FavoriteCase"]] = relationship(back_populates="user")
+    court_roles: Mapped[list[UserCourtRole]] = relationship(back_populates="user")
+    favorite_cases: Mapped[list[FavoriteCase]] = relationship(back_populates="user")
 
     @property
     def full_name(self) -> str:
@@ -61,7 +67,7 @@ class UserCourtRole(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    user: Mapped["User"] = relationship(back_populates="court_roles")
+    user: Mapped[User] = relationship(back_populates="court_roles")
 
 
 class FavoriteCase(Base):
@@ -79,5 +85,5 @@ class FavoriteCase(Base):
         UniqueConstraint("user_id", "case_id", name="uq_user_case_favorite"),
     )
 
-    user: Mapped["User"] = relationship(back_populates="favorite_cases")
-    case: Mapped["Case"] = relationship()  # No back_populates needed
+    user: Mapped[User] = relationship(back_populates="favorite_cases")
+    case: Mapped[Case] = relationship()  # No back_populates needed

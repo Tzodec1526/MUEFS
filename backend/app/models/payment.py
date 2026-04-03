@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
-class PaymentStatus(str, enum.Enum):
+class PaymentStatus(enum.StrEnum):
     PENDING = "pending"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -15,7 +15,7 @@ class PaymentStatus(str, enum.Enum):
     WAIVED = "waived"
 
 
-class PaymentMethod(str, enum.Enum):
+class PaymentMethod(enum.StrEnum):
     CREDIT_CARD = "credit_card"
     DEBIT_CARD = "debit_card"
     ACH = "ach"
