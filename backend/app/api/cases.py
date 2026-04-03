@@ -35,7 +35,7 @@ async def search_cases(
         page=page,
         page_size=page_size,
     )
-    return CaseSearchResponse(cases=cases, total=total, page=page, page_size=page_size)
+    return CaseSearchResponse(cases=cases, total=total, page=page, page_size=page_size)  # type: ignore[arg-type]
 
 
 @router.get("/{case_id}", response_model=CaseResponse)

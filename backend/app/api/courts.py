@@ -40,7 +40,7 @@ async def list_courts(
     query = query.order_by(Court.county, Court.name).offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
 
-    return CourtListResponse(courts=list(result.scalars().all()), total=total)
+    return CourtListResponse(courts=list(result.scalars().all()), total=total)  # type: ignore[arg-type]
 
 
 @router.get("/{court_id}", response_model=CourtResponse)

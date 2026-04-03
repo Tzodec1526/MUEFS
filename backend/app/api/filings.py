@@ -46,7 +46,7 @@ async def list_filings(
     filings, total = await filing_service.list_filings(
         db, user_id, status=status_filter, page=page, page_size=page_size
     )
-    return FilingListResponse(filings=filings, total=total, page=page, page_size=page_size)
+    return FilingListResponse(filings=filings, total=total, page=page, page_size=page_size)  # type: ignore[arg-type]
 
 
 @router.get("/{filing_id}", response_model=FilingEnvelopeResponse)
