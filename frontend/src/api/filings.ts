@@ -25,6 +25,9 @@ export interface FilingEnvelope {
   submitted_at: string | null;
   reviewed_at: string | null;
   rejection_reason: string | null;
+  fee_waiver_requested: boolean;
+  fee_waiver_granted: boolean | null;
+  fee_waiver_reason: string | null;
   documents: FilingDocument[];
   created_at: string;
   updated_at: string;

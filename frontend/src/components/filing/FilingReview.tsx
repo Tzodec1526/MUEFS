@@ -47,7 +47,9 @@ function FilingReview({ filingData, filingId, onSubmitSuccess }: Props) {
       setSubmitted(true);
       onSubmitSuccess?.();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Submission failed. Please try again.';
+      const axiosErr = err as { response?: { data?: { detail?: string } } };
+      const detail = axiosErr?.response?.data?.detail;
+      const message = detail || (err instanceof Error ? err.message : 'Submission failed. Please try again.');
       setError(message);
     } finally {
       setSubmitting(false);

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { searchCases } from '../../api/documents';
+import { searchCases } from '../../api/cases';
 import { listFavorites, addFavorite, removeFavorite } from '../../api/favorites';
 
 interface CaseResult {
