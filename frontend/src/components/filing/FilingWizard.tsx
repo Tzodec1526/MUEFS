@@ -34,6 +34,8 @@ interface FilingData {
     method: string;
   }>;
   paymentComplete: boolean;
+  feeWaiverRequested: boolean;
+  feeWaiverReason: string;
 }
 
 const STEPS: { key: WizardStep; label: string; required: boolean }[] = [
@@ -80,6 +82,8 @@ const defaultFilingData: FilingData = {
   documents: [],
   serviceContacts: [],
   paymentComplete: false,
+  feeWaiverRequested: false,
+  feeWaiverReason: '',
 };
 
 function FilingWizard() {
@@ -169,6 +173,8 @@ function FilingWizard() {
           filing_type: filingData.filingType,
           case_title: filingData.caseTitle,
           filing_description: filingData.filingDescription,
+          fee_waiver_requested: filingData.feeWaiverRequested,
+          fee_waiver_reason: filingData.feeWaiverReason || undefined,
         });
         updateData({ filingId: envelope.id });
       } catch (err: unknown) {

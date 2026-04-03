@@ -10,6 +10,7 @@ function Sidebar() {
     { path: '/cases/search', label: 'Case Search' },
     { path: '/favorites', label: 'Favorites' },
     { path: '/clerk/queue', label: 'Clerk Queue' },
+    { path: '/stats', label: 'Coverage Stats' },
   ];
 
   return (

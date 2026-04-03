@@ -2225,3 +2225,150 @@ textarea:focus-visible {
 .companion-requirements li {
   margin-bottom: 0.2rem;
 }
+
+.companion-hint {
+  font-style: italic;
+  color: var(--gray-500);
+  font-size: 0.8rem;
+}
+
+/* ============================================
+   Coverage Stats Page
+   ============================================ */
+
+.stats-page { max-width: 960px; margin: 0 auto; }
+
+.stats-hero {
+  text-align: center;
+  padding: 2rem 0 1.5rem;
+}
+.stats-hero h2 { font-size: 1.8rem; color: var(--primary); margin-bottom: 0.5rem; }
+.stats-hero p { color: var(--gray-600); font-size: 1.05rem; }
+
+.stats-overview {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.stats-section {
+  margin-bottom: 2.5rem;
+}
+.stats-section h3 {
+  font-size: 1.3rem;
+  color: var(--primary);
+  border-bottom: 2px solid var(--primary);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.court-type-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+.court-type-card {
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 1.25rem;
+  text-align: center;
+}
+.court-type-count {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+.court-type-label {
+  font-size: 0.9rem;
+  color: var(--gray-600);
+  margin-top: 0.25rem;
+}
+
+.impact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+}
+.impact-card {
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+.impact-icon {
+  font-size: 1.8rem;
+  margin-bottom: 0.5rem;
+}
+.impact-card h4 {
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+  font-size: 1.05rem;
+}
+.impact-card p {
+  color: var(--gray-700);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.problem-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+.comparison-col {
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+.comparison-col h4 {
+  margin-bottom: 1rem;
+  font-size: 1.05rem;
+}
+.comparison-col ul {
+  list-style: none;
+  padding: 0;
+}
+.comparison-col li {
+  padding: 0.4rem 0 0.4rem 1.5rem;
+  position: relative;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.comparison-current {
+  background: #fff5f5;
+  border: 1px solid var(--danger);
+}
+.comparison-current h4 { color: var(--danger); }
+.comparison-current li::before {
+  content: "\2717";
+  position: absolute;
+  left: 0;
+  color: var(--danger);
+  font-weight: bold;
+}
+.comparison-unified {
+  background: #f0fff4;
+  border: 1px solid var(--success);
+}
+.comparison-unified h4 { color: var(--success); }
+.comparison-unified li::before {
+  content: "\2713";
+  position: absolute;
+  left: 0;
+  color: var(--success);
+  font-weight: bold;
+}
+
+.fee-waiver-section {
+  margin: 1rem 0;
+}
+.fee-waiver-section .alert { margin-bottom: 1rem; }
+.fee-waiver-section p { margin-top: 0.5rem; font-size: 0.9rem; }
+
+@media (max-width: 768px) {
+  .stats-overview { grid-template-columns: repeat(2, 1fr); }
+  .court-type-grid { grid-template-columns: repeat(2, 1fr); }
+  .impact-grid { grid-template-columns: 1fr; }
+  .problem-comparison { grid-template-columns: 1fr; }
+}

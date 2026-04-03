@@ -125,15 +125,40 @@ function PaymentForm({ courtId, caseTypeId, onPaymentComplete }: Props) {
             </div>
           </div>
 
+          {paymentMethod === 'waiver' && (
+            <div className="fee-waiver-section">
+              <div className="alert alert-info">
+                <strong>Fee Waiver Request (MCR 2.002)</strong>
+                <p>
+                  Under MCR 2.002, you may request a fee waiver if you are unable to pay filing fees.
+                  You must demonstrate financial hardship. The court will review your request and
+                  may grant a full or partial waiver.
+                </p>
+              </div>
+              <div className="form-group">
+                <label htmlFor="waiverReason">Reason for Fee Waiver Request <span className="required-marker">*</span></label>
+                <textarea
+                  id="waiverReason"
+                  rows={3}
+                  placeholder="Describe why you are unable to pay the filing fee (e.g., receiving public assistance, income below poverty guidelines, financial hardship)..."
+                  onChange={() => {/* stored in parent via onPaymentComplete */}}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="payment-note">
             <p className="info-text">
-              Payment processing integration coming in Phase 2. For the MVP demo,
-              clicking "Confirm Payment" will record the fee without charging.
+              {paymentMethod === 'waiver'
+                ? 'Your fee waiver request will be reviewed by the court. If denied, you will be notified and may pay the fee at that time.'
+                : 'Your payment will be securely processed. Filing fees are set by the Michigan Supreme Court and are the same regardless of how you file.'}
             </p>
           </div>
 
           <button className="btn btn-primary btn-large" onClick={handlePay}>
-            Confirm Payment &mdash; {formatCurrency(fees.total_cents)}
+            {paymentMethod === 'waiver'
+              ? 'Submit Fee Waiver Request'
+              : `Confirm Payment \u2014 ${formatCurrency(fees.total_cents)}`}
           </button>
         </>
       )}

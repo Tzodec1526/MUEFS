@@ -8,6 +8,7 @@ import ReviewQueue from './components/clerk/ReviewQueue';
 import CaseSearch from './components/search/CaseSearch';
 import Favorites from './components/search/Favorites';
 import CaseDetailPage from './components/search/CaseDetailPage';
+import CoverageStats from './components/stats/CoverageStats';
 import LoginScreen, { getDemoRole } from './components/auth/LoginScreen';
 
 function RequireRole({ children }: { children: React.ReactNode }) {
@@ -154,6 +155,7 @@ function App() {
                     <Route path="/cases/:caseId" element={<CaseDetailPage />} />
                     <Route path="/favorites" element={<Favorites />} />
                     <Route path="/clerk/queue" element={<ReviewQueue />} />
+                    <Route path="/stats" element={<CoverageStats />} />
                     <Route path="/stats" element={<StatsPlaceholder />} />
                   </Routes>
                 </main>

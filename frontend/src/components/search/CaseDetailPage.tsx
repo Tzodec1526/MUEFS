@@ -49,6 +49,7 @@ function CaseDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [togglingFav, setTogglingFav] = useState(false);
+  const [courtName, setCourtName] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -60,6 +61,13 @@ function CaseDetailPage() {
         ]);
         setCaseData(caseRes.data);
         setFilings(filingsRes.data);
+        // Fetch court name
+        try {
+          const courtRes = await apiClient.get(`/courts/${caseRes.data.court_id}`);
+          setCourtName(courtRes.data.name);
+        } catch {
+          setCourtName(`Court #${caseRes.data.court_id}`);
+        }
         setIsFavorited(favsRes.favorites.some((f: { case_id: number }) => f.case_id === Number(caseId)));
       } catch {
         setError('Failed to load case details.');
@@ -153,7 +161,7 @@ function CaseDetailPage() {
           <div className="detail-grid">
             <div><label>Case Number</label><span>{caseData.case_number}</span></div>
             <div><label>Status</label><span className={`status-badge ${caseData.status}`}>{caseData.status}</span></div>
-            <div><label>Court</label><span>Court #{caseData.court_id}</span></div>
+            <div><label>Court</label><span>{courtName}</span></div>
             <div><label>Filed Date</label><span>{formatDate(caseData.filed_date)}</span></div>
           </div>
         </div>

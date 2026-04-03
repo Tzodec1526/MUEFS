@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getClerkQueue, reviewFiling, FilingEnvelope } from '../../api/filings';
+import { apiClient } from '../../api/client';
+
+interface CourtOption { id: number; name: string; county: string; }
 
 function ReviewQueue() {
+  const [courts, setCourts] = useState<CourtOption[]>([]);
   const [courtId, setCourtId] = useState(1);
   const [filings, setFilings] = useState<FilingEnvelope[]>([]);
   const [total, setTotal] = useState(0);
@@ -31,6 +35,21 @@ function ReviewQueue() {
   useEffect(() => {
     fetchQueue();
   }, [fetchQueue]);
+
+  // Fetch courts for dropdown
+  useEffect(() => {
+    async function fetchCourts() {
+      try {
+        const { data } = await apiClient.get('/courts', { params: { page_size: 20 } });
+        setCourts(data.courts || data);
+        if (data.courts?.length > 0 || data.length > 0) {
+          const list = data.courts || data;
+          setCourtId(list[0].id);
+        }
+      } catch { /* use default */ }
+    }
+    fetchCourts();
+  }, []);
 
   // Auto-refresh every 30 seconds, only when tab is visible
   useEffect(() => {
@@ -150,12 +169,11 @@ function ReviewQueue() {
             value={courtId}
             onChange={(e) => { setCourtId(Number(e.target.value)); setSelectedFiling(null); }}
           >
-            <option value={1}>3rd Circuit Court - Wayne County</option>
-            <option value={2}>6th Circuit Court - Oakland County</option>
-            <option value={3}>22nd Circuit Court - Washtenaw County</option>
-            <option value={4}>16th Circuit Court - Macomb County</option>
-            <option value={5}>17th Circuit Court - Kent County</option>
-            <option value={6}>30th Circuit Court - Ingham County</option>
+            {courts.length > 0 ? courts.map(c => (
+              <option key={c.id} value={c.id}>{c.name} - {c.county} County</option>
+            )) : (
+              <option value={1}>3rd Circuit Court - Wayne County</option>
+            )}
           </select>
         </div>
         <div className="form-group">
@@ -328,7 +346,7 @@ function ReviewQueue() {
                 <label htmlFor="quickReason">Reason (required for reject/return)</label>
                 <select
                   id="quickReason"
-                  value=""
+                  value={reviewReason}
                   onChange={(e) => setReviewReason(e.target.value)}
                 >
                   <option value="">-- Select common reason --</option>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { listFilings, FilingEnvelope } from '../../api/filings';
 
 const STATUS_OPTIONS = [
@@ -13,6 +13,7 @@ const STATUS_OPTIONS = [
 ];
 
 function MyFilings() {
+  const navigate = useNavigate();
   const [filings, setFilings] = useState<FilingEnvelope[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -145,12 +146,16 @@ function MyFilings() {
                 )}
                 <div className="filing-card-actions">
                   {filing.status === 'draft' && (
-                    <button className="btn btn-primary btn-small">Continue Filing</button>
+                    <button className="btn btn-primary btn-small" onClick={() => navigate(`/filing/new?filing_id=${filing.id}`)}>Continue Filing</button>
                   )}
                   {filing.status === 'returned' && (
-                    <button className="btn btn-warning btn-small">Resubmit</button>
+                    <button className="btn btn-warning btn-small" onClick={() => navigate(`/filing/new?filing_id=${filing.id}`)}>Resubmit</button>
                   )}
-                  <button className="btn btn-secondary btn-small">View Details</button>
+                  {filing.case_id ? (
+                    <button className="btn btn-secondary btn-small" onClick={() => navigate(`/cases/${filing.case_id}`)}>View Case</button>
+                  ) : (
+                    <button className="btn btn-secondary btn-small" onClick={() => alert(`Filing #${filing.id}: ${filing.case_title}\nStatus: ${filing.status}\nDocuments: ${filing.documents.length}`)}>View Details</button>
+                  )}
                 </div>
               </div>
             );

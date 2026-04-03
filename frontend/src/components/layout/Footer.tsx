@@ -8,7 +8,7 @@ function Footer() {
           Michigan Courts
         </a>
         {' | '}
-        <a href="/docs" target="_blank" rel="noopener noreferrer">
+        <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer">
           API Documentation
         </a>
       </p>

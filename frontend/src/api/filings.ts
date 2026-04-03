@@ -44,6 +44,8 @@ export async function createFiling(data: {
   filing_type?: string;
   case_title?: string;
   filing_description?: string;
+  fee_waiver_requested?: boolean;
+  fee_waiver_reason?: string;
 }): Promise<FilingEnvelope> {
   const response = await apiClient.post('/filings', data);
   return response.data;
