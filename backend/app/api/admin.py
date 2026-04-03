@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user_id
 from app.database import get_db
 from app.models.audit import AuditLog
 from app.models.case import Case
-from app.models.court import Court
+from app.models.court import CaseType, Court, CourtType
 from app.models.filing import FilingEnvelope, FilingStatus
 from app.models.user import User
 
@@ -84,4 +84,48 @@ async def get_audit_log(
         ],
         "page": page,
         "page_size": page_size,
+    }
+
+
+@router.get("/public-stats")
+async def get_public_stats(
+    db: AsyncSession = Depends(get_db),
+):
+    """Public statistics — no auth required. For the coverage dashboard."""
+    # Count courts by type
+    court_type_counts = {}
+    for ct in CourtType:
+        count = (await db.execute(
+            select(func.count()).select_from(Court).where(Court.court_type == ct)
+        )).scalar() or 0
+        court_type_counts[ct.value] = count
+
+    # Count unique counties
+    county_count = (await db.execute(
+        select(func.count(distinct(Court.county))).select_from(Court)
+    )).scalar() or 0
+
+    # Total case types
+    case_type_count = (await db.execute(
+        select(func.count()).select_from(CaseType)
+    )).scalar() or 0
+
+    # Filing stats
+    total_filings = (await db.execute(
+        select(func.count()).select_from(FilingEnvelope)
+    )).scalar() or 0
+
+    accepted_filings = (await db.execute(
+        select(func.count()).select_from(FilingEnvelope).where(
+            FilingEnvelope.status == FilingStatus.ACCEPTED
+        )
+    )).scalar() or 0
+
+    return {
+        "courts_by_type": court_type_counts,
+        "total_courts": sum(court_type_counts.values()),
+        "counties_covered": county_count,
+        "total_case_types": case_type_count,
+        "total_filings": total_filings,
+        "accepted_filings": accepted_filings,
     }

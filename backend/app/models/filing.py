@@ -42,6 +42,9 @@ class FilingEnvelope(Base):
     reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
     rejection_reason: Mapped[str | None] = mapped_column(Text)
     payment_id: Mapped[int | None] = mapped_column(ForeignKey("payments.id"), index=True)
+    fee_waiver_requested: Mapped[bool] = mapped_column(default=False)
+    fee_waiver_granted: Mapped[bool | None] = mapped_column(default=None)
+    fee_waiver_reason: Mapped[str | None] = mapped_column(String(2000))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

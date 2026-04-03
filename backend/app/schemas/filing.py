@@ -27,6 +27,8 @@ class FilingEnvelopeCreate(BaseModel):
     filing_type: str = Field("subsequent", max_length=20)  # "initial", "subsequent", "service_only"
     case_title: str | None = Field(None, max_length=500)
     filing_description: str | None = Field(None, max_length=5000)
+    fee_waiver_requested: bool = False
+    fee_waiver_reason: str | None = Field(None, max_length=2000)
 
 
 class FilingEnvelopeUpdate(BaseModel):
@@ -49,6 +51,9 @@ class FilingEnvelopeResponse(BaseModel):
     reviewer_id: int | None
     rejection_reason: str | None
     payment_id: int | None
+    fee_waiver_requested: bool
+    fee_waiver_granted: bool | None
+    fee_waiver_reason: str | None
     documents: list[FilingDocumentResponse] = []
     created_at: datetime
     updated_at: datetime

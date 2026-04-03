@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,14 +9,11 @@ from app.schemas.user import UserCreate, UserProfile, UserResponse
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-async def get_current_user_id() -> int:
-    """Placeholder for Keycloak JWT validation.
-
-    In production, this decodes the JWT token from the Authorization header,
-    validates it against Keycloak, and returns the user ID.
-    For MVP development, returns a default user ID.
-    """
-    return 1
+async def get_current_user_id(
+    x_demo_user_id: int = Header(default=1, alias="X-Demo-User-Id"),
+) -> int:
+    """Demo mode: user ID comes from header. Production: decode JWT."""
+    return x_demo_user_id
 
 
 async def get_current_user(

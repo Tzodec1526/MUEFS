@@ -18,6 +18,19 @@ apiClient.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Demo mode: send user ID based on selected role
+  const demoRole = localStorage.getItem('demo_role');
+  const roleToUserId: Record<string, number> = {
+    attorney: 1,
+    clerk: 2,
+    admin: 3,
+    self_represented: 4,
+  };
+  if (demoRole && roleToUserId[demoRole]) {
+    config.headers['X-Demo-User-Id'] = roleToUserId[demoRole];
+  }
+
   return config;
 });
 

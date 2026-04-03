@@ -1898,3 +1898,330 @@ textarea:focus-visible {
   .case-detail-actions { width: 100%; }
   .docket-header { flex-direction: column; gap: 0.5rem; }
 }
+
+/* ============================================
+   Login Screen
+   ============================================ */
+
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 50%, var(--primary-light) 100%);
+  padding: 2rem;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 900px;
+  text-align: center;
+}
+
+.login-branding {
+  color: var(--white);
+  margin-bottom: 2.5rem;
+}
+
+.state-seal {
+  font-size: 0.9rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  margin-bottom: 0.75rem;
+}
+
+.login-branding h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.login-subtitle {
+  font-size: 1.1rem;
+  opacity: 0.8;
+}
+
+.login-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.login-card {
+  background: var(--white);
+  border-radius: 10px;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.login-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.login-card-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.login-card-role {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.login-card-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 0.2rem;
+}
+
+.login-card-detail {
+  font-size: 0.85rem;
+  color: var(--gray-500);
+  margin-bottom: 0.75rem;
+}
+
+.login-card-desc {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  margin-bottom: 1.25rem;
+  flex: 1;
+}
+
+.login-card-btn {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.login-footer-note {
+  color: var(--white);
+  opacity: 0.7;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 768px) {
+  .login-cards {
+    grid-template-columns: 1fr;
+    max-width: 360px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .login-branding h1 {
+    font-size: 1.5rem;
+  }
+}
+
+/* ============================================
+   Hero Section (Dashboard)
+   ============================================ */
+
+.hero-section {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  color: var(--white);
+  padding: 3rem 2.5rem;
+  border-radius: 10px;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.hero-section h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.hero-section p {
+  font-size: 1.05rem;
+  opacity: 0.9;
+  max-width: 680px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+.section-heading {
+  margin-bottom: 1rem;
+}
+
+.section-heading h3 {
+  font-size: 1.2rem;
+  color: var(--primary);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ============================================
+   Problem Cards
+   ============================================ */
+
+.problem-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.problem-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-left: 4px solid var(--danger);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.problem-card-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.problem-card h4 {
+  font-size: 1rem;
+  color: var(--gray-900);
+  margin-bottom: 0.5rem;
+}
+
+.problem-card p {
+  font-size: 0.875rem;
+  color: var(--gray-500);
+  line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  .problem-cards { grid-template-columns: 1fr; }
+}
+
+/* ============================================
+   Solution Cards
+   ============================================ */
+
+.solution-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.solution-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-left: 4px solid var(--success);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.solution-card-stat {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 0.5rem;
+}
+
+.solution-card h4 {
+  font-size: 1rem;
+  color: var(--gray-900);
+  margin-bottom: 0.5rem;
+}
+
+.solution-card p {
+  font-size: 0.875rem;
+  color: var(--gray-500);
+  line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  .solution-cards { grid-template-columns: 1fr; }
+}
+
+/* ============================================
+   Coverage Footer
+   ============================================ */
+
+.coverage-footer {
+  text-align: center;
+  padding: 1.5rem;
+  margin-top: 1rem;
+  color: var(--gray-500);
+  font-size: 0.9rem;
+  border-top: 1px solid var(--gray-200);
+}
+
+/* ============================================
+   User Badge (Header)
+   ============================================ */
+
+.user-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--white);
+  vertical-align: middle;
+}
+
+.user-badge-srl {
+  background: var(--warning);
+  color: var(--gray-900);
+}
+
+.header-switch-role {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: var(--white);
+  padding: 0.2rem 0.6rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  margin-left: 0.75rem;
+  transition: background 0.2s;
+}
+
+.header-switch-role:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* ============================================
+   Companion Requirements
+   ============================================ */
+
+.companion-requirements {
+  background: #fffbe6;
+  border: 1px solid var(--warning);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.companion-requirements h5 {
+  font-size: 0.85rem;
+  color: var(--gray-900);
+  margin-bottom: 0.4rem;
+}
+
+.companion-requirements ul {
+  margin: 0.25rem 0 0 1.25rem;
+  color: var(--gray-700);
+}
+
+.companion-requirements li {
+  margin-bottom: 0.2rem;
+}

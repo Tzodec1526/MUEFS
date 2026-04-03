@@ -26,6 +26,8 @@ async def create_filing(
         filing_type=data.filing_type,
         case_title=data.case_title,
         filing_description=data.filing_description,
+        fee_waiver_requested=data.fee_waiver_requested,
+        fee_waiver_reason=data.fee_waiver_reason,
         status=FilingStatus.DRAFT,
     )
     db.add(envelope)

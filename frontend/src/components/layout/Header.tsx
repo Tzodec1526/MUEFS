@@ -1,6 +1,25 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { getDemoRole, getDemoUserName } from '../auth/LoginScreen';
 
 function Header() {
+  const navigate = useNavigate();
+  const role = getDemoRole();
+  const userName = getDemoUserName();
+
+  const handleSwitchRole = () => {
+    localStorage.removeItem('demo_role');
+    localStorage.removeItem('demo_user_name');
+    navigate('/login');
+  };
+
+  const roleLabelMap: Record<string, string> = {
+    attorney: 'Attorney',
+    clerk: 'Court Clerk',
+    srl: 'Self-Represented Litigant',
+  };
+
+  const roleLabel = role ? roleLabelMap[role] || role : '';
+
   return (
     <header className="app-header">
       <div className="header-brand">
@@ -14,7 +33,15 @@ function Header() {
         <Link to="/clerk/queue">Clerk Review</Link>
       </nav>
       <div className="header-user">
-        <span>Demo Attorney</span>
+        <span>{userName || 'Guest'}</span>
+        {role && (
+          <span className={`user-badge ${role === 'srl' ? 'user-badge-srl' : ''}`}>
+            {roleLabel}
+          </span>
+        )}
+        <button className="header-switch-role" onClick={handleSwitchRole}>
+          Switch Role
+        </button>
       </div>
     </header>
   );

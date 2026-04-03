@@ -552,6 +552,13 @@ def seed_database():
                 user_type=UserType.ADMIN,
                 phone="517-555-0300",
             ),
+            User(
+                email="srl@demo.muefs.gov",
+                first_name="Maria",
+                last_name="Williams",
+                user_type=UserType.SELF_REPRESENTED,
+                phone="248-555-0400",
+            ),
         ]
         session.add_all(users)
         session.flush()
