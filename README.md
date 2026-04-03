@@ -4,7 +4,28 @@ A modern, open-source statewide e-filing platform for Michigan courts. Designed 
 
 **Why this exists**: Michigan's current e-filing landscape is fragmented across multiple vendors and systems. Attorneys waste hours navigating incompatible platforms. Self-represented litigants face complex procedures with no guidance. MUEFS demonstrates that a unified, modern alternative is achievable.
 
-## Demo Mode (No Docker Required)
+## MUEFS vs MiFILE
+
+| Feature | MiFILE (Current) | MUEFS |
+|---|---|---|
+| **Court coverage** | Fragmented across vendors | All 256 courts, one login |
+| **Document types** | Varies by vendor | 135+ MCR-referenced types |
+| **Upload limit** | 25 MB | 100 MB |
+| **Fee waiver (MCR 2.002)** | Manual/unclear | Built into payment flow |
+| **Motion companions** | No guidance | Auto-prompts for briefs, proposed orders (MCR 2.119) |
+| **Case favorites** | Not available | Star cases, quick access across sessions |
+| **One-click motion filing** | Re-enter case info every time | Pre-fills court, case, type from case detail |
+| **Clerk review tools** | Basic | Batch accept, age tracking, common rejection reasons |
+| **Cost model** | Per-transaction vendor fees | Open source, no licensing fees |
+| **Vendor lock-in** | Yes | AGPL-3.0, community-driven |
+
+> **Status:** MVP — core filing flow works today. Ready for security audit and court integration discussion.
+
+---
+
+## Try It Now
+
+Clone and run the full demo in 4 commands — no Docker, no database setup:
 
 ```bash
 git clone https://github.com/Tzodec1526/MUEFS.git
@@ -13,10 +34,13 @@ pip install -e ".[test]"
 python run_demo.py
 ```
 
-This starts both backend and frontend using SQLite (no PostgreSQL/Docker needed):
 - **Filing Portal**: http://localhost:3000
 - **API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
+
+Log in as **Attorney**, **Court Clerk**, or **Self-Represented Litigant** to see role-specific interfaces.
+
+---
 
 ## Architecture
 
@@ -69,6 +93,8 @@ MUEFS/
 - **Unified filing** across all 256 Michigan courts from a single login
 - **135+ MCR-referenced document types** with court rule guidance
 - **Companion document alerts** — system tells you when a motion requires a brief (MCR 2.119), meet-and-confer certification (MCR 2.313), or proposed order
+- **One-click motion filing** — open a case, click "File with Court", and court/case/type are pre-filled
+- **Case favorites** — star cases for quick access across sessions
 - **Auto-save drafts** — never lose work in progress
 - **Pre-submission validation** — catch errors before clerk review
 
@@ -129,6 +155,6 @@ npm run build             # Production build
 
 ## License
 
-MIT License — See [LICENSE](LICENSE) for details.
+AGPL-3.0 License — See [LICENSE](LICENSE) for details.
 
 This project is open source to demonstrate that a unified Michigan e-filing system is technically achievable and to remove barriers to implementation.
