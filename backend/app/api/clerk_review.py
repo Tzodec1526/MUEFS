@@ -5,10 +5,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.auth import get_current_user_id
 from app.database import get_db
 from app.models.court import Court
+from app.models.user import CourtRole, UserCourtRole
 from app.schemas.filing import ClerkReviewRequest, FilingEnvelopeResponse, FilingListResponse
 from app.services import audit_service, filing_service, notification_service
 
 router = APIRouter(prefix="/clerk", tags=["Clerk Review"])
+
+
+async def _require_clerk_role(
+    db: AsyncSession, user_id: int, court_id: int,
+) -> None:
+    """Verify user has clerk/judge/admin role for the given court."""
+    result = await db.execute(
+        select(UserCourtRole).where(
+            UserCourtRole.user_id == user_id,
+            UserCourtRole.court_id == court_id,
+            UserCourtRole.role.in_([CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]),
+        )
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized as clerk for this court",
+        )
 
 
 @router.get("/queue", response_model=FilingListResponse)
@@ -19,6 +38,7 @@ async def get_review_queue(
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
+    await _require_clerk_role(db, user_id, court_id)
     filings, total = await filing_service.get_clerk_queue(
         db, court_id, page=page, page_size=page_size
     )
@@ -43,6 +63,14 @@ async def review_filing(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Reason is required for reject/return actions",
         )
+
+    # Look up filing to check court authorization
+    filing_check = await filing_service.get_filing(db, filing_id)
+    if not filing_check:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found"
+        )
+    await _require_clerk_role(db, user_id, filing_check.court_id)
 
     filing = await filing_service.review_filing(
         db, filing_id, reviewer_id=user_id, action=data.action, reason=data.reason

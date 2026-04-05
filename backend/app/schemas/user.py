@@ -15,8 +15,14 @@ class UserBase(BaseModel):
     firm_name: str | None = Field(None, max_length=255)
 
 
-class UserCreate(UserBase):
-    keycloak_id: str | None = Field(None, max_length=255)
+class UserCreate(BaseModel):
+    email: EmailStr
+    first_name: str = Field(..., max_length=100)
+    last_name: str = Field(..., max_length=100)
+    bar_number: str | None = Field(None, max_length=20)
+    phone: str | None = Field(None, max_length=20)
+    firm_name: str | None = Field(None, max_length=255)
+    user_type: UserType = UserType.SELF_REPRESENTED
 
 
 class UserResponse(UserBase):

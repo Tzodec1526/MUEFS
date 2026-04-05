@@ -11,6 +11,8 @@ function Header() {
     localStorage.removeItem('demo_user_name');
     localStorage.removeItem('demo_court_id');
     localStorage.removeItem('demo_court_name');
+    localStorage.removeItem('muefs_filing_draft');
+    localStorage.removeItem('auth_token');
     navigate('/login');
   };
 

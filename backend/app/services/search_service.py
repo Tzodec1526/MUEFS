@@ -5,6 +5,11 @@ from sqlalchemy.orm import selectinload
 from app.models.case import Case, CaseParticipant, CaseStatus
 
 
+def _escape_like(value: str) -> str:
+    """Escape LIKE/ILIKE wildcard characters in user input."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 async def search_cases(
     db: AsyncSession,
     *,
@@ -20,12 +25,14 @@ async def search_cases(
     count_query = select(func.count()).select_from(Case)
 
     if case_number:
-        query = query.where(Case.case_number.ilike(f"%{case_number}%"))
-        count_query = count_query.where(Case.case_number.ilike(f"%{case_number}%"))
+        escaped = _escape_like(case_number)
+        query = query.where(Case.case_number.ilike(f"%{escaped}%"))
+        count_query = count_query.where(Case.case_number.ilike(f"%{escaped}%"))
 
     if party_name:
+        escaped = _escape_like(party_name)
         subq = select(CaseParticipant.case_id).where(
-            CaseParticipant.party_name.ilike(f"%{party_name}%")
+            CaseParticipant.party_name.ilike(f"%{escaped}%")
         )
         query = query.where(Case.id.in_(subq))
         count_query = count_query.where(Case.id.in_(subq))

@@ -1,22 +1,33 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import get_current_user_id
+from app.api.auth import get_current_user
 from app.database import get_db
 from app.models.audit import AuditLog
 from app.models.case import Case
 from app.models.court import CaseType, Court, CourtType
 from app.models.filing import FilingEnvelope, FilingStatus
-from app.models.user import User
+from app.models.user import User, UserType
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+
+
+async def _require_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    if current_user.user_type != UserType.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return current_user
 
 
 @router.get("/stats")
 async def get_system_stats(
     db: AsyncSession = Depends(get_db),
-    _user_id: int = Depends(get_current_user_id),
+    _admin: User = Depends(_require_admin),
 ):
     total_courts = (await db.execute(select(func.count()).select_from(Court))).scalar() or 0
     total_users = (await db.execute(select(func.count()).select_from(User))).scalar() or 0
@@ -53,7 +64,7 @@ async def get_audit_log(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    _current_user_id: int = Depends(get_current_user_id),
+    _admin: User = Depends(_require_admin),
 ):
     query = select(AuditLog).order_by(AuditLog.timestamp.desc())
 

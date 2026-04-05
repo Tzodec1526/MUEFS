@@ -31,10 +31,10 @@ async def process_payment(
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    if data.amount_cents < 0:
+    if data.amount_cents <= 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Payment amount cannot be negative",
+            detail="Payment amount must be positive",
         )
 
     # Look up the filing envelope to validate payment against actual fees
@@ -48,6 +48,13 @@ async def process_payment(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to pay for this filing",
+        )
+
+    # Prevent double-payment
+    if filing.payment_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Payment already processed for this filing",
         )
 
     # Validate amount matches calculated fees
@@ -70,6 +77,10 @@ async def process_payment(
         payer_id=user_id,
         description=f"Filing envelope #{data.envelope_id}",
     )
+
+    # Link payment to filing
+    filing.payment_id = payment.id
+    await db.flush()
 
     await audit_service.log_action(
         db, user_id=user_id, action="process_payment",

@@ -27,8 +27,9 @@ async def list_courts(
     count_query = select(func.count()).select_from(Court)
 
     if county:
-        query = query.where(Court.county.ilike(f"%{county}%"))
-        count_query = count_query.where(Court.county.ilike(f"%{county}%"))
+        escaped = county.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        query = query.where(Court.county.ilike(f"%{escaped}%"))
+        count_query = count_query.where(Court.county.ilike(f"%{escaped}%"))
     if court_type:
         query = query.where(Court.court_type == court_type)
         count_query = count_query.where(Court.court_type == court_type)

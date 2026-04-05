@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.user import User
+from app.models.user import User, UserType
 from app.schemas.user import UserCreate, UserProfile, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -42,6 +42,14 @@ async def register_user(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="User with this email already exists",
+        )
+
+    # Only allow non-privileged user types on self-registration
+    allowed_types = {UserType.ATTORNEY, UserType.SELF_REPRESENTED}
+    if data.user_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot self-register with this user type",
         )
 
     user = User(**data.model_dump())

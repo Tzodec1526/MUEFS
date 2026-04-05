@@ -34,18 +34,35 @@ async def download_document(
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    # Ownership check: verify user owns the filing containing this document
+    # Ownership check: verify user owns the filing or has a court role
     from app.models.filing import FilingEnvelope
+    from app.models.user import CourtRole, UserCourtRole
     filing_result = await db.execute(
         select(FilingEnvelope).where(FilingEnvelope.id == doc.envelope_id)
     )
     filing = filing_result.scalar_one_or_none()
     if not filing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
-    # Allow owner, or any authenticated user for clerk access in MVP
-    # TODO: In production, add role-based check (clerk/judge can access their court's filings)
 
-    if doc.is_confidential and filing.filer_id != user_id:
+    is_owner = filing.filer_id == user_id
+    is_court_staff = False
+    if not is_owner:
+        role_result = await db.execute(
+            select(UserCourtRole).where(
+                UserCourtRole.user_id == user_id,
+                UserCourtRole.court_id == filing.court_id,
+                UserCourtRole.role.in_([CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]),
+            )
+        )
+        is_court_staff = role_result.scalar_one_or_none() is not None
+
+    if not is_owner and not is_court_staff:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this document",
+        )
+
+    if doc.is_confidential and not is_owner:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied: this document is sealed/confidential",
@@ -64,7 +81,7 @@ async def download_document(
 async def verify_document(
     document_id: int,
     db: AsyncSession = Depends(get_db),
-    _user_id: int = Depends(get_current_user_id),
+    user_id: int = Depends(get_current_user_id),
 ):
     result = await db.execute(
         select(FilingDocument).where(FilingDocument.id == document_id)
@@ -72,6 +89,27 @@ async def verify_document(
     doc = result.scalar_one_or_none()
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    # Ownership check
+    from app.models.filing import FilingEnvelope
+    from app.models.user import CourtRole, UserCourtRole
+    filing_result = await db.execute(
+        select(FilingEnvelope).where(FilingEnvelope.id == doc.envelope_id)
+    )
+    filing = filing_result.scalar_one_or_none()
+    if filing and filing.filer_id != user_id:
+        role_result = await db.execute(
+            select(UserCourtRole).where(
+                UserCourtRole.user_id == user_id,
+                UserCourtRole.court_id == filing.court_id,
+                UserCourtRole.role.in_([CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]),
+            )
+        )
+        if not role_result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to verify this document",
+            )
 
     try:
         file_stream = await document_service.download_document(doc.file_key)

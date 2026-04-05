@@ -39,7 +39,7 @@ def detect_mime_type(file_data: bytes) -> str:
     try:
         import magic
         return magic.from_buffer(file_data[:2048], mime=True)
-    except BaseException:
+    except Exception:
         return "application/octet-stream"
 
 
@@ -66,13 +66,22 @@ def validate_mime_type(mime_type: str) -> bool:
     return mime_type in allowed
 
 
+def _safe_local_path(file_key: str) -> Path:
+    """Resolve local path and verify it stays within the storage directory."""
+    base = _local_storage_path().resolve()
+    local_path = (base / file_key).resolve()
+    if not local_path.is_relative_to(base):
+        raise ValueError("Invalid file key: path traversal detected")
+    return local_path
+
+
 async def upload_document(
     file_data: bytes,
     file_key: str,
     content_type: str,
 ) -> str:
     if _is_demo_mode():
-        local_path = _local_storage_path() / file_key
+        local_path = _safe_local_path(file_key)
         local_path.parent.mkdir(parents=True, exist_ok=True)
         local_path.write_bytes(file_data)
         return file_key
@@ -89,7 +98,7 @@ async def upload_document(
 
 async def download_document(file_key: str) -> BinaryIO:
     if _is_demo_mode():
-        local_path = _local_storage_path() / file_key
+        local_path = _safe_local_path(file_key)
         return io.BytesIO(local_path.read_bytes())
 
     client = get_s3_client()
@@ -99,7 +108,7 @@ async def download_document(file_key: str) -> BinaryIO:
 
 async def delete_document(file_key: str) -> None:
     if _is_demo_mode():
-        local_path = _local_storage_path() / file_key
+        local_path = _safe_local_path(file_key)
         if local_path.exists():
             local_path.unlink()
         return
@@ -113,7 +122,7 @@ def get_pdf_page_count(file_data: bytes) -> int | None:
         from pypdf import PdfReader
         reader = PdfReader(io.BytesIO(file_data))
         return len(reader.pages)
-    except BaseException as e:
+    except Exception as e:
         logger.warning("Failed to extract PDF page count: %s", e)
         return None
 
@@ -126,6 +135,6 @@ def is_pdf_text_searchable(file_data: bytes) -> bool:
             return False
         text = reader.pages[0].extract_text()
         return bool(text and text.strip())
-    except BaseException as e:
+    except Exception as e:
         logger.warning("Failed to check PDF text searchability: %s", e)
         return False

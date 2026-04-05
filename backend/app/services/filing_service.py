@@ -139,7 +139,14 @@ async def submit_filing(
     db: AsyncSession,
     filing_id: int,
 ) -> FilingEnvelope | None:
-    filing = await get_filing(db, filing_id)
+    # Lock the row to prevent double-submit
+    result = await db.execute(
+        select(FilingEnvelope)
+        .options(selectinload(FilingEnvelope.documents))
+        .where(FilingEnvelope.id == filing_id)
+        .with_for_update()
+    )
+    filing = result.scalar_one_or_none()
     if not filing or filing.status != FilingStatus.DRAFT:
         return None
 
@@ -166,7 +173,14 @@ async def review_filing(
     action: str,
     reason: str | None = None,
 ) -> FilingEnvelope | None:
-    filing = await get_filing(db, filing_id)
+    # Lock the row to prevent concurrent review
+    result = await db.execute(
+        select(FilingEnvelope)
+        .options(selectinload(FilingEnvelope.documents))
+        .where(FilingEnvelope.id == filing_id)
+        .with_for_update()
+    )
+    filing = result.scalar_one_or_none()
     if not filing or filing.status not in (FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW):
         return None
 

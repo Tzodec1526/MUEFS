@@ -2,6 +2,7 @@ import re
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user_id
@@ -58,9 +59,21 @@ async def get_filing(
     filing = await filing_service.get_filing(db, filing_id)
     if not filing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
-    # TODO: SECURITY - Add ownership/role-based access check here.
-    # Allow owner, or any authenticated user for now (clerk access TBD)
-    # In production, add role-based checks here
+    if filing.filer_id != user_id:
+        # Check if user is a clerk/judge for the filing's court
+        from app.models.user import CourtRole, UserCourtRole
+        role_result = await db.execute(
+            select(UserCourtRole).where(
+                UserCourtRole.user_id == user_id,
+                UserCourtRole.court_id == filing.court_id,
+                UserCourtRole.role.in_([CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]),
+            )
+        )
+        if not role_result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access this filing",
+            )
     return filing
 
 
@@ -126,6 +139,17 @@ async def submit_filing(
             detail="Not authorized to access this filing",
         )
 
+    # Verify payment for non-service-only, non-fee-waiver filings
+    if (
+        filing_check.filing_type != "service_only"
+        and not filing_check.fee_waiver_requested
+        and filing_check.payment_id is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Payment required before submission",
+        )
+
     # Validate before submitting
     validation = await filing_service.validate_filing(db, filing_id)
     if not validation.is_valid:
@@ -179,21 +203,22 @@ async def upload_document(
             detail="Cannot upload documents to this filing",
         )
 
-    # Pre-check file size from Content-Length header before reading into memory
+    # Read file in chunks to prevent memory exhaustion from spoofed Content-Length
     max_bytes = settings.max_file_size_mb * 1024 * 1024
-    if file.size and file.size > max_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File exceeds maximum size of {settings.max_file_size_mb}MB",
-        )
-
-    file_data = await file.read()
-
-    if not document_service.validate_file_size(len(file_data)):
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File exceeds maximum size of {document_service.settings.max_file_size_mb}MB",
-        )
+    chunks: list[bytes] = []
+    total_read = 0
+    while True:
+        chunk = await file.read(65536)  # 64KB chunks
+        if not chunk:
+            break
+        total_read += len(chunk)
+        if total_read > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File exceeds maximum size of {settings.max_file_size_mb}MB",
+            )
+        chunks.append(chunk)
+    file_data = b"".join(chunks)
 
     # Validate MIME type: try content detection first, fall back to HTTP header
     detected_type = document_service.detect_mime_type(file_data)
