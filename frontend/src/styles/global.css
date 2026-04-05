@@ -2381,3 +2381,18 @@ textarea:focus-visible {
   padding: 0.4rem 0;
   display: inline-block;
 }
+
+/* Login page public access section */
+.login-public-access {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e0e0e0;
+}
+.login-public-note {
+  color: #666;
+  font-size: 0.85rem;
+}

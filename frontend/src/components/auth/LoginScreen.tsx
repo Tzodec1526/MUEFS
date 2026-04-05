@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 export function getDemoRole(): string | null {
   return localStorage.getItem('demo_role');
@@ -97,6 +97,13 @@ function LoginScreen() {
               </button>
             </div>
           ))}
+        </div>
+
+        <div className="login-public-access">
+          <Link to="/cases/search" className="btn btn-secondary">
+            Search Court Records
+          </Link>
+          <span className="login-public-note">No account required</span>
         </div>
 
         <div className="login-footer-note">

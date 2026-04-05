@@ -129,6 +129,28 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginScreen />} />
+      {/* Public routes — no login required */}
+      <Route path="/cases/search" element={
+        <div className="app-layout">
+          <Header />
+          <div className="app-body">
+            <Sidebar />
+            <main className="main-content"><CaseSearch /></main>
+          </div>
+          <Footer />
+        </div>
+      } />
+      <Route path="/cases/:caseId" element={
+        <div className="app-layout">
+          <Header />
+          <div className="app-body">
+            <Sidebar />
+            <main className="main-content"><CaseDetailPage /></main>
+          </div>
+          <Footer />
+        </div>
+      } />
+      {/* Authenticated routes */}
       <Route
         path="*"
         element={
@@ -142,8 +164,6 @@ function App() {
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/filing/new" element={<RequireFiler><FilingWizard /></RequireFiler>} />
                     <Route path="/filings" element={<RequireFiler><MyFilings /></RequireFiler>} />
-                    <Route path="/cases/search" element={<CaseSearch />} />
-                    <Route path="/cases/:caseId" element={<CaseDetailPage />} />
                     <Route path="/favorites" element={<RequireFiler><Favorites /></RequireFiler>} />
                     <Route path="/clerk/queue" element={<RequireClerk><ReviewQueue /></RequireClerk>} />
                     <Route path="/stats" element={<CoverageStats />} />
