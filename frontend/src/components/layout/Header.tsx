@@ -28,7 +28,7 @@ function Header() {
     <header className="app-header">
       <div className="header-brand">
         <h1>Michigan Unified E-Filing System</h1>
-        <span className="header-subtitle">State Court Administrative Office</span>
+        <span className="header-subtitle">Open-Source E-Filing Demo</span>
       </div>
       <nav className="header-nav">
         <Link to="/">Dashboard</Link>
