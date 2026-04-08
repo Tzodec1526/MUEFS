@@ -462,7 +462,6 @@ APPEALS_CASE_TYPES = [
 CIVIL_FILING_REQUIREMENTS = [
     ("COMPLAINT", True, "Complaint", "MCR 2.111", None, None),
     ("SUMMONS", True, "Summons (SCAO Form MC 01)", "MCR 2.102", None, None),
-    ("COVER_SHEET", False, "Civil Case Cover Sheet", "MCR 8.119", None, None),
     ("PROOF_SERVICE", True, "Proof of Service", "MCR 2.104", None, None),
     ("FILING_FEE", True, "Filing Fee or Fee Waiver", "MCR 2.002", None, None),
     ("EXHIBIT", False, "Exhibits", None, None, "Attach separately; label clearly"),
