@@ -69,7 +69,19 @@ function LoginScreen() {
     <div className="login-screen">
       <div className="login-container">
         <div className="login-branding">
-          <div className="state-seal">{'\u2694'} STATE OF MICHIGAN {'\u2694'}</div>
+          <div className="state-seal">
+            <svg className="michigan-outline" viewBox="0 0 100 120" width="28" height="34" aria-label="Michigan outline">
+              {/* Upper Peninsula */}
+              <path d="M5,35 L12,30 L20,28 L28,25 L35,27 L42,24 L48,26 L52,23 L55,25 L50,30 L45,33 L40,35 L35,34 L30,36 L25,38 L20,37 L15,38 L10,37Z" fill="currentColor"/>
+              {/* Lower Peninsula */}
+              <path d="M38,42 L45,40 L52,38 L58,40 L65,38 L70,40 L72,45 L74,52 L73,60 L70,68 L68,75 L65,80 L60,85 L55,90 L50,93 L45,90 L40,85 L38,78 L36,70 L35,62 L36,55 L37,48Z" fill="currentColor"/>
+            </svg>
+            STATE OF MICHIGAN
+            <svg className="michigan-outline" viewBox="0 0 100 120" width="28" height="34" aria-label="Michigan outline">
+              <path d="M5,35 L12,30 L20,28 L28,25 L35,27 L42,24 L48,26 L52,23 L55,25 L50,30 L45,33 L40,35 L35,34 L30,36 L25,38 L20,37 L15,38 L10,37Z" fill="currentColor"/>
+              <path d="M38,42 L45,40 L52,38 L58,40 L65,38 L70,40 L72,45 L74,52 L73,60 L70,68 L68,75 L65,80 L60,85 L55,90 L50,93 L45,90 L40,85 L38,78 L36,70 L35,62 L36,55 L37,48Z" fill="currentColor"/>
+            </svg>
+          </div>
           <h1>Michigan Unified E-Filing System</h1>
           <p className="login-subtitle">Statewide Electronic Filing Portal</p>
         </div>

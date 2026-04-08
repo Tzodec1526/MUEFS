@@ -2396,3 +2396,14 @@ textarea:focus-visible {
   color: #666;
   font-size: 0.85rem;
 }
+
+/* Michigan outline SVG in login header */
+.state-seal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.michigan-outline {
+  opacity: 0.9;
+}
