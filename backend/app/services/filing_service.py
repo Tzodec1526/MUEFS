@@ -1,3 +1,4 @@
+import io
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
@@ -125,6 +126,27 @@ async def validate_filing(
                 f"Document '{doc.title}' may not be text-searchable. "
                 "MCR 1.109 requires text-searchable PDFs."
             )
+
+    # PII detection on PDF documents (MCR 1.109 redaction requirements)
+    from app.services import document_service
+    from app.utils.pdf import check_pii_patterns
+
+    for doc in filing.documents:
+        if doc.mime_type == "application/pdf":
+            try:
+                file_stream = await document_service.download_document(doc.file_key)
+                file_data = file_stream.read()
+                from pypdf import PdfReader
+                reader = PdfReader(io.BytesIO(file_data))
+                for page in reader.pages[:5]:  # Check first 5 pages
+                    text = page.extract_text() or ""
+                    pii_warnings = check_pii_patterns(text)
+                    for w in pii_warnings:
+                        warnings.append(f"Document '{doc.title}': {w}")
+                    if pii_warnings:
+                        break  # One warning per doc is enough
+            except Exception:
+                pass  # Skip PII check if file can't be read
 
     is_valid = len(errors) == 0 and len(missing_docs) == 0
     return FilingValidationResult(

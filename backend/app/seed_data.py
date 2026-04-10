@@ -523,6 +523,89 @@ MOTION_FILING_REQUIREMENTS = [
     ("EXHIBIT", False, "Exhibits", None, None, None),
 ]
 
+# District court civil filing requirements
+DISTRICT_CIVIL_REQUIREMENTS = [
+    ("COMPLAINT", True, "Complaint", "MCR 2.111", None, None),
+    ("SUMMONS", True, "Summons (SCAO Form MC 01)", "MCR 2.102", None, None),
+    ("PROOF_SERVICE", True, "Proof of Service", "MCR 2.104", None, None),
+    ("FILING_FEE", True, "Filing Fee or Fee Waiver", "MCR 2.002", None, None),
+    ("EXHIBIT", False, "Exhibits", None, None, "Attach separately; label clearly"),
+]
+
+# Small claims filing requirements
+SMALL_CLAIMS_REQUIREMENTS = [
+    ("SM_AFFIDAVIT", True, "Affidavit and Claim (SCAO Form DC 84)", "MCR 4.302", None, None),
+    ("FILING_FEE", True, "Filing Fee", None, None, None),
+    ("EXHIBIT", False, "Supporting Documents/Evidence", None, None, None),
+]
+
+# Family law filing requirements (circuit courts)
+FAMILY_FILING_REQUIREMENTS = [
+    ("COMPLAINT", True, "Complaint for Divorce", "MCR 3.206", None, None),
+    ("SUMMONS", True, "Summons (SCAO Form MC 01)", "MCR 2.102", None, None),
+    ("VERIFIED_STMT", True, "Verified Statement (SCAO Form FOC 23)", "MCR 3.206(B)", None, None),
+    ("UCCJEA", True, "UCCJEA Affidavit (SCAO Form MC 416)", "MCL 722.1209", None, None),
+    ("PROOF_SERVICE", True, "Proof of Service", "MCR 2.104", None, None),
+    ("FILING_FEE", True, "Filing Fee or Fee Waiver", "MCR 2.002", None, None),
+    ("FRIEND_OF_CT", False, "Friend of Court Recommendation", "MCL 552.505", None, None),
+    ("EXHIBIT", False, "Exhibits", None, None, None),
+]
+
+# PPO filing requirements
+PPO_FILING_REQUIREMENTS = [
+    ("PPO_PETITION", True, "Petition for PPO (SCAO Form CC 375)", "MCL 600.2950", None, None),
+    ("PPO_INFO", True, "PPO Information Sheet", "MCL 600.2950(3)", None, None),
+    ("EXHIBIT", False, "Supporting Evidence", None, None, None),
+]
+
+# Criminal filing requirements (prosecutor-initiated)
+CRIMINAL_FILING_REQUIREMENTS = [
+    ("INFORMATION", True, "Information / Complaint", "MCR 6.112", None, None),
+    ("WARRANT", True, "Arrest Warrant or Summons", "MCR 6.102", None, None),
+    ("PROOF_SERVICE", True, "Proof of Service", "MCR 6.103", None, None),
+]
+
+# Probate filing requirements
+PROBATE_ESTATE_REQUIREMENTS = [
+    ("PETITION", True, "Petition for Probate (SCAO Form PC 558)", "MCL 700.3301", None, None),
+    ("DEATH_CERT", True, "Certified Death Certificate", "MCL 700.3301(1)(a)", None, None),
+    ("WILL_ORIG", False, "Original Will (if testate)", "MCL 700.3402", None, None),
+    ("TESTIMONY", True, "Testimony to Identify Heirs", "MCL 700.3301", None, None),
+    ("FILING_FEE", True, "Filing Fee or Fee Waiver", "MCR 2.002", None, None),
+    ("NOTICE_HEARING", True, "Notice of Hearing", "MCR 5.105", None, None),
+    ("RENUNC", False, "Renunciation / Nomination of PR", "MCL 700.3303", None, None),
+    ("BOND", False, "Bond (if required)", "MCL 700.3603", None, None),
+]
+
+PROBATE_GUARDIANSHIP_REQUIREMENTS = [
+    ("PETITION", True, "Petition for Guardianship (SCAO Form PC 660)", "MCL 700.5303", None, None),
+    ("PHYSICIAN_RPT", True, "Physician Report (SCAO Form PC 625)", "MCL 700.5303(3)", None, None),
+    ("PROOF_SERVICE", True, "Proof of Service on Ward", "MCR 5.105", None, None),
+    ("FILING_FEE", True, "Filing Fee or Fee Waiver", "MCR 2.002", None, None),
+    ("NOTICE_HEARING", True, "Notice of Hearing", "MCR 5.105", None, None),
+    ("BACKGROUND", False, "Background Check / ICHAT", None, None, None),
+]
+
+# Appellate filing requirements
+APPEALS_FILING_REQUIREMENTS = [
+    ("CLAIM_APPEAL", True, "Claim of Appeal", "MCR 7.204(A)", None, None),
+    ("ENTRY_ORDER", True, "Entry of Order Being Appealed", "MCR 7.204(A)(2)", None, None),
+    ("FILING_FEE", True, "Filing Fee", None, None, None),
+    ("TRANSCRIPT_ORDER", True, "Transcript Order Form", "MCR 7.210", None, None),
+    ("DOCKETING_STMT", True, "Docketing Statement", "MCR 7.204(B)", None, None),
+    ("PROOF_SERVICE", True, "Proof of Service", "MCR 7.204(A)(3)", None, None),
+    ("APP_BRIEF", False, "Appellant's Brief", "MCR 7.212", 50, "Due within 56 days"),
+]
+
+SUPREME_COURT_REQUIREMENTS = [
+    ("APP_LEAVE", True, "Application for Leave to Appeal", "MCR 7.305(B)", None, None),
+    ("DECISION_BELOW", True, "Decision of Court of Appeals", "MCR 7.305(B)(1)", None, None),
+    ("FILING_FEE", True, "Filing Fee", None, None, None),
+    ("PROOF_SERVICE", True, "Proof of Service", "MCR 7.305(B)(6)", None, None),
+    ("APP_BRIEF", False, "Supporting Brief", "MCR 7.305(B)(5)", 50, None),
+    ("APPENDIX", False, "Appendix", "MCR 7.305(B)(4)", None, None),
+]
+
 
 def seed_database():
     engine = create_engine(DATABASE_URL, echo=False)
@@ -665,6 +748,157 @@ def seed_database():
                     ),
                 ))
 
+            # Filing requirements for family law cases
+            fam_ct = session.query(CaseType).filter_by(
+                court_id=court.id, code="FAM-DIV"
+            ).first()
+            if fam_ct:
+                for doc_code, required, desc, mcr, page_limit, notes in FAMILY_FILING_REQUIREMENTS:
+                    session.add(FilingRequirement(
+                        court_id=court.id,
+                        case_type_id=fam_ct.id,
+                        document_type_code=doc_code,
+                        is_required=required,
+                        description=desc,
+                        mcr_reference=mcr,
+                        page_limit=page_limit,
+                        format_notes=notes,
+                    ))
+
+            # Filing requirements for PPO
+            ppo_ct = session.query(CaseType).filter_by(
+                court_id=court.id, code="FAM-PPO"
+            ).first()
+            if ppo_ct:
+                for doc_code, required, desc, mcr, page_limit, notes in PPO_FILING_REQUIREMENTS:
+                    session.add(FilingRequirement(
+                        court_id=court.id,
+                        case_type_id=ppo_ct.id,
+                        document_type_code=doc_code,
+                        is_required=required,
+                        description=desc,
+                        mcr_reference=mcr,
+                        page_limit=page_limit,
+                        format_notes=notes,
+                    ))
+
+            # Filing requirements for criminal cases
+            crim_ct = session.query(CaseType).filter_by(
+                court_id=court.id, code="CR-FEL"
+            ).first()
+            if crim_ct:
+                for (doc_code, required, desc,
+                     mcr, page_limit, notes) in CRIMINAL_FILING_REQUIREMENTS:
+                    session.add(FilingRequirement(
+                        court_id=court.id,
+                        case_type_id=crim_ct.id,
+                        document_type_code=doc_code,
+                        is_required=required,
+                        description=desc,
+                        mcr_reference=mcr,
+                        page_limit=page_limit,
+                        format_notes=notes,
+                    ))
+
+            # Motion filing requirements for civil cases
+            if civil_ct:
+                for doc_code, required, desc, mcr, page_limit, notes in MOTION_FILING_REQUIREMENTS:
+                    session.add(FilingRequirement(
+                        court_id=court.id,
+                        case_type_id=civil_ct.id,
+                        document_type_code=doc_code,
+                        is_required=required,
+                        description=desc,
+                        mcr_reference=mcr,
+                        page_limit=page_limit,
+                        format_notes=notes,
+                    ))
+
+                # Additional motion checklists
+                session.add(FilingChecklist(
+                    court_id=court.id,
+                    case_type_id=civil_ct.id,
+                    motion_type="General Motion (MCR 2.119)",
+                    checklist_items={
+                        "items": [
+                            {"label": "Motion", "required": True},
+                            {"label": "Brief in Support", "required": True},
+                            {"label": "Proposed Order", "required": True},
+                            {"label": "Notice of Hearing (9 days before)", "required": True},
+                            {"label": "Proof of Service", "required": True},
+                            {"label": "Supporting Affidavits", "required": False},
+                        ]
+                    },
+                    help_text=(
+                        "MCR 2.119 governs all motion practice."
+                        " Brief limited to 20 pages. Notice of"
+                        " hearing must be served at least 9 days"
+                        " before the hearing date."
+                    ),
+                    mcr_url=(
+                        "https://courts.michigan.gov/courts/"
+                        "michigansupremecourt/rules/court-rules-702/"
+                        "chapter-2-civil-procedure/subchapter-2100"
+                        "-pleadings-and-motions/rule-2119-motion-practice"
+                    ),
+                ))
+
+                session.add(FilingChecklist(
+                    court_id=court.id,
+                    case_type_id=civil_ct.id,
+                    motion_type="Discovery Motion (MCR 2.313)",
+                    checklist_items={
+                        "items": [
+                            {"label": "Motion to Compel / Protective Order", "required": True},
+                            {"label": "Brief in Support", "required": True},
+                            {"label": "Meet-and-Confer Certification", "required": True},
+                            {"label": "Proposed Order", "required": True},
+                            {"label": "Proof of Service", "required": True},
+                            {"label": "Copy of Discovery Request at Issue", "required": False},
+                        ]
+                    },
+                    help_text=(
+                        "MCR 2.313 requires a meet-and-confer"
+                        " certification stating counsel attempted"
+                        " to resolve the dispute before filing."
+                        " Failure to include may result in denial."
+                    ),
+                    mcr_url=(
+                        "https://courts.michigan.gov/courts/"
+                        "michigansupremecourt/rules/court-rules-702/"
+                        "chapter-2-civil-procedure/subchapter-2300"
+                        "-discovery/rule-2313-failure-to-provide"
+                        "-discovery-sanctions"
+                    ),
+                ))
+
+                session.add(FilingChecklist(
+                    court_id=court.id,
+                    case_type_id=civil_ct.id,
+                    motion_type="Default Judgment (MCR 2.603)",
+                    checklist_items={
+                        "items": [
+                            {"label": "Request / Motion for Default", "required": True},
+                            {"label": "Affidavit of Non-Military Service", "required": True},
+                            {"label": "Proof of Service of Process", "required": True},
+                            {"label": "Proposed Default Judgment", "required": True},
+                            {"label": "Affidavit of Damages (if unliquidated)", "required": False},
+                        ]
+                    },
+                    help_text=(
+                        "MCR 2.603. Default may be entered if"
+                        " defendant fails to plead or defend"
+                        " within 21 days of service. Must verify"
+                        " non-military status under SCRA."
+                    ),
+                    mcr_url=(
+                        "https://courts.michigan.gov/courts/"
+                        "michigansupremecourt/rules/court-rules-702/"
+                        "chapter-2-civil-procedure/subchapter-2600"
+                        "-judgment/rule-2603-default-default-judgment"
+                    ),
+                ))
+
             # Add filing requirements for domesticating subpoena
             subp_ct = session.query(CaseType).filter_by(
                 court_id=court.id, code="CIV-SUBP"
@@ -711,6 +945,60 @@ def seed_database():
                     filing_fee_cents=fee,
                 ))
 
+            session.flush()
+
+            # Filing requirements for district civil cases
+            dc_civil = session.query(CaseType).filter_by(
+                court_id=court.id, code="CIV-GEN"
+            ).first()
+            if dc_civil:
+                for doc_code, required, desc, mcr, page_limit, notes in DISTRICT_CIVIL_REQUIREMENTS:
+                    session.add(FilingRequirement(
+                        court_id=court.id,
+                        case_type_id=dc_civil.id,
+                        document_type_code=doc_code,
+                        is_required=required,
+                        description=desc,
+                        mcr_reference=mcr,
+                        page_limit=page_limit,
+                        format_notes=notes,
+                    ))
+
+            # Filing requirements for small claims
+            dc_sm = session.query(CaseType).filter_by(
+                court_id=court.id, code="SM-CLM"
+            ).first()
+            if dc_sm:
+                for doc_code, required, desc, mcr, page_limit, notes in SMALL_CLAIMS_REQUIREMENTS:
+                    session.add(FilingRequirement(
+                        court_id=court.id,
+                        case_type_id=dc_sm.id,
+                        document_type_code=doc_code,
+                        is_required=required,
+                        description=desc,
+                        mcr_reference=mcr,
+                        page_limit=page_limit,
+                        format_notes=notes,
+                    ))
+
+            # Filing requirements for criminal cases
+            dc_crim = session.query(CaseType).filter_by(
+                court_id=court.id, code="CR-MISD"
+            ).first()
+            if dc_crim:
+                for (doc_code, required, desc,
+                     mcr, page_limit, notes) in CRIMINAL_FILING_REQUIREMENTS:
+                    session.add(FilingRequirement(
+                        court_id=court.id,
+                        case_type_id=dc_crim.id,
+                        document_type_code=doc_code,
+                        is_required=required,
+                        description=desc,
+                        mcr_reference=mcr,
+                        page_limit=page_limit,
+                        format_notes=notes,
+                    ))
+
             dc_count += 1
 
         print(f"  Created {dc_count} district courts")
@@ -738,6 +1026,43 @@ def seed_database():
                     category=category,
                     filing_fee_cents=fee,
                 ))
+
+            session.flush()
+
+            # Filing requirements for estate cases
+            pc_estate = session.query(CaseType).filter_by(
+                court_id=court.id, code="PR-EST"
+            ).first()
+            if pc_estate:
+                for doc_code, required, desc, mcr, page_limit, notes in PROBATE_ESTATE_REQUIREMENTS:
+                    session.add(FilingRequirement(
+                        court_id=court.id,
+                        case_type_id=pc_estate.id,
+                        document_type_code=doc_code,
+                        is_required=required,
+                        description=desc,
+                        mcr_reference=mcr,
+                        page_limit=page_limit,
+                        format_notes=notes,
+                    ))
+
+            # Filing requirements for guardianship cases
+            pc_guard = session.query(CaseType).filter_by(
+                court_id=court.id, code="PR-GRDN"
+            ).first()
+            if pc_guard:
+                for (doc_code, required, desc,
+                     mcr, page_limit, notes) in PROBATE_GUARDIANSHIP_REQUIREMENTS:
+                    session.add(FilingRequirement(
+                        court_id=court.id,
+                        case_type_id=pc_guard.id,
+                        document_type_code=doc_code,
+                        is_required=required,
+                        description=desc,
+                        mcr_reference=mcr,
+                        page_limit=page_limit,
+                        format_notes=notes,
+                    ))
 
             pc_count += 1
 
@@ -794,6 +1119,25 @@ def seed_database():
                     filing_fee_cents=fee,
                 ))
 
+            session.flush()
+
+            # Filing requirements for appeals
+            app_civil = session.query(CaseType).filter_by(
+                court_id=court.id, code="APP-CIV"
+            ).first()
+            if app_civil:
+                for doc_code, required, desc, mcr, page_limit, notes in APPEALS_FILING_REQUIREMENTS:
+                    session.add(FilingRequirement(
+                        court_id=court.id,
+                        case_type_id=app_civil.id,
+                        document_type_code=doc_code,
+                        is_required=required,
+                        description=desc,
+                        mcr_reference=mcr,
+                        page_limit=page_limit,
+                        format_notes=notes,
+                    ))
+
         print("  Created 4 Court of Appeals districts")
 
         # --- Supreme Court ---
@@ -817,6 +1161,25 @@ def seed_database():
                 category=category,
                 filing_fee_cents=fee + 12500,  # Supreme Court fees are higher
             ))
+
+        session.flush()
+
+        # Filing requirements for Supreme Court
+        sc_civil = session.query(CaseType).filter_by(
+            court_id=court.id, code="APP-CIV"
+        ).first()
+        if sc_civil:
+            for doc_code, required, desc, mcr, page_limit, notes in SUPREME_COURT_REQUIREMENTS:
+                session.add(FilingRequirement(
+                    court_id=court.id,
+                    case_type_id=sc_civil.id,
+                    document_type_code=doc_code,
+                    is_required=required,
+                    description=desc,
+                    mcr_reference=mcr,
+                    page_limit=page_limit,
+                    format_notes=notes,
+                ))
 
         print("  Created Michigan Supreme Court")
 
