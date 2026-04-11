@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,6 +8,7 @@ from app.models.court import Court
 from app.models.user import CourtRole, UserCourtRole
 from app.schemas.filing import ClerkReviewRequest, FilingEnvelopeResponse, FilingListResponse
 from app.services import audit_service, filing_service, notification_service
+from app.utils.http_context import client_ip, client_user_agent
 
 router = APIRouter(prefix="/clerk", tags=["Clerk Review"])
 
@@ -47,6 +48,7 @@ async def get_review_queue(
 
 @router.post("/filings/{filing_id}/review", response_model=FilingEnvelopeResponse)
 async def review_filing(
+    request: Request,
     filing_id: int,
     data: ClerkReviewRequest,
     db: AsyncSession = Depends(get_db),
@@ -84,9 +86,14 @@ async def review_filing(
     await db.refresh(filing, ["documents"])
 
     await audit_service.log_action(
-        db, user_id=user_id, action=f"review_filing_{data.action}",
-        entity_type="filing_envelope", entity_id=filing_id,
+        db,
+        user_id=user_id,
+        action=f"review_filing_{data.action}",
+        entity_type="filing_envelope",
+        entity_id=filing_id,
         details={"action": data.action, "reason": data.reason},
+        ip_address=client_ip(request),
+        user_agent=client_user_agent(request),
     )
 
     # Look up actual court name for notification

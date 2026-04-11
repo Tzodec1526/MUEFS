@@ -79,22 +79,3 @@ class FilingDocument(Base):
     )
 
     envelope: Mapped["FilingEnvelope"] = relationship(back_populates="documents")
-    versions: Mapped[list["DocumentVersion"]] = relationship(back_populates="document")
-
-
-class DocumentVersion(Base):
-    __tablename__ = "document_versions"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    filing_document_id: Mapped[int] = mapped_column(
-        ForeignKey("filing_documents.id"), index=True
-    )
-    version: Mapped[int] = mapped_column(Integer, default=1)
-    file_key: Mapped[str] = mapped_column(String(500))
-    file_size_bytes: Mapped[int] = mapped_column(Integer)
-    sha256_hash: Mapped[str] = mapped_column(String(64))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
-
-    document: Mapped["FilingDocument"] = relationship(back_populates="versions")

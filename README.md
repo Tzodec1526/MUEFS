@@ -40,6 +40,10 @@ python run_demo.py
 
 Log in as **Attorney**, **Court Clerk**, or **Self-Represented Litigant** to see role-specific interfaces.
 
+### Stakeholder demo (presenting to non-developers)
+
+See **[docs/STAKEHOLDER_DEMO.md](docs/STAKEHOLDER_DEMO.md)** for a **10–15 minute walkthrough script**, what to say about simulated identity/payments, and troubleshooting. The UI shows a purple **“Demonstration build”** bar when demo mode is enabled.
+
 ---
 
 ## Architecture
@@ -78,7 +82,7 @@ MUEFS/
 │   │   ├── schemas/   # Pydantic schemas
 │   │   ├── services/  # Business logic
 │   │   └── seed_data.py  # Michigan court data
-│   └── tests/         # 35 backend tests
+│   └── tests/         # backend tests (pytest + HTTP smoke)
 ├── frontend/          # React frontend
 │   └── src/
 │       ├── components/  # Filing wizard, clerk queue, case search
@@ -119,7 +123,7 @@ MUEFS/
 ```bash
 cd backend
 pip install -e ".[test]"
-pytest tests/ -v          # Run 35 tests
+pytest tests/ -v          # Run full suite (includes HTTP smoke: /health, /docs)
 uvicorn app.main:app --reload
 ```
 

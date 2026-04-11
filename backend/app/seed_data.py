@@ -1206,6 +1206,7 @@ def seed_database():
         now = datetime.now(UTC)
         attorney = users[0]  # Jane Doe, P12345
         clerk_user = users[1]  # Robert Johnson
+        srl_user = users[3]  # Maria Williams — linked to case 2 for access-control demos
 
         # Get the 3rd Circuit Court (Wayne County - Detroit)
         wayne_circuit = session.query(Court).filter_by(
@@ -1323,7 +1324,9 @@ def seed_database():
             session.flush()
 
             session.add(CaseParticipant(
-                case_id=case2.id, role=ParticipantRole.PLAINTIFF,
+                case_id=case2.id,
+                user_id=srl_user.id,
+                role=ParticipantRole.PLAINTIFF,
                 party_name="Maria Williams",
             ))
             session.add(CaseParticipant(

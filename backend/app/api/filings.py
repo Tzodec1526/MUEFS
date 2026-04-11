@@ -1,8 +1,17 @@
 import re
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
-from sqlalchemy import select
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user_id
@@ -17,21 +26,28 @@ from app.schemas.filing import (
     FilingListResponse,
     FilingValidationResult,
 )
-from app.services import audit_service, document_service, filing_service
+from app.services import access_service, audit_service, document_service, filing_service
+from app.utils.http_context import client_ip, client_user_agent
 
 router = APIRouter(prefix="/filings", tags=["Filings"])
 
 
 @router.post("", response_model=FilingEnvelopeResponse, status_code=status.HTTP_201_CREATED)
 async def create_filing(
+    request: Request,
     data: FilingEnvelopeCreate,
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
     envelope = await filing_service.create_filing(db, user_id, data)
     await audit_service.log_action(
-        db, user_id=user_id, action="create_filing",
-        entity_type="filing_envelope", entity_id=envelope.id,
+        db,
+        user_id=user_id,
+        action="create_filing",
+        entity_type="filing_envelope",
+        entity_id=envelope.id,
+        ip_address=client_ip(request),
+        user_agent=client_user_agent(request),
     )
     return envelope
 
@@ -59,21 +75,11 @@ async def get_filing(
     filing = await filing_service.get_filing(db, filing_id)
     if not filing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
-    if filing.filer_id != user_id:
-        # Check if user is a clerk/judge for the filing's court
-        from app.models.user import CourtRole, UserCourtRole
-        role_result = await db.execute(
-            select(UserCourtRole).where(
-                UserCourtRole.user_id == user_id,
-                UserCourtRole.court_id == filing.court_id,
-                UserCourtRole.role.in_([CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]),
-            )
+    if not await access_service.user_may_read_filing_envelope(db, user_id, filing):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access this filing",
         )
-        if not role_result.scalar_one_or_none():
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to access this filing",
-            )
     return filing
 
 
@@ -125,6 +131,7 @@ async def validate_filing(
 
 @router.post("/{filing_id}/submit", response_model=FilingEnvelopeResponse)
 async def submit_filing(
+    request: Request,
     filing_id: int,
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
@@ -176,14 +183,20 @@ async def submit_filing(
     await db.refresh(filing, ["documents"])
 
     await audit_service.log_action(
-        db, user_id=user_id, action="submit_filing",
-        entity_type="filing_envelope", entity_id=filing_id,
+        db,
+        user_id=user_id,
+        action="submit_filing",
+        entity_type="filing_envelope",
+        entity_id=filing_id,
+        ip_address=client_ip(request),
+        user_agent=client_user_agent(request),
     )
     return filing
 
 
 @router.post("/{filing_id}/documents", response_model=DocumentUploadResponse)
 async def upload_document(
+    request: Request,
     filing_id: int,
     file: UploadFile = File(...),
     document_type_code: str = Form(...),
@@ -261,9 +274,14 @@ async def upload_document(
         await db.refresh(doc)
 
         await audit_service.log_action(
-            db, user_id=user_id, action="upload_document",
-            entity_type="filing_document", entity_id=doc.id,
+            db,
+            user_id=user_id,
+            action="upload_document",
+            entity_type="filing_document",
+            entity_id=doc.id,
             details={"filing_id": filing_id, "filename": file.filename},
+            ip_address=client_ip(request),
+            user_agent=client_user_agent(request),
         )
     except Exception:
         # Clean up orphaned S3 object if DB operations fail
@@ -283,6 +301,7 @@ async def upload_document(
 
 @router.delete("/{filing_id}/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_document(
+    request: Request,
     filing_id: int,
     document_id: int,
     db: AsyncSession = Depends(get_db),
@@ -294,6 +313,13 @@ async def remove_document(
     if filing.filer_id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your filing")
 
+    # Record immutability: only draft/returned envelopes may drop attachments (court retention).
+    if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Submitted filings cannot be altered by removing documents",
+        )
+
     doc = next((d for d in filing.documents if d.id == document_id), None)
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
@@ -303,3 +329,14 @@ async def remove_document(
     await db.delete(doc)
     await db.flush()
     await document_service.delete_document(file_key)
+
+    await audit_service.log_action(
+        db,
+        user_id=user_id,
+        action="remove_document",
+        entity_type="filing_document",
+        entity_id=document_id,
+        details={"filing_id": filing_id},
+        ip_address=client_ip(request),
+        user_agent=client_user_agent(request),
+    )

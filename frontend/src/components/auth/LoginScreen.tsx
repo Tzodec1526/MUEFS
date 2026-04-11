@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { isDemoBuild } from '../../config/demoMode';
 
 export function getDemoRole(): string | null {
   return localStorage.getItem('demo_role');
@@ -67,6 +68,12 @@ function LoginScreen() {
 
   return (
     <div className="login-screen">
+      {isDemoBuild() && (
+        <div className="demo-stakeholder-banner demo-stakeholder-banner--login" role="status">
+          <strong>Stakeholder demo</strong>
+          {' — '}Pick a role below. No passwords; this is a guided product walkthrough.
+        </div>
+      )}
       <div className="login-container">
         <div className="login-branding">
           <div className="state-seal">
@@ -108,14 +115,16 @@ function LoginScreen() {
         </div>
 
         <div className="login-public-access">
+          <p className="login-public-note">
+            Case search requires an authenticated session (court privacy). Select a role below, then use Search.
+          </p>
           <Link to="/cases/search" className="btn btn-secondary">
             Search Court Records
           </Link>
-          <span className="login-public-note">No account required</span>
         </div>
 
         <div className="login-footer-note">
-          Demo Mode &mdash; Select a role to explore the system
+          Demo Mode &mdash; Select a role to explore the system (set VITE_ALLOW_DEMO_MODE=true with ALLOW_DEMO_MODE=true)
         </div>
       </div>
     </div>

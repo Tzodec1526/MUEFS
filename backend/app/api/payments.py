@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user_id
+from app.config import settings
 from app.database import get_db
 from app.schemas.payment import (
     PaymentCalculateRequest,
@@ -10,6 +11,7 @@ from app.schemas.payment import (
     PaymentResponse,
 )
 from app.services import audit_service, filing_service, payment_service
+from app.utils.http_context import client_ip, client_user_agent
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
@@ -27,6 +29,7 @@ async def calculate_fees(
 
 @router.post("/process", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
 async def process_payment(
+    request: Request,
     data: PaymentProcessRequest,
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
@@ -83,9 +86,27 @@ async def process_payment(
     await db.flush()
 
     await audit_service.log_action(
-        db, user_id=user_id, action="process_payment",
-        entity_type="payment", entity_id=payment.id,
+        db,
+        user_id=user_id,
+        action="process_payment",
+        entity_type="payment",
+        entity_id=payment.id,
         details={"amount_cents": data.amount_cents, "envelope_id": data.envelope_id},
+        ip_address=client_ip(request),
+        user_agent=client_user_agent(request),
     )
 
-    return payment
+    return PaymentResponse.model_validate(
+        payment,
+        from_attributes=True,
+    ).model_copy(
+        update={
+            "is_simulated": settings.payments_are_simulated,
+            "simulation_notice": (
+                "No card or ACH data is collected in this build. "
+                "This transaction is recorded for workflow testing only."
+                if settings.payments_are_simulated
+                else ""
+            ),
+        },
+    )

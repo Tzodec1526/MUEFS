@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     # App
     secret_key: str = "change-this-to-a-random-secret-in-production"
     debug: bool = True
+    # Court compliance: NEVER enable in production. Allows X-Demo-User-Id header auth.
+    allow_demo_mode: bool = False
     allowed_origins: str = "http://localhost:3000,http://localhost:5173,http://0.0.0.0:3000"
 
     # Email
@@ -34,6 +36,22 @@ class Settings(BaseSettings):
 
     # Document processing
     max_file_size_mb: int = 100
+
+    # Registration: self-serve POST /auth/register (demo only in typical court deploys)
+    allow_public_registration: bool = False
+
+    # OIDC: create User on first Bearer login when no keycloak_id match (needs email in token)
+    provision_user_on_first_oidc_login: bool = True
+
+    # Rate limiting (set backend=redis in Docker / when Redis is reachable)
+    rate_limit_enabled: bool = True
+    rate_limit_backend: str = "memory"  # redis | memory
+    rate_limit_default_per_minute: int = 120
+    rate_limit_search_per_minute: int = 30
+    rate_limit_document_per_minute: int = 60
+
+    # Payments: no PSP integration in this repo — UI/API must reflect simulation
+    payments_are_simulated: bool = True
 
     @property
     def allowed_origins_list(self) -> list[str]:

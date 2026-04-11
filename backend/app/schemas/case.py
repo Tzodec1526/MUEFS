@@ -51,8 +51,33 @@ class CaseSearchParams(BaseModel):
     page_size: int = 25
 
 
+class CaseSearchParticipantPublic(BaseModel):
+    """Search index: party/counsel identifiers only — no contact PII (court privacy)."""
+
+    party_name: str
+    role: ParticipantRole
+    attorney_bar_number: str | None = None
+
+
+class CaseSearchItemResponse(BaseModel):
+    """Authenticated case search row; participant contacts omitted vs full CaseResponse."""
+
+    id: int
+    court_id: int
+    case_number: str
+    case_type_id: int
+    title: str
+    status: CaseStatus
+    filed_date: datetime
+    judge_id: int | None
+    created_at: datetime
+    participants: list[CaseSearchParticipantPublic] = []
+
+    model_config = {"from_attributes": True}
+
+
 class CaseSearchResponse(BaseModel):
-    cases: list[CaseResponse]
+    cases: list[CaseSearchItemResponse]
     total: int
     page: int
     page_size: int

@@ -1,5 +1,10 @@
 """Test configuration and fixtures."""
 
+import os
+
+# Before any app.settings load: keep tests from depending on Redis for rate limiting.
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
+
 import asyncio
 from collections.abc import AsyncGenerator
 

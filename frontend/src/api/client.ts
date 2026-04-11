@@ -19,17 +19,25 @@ apiClient.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
-  // Demo mode: send user ID based on selected role
-  const demoRole = localStorage.getItem('demo_role');
-  const roleToUserId: Record<string, number> = {
-    attorney: 1,
-    clerk: 2,
-    admin: 3,
-    self_represented: 4,
-    srl: 4,
-  };
-  if (demoRole && roleToUserId[demoRole]) {
-    config.headers['X-Demo-User-Id'] = roleToUserId[demoRole];
+  // Demo only: production builds require explicit VITE_ALLOW_DEMO_MODE=true|1.
+  // Dev server defaults to on unless VITE_ALLOW_DEMO_MODE is false|0 (local UX).
+  const rawDemo = import.meta.env.VITE_ALLOW_DEMO_MODE;
+  const demoHeadersOn =
+    rawDemo === 'true' ||
+    rawDemo === '1' ||
+    (import.meta.env.DEV && rawDemo !== 'false' && rawDemo !== '0');
+  if (demoHeadersOn) {
+    const demoRole = localStorage.getItem('demo_role');
+    const roleToUserId: Record<string, number> = {
+      attorney: 1,
+      clerk: 2,
+      admin: 3,
+      self_represented: 4,
+      srl: 4,
+    };
+    if (demoRole && roleToUserId[demoRole]) {
+      config.headers['X-Demo-User-Id'] = String(roleToUserId[demoRole]);
+    }
   }
 
   return config;

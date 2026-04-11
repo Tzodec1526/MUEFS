@@ -13,6 +13,8 @@ function PaymentForm({ courtId, caseTypeId, onPaymentComplete }: Props) {
     total_cents: number;
     fee_description: string;
     additional_fees: Array<{ fee_type: string; amount_cents: number; description: string }>;
+    is_simulated?: boolean;
+    simulation_notice?: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState('credit_card');
@@ -56,6 +58,7 @@ function PaymentForm({ courtId, caseTypeId, onPaymentComplete }: Props) {
   }
 
   if (completed) {
+    const wasSimulated = fees?.is_simulated !== false;
     return (
       <div className="form-section">
         <h3>Filing Fees</h3>
@@ -63,7 +66,9 @@ function PaymentForm({ courtId, caseTypeId, onPaymentComplete }: Props) {
           <span className="payment-check">&#10003;</span>
           <p>
             {fees && fees.total_cents > 0
-              ? `Payment of ${formatCurrency(fees.total_cents)} confirmed.`
+              ? wasSimulated
+                ? `Simulated payment of ${formatCurrency(fees.total_cents)} recorded (no charge).`
+                : `Payment of ${formatCurrency(fees.total_cents)} confirmed.`
               : 'No filing fee required for this case type.'}
           </p>
         </div>
@@ -71,9 +76,22 @@ function PaymentForm({ courtId, caseTypeId, onPaymentComplete }: Props) {
     );
   }
 
+  const showSimulated =
+    fees?.is_simulated !== false &&
+    (fees?.simulation_notice || fees?.is_simulated === true);
+
   return (
     <div className="form-section">
       <h3>Filing Fees</h3>
+      {showSimulated && (
+        <div className="alert alert-info" role="status">
+          <strong>Simulated payment</strong>
+          <p>
+            {fees?.simulation_notice ||
+              'No card or bank data is sent. This demo records fees for workflow testing only.'}
+          </p>
+        </div>
+      )}
       <p className="info-text">
         Review the fees below and select a payment method to continue.
       </p>
@@ -153,14 +171,18 @@ function PaymentForm({ courtId, caseTypeId, onPaymentComplete }: Props) {
             <p className="info-text">
               {paymentMethod === 'waiver'
                 ? 'Your fee waiver request will be reviewed by the court. If denied, you will be notified and may pay the fee at that time.'
-                : 'Your payment will be securely processed. Filing fees are set by the Michigan Supreme Court and are the same regardless of how you file.'}
+                : showSimulated
+                  ? 'Confirming below only advances the filing wizard in this demo. Connect a payment service provider for production.'
+                  : 'Your payment will be securely processed. Filing fees are set by the Michigan Supreme Court and are the same regardless of how you file.'}
             </p>
           </div>
 
           <button className="btn btn-primary btn-large" onClick={handlePay}>
             {paymentMethod === 'waiver'
               ? 'Submit Fee Waiver Request'
-              : `Confirm Payment \u2014 ${formatCurrency(fees.total_cents)}`}
+              : showSimulated
+                ? `Confirm (simulated) \u2014 ${formatCurrency(fees.total_cents)}`
+                : `Confirm Payment \u2014 ${formatCurrency(fees.total_cents)}`}
           </button>
         </>
       )}

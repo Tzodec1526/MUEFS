@@ -105,6 +105,11 @@ services:
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-muefs-api}
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-change-me-in-production}
       SECRET_KEY: ${SECRET_KEY:-change-this-to-a-random-secret-in-production}
+      # Local stack: true (X-Demo-User-Id). Production deploys: must be false.
+      ALLOW_DEMO_MODE: ${ALLOW_DEMO_MODE:-true}
+      ALLOW_PUBLIC_REGISTRATION: ${ALLOW_PUBLIC_REGISTRATION:-true}
+      PROVISION_USER_ON_FIRST_OIDC_LOGIN: ${PROVISION_USER_ON_FIRST_OIDC_LOGIN:-true}
+      RATE_LIMIT_BACKEND: ${RATE_LIMIT_BACKEND:-redis}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
       SMTP_HOST: ${SMTP_HOST:-mailhog}
       SMTP_PORT: ${SMTP_PORT:-1025}
@@ -166,6 +171,7 @@ services:
       - ./frontend/src:/app/src
     environment:
       VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+      VITE_ALLOW_DEMO_MODE: ${VITE_ALLOW_DEMO_MODE:-true}
       VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-http://localhost:8080}
       VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-muefs}
       VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-muefs-frontend}

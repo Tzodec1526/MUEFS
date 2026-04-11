@@ -89,6 +89,7 @@ async def get_audit_log(
                 "entity_id": e.entity_id,
                 "details": e.details,
                 "ip_address": e.ip_address,
+                "user_agent": e.user_agent,
                 "timestamp": e.timestamp.isoformat() if e.timestamp else None,
             }
             for e in entries

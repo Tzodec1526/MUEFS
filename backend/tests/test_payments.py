@@ -26,6 +26,9 @@ async def test_calculate_fees(db_session):
     result = await payment_service.calculate_fees(db_session, court.id, case_type.id)
     assert result.filing_fee_cents == 17500
     assert result.total_cents >= 17500
+    assert result.is_simulated is True
+    notice = result.simulation_notice.lower()
+    assert "simulation" in notice or "processor" in notice
 
 
 @pytest.mark.asyncio
@@ -43,3 +46,4 @@ async def test_process_payment(db_session):
     assert payment.status == PaymentStatus.COMPLETED
     assert payment.transaction_ref is not None
     assert payment.processed_at is not None
+    assert "[SIMULATED" in (payment.description or "")

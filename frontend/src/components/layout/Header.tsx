@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { isDemoBuild } from '../../config/demoMode';
 import { getDemoRole, getDemoUserName } from '../auth/LoginScreen';
 
 function Header() {
@@ -25,6 +26,19 @@ function Header() {
   const roleLabel = role ? roleLabelMap[role] || role : '';
 
   return (
+    <>
+      {isDemoBuild() && (
+        <div className="demo-stakeholder-banner" role="status" aria-live="polite">
+          <span>
+            <strong>Demonstration build</strong>
+            {' — '}
+            Not for filing real cases. Identity and payments are simulated.
+          </span>
+          <a href="/login" className="demo-banner-link">
+            Roles
+          </a>
+        </div>
+      )}
     <header className="app-header">
       <div className="header-brand">
         <h1>Michigan Unified E-Filing System</h1>
@@ -48,6 +62,7 @@ function Header() {
         </button>
       </div>
     </header>
+    </>
   );
 }
 

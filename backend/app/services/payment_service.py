@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.court import CaseType, FeeSchedule
 from app.models.payment import Payment, PaymentMethod, PaymentStatus
 from app.schemas.payment import PaymentCalculateResponse
@@ -45,6 +46,13 @@ async def calculate_fees(
         additional_fees=additional_fees,
         total_cents=total,
         fee_description=f"Filing fee for {case_type.name}" if case_type else "Filing fee",
+        is_simulated=settings.payments_are_simulated,
+        simulation_notice=(
+            "Fees are calculated from court schedules. "
+            "No payment processor is connected; amounts are not charged."
+            if settings.payments_are_simulated
+            else ""
+        ),
     )
 
 
@@ -55,12 +63,17 @@ async def process_payment(
     payer_id: int,
     description: str | None = None,
 ) -> Payment:
+    # Court compliance: PSP integration must replace this; keep audit text explicit.
+    desc = description or ""
+    if settings.payments_are_simulated:
+        desc = f"[SIMULATED — no funds moved] {desc}".strip()
+
     payment = Payment(
         amount_cents=amount_cents,
-        status=PaymentStatus.COMPLETED,  # Simplified for MVP
+        status=PaymentStatus.COMPLETED,  # Replace when wiring a real PSP + webhooks
         payment_method=payment_method,
         payer_id=payer_id,
-        description=description,
+        description=desc,
         transaction_ref=(
             f"MUEFS-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
             f"-{payer_id}"

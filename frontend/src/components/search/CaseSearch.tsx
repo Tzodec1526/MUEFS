@@ -13,6 +13,7 @@ interface CaseResult {
   participants: Array<{
     party_name: string;
     role: string;
+    attorney_bar_number?: string | null;
   }>;
 }
 

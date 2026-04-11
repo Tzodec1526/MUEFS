@@ -33,6 +33,36 @@ body {
   line-height: 1.6;
 }
 
+/* Stakeholder demo — visible on all shell pages when VITE_ALLOW_DEMO_MODE is on */
+.demo-stakeholder-banner {
+  background: linear-gradient(90deg, #6f42c1 0%, #5a32a3 100%);
+  color: var(--white);
+  padding: 0.4rem 1.25rem;
+  font-size: 0.8125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  text-align: center;
+}
+
+.demo-stakeholder-banner--login {
+  margin-bottom: 1rem;
+  border-radius: 6px;
+}
+
+.demo-stakeholder-banner .demo-banner-link {
+  color: var(--white);
+  font-weight: 600;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+.demo-stakeholder-banner .demo-banner-link:hover {
+  opacity: 0.92;
+}
+
 /* Layout */
 .app-layout {
   display: flex;

@@ -13,6 +13,9 @@ import signal
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./demo.db"
 os.environ["DATABASE_URL_SYNC"] = "sqlite:///./demo.db"
 os.environ["DEBUG"] = "true"
+os.environ["ALLOW_DEMO_MODE"] = "true"
+os.environ["ALLOW_PUBLIC_REGISTRATION"] = "true"
+os.environ["RATE_LIMIT_BACKEND"] = "memory"
 os.environ["ALLOWED_ORIGINS"] = "http://localhost:3000,http://localhost:5173,http://0.0.0.0:3000"
 os.environ["S3_ENDPOINT_URL"] = "http://localhost:9000"  # Won't connect but won't crash
 os.environ["REDIS_URL"] = "redis://localhost:6379/0"
@@ -47,10 +50,10 @@ def setup_demo_db():
         print(f"Seed warning (non-fatal): {e}")
         # Manual minimal seed for demo
         with Session(engine) as session:
-            from app.models.user import User, UserType
+            from app.models.user import CourtRole, User, UserCourtRole, UserType
             from app.models.court import Court, CourtType, CaseType, CaseCategory
 
-            # Demo users
+            # Demo users (ids 1–4 must match frontend roleToUserId in api/client.ts)
             session.add(User(
                 email="attorney@demo.muefs.gov",
                 first_name="Jane", last_name="Doe",
@@ -62,8 +65,20 @@ def setup_demo_db():
                 first_name="Robert", last_name="Johnson",
                 user_type=UserType.CLERK,
             ))
+            session.add(User(
+                email="admin@demo.muefs.gov",
+                first_name="Admin", last_name="User",
+                user_type=UserType.ADMIN,
+            ))
+            session.add(User(
+                email="srl@demo.muefs.gov",
+                first_name="Maria", last_name="Williams",
+                user_type=UserType.SELF_REPRESENTED,
+            ))
+            session.flush()
 
             # A few courts
+            third_circuit_id = None
             for name, county, city in [
                 ("3rd Circuit Court", "Wayne", "Detroit"),
                 ("6th Circuit Court", "Oakland", "Pontiac"),
@@ -75,12 +90,20 @@ def setup_demo_db():
                               cms_type="JIS", is_efiling_enabled=True)
                 session.add(court)
                 session.flush()
+                if name == "3rd Circuit Court":
+                    third_circuit_id = court.id
                 session.add(CaseType(court_id=court.id, code="CIV-GEN",
                     name="Civil - General", category=CaseCategory.CIVIL,
                     filing_fee_cents=17500))
                 session.add(CaseType(court_id=court.id, code="FAM-DIV",
                     name="Divorce/Dissolution", category=CaseCategory.FAMILY,
                     filing_fee_cents=17500))
+            if third_circuit_id:
+                session.add(UserCourtRole(
+                    user_id=2,
+                    court_id=third_circuit_id,
+                    role=CourtRole.CLERK,
+                ))
             session.commit()
             print("Minimal demo data seeded.")
 
@@ -115,10 +138,12 @@ if __name__ == "__main__":
 
     # Start frontend
     print("Starting frontend on http://localhost:3000 ...")
+    fe_env = os.environ.copy()
+    fe_env.setdefault("VITE_ALLOW_DEMO_MODE", "true")
     frontend = subprocess.Popen(
         [npm_cmd, "run", "dev"],
         cwd=frontend_dir,
-        env=os.environ.copy(),
+        env=fe_env,
     )
 
     print()
@@ -128,6 +153,11 @@ if __name__ == "__main__":
     print("  Frontend:  http://localhost:3000")
     print("  API:       http://localhost:8000")
     print("  API Docs:  http://localhost:8000/docs")
+    demo_guide = os.path.normpath(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docs", "STAKEHOLDER_DEMO.md")
+    )
+    print()
+    print(f"  Stakeholder walkthrough: {demo_guide}")
     print()
     print("  Press Ctrl+C to stop all services")
     print("=" * 60)
