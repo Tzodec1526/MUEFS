@@ -81,6 +81,7 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
             <option value="circuit">Circuit Court</option>
             <option value="district">District Court</option>
             <option value="probate">Probate Court</option>
+            <option value="court_of_claims">Court of Claims</option>
             <option value="court_of_appeals">Court of Appeals</option>
             <option value="supreme_court">Supreme Court</option>
           </select>

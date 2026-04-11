@@ -21,7 +21,7 @@ function ReviewQueue() {
   const fetchQueue = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await getClerkQueue(courtId);
+      const result = await getClerkQueue(courtId, 1, statusFilter);
       setFilings(result.filings);
       setTotal(result.total);
       setLastRefresh(new Date());
@@ -30,7 +30,7 @@ function ReviewQueue() {
     } finally {
       setLoading(false);
     }
-  }, [courtId]);
+  }, [courtId, statusFilter]);
 
   useEffect(() => {
     fetchQueue();

@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { calculateFees } from '../../api/documents';
+import { calculateFees, processPayment } from '../../api/documents';
 
 interface Props {
   courtId: number;
   caseTypeId: number;
+  filingId: number | null;
   onPaymentComplete: () => void;
 }
 
-function PaymentForm({ courtId, caseTypeId, onPaymentComplete }: Props) {
+function PaymentForm({ courtId, caseTypeId, filingId, onPaymentComplete }: Props) {
   const [fees, setFees] = useState<{
     filing_fee_cents: number;
     total_cents: number;
@@ -43,9 +44,35 @@ function PaymentForm({ courtId, caseTypeId, onPaymentComplete }: Props) {
 
   const formatCurrency = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
-  const handlePay = () => {
-    setCompleted(true);
-    onPaymentComplete();
+  const [processing, setProcessing] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
+
+  const handlePay = async () => {
+    if (!fees || !filingId) {
+      setCompleted(true);
+      onPaymentComplete();
+      return;
+    }
+
+    // Fee waiver — no backend payment needed, filing already has fee_waiver_requested
+    if (paymentMethod === 'waiver') {
+      setCompleted(true);
+      onPaymentComplete();
+      return;
+    }
+
+    setProcessing(true);
+    setPayError(null);
+    try {
+      await processPayment(filingId, fees.total_cents, paymentMethod);
+      setCompleted(true);
+      onPaymentComplete();
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { detail?: string } } };
+      setPayError(axiosErr?.response?.data?.detail || 'Payment processing failed');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   if (loading) {
@@ -177,12 +204,18 @@ function PaymentForm({ courtId, caseTypeId, onPaymentComplete }: Props) {
             </p>
           </div>
 
-          <button className="btn btn-primary btn-large" onClick={handlePay}>
-            {paymentMethod === 'waiver'
-              ? 'Submit Fee Waiver Request'
-              : showSimulated
-                ? `Confirm (simulated) \u2014 ${formatCurrency(fees.total_cents)}`
-                : `Confirm Payment \u2014 ${formatCurrency(fees.total_cents)}`}
+          {payError && (
+            <div className="alert alert-error" role="alert">{payError}</div>
+          )}
+
+          <button className="btn btn-primary btn-large" onClick={handlePay} disabled={processing}>
+            {processing
+              ? 'Processing...'
+              : paymentMethod === 'waiver'
+                ? 'Submit Fee Waiver Request'
+                : showSimulated
+                  ? `Confirm (simulated) \u2014 ${formatCurrency(fees.total_cents)}`
+                  : `Confirm Payment \u2014 ${formatCurrency(fees.total_cents)}`}
           </button>
         </>
       )}

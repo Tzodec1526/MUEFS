@@ -464,6 +464,7 @@ function FilingWizard() {
           <PaymentForm
             courtId={filingData.courtId}
             caseTypeId={filingData.caseTypeId}
+            filingId={filingData.filingId}
             onPaymentComplete={() => updateData({ paymentComplete: true })}
           />
         )}

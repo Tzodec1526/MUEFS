@@ -220,10 +220,17 @@ function CaseDetailPage() {
                 )}
                 <div className="docket-entry-docs">
                   {f.documents.map((doc) => (
-                    <span key={doc.id} className="docket-doc">
+                    <a
+                      key={doc.id}
+                      className="docket-doc docket-doc-link"
+                      href={`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/documents/${doc.id}/download`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Download document"
+                    >
                       {doc.title} ({doc.document_type_code}, {formatSize(doc.file_size_bytes)}
                       {doc.page_count ? `, ${doc.page_count}p` : ''})
-                    </span>
+                    </a>
                   ))}
                 </div>
               </div>

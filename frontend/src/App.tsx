@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react';
 import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
+import { apiClient } from './api/client';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Footer from './components/layout/Footer';
@@ -34,6 +36,18 @@ function RequireFiler({ children }: { children: React.ReactNode }) {
 }
 
 function FilerDashboard() {
+  const [stats, setStats] = useState<{
+    total_courts: number;
+    counties_covered: number;
+    total_case_types: number;
+  } | null>(null);
+
+  useEffect(() => {
+    apiClient.get('/admin/public-stats').then(res => {
+      setStats(res.data);
+    }).catch(() => { /* use fallback */ });
+  }, []);
+
   return (
     <div className="dashboard">
       <div className="dashboard-welcome">
@@ -43,16 +57,16 @@ function FilerDashboard() {
 
       <div className="dashboard-stats">
         <div className="stat-card accent">
-          <span className="stat-number">256</span>
+          <span className="stat-number">{stats?.total_courts ?? '...'}</span>
           <span className="stat-label">Courts</span>
         </div>
         <div className="stat-card">
-          <span className="stat-number">83</span>
+          <span className="stat-number">{stats?.counties_covered ?? '...'}</span>
           <span className="stat-label">Counties</span>
         </div>
         <div className="stat-card">
-          <span className="stat-number">135+</span>
-          <span className="stat-label">Filing Types</span>
+          <span className="stat-number">{stats?.total_case_types ?? '...'}</span>
+          <span className="stat-label">Case Types</span>
         </div>
         <div className="stat-card">
           <span className="stat-number">24/7</span>

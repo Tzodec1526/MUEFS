@@ -118,9 +118,12 @@ export async function reviewFiling(
 export async function getClerkQueue(
   courtId: number,
   page: number = 1,
+  statusFilter?: string,
 ): Promise<{ filings: FilingEnvelope[]; total: number }> {
-  const { data } = await apiClient.get('/clerk/queue', {
-    params: { court_id: courtId, page },
-  });
+  const params: Record<string, unknown> = { court_id: courtId, page };
+  if (statusFilter && statusFilter !== 'all') {
+    params.status = statusFilter;
+  }
+  const { data } = await apiClient.get('/clerk/queue', { params });
   return data;
 }

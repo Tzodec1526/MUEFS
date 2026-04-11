@@ -68,10 +68,6 @@ class FilingListResponse(BaseModel):
     page_size: int
 
 
-class FilingSubmitRequest(BaseModel):
-    confirm: bool = True
-
-
 class ClerkReviewRequest(BaseModel):
     action: str  # "accept", "reject", "return"
     reason: str | None = Field(None, max_length=5000)

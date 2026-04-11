@@ -41,16 +41,6 @@ class CaseResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class CaseSearchParams(BaseModel):
-    case_number: str | None = None
-    party_name: str | None = None
-    attorney_bar_number: str | None = None
-    court_id: int | None = None
-    status: CaseStatus | None = None
-    page: int = 1
-    page_size: int = 25
-
-
 class CaseSearchParticipantPublic(BaseModel):
     """Search index: party/counsel identifiers only — no contact PII (court privacy)."""
 

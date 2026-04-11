@@ -35,8 +35,8 @@ function Sidebar() {
       </nav>
       <div className="sidebar-info">
         <h4>Quick Info</h4>
-        <p>Courts: 256</p>
-        <p>Counties: 83</p>
+        <p>All Michigan Courts</p>
+        <p>All 83 Counties</p>
         <p>MCR 1.109 Compliant</p>
       </div>
     </aside>

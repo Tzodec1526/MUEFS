@@ -12,3 +12,16 @@ export async function calculateFees(
   });
   return data;
 }
+
+export async function processPayment(
+  envelopeId: number,
+  amountCents: number,
+  paymentMethod: string,
+) {
+  const { data } = await apiClient.post('/payments/process', {
+    envelope_id: envelopeId,
+    amount_cents: amountCents,
+    payment_method: paymentMethod,
+  });
+  return data;
+}

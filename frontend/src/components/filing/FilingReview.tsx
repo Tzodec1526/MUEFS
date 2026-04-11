@@ -91,8 +91,7 @@ function FilingReview({ filingData, filingId, onSubmitSuccess }: Props) {
           </div>
         </div>
         <p className="success-note">
-          You will receive an email notification when the clerk reviews your filing.
-          You can track the status from your dashboard.
+          You can track the status of your filing from your dashboard under "My Filings."
         </p>
         <div className="success-actions">
           <a href="/" className="btn btn-primary">Return to Dashboard</a>
