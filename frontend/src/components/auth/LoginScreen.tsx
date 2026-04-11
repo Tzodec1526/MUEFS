@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { isDemoBuild } from '../../config/demoMode';
 
 export function getDemoRole(): string | null {
@@ -112,15 +112,6 @@ function LoginScreen() {
               </button>
             </div>
           ))}
-        </div>
-
-        <div className="login-public-access">
-          <p className="login-public-note">
-            Case search requires an authenticated session (court privacy). Select a role below, then use Search.
-          </p>
-          <Link to="/cases/search" className="btn btn-secondary">
-            Search Court Records
-          </Link>
         </div>
 
         <div className="login-footer-note">
