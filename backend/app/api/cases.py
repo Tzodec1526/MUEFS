@@ -39,6 +39,7 @@ def _to_search_item(case: Case) -> CaseSearchItemResponse:
         filed_date=case.filed_date,
         judge_id=case.judge_id,
         created_at=case.created_at,
+        is_sealed=case.is_sealed,
         participants=participants,
     )
 
@@ -112,7 +113,12 @@ async def get_case_filings(
         .options(selectinload(FilingEnvelope.documents))
         .where(FilingEnvelope.case_id == case_id)
         .order_by(FilingEnvelope.created_at.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
     )
-    return list(result.scalars().all())
+    ordered = list(result.scalars().all())
+    visible = [
+        env
+        for env in ordered
+        if await access_service.user_may_read_filing_envelope(db, user_id, env)
+    ]
+    start = (page - 1) * page_size
+    return visible[start : start + page_size]

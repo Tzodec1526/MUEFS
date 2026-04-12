@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { addFavorite, removeFavorite, listFavorites } from '../../api/favorites';
+import { getDemoRole } from '../auth/LoginScreen';
 
 interface CaseDetail {
   id: number;
@@ -9,6 +10,7 @@ interface CaseDetail {
   case_number: string;
   case_type_id: number;
   title: string;
+  is_sealed?: boolean;
   status: string;
   filed_date: string;
   judge_id: number | null;
@@ -43,6 +45,7 @@ interface CaseFiling {
 
 function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const isPublicViewer = getDemoRole() === 'public';
   const [caseData, setCaseData] = useState<CaseDetail | null>(null);
   const [filings, setFilings] = useState<CaseFiling[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,7 +60,9 @@ function CaseDetailPage() {
         const [caseRes, filingsRes, favsRes] = await Promise.all([
           apiClient.get(`/cases/${caseId}`),
           apiClient.get(`/cases/${caseId}/filings`),
-          listFavorites().catch(() => ({ favorites: [] })),
+          isPublicViewer
+            ? Promise.resolve({ favorites: [] as { case_id: number }[] })
+            : listFavorites().catch(() => ({ favorites: [] })),
         ]);
         setCaseData(caseRes.data);
         setFilings(filingsRes.data);
@@ -76,7 +81,7 @@ function CaseDetailPage() {
       }
     }
     load();
-  }, [caseId]);
+  }, [caseId, isPublicViewer]);
 
   const toggleFavorite = async () => {
     if (!caseData) return;
@@ -131,26 +136,32 @@ function CaseDetailPage() {
           <h2>{caseData.title}</h2>
         </div>
         <div className="case-detail-actions">
-          <button
-            className={`fav-btn-large ${isFavorited ? 'favorited' : ''}`}
-            onClick={toggleFavorite}
-            disabled={togglingFav}
-            title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
-          >
-            {isFavorited ? '\u2605 Favorited' : '\u2606 Favorite'}
-          </button>
-          <Link
-            to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&case_title=${encodeURIComponent(caseData.title)}`}
-            className="btn btn-primary"
-          >
-            File with Court
-          </Link>
-          <Link
-            to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&case_title=${encodeURIComponent(caseData.title)}&service_only=true`}
-            className="btn btn-secondary"
-          >
-            Serve Documents Only
-          </Link>
+          {!isPublicViewer && (
+            <button
+              className={`fav-btn-large ${isFavorited ? 'favorited' : ''}`}
+              onClick={toggleFavorite}
+              disabled={togglingFav}
+              title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+            >
+              {isFavorited ? '\u2605 Favorited' : '\u2606 Favorite'}
+            </button>
+          )}
+          {!isPublicViewer && (
+            <>
+              <Link
+                to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&case_title=${encodeURIComponent(caseData.title)}`}
+                className="btn btn-primary"
+              >
+                File with Court
+              </Link>
+              <Link
+                to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&case_title=${encodeURIComponent(caseData.title)}&service_only=true`}
+                className="btn btn-secondary"
+              >
+                Serve Documents Only
+              </Link>
+            </>
+          )}
         </div>
       </div>
 
@@ -193,12 +204,14 @@ function CaseDetailPage() {
       <div className="case-detail-card">
         <div className="docket-header">
           <h3>Docket / Filing History ({filings.length})</h3>
-          <Link
-            to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&case_title=${encodeURIComponent(caseData.title)}`}
-            className="btn btn-primary btn-small"
-          >
-            + Create New Filing
-          </Link>
+          {!isPublicViewer && (
+            <Link
+              to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&case_title=${encodeURIComponent(caseData.title)}`}
+              className="btn btn-primary btn-small"
+            >
+              + Create New Filing
+            </Link>
+          )}
         </div>
 
         {filings.length > 0 ? (

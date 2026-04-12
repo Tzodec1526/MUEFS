@@ -21,8 +21,12 @@ async def search_cases(
     page: int = 1,
     page_size: int = 25,
 ) -> tuple[list[Case], int]:
-    query = select(Case).options(selectinload(Case.participants))
-    count_query = select(func.count()).select_from(Case)
+    query = (
+        select(Case)
+        .options(selectinload(Case.participants))
+        .where(Case.is_sealed.is_(False))
+    )
+    count_query = select(func.count()).select_from(Case).where(Case.is_sealed.is_(False))
 
     if case_number:
         escaped = _escape_like(case_number)

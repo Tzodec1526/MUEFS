@@ -2,7 +2,7 @@ import enum
 from datetime import datetime
 
 import sqlalchemy as sa
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -34,6 +34,8 @@ class Case(Base):
     case_number: Mapped[str] = mapped_column(String(50), index=True)
     case_type_id: Mapped[int] = mapped_column(ForeignKey("case_types.id"), index=True)
     title: Mapped[str] = mapped_column(String(500))
+    # True: only parties, counsel, court staff (and linked filers) may view the docket.
+    is_sealed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     status: Mapped[CaseStatus] = mapped_column(Enum(CaseStatus), default=CaseStatus.OPEN)
     filed_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     judge_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)

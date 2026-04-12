@@ -652,6 +652,13 @@ def seed_database():
                 user_type=UserType.SELF_REPRESENTED,
                 phone="248-555-0400",
             ),
+            User(
+                email="public@demo.muefs.gov",
+                first_name="Alex",
+                last_name="Rivera",
+                user_type=UserType.PUBLIC,
+                phone="313-555-0500",
+            ),
         ]
         session.add_all(users)
         session.flush()
@@ -1368,6 +1375,7 @@ def seed_database():
                     case_number=f"MI-{wayne_circuit.id}-2025-000003",
                     case_type_id=wayne_divorce.id,
                     title="Thompson v. Thompson",
+                    is_sealed=True,
                     status=CaseStatus.OPEN,
                     filed_date=now,
                 )

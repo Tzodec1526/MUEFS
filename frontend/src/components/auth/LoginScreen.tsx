@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { isDemoBuild } from '../../config/demoMode';
 
 export function getDemoRole(): string | null {
@@ -47,6 +47,13 @@ const roles: RoleOption[] = [
     detail: 'Filing without an attorney',
     description: 'Guided filing with plain-language assistance',
     icon: '\uD83D\uDC64',
+  },
+  {
+    role: 'public',
+    name: 'Alex Rivera',
+    detail: 'Journalist / citizen docket viewer',
+    description: 'Read non-sealed cases and filings after sign-in (no e-filing)',
+    icon: '\uD83D\uDCD6',
   },
 ];
 
@@ -100,6 +107,7 @@ function LoginScreen() {
                 {option.role === 'attorney' && 'Attorney'}
                 {option.role === 'clerk' && 'Court Clerk'}
                 {option.role === 'srl' && 'Self-Represented Litigant'}
+                {option.role === 'public' && 'Public docket'}
               </div>
               <div className="login-card-name">{option.name}</div>
               <div className="login-card-detail">{option.detail}</div>
@@ -112,6 +120,16 @@ function LoginScreen() {
               </button>
             </div>
           ))}
+        </div>
+
+        <div className="login-public-access">
+          <p className="login-public-note">
+            Sign in to search and open non-sealed court records. Sealed matters and others&apos; draft
+            filings stay private; choose Public docket for transparency-only access.
+          </p>
+          <Link to="/cases/search" className="btn btn-secondary">
+            Search Court Records
+          </Link>
         </div>
 
         <div className="login-footer-note">

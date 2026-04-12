@@ -18,6 +18,8 @@ class UserType(enum.StrEnum):
     CLERK = "clerk"
     JUDGE = "judge"
     SELF_REPRESENTED = "self_represented"
+    # Signed-in public docket viewer (journalist, citizen); no filing privileges by default.
+    PUBLIC = "public"
     ADMIN = "admin"
 
 

@@ -4,10 +4,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.auth import get_current_user_id
+from app.api.auth import get_current_user_id, require_user_may_manage_efilings
 from app.database import get_db
 from app.models.case import Case
-from app.models.user import FavoriteCase
+from app.models.user import FavoriteCase, User
 
 router = APIRouter(prefix="/favorites", tags=["Favorites"])
 
@@ -63,8 +63,9 @@ async def list_favorites(
 async def add_favorite(
     data: FavoriteCaseCreate,
     db: AsyncSession = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    current_user: User = Depends(require_user_may_manage_efilings),
 ):
+    user_id = current_user.id
     # Check case exists
     case_result = await db.execute(select(Case).where(Case.id == data.case_id))
     case = case_result.scalar_one_or_none()
@@ -101,8 +102,9 @@ async def add_favorite(
 async def remove_favorite(
     case_id: int,
     db: AsyncSession = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    current_user: User = Depends(require_user_may_manage_efilings),
 ):
+    user_id = current_user.id
     result = await db.execute(
         select(FavoriteCase).where(
             FavoriteCase.user_id == user_id,

@@ -3,7 +3,7 @@
 import pytest
 from sqlalchemy import select
 
-from app.models.case import Case, CaseParticipant, ParticipantRole
+from app.models.case import Case, CaseParticipant, CaseStatus, ParticipantRole
 from app.models.court import CaseCategory, CaseType, Court, CourtType
 from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.models.user import FavoriteCase, User, UserType
@@ -432,6 +432,64 @@ async def test_search_by_court_id(db_session):
     )
     assert total >= 1
     assert all(c.court_id == court.id for c in cases)
+
+
+@pytest.mark.asyncio
+async def test_search_excludes_sealed_cases(db_session):
+    """Sealed matters are not listed in the public transparency search index."""
+    from datetime import UTC, datetime
+
+    user = User(
+        email="sealed_search_u@test.com",
+        first_name="S",
+        last_name="User",
+        user_type=UserType.ATTORNEY,
+        bar_number="P66666",
+    )
+    db_session.add(user)
+    court = Court(
+        name="Sealed Search Court",
+        county="Oakland",
+        court_type=CourtType.CIRCUIT,
+        city="Pontiac",
+    )
+    db_session.add(court)
+    await db_session.flush()
+    case_type = CaseType(
+        court_id=court.id,
+        code="CIV-SEAL",
+        name="Civil",
+        category=CaseCategory.CIVIL,
+        filing_fee_cents=100,
+    )
+    db_session.add(case_type)
+    await db_session.flush()
+    now = datetime.now(UTC)
+    open_case = Case(
+        court_id=court.id,
+        case_number=f"MI-{court.id}-OPEN-1",
+        case_type_id=case_type.id,
+        title="Public Index Case",
+        status=CaseStatus.OPEN,
+        filed_date=now,
+        is_sealed=False,
+    )
+    sealed_case = Case(
+        court_id=court.id,
+        case_number=f"MI-{court.id}-SEAL-1",
+        case_type_id=case_type.id,
+        title="Sealed Index Case",
+        status=CaseStatus.OPEN,
+        filed_date=now,
+        is_sealed=True,
+    )
+    db_session.add_all([open_case, sealed_case])
+    await db_session.flush()
+
+    cases, total = await search_service.search_cases(db_session, court_id=court.id)
+    assert total == 1
+    assert len(cases) == 1
+    assert cases[0].id == open_case.id
 
 
 # ========== FAVORITE CASES TESTS ==========

@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import get_current_user_id
+from app.api.auth import get_current_user_id, require_user_may_manage_efilings
 from app.config import settings
 from app.database import get_db
+from app.models.user import User
 from app.schemas.payment import (
     PaymentCalculateRequest,
     PaymentCalculateResponse,
@@ -32,8 +33,9 @@ async def process_payment(
     request: Request,
     data: PaymentProcessRequest,
     db: AsyncSession = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    current_user: User = Depends(require_user_may_manage_efilings),
 ):
+    user_id = current_user.id
     if data.amount_cents <= 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

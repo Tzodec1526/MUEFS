@@ -29,7 +29,8 @@ function RequireClerk({ children }: { children: React.ReactNode }) {
 }
 
 function RequireFiler({ children }: { children: React.ReactNode }) {
-  if (getDemoRole() === 'clerk') {
+  const r = getDemoRole();
+  if (r === 'clerk' || r === 'public') {
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;
@@ -98,6 +99,34 @@ function FilerDashboard() {
   );
 }
 
+function PublicDashboard() {
+  return (
+    <div className="dashboard">
+      <div className="dashboard-welcome">
+        <h2>Public court records</h2>
+        <p>
+          Signed-in transparency access: search and open non-sealed matters. Draft filings and
+          sealed cases stay restricted to parties, counsel, and court staff.
+        </p>
+      </div>
+      <div className="dashboard-cards">
+        <div className="card card-primary">
+          <div className="card-icon">&#128269;</div>
+          <h3>Case Search</h3>
+          <p>Browse the public docket index (sealed cases are excluded from search).</p>
+          <Link to="/cases/search" className="btn btn-primary">Search Cases</Link>
+        </div>
+        <div className="card">
+          <div className="card-icon">&#128202;</div>
+          <h3>Coverage Stats</h3>
+          <p>Statewide court coverage data.</p>
+          <Link to="/stats" className="btn btn-secondary">View Stats</Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ClerkDashboard() {
   const courtName = getDemoCourtName() || '3rd Circuit Court - Wayne County';
   return (
@@ -135,6 +164,9 @@ function Dashboard() {
   const role = getDemoRole();
   if (role === 'clerk') {
     return <ClerkDashboard />;
+  }
+  if (role === 'public') {
+    return <PublicDashboard />;
   }
   return <FilerDashboard />;
 }

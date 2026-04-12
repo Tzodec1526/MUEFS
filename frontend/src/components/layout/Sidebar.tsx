@@ -6,13 +6,13 @@ function Sidebar() {
   const role = getDemoRole();
 
   const allLinks = [
-    { path: '/', label: 'Dashboard', roles: ['attorney', 'clerk', 'srl'] },
+    { path: '/', label: 'Dashboard', roles: ['attorney', 'clerk', 'srl', 'public'] },
     { path: '/filing/new', label: 'New Filing', roles: ['attorney', 'srl'] },
     { path: '/filings', label: 'My Filings', roles: ['attorney', 'srl'] },
-    { path: '/cases/search', label: 'Case Search', roles: ['attorney', 'clerk', 'srl'] },
+    { path: '/cases/search', label: 'Case Search', roles: ['attorney', 'clerk', 'srl', 'public'] },
     { path: '/favorites', label: 'Favorites', roles: ['attorney', 'srl'] },
     { path: '/clerk/queue', label: 'Review Queue', roles: ['clerk'] },
-    { path: '/stats', label: 'Coverage Stats', roles: ['attorney', 'clerk', 'srl'] },
+    { path: '/stats', label: 'Coverage Stats', roles: ['attorney', 'clerk', 'srl', 'public'] },
   ];
 
   const links = allLinks.filter(link => !role || link.roles.includes(role));

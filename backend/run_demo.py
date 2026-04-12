@@ -53,7 +53,7 @@ def setup_demo_db():
             from app.models.user import CourtRole, User, UserCourtRole, UserType
             from app.models.court import Court, CourtType, CaseType, CaseCategory
 
-            # Demo users (ids 1–4 must match frontend roleToUserId in api/client.ts)
+            # Demo users (ids 1–5 must match frontend roleToUserId in api/client.ts)
             session.add(User(
                 email="attorney@demo.muefs.gov",
                 first_name="Jane", last_name="Doe",
@@ -74,6 +74,11 @@ def setup_demo_db():
                 email="srl@demo.muefs.gov",
                 first_name="Maria", last_name="Williams",
                 user_type=UserType.SELF_REPRESENTED,
+            ))
+            session.add(User(
+                email="public@demo.muefs.gov",
+                first_name="Alex", last_name="Rivera",
+                user_type=UserType.PUBLIC,
             ))
             session.flush()
 

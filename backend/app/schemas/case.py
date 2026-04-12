@@ -32,6 +32,7 @@ class CaseResponse(BaseModel):
     case_number: str
     case_type_id: int
     title: str
+    is_sealed: bool = False
     status: CaseStatus
     filed_date: datetime
     judge_id: int | None
@@ -57,6 +58,7 @@ class CaseSearchItemResponse(BaseModel):
     case_number: str
     case_type_id: int
     title: str
+    is_sealed: bool = False
     status: CaseStatus
     filed_date: datetime
     judge_id: int | None

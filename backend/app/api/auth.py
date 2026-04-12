@@ -98,6 +98,16 @@ async def get_current_user(
     return user
 
 
+async def require_user_may_manage_efilings(current_user: User = Depends(get_current_user)) -> User:
+    """Public docket accounts may search and read non-sealed matters but not file or pay."""
+    if current_user.user_type == UserType.PUBLIC:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Public docket accounts cannot create or manage e-filings.",
+        )
+    return current_user
+
+
 @router.get("/me", response_model=UserProfile)
 async def get_profile(current_user: User = Depends(get_current_user)):
     return current_user
@@ -122,7 +132,7 @@ async def register_user(
         )
 
     # Only allow non-privileged user types on self-registration
-    allowed_types = {UserType.ATTORNEY, UserType.SELF_REPRESENTED}
+    allowed_types = {UserType.ATTORNEY, UserType.SELF_REPRESENTED, UserType.PUBLIC}
     if data.user_type not in allowed_types:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

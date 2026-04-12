@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { searchCases } from '../../api/cases';
 import { listFavorites, addFavorite, removeFavorite } from '../../api/favorites';
+import { getDemoRole } from '../auth/LoginScreen';
 
 interface CaseResult {
   id: number;
@@ -18,6 +19,8 @@ interface CaseResult {
 }
 
 function CaseSearch() {
+  const demoRole = getDemoRole();
+  const showFavorites = demoRole !== 'public';
   const [caseNumber, setCaseNumber] = useState('');
   const [partyName, setPartyName] = useState('');
   const [results, setResults] = useState<CaseResult[]>([]);
@@ -27,8 +30,9 @@ function CaseSearch() {
   const [favoritedIds, setFavoritedIds] = useState<Set<number>>(new Set());
   const [togglingFav, setTogglingFav] = useState<number | null>(null);
 
-  // Load user's favorites on mount
+  // Load user's favorites on mount (filers and counsel only)
   useEffect(() => {
+    if (!showFavorites) return;
     async function loadFavorites() {
       try {
         const data = await listFavorites();
@@ -38,7 +42,7 @@ function CaseSearch() {
       }
     }
     loadFavorites();
-  }, []);
+  }, [showFavorites]);
 
   const handleSearch = async () => {
     setSearching(true);
@@ -87,8 +91,8 @@ function CaseSearch() {
     <div className="case-search">
       <h2>Case Search</h2>
       <p className="info-text">
-        Search for cases across all Michigan courts. You can search by case number
-        or party name. Click the star to add a case to your favorites.
+        Search for non-sealed cases across Michigan courts by case number or party name.
+        {showFavorites ? ' Click the star to add a case to your favorites.' : ''}
       </p>
 
       <div className="search-form">
@@ -128,7 +132,7 @@ function CaseSearch() {
             <table>
               <thead>
                 <tr>
-                  <th className="th-fav"></th>
+                  {showFavorites && <th className="th-fav"></th>}
                   <th>Case Number</th>
                   <th>Title</th>
                   <th>Status</th>
@@ -139,17 +143,19 @@ function CaseSearch() {
               <tbody>
                 {results.map((c) => (
                   <tr key={c.id}>
-                    <td className="td-fav">
-                      <button
-                        className={`fav-btn ${favoritedIds.has(c.id) ? 'favorited' : ''}`}
-                        onClick={() => toggleFavorite(c.id)}
-                        disabled={togglingFav === c.id}
-                        title={favoritedIds.has(c.id) ? 'Remove from favorites' : 'Add to favorites'}
-                        aria-label={favoritedIds.has(c.id) ? 'Remove from favorites' : 'Add to favorites'}
-                      >
-                        {favoritedIds.has(c.id) ? '\u2605' : '\u2606'}
-                      </button>
-                    </td>
+                    {showFavorites && (
+                      <td className="td-fav">
+                        <button
+                          className={`fav-btn ${favoritedIds.has(c.id) ? 'favorited' : ''}`}
+                          onClick={() => toggleFavorite(c.id)}
+                          disabled={togglingFav === c.id}
+                          title={favoritedIds.has(c.id) ? 'Remove from favorites' : 'Add to favorites'}
+                          aria-label={favoritedIds.has(c.id) ? 'Remove from favorites' : 'Add to favorites'}
+                        >
+                          {favoritedIds.has(c.id) ? '\u2605' : '\u2606'}
+                        </button>
+                      </td>
+                    )}
                     <td><Link to={`/cases/${c.id}`}>{c.case_number}</Link></td>
                     <td>{c.title}</td>
                     <td>

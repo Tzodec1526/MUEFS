@@ -34,6 +34,7 @@ apiClient.interceptors.request.use((config) => {
       admin: 3,
       self_represented: 4,
       srl: 4,
+      public: 5,
     };
     if (demoRole && roleToUserId[demoRole]) {
       config.headers['X-Demo-User-Id'] = String(roleToUserId[demoRole]);

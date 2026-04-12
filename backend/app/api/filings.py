@@ -14,10 +14,11 @@ from fastapi import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import get_current_user_id
+from app.api.auth import get_current_user_id, require_user_may_manage_efilings
 from app.config import settings
 from app.database import get_db
 from app.models.filing import FilingDocument, FilingStatus
+from app.models.user import User
 from app.schemas.document import DocumentUploadResponse
 from app.schemas.filing import (
     FilingEnvelopeCreate,
@@ -37,8 +38,9 @@ async def create_filing(
     request: Request,
     data: FilingEnvelopeCreate,
     db: AsyncSession = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    current_user: User = Depends(require_user_may_manage_efilings),
 ):
+    user_id = current_user.id
     envelope = await filing_service.create_filing(db, user_id, data)
     await audit_service.log_action(
         db,
@@ -88,8 +90,9 @@ async def update_filing(
     filing_id: int,
     data: FilingEnvelopeUpdate,
     db: AsyncSession = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    current_user: User = Depends(require_user_may_manage_efilings),
 ):
+    user_id = current_user.id
     filing = await filing_service.get_filing(db, filing_id)
     if not filing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
@@ -116,8 +119,9 @@ async def update_filing(
 async def validate_filing(
     filing_id: int,
     db: AsyncSession = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    current_user: User = Depends(require_user_may_manage_efilings),
 ):
+    user_id = current_user.id
     filing = await filing_service.get_filing(db, filing_id)
     if not filing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
@@ -134,8 +138,9 @@ async def submit_filing(
     request: Request,
     filing_id: int,
     db: AsyncSession = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    current_user: User = Depends(require_user_may_manage_efilings),
 ):
+    user_id = current_user.id
     # Ownership check
     filing_check = await filing_service.get_filing(db, filing_id)
     if not filing_check:
@@ -203,8 +208,9 @@ async def upload_document(
     title: str = Form(...),
     is_confidential: bool = Form(False),
     db: AsyncSession = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    current_user: User = Depends(require_user_may_manage_efilings),
 ):
+    user_id = current_user.id
     filing = await filing_service.get_filing(db, filing_id)
     if not filing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
@@ -305,8 +311,9 @@ async def remove_document(
     filing_id: int,
     document_id: int,
     db: AsyncSession = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    current_user: User = Depends(require_user_may_manage_efilings),
 ):
+    user_id = current_user.id
     filing = await filing_service.get_filing(db, filing_id)
     if not filing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
