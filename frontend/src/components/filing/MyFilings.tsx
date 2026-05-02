@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { listFilings, FilingEnvelope } from '../../api/filings';
+import { useQueries, useQuery } from '@tanstack/react-query';
+import { listFilings } from '../../api/filings';
 import { getCourt } from '../../api/courts';
 
 const STATUS_OPTIONS = [
@@ -13,43 +14,46 @@ const STATUS_OPTIONS = [
   { value: 'returned', label: 'Returned' },
 ];
 
+const PAGE_SIZE = 25;
+
 function MyFilings() {
   const navigate = useNavigate();
-  const [filings, setFilings] = useState<FilingEnvelope[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
-  const [courtNames, setCourtNames] = useState<Record<number, string>>({});
 
-  useEffect(() => {
-    async function fetchFilings() {
-      setLoading(true);
-      try {
-        const result = await listFilings({
-          status: statusFilter || undefined,
-          page,
-        });
-        setFilings(result.filings);
-        setTotal(result.total);
-        // Fetch court names for display
-        const courtIds = [...new Set(result.filings.map(f => f.court_id))];
-        const names: Record<number, string> = {};
-        await Promise.all(courtIds.map(async (id) => {
-          try {
-            const court = await getCourt(id);
-            names[id] = court.name;
-          } catch { /* ignore */ }
-        }));
-        setCourtNames(prev => ({ ...prev, ...names }));
-      } catch {
-        setFilings([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchFilings();
-  }, [statusFilter, page]);
+  const filingsQuery = useQuery({
+    queryKey: ['my-filings', statusFilter, page] as const,
+    queryFn: () => listFilings({ status: statusFilter || undefined, page }),
+    staleTime: 30_000,
+  });
+
+  const filings = filingsQuery.data?.filings ?? [];
+  const total = filingsQuery.data?.total ?? 0;
+  const loading = filingsQuery.isLoading;
+
+  const uniqueCourtIds = useMemo(
+    () => Array.from(new Set(filings.map(f => f.court_id))),
+    [filings],
+  );
+
+  // One cached lookup per court id (5 min). React Query dedupes between renders and
+  // across components; the previous implementation re-fetched on every navigation.
+  const courtQueries = useQueries({
+    queries: uniqueCourtIds.map((id) => ({
+      queryKey: ['court', id] as const,
+      queryFn: () => getCourt(id),
+      staleTime: 5 * 60_000,
+    })),
+  });
+
+  const courtNames = useMemo(() => {
+    const map: Record<number, string> = {};
+    uniqueCourtIds.forEach((id, idx) => {
+      const data = courtQueries[idx]?.data;
+      if (data) map[id] = data.name;
+    });
+    return map;
+  }, [uniqueCourtIds, courtQueries]);
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '--';
@@ -88,7 +92,6 @@ function MyFilings() {
         <Link to="/filing/new" className="btn btn-primary">New Filing</Link>
       </div>
 
-      {/* Status summary cards */}
       <div className="status-summary">
         {['draft', 'submitted', 'under_review', 'accepted', 'rejected', 'returned'].map(s => {
           const info = getStatusInfo(s);
@@ -96,7 +99,7 @@ function MyFilings() {
             <button
               key={s}
               className={`status-card ${statusFilter === s ? 'active' : ''}`}
-              onClick={() => setStatusFilter(statusFilter === s ? '' : s)}
+              onClick={() => { setStatusFilter(statusFilter === s ? '' : s); setPage(1); }}
             >
               <span className="status-card-count">{statusCounts[s] || 0}</span>
               <span className={`status-badge ${info.className}`}>{info.label}</span>
@@ -105,7 +108,6 @@ function MyFilings() {
         })}
       </div>
 
-      {/* Filters */}
       <div className="filings-controls">
         <div className="form-group">
           <select
@@ -175,8 +177,7 @@ function MyFilings() {
         </div>
       )}
 
-      {/* Pagination */}
-      {total > 25 && (
+      {total > PAGE_SIZE && (
         <div className="pagination">
           <button
             className="btn btn-secondary btn-small"
@@ -185,10 +186,10 @@ function MyFilings() {
           >
             Previous
           </button>
-          <span>Page {page} of {Math.ceil(total / 25)}</span>
+          <span>Page {page} of {Math.ceil(total / PAGE_SIZE)}</span>
           <button
             className="btn btn-secondary btn-small"
-            disabled={page >= Math.ceil(total / 25)}
+            disabled={page >= Math.ceil(total / PAGE_SIZE)}
             onClick={() => setPage(p => p + 1)}
           >
             Next

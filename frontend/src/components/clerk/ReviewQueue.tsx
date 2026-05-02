@@ -1,73 +1,79 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getClerkQueue, reviewFiling, FilingEnvelope } from '../../api/filings';
 import { getDemoCourtName } from '../auth/LoginScreen';
 
+const COMMON_REASONS = [
+  'Missing required documents',
+  'Document not text-searchable (MCR 1.109)',
+  'Incorrect filing fee',
+  'Filed in wrong court',
+  'Missing proof of service',
+  'Document formatting does not comply with court rules',
+  'Incomplete case information',
+];
+
+const REFRESH_MS = 30_000;
+
 function ReviewQueue() {
+  const queryClient = useQueryClient();
   const clerkCourtId = parseInt(localStorage.getItem('demo_court_id') || '3', 10);
   const clerkCourtName = getDemoCourtName() || '3rd Circuit Court - Wayne County';
 
-  const [courtId] = useState(clerkCourtId);
-  const [filings, setFilings] = useState<FilingEnvelope[]>([]);
-  const [total, setTotal] = useState(0);
-  const [selectedFiling, setSelectedFiling] = useState<FilingEnvelope | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [reviewReason, setReviewReason] = useState('');
-  const [actionInProgress, setActionInProgress] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedFiling, setSelectedFiling] = useState<FilingEnvelope | null>(null);
+  const [reviewReason, setReviewReason] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [reviewError, setReviewError] = useState<string | null>(null);
 
-  const fetchQueue = useCallback(async () => {
-    setLoading(true);
-    try {
-      const result = await getClerkQueue(courtId, 1, statusFilter);
-      setFilings(result.filings);
-      setTotal(result.total);
-      setLastRefresh(new Date());
-    } catch {
-      setFilings([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [courtId, statusFilter]);
+  const queryKey = ['clerk-queue', clerkCourtId, statusFilter] as const;
 
-  useEffect(() => {
-    fetchQueue();
-  }, [fetchQueue]);
+  const { data, isFetching, dataUpdatedAt, refetch } = useQuery({
+    queryKey,
+    queryFn: () => getClerkQueue(clerkCourtId, 1, statusFilter),
+    // React Query handles tab-visibility, focus refetch, and the polling cadence.
+    refetchInterval: REFRESH_MS,
+    refetchIntervalInBackground: false,
+    staleTime: 5_000,
+  });
 
-  // Auto-refresh every 30 seconds, only when tab is visible
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!document.hidden) fetchQueue();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [fetchQueue]);
+  const filings = data?.filings ?? [];
+  const total = data?.total ?? 0;
+  const lastRefresh = dataUpdatedAt ? new Date(dataUpdatedAt) : new Date();
 
-  async function handleReview(filingId: number, action: 'accept' | 'reject' | 'return') {
-    setActionInProgress(true);
-    setReviewError(null);
-    try {
-      await reviewFiling(filingId, action, action !== 'accept' ? reviewReason : undefined);
-      setSelectedFiling(null);
-      setReviewReason('');
-      await fetchQueue();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Review failed';
-      setReviewError(`Failed to ${action} filing #${filingId}: ${msg}`);
-    } finally {
-      setActionInProgress(false);
-    }
-  }
+  const reviewMutation = useMutation({
+    mutationFn: (vars: { filingId: number; action: 'accept' | 'reject' | 'return'; reason?: string }) =>
+      reviewFiling(vars.filingId, vars.action, vars.reason),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+  });
 
-  async function handleBatchAccept() {
+  const handleReview = useCallback(
+    async (filingId: number, action: 'accept' | 'reject' | 'return') => {
+      setReviewError(null);
+      try {
+        await reviewMutation.mutateAsync({
+          filingId,
+          action,
+          reason: action !== 'accept' ? reviewReason : undefined,
+        });
+        setSelectedFiling(null);
+        setReviewReason('');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Review failed';
+        setReviewError(`Failed to ${action} filing #${filingId}: ${msg}`);
+      }
+    },
+    [reviewMutation, reviewReason],
+  );
+
+  const handleBatchAccept = async () => {
     if (selectedIds.size === 0) return;
-    setActionInProgress(true);
     setReviewError(null);
     const failed: number[] = [];
+    // Sequential to keep clerk-side ordering deterministic and avoid hammering the API.
     for (const id of selectedIds) {
       try {
-        await reviewFiling(id, 'accept');
+        await reviewMutation.mutateAsync({ filingId: id, action: 'accept' });
       } catch {
         failed.push(id);
       }
@@ -76,9 +82,7 @@ function ReviewQueue() {
       setReviewError(`Failed to accept filing(s): ${failed.map(id => `#${id}`).join(', ')}`);
     }
     setSelectedIds(new Set());
-    setActionInProgress(false);
-    await fetchQueue();
-  }
+  };
 
   const toggleSelect = (id: number) => {
     setSelectedIds(prev => {
@@ -116,16 +120,8 @@ function ReviewQueue() {
     return `${(bytes / 1048576).toFixed(1)} MB`;
   };
 
-  // Common rejection reasons for quick selection
-  const COMMON_REASONS = [
-    'Missing required documents',
-    'Document not text-searchable (MCR 1.109)',
-    'Incorrect filing fee',
-    'Filed in wrong court',
-    'Missing proof of service',
-    'Document formatting does not comply with court rules',
-    'Incomplete case information',
-  ];
+  const overdueCount = filings.filter(f => getAge(f.submitted_at).level === 'overdue').length;
+  const actionInProgress = reviewMutation.isPending;
 
   return (
     <div className="clerk-review">
@@ -137,10 +133,7 @@ function ReviewQueue() {
             <span className="stat-label">Pending</span>
           </div>
           <div className="stat-card">
-            <span className="stat-number">{filings.filter(f => {
-              const age = getAge(f.submitted_at);
-              return age.level === 'overdue';
-            }).length}</span>
+            <span className="stat-number">{overdueCount}</span>
             <span className="stat-label">Overdue</span>
           </div>
         </div>
@@ -163,8 +156,8 @@ function ReviewQueue() {
             <option value="under_review">Under Review</option>
           </select>
         </div>
-        <button className="btn btn-secondary" onClick={fetchQueue} disabled={loading}>
-          {loading ? 'Refreshing...' : 'Refresh'}
+        <button className="btn btn-secondary" onClick={() => refetch()} disabled={isFetching}>
+          {isFetching ? 'Refreshing...' : 'Refresh'}
         </button>
         <span className="queue-meta">
           Last updated: {lastRefresh.toLocaleTimeString()}
@@ -199,7 +192,6 @@ function ReviewQueue() {
       )}
 
       <div className="queue-layout">
-        {/* Filing List */}
         <div className="queue-list">
           <table>
             <thead>
@@ -252,7 +244,7 @@ function ReviewQueue() {
                   </tr>
                 );
               })}
-              {!loading && filings.length === 0 && (
+              {!isFetching && filings.length === 0 && (
                 <tr>
                   <td colSpan={7} className="empty-queue">
                     No pending filings for this court. Queue is clear.
@@ -263,7 +255,6 @@ function ReviewQueue() {
           </table>
         </div>
 
-        {/* Filing Detail Panel */}
         {selectedFiling && (
           <div className="filing-detail-panel">
             <div className="detail-panel-header">
@@ -297,7 +288,7 @@ function ReviewQueue() {
                       <strong>{doc.title}</strong>
                       <span className="doc-meta">
                         {doc.document_type_code} &middot; {formatSize(doc.file_size_bytes)}
-                        {doc.page_count && ` \u00b7 ${doc.page_count} pages`}
+                        {doc.page_count && ` · ${doc.page_count} pages`}
                       </span>
                     </div>
                     <div className="doc-flags">
@@ -316,7 +307,6 @@ function ReviewQueue() {
             <div className="detail-section">
               <h4>Review Actions</h4>
 
-              {/* Quick reason selector */}
               <div className="form-group">
                 <label htmlFor="quickReason">Reason (required for reject/return)</label>
                 <select

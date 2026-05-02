@@ -3,10 +3,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.auth import get_current_user_id
+from app.api.auth import get_current_user, get_current_user_id
 from app.database import get_db
 from app.models.case import Case, CaseStatus
 from app.models.filing import FilingEnvelope
+from app.models.user import User
 from app.schemas.case import (
     CaseResponse,
     CaseSearchItemResponse,
@@ -101,13 +102,29 @@ async def get_case_filings(
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    current_user: User = Depends(get_current_user),
 ):
-    if not await access_service.user_may_read_case(db, user_id, case_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access filings for this case",
+    """Docket listing for a case. Resolves user/case/court-staff once, then filters
+    envelopes in memory using the access-service fast path (avoids N+1 queries)."""
+    case = await access_service._load_case(db, case_id)
+    if not case:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
+
+    is_court_staff = await access_service.user_is_court_staff_for_court(
+        db, current_user.id, case.court_id
+    )
+
+    # Sealed case access still requires the full sealed check (litigant/counsel/etc.).
+    if case.is_sealed and not is_court_staff:
+        may_view = await access_service._user_may_read_sealed_case_resolved(
+            db, current_user, case
         )
+        if not may_view:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to access filings for this case",
+            )
+
     result = await db.execute(
         select(FilingEnvelope)
         .options(selectinload(FilingEnvelope.documents))
@@ -115,10 +132,13 @@ async def get_case_filings(
         .order_by(FilingEnvelope.created_at.desc())
     )
     ordered = list(result.scalars().all())
-    visible = [
-        env
-        for env in ordered
-        if await access_service.user_may_read_filing_envelope(db, user_id, env)
-    ]
+
+    visible: list[FilingEnvelope] = []
+    for env in ordered:
+        if await access_service.user_may_read_envelope_with_case(
+            db, current_user, env, case, is_court_staff
+        ):
+            visible.append(env)
+
     start = (page - 1) * page_size
     return visible[start : start + page_size]

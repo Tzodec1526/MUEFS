@@ -259,8 +259,10 @@ async def upload_document(
     page_count = None
     is_searchable = False
     if content_type == "application/pdf":
-        page_count = document_service.get_pdf_page_count(file_data)
-        is_searchable = document_service.is_pdf_text_searchable(file_data)
+        # One PDF parse covers both fields (was two open()/read() round trips).
+        meta = document_service.parse_pdf_metadata(file_data)
+        page_count = meta.page_count
+        is_searchable = meta.is_text_searchable
 
     try:
         doc = FilingDocument(

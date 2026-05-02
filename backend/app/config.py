@@ -1,4 +1,19 @@
+"""Application configuration loaded from environment / .env.
+
+Production safety: when ``debug`` and ``allow_demo_mode`` are both off, several
+default values that are safe in dev (e.g. ``secret_key="change-this-…"``) are
+hard-failed at startup so they cannot leak into a court-facing deploy.
+"""
+
+from __future__ import annotations
+
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
+
+_INSECURE_SECRET_DEFAULTS = frozenset({
+    "change-me-in-production",
+    "change-this-to-a-random-secret-in-production",
+})
 
 
 class Settings(BaseSettings):
@@ -49,13 +64,49 @@ class Settings(BaseSettings):
     rate_limit_default_per_minute: int = 120
     rate_limit_search_per_minute: int = 30
     rate_limit_document_per_minute: int = 60
+    # Cap memory rate limit dict — bounds RAM under skewed traffic / slow scrapers.
+    rate_limit_memory_max_keys: int = 50_000
 
     # Payments: no PSP integration in this repo — UI/API must reflect simulation
     payments_are_simulated: bool = True
 
     @property
     def allowed_origins_list(self) -> list[str]:
-        return [o.strip() for o in self.allowed_origins.split(",")]
+        return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        """A deploy is treated as production when debug is off AND demo mode is off."""
+        return not self.debug and not self.allow_demo_mode
+
+    @model_validator(mode="after")
+    def _enforce_production_safety(self) -> Settings:
+        if not self.is_production:
+            return self
+
+        problems: list[str] = []
+        if self.secret_key in _INSECURE_SECRET_DEFAULTS:
+            problems.append("SECRET_KEY is still set to a default placeholder value.")
+        if self.keycloak_client_secret in _INSECURE_SECRET_DEFAULTS:
+            problems.append(
+                "KEYCLOAK_CLIENT_SECRET is still set to a default placeholder value."
+            )
+        if self.allow_public_registration:
+            problems.append(
+                "ALLOW_PUBLIC_REGISTRATION must be false in production "
+                "(use IdP / admin invite instead)."
+            )
+        if any(o.startswith("http://") and "localhost" not in o for o in self.allowed_origins_list):
+            problems.append(
+                "ALLOWED_ORIGINS contains a non-localhost http:// origin in production; "
+                "use https:// origins for the portal."
+            )
+        if problems:
+            raise ValueError(
+                "Refusing to start with insecure production configuration:\n  - "
+                + "\n  - ".join(problems)
+            )
+        return self
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

@@ -1,17 +1,23 @@
-import { useState, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { apiClient } from './api/client';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Footer from './components/layout/Footer';
-import FilingWizard from './components/filing/FilingWizard';
-import MyFilings from './components/filing/MyFilings';
-import ReviewQueue from './components/clerk/ReviewQueue';
-import CaseSearch from './components/search/CaseSearch';
-import Favorites from './components/search/Favorites';
-import CaseDetailPage from './components/search/CaseDetailPage';
-import CoverageStats from './components/stats/CoverageStats';
 import LoginScreen, { getDemoRole, getDemoCourtName } from './components/auth/LoginScreen';
+
+// Heavy/route-only components are lazy so the initial bundle covers only the shell + login.
+const FilingWizard = lazy(() => import('./components/filing/FilingWizard'));
+const MyFilings = lazy(() => import('./components/filing/MyFilings'));
+const ReviewQueue = lazy(() => import('./components/clerk/ReviewQueue'));
+const CaseSearch = lazy(() => import('./components/search/CaseSearch'));
+const Favorites = lazy(() => import('./components/search/Favorites'));
+const CaseDetailPage = lazy(() => import('./components/search/CaseDetailPage'));
+const CoverageStats = lazy(() => import('./components/stats/CoverageStats'));
+
+function RouteFallback() {
+  return <div className="loading" role="status" aria-live="polite">Loading…</div>;
+}
 
 function RequireRole({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -44,9 +50,11 @@ function FilerDashboard() {
   } | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     apiClient.get('/admin/public-stats').then(res => {
-      setStats(res.data);
+      if (!cancelled) setStats(res.data);
     }).catch(() => { /* use fallback */ });
+    return () => { cancelled = true; };
   }, []);
 
   return (
@@ -185,16 +193,18 @@ function App() {
               <div className="app-body">
                 <Sidebar />
                 <main className="main-content">
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/filing/new" element={<RequireFiler><FilingWizard /></RequireFiler>} />
-                    <Route path="/filings" element={<RequireFiler><MyFilings /></RequireFiler>} />
-                    <Route path="/cases/search" element={<CaseSearch />} />
-                    <Route path="/cases/:caseId" element={<CaseDetailPage />} />
-                    <Route path="/favorites" element={<RequireFiler><Favorites /></RequireFiler>} />
-                    <Route path="/clerk/queue" element={<RequireClerk><ReviewQueue /></RequireClerk>} />
-                    <Route path="/stats" element={<CoverageStats />} />
-                  </Routes>
+                  <Suspense fallback={<RouteFallback />}>
+                    <Routes>
+                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/filing/new" element={<RequireFiler><FilingWizard /></RequireFiler>} />
+                      <Route path="/filings" element={<RequireFiler><MyFilings /></RequireFiler>} />
+                      <Route path="/cases/search" element={<CaseSearch />} />
+                      <Route path="/cases/:caseId" element={<CaseDetailPage />} />
+                      <Route path="/favorites" element={<RequireFiler><Favorites /></RequireFiler>} />
+                      <Route path="/clerk/queue" element={<RequireClerk><ReviewQueue /></RequireClerk>} />
+                      <Route path="/stats" element={<CoverageStats />} />
+                    </Routes>
+                  </Suspense>
                 </main>
               </div>
               <Footer />

@@ -13,4 +13,22 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    target: 'es2020',
+    sourcemap: false,
+    cssCodeSplit: true,
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        // Split heavy vendor groups so the initial bundle stays small and the
+        // wizard / clerk routes can lazy-load their own chunks.
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'query-vendor': ['@tanstack/react-query'],
+          'http-vendor': ['axios'],
+          icons: ['lucide-react'],
+        },
+      },
+    },
+  },
 });
