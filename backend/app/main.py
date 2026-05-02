@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.router import api_router
 from app.config import settings
-from app.database import get_db
+from app.database import async_session
 from app.logging_config import configure_logging, get_logger
 from app.middleware import (
     RateLimitMiddleware,
@@ -81,8 +81,21 @@ async def health_check() -> dict[str, str]:
     return {"status": "healthy", "service": "muefs-api"}
 
 
+async def _readiness_db_session() -> AsyncGenerator[AsyncSession, None]:
+    """Like ``get_db`` but rolls back instead of committing — readiness must never
+    write — and surfaces connection failures as exceptions the endpoint can convert
+    into 503 (rather than the 500 that ``get_db``'s commit failure would trigger)."""
+    async with async_session() as session:
+        try:
+            yield session
+        finally:
+            await session.rollback()
+
+
 @app.get("/health/ready")
-async def readiness_check(db: AsyncSession = Depends(get_db)) -> JSONResponse:
+async def readiness_check(
+    db: AsyncSession = Depends(_readiness_db_session),
+) -> JSONResponse:
     """Readiness probe: confirms the database is reachable.
 
     Returns 200 with ``{"status": "ready", ...}`` when ``SELECT 1`` succeeds and 503 with
