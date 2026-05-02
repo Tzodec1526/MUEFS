@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.logging_config import get_request_id
 from app.models.audit import AuditLog
 
 
@@ -14,6 +17,17 @@ async def log_action(
     ip_address: str | None = None,
     user_agent: str | None = None,
 ) -> AuditLog:
+    """Append an audit row.
+
+    The current request id (set by :class:`RequestIdMiddleware`) is mixed into ``details``
+    automatically so audit rows can be joined to log lines for end-to-end tracing.
+    """
+    request_id = get_request_id()
+    if request_id:
+        merged: dict = dict(details) if details else {}
+        merged.setdefault("request_id", request_id)
+        details = merged
+
     entry = AuditLog(
         user_id=user_id,
         action=action,

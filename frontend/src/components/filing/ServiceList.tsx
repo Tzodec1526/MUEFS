@@ -11,14 +11,33 @@ interface Props {
   onChange: (contacts: ServiceContact[]) => void;
 }
 
+// RFC 5322-light: enough to catch obvious typos without rejecting valid edge cases.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function ServiceList({ contacts, onChange }: Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [method, setMethod] = useState('electronic');
+  const [error, setError] = useState<string | null>(null);
+
+  const requireEmail = method === 'electronic';
 
   const addContact = () => {
-    if (!name.trim() || !email.trim()) return;
-    onChange([...contacts, { name, email, method }]);
+    if (!name.trim()) {
+      setError('Please enter a name.');
+      return;
+    }
+    const trimmedEmail = email.trim();
+    if (requireEmail && !trimmedEmail) {
+      setError('Email is required for electronic service.');
+      return;
+    }
+    if (trimmedEmail && !EMAIL_RE.test(trimmedEmail)) {
+      setError('Enter a valid email address.');
+      return;
+    }
+    setError(null);
+    onChange([...contacts, { name: name.trim(), email: trimmedEmail, method }]);
     setName('');
     setEmail('');
   };
@@ -49,13 +68,18 @@ function ServiceList({ contacts, onChange }: Props) {
             />
           </div>
           <div className="form-group">
-            <label htmlFor="contactEmail">Email</label>
+            <label htmlFor="contactEmail">
+              Email{requireEmail ? ' *' : ' (optional)'}
+            </label>
             <input
               id="contactEmail"
               type="email"
+              inputMode="email"
+              autoComplete="off"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="service@example.com"
+              aria-invalid={Boolean(error && error.toLowerCase().includes('email'))}
             />
           </div>
           <div className="form-group">
@@ -74,6 +98,7 @@ function ServiceList({ contacts, onChange }: Props) {
             Add
           </button>
         </div>
+        {error && <div className="alert alert-error" role="alert">{error}</div>}
       </div>
 
       {contacts.length > 0 && (

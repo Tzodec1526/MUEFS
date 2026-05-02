@@ -110,8 +110,7 @@ async def update_filing(
         filing.filing_description = data.filing_description
 
     await db.flush()
-    await db.refresh(filing)
-    await db.refresh(filing, ["documents"])
+    await db.refresh(filing, attribute_names=["documents"])
     return filing
 
 
@@ -183,9 +182,6 @@ async def submit_filing(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Filing cannot be submitted (not in draft status)",
         )
-    # Full refresh to get updated_at, then load documents relationship
-    await db.refresh(filing)
-    await db.refresh(filing, ["documents"])
 
     await audit_service.log_action(
         db,

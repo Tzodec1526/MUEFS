@@ -1,11 +1,14 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { isDemoBuild } from '../../config/demoMode';
 import { getDemoRole, getDemoUserName } from '../auth/LoginScreen';
+import NotificationsBell from './NotificationsBell';
 
 function Header() {
   const navigate = useNavigate();
   const role = getDemoRole();
   const userName = getDemoUserName();
+  // Public docket viewers don't have notifications wired up yet; skip the poll there.
+  const notificationsEnabled = role !== null && role !== 'public';
 
   const handleSwitchRole = () => {
     localStorage.removeItem('demo_role');
@@ -21,6 +24,7 @@ function Header() {
     attorney: 'Attorney',
     clerk: 'Court Clerk',
     srl: 'Self-Represented Litigant',
+    public: 'Public Docket',
   };
 
   const roleLabel = role ? roleLabelMap[role] || role : '';
@@ -46,11 +50,12 @@ function Header() {
       </div>
       <nav className="header-nav">
         <Link to="/">Dashboard</Link>
-        {role !== 'clerk' && <Link to="/filing/new">New Filing</Link>}
+        {role !== 'clerk' && role !== 'public' && <Link to="/filing/new">New Filing</Link>}
         <Link to="/cases/search">Case Search</Link>
         {role === 'clerk' && <Link to="/clerk/queue">Review Queue</Link>}
       </nav>
       <div className="header-user">
+        <NotificationsBell enabled={notificationsEnabled} />
         <span>{userName || 'Guest'}</span>
         {role && (
           <span className={`user-badge ${role === 'srl' ? 'user-badge-srl' : ''}`}>

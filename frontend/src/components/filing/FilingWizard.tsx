@@ -6,8 +6,8 @@ import DocumentUpload from './DocumentUpload';
 import ServiceList from './ServiceList';
 import PaymentForm from './PaymentForm';
 import FilingReview from './FilingReview';
-import { createFiling } from '../../api/filings';
-import { getCourt } from '../../api/courts';
+import { createFiling, getFiling } from '../../api/filings';
+import { getCourt, getCaseTypes } from '../../api/courts';
 
 type WizardStep = 'court' | 'case-type' | 'details' | 'documents' | 'service' | 'payment' | 'review';
 
@@ -97,8 +97,80 @@ function FilingWizard() {
   const [errors, setErrors] = useState<string[]>([]);
   const [isMotionMode, setIsMotionMode] = useState(false);
 
-  // Pre-fill from URL params (e.g., "File a Motion" from case detail page)
+  // Pre-fill from URL params:
+  //   ?filing_id=N        — resume an existing draft / returned filing.
+  //   ?case_id&court_id&case_type_id&case_title[&service_only=true] — file a new motion.
   useEffect(() => {
+    let cancelled = false;
+    const filingIdParam = searchParams.get('filing_id');
+
+    if (filingIdParam) {
+      const numFilingId = Number(filingIdParam);
+      if (!Number.isFinite(numFilingId)) return;
+      clearDraft();
+      setShowDraftBanner(false);
+      (async () => {
+        try {
+          const filing = await getFiling(numFilingId);
+          if (cancelled) return;
+          // Resolve court name + case-type display name.
+          let courtName = `Court #${filing.court_id}`;
+          let caseTypeName = '';
+          let filingFeeCents = 0;
+          try {
+            const court = await getCourt(filing.court_id);
+            if (cancelled) return;
+            courtName = court.name;
+          } catch { /* keep fallback */ }
+          try {
+            const caseTypes = await getCaseTypes(filing.court_id);
+            if (cancelled) return;
+            const ct = caseTypes.find(c => c.id === filing.case_type_id);
+            if (ct) {
+              caseTypeName = ct.name;
+              filingFeeCents = ct.filing_fee_cents;
+            }
+          } catch { /* keep fallback */ }
+
+          if (cancelled) return;
+          const filingTypeRaw = filing.filing_type as FilingData['filingType'] | string | undefined;
+          const isServiceOnly = filingTypeRaw === 'service_only';
+          setIsMotionMode(filing.case_id != null);
+          setFilingData({
+            ...defaultFilingData,
+            filingId: filing.id,
+            courtId: filing.court_id,
+            courtName,
+            caseId: filing.case_id,
+            filingType: (filingTypeRaw === 'initial' || filingTypeRaw === 'subsequent' || filingTypeRaw === 'service_only')
+              ? filingTypeRaw
+              : 'subsequent',
+            caseTypeId: filing.case_type_id,
+            caseTypeName,
+            filingFeeCents,
+            caseTitle: filing.case_title || '',
+            filingDescription: filing.filing_description || '',
+            documents: filing.documents.map(d => ({
+              id: d.id,
+              title: d.title,
+              type: d.document_type_code,
+              size: d.file_size_bytes,
+              isSearchable: d.is_text_searchable,
+            })),
+            // Resumed filings already have their server-side state; jump to documents step.
+            paymentComplete: isServiceOnly || filingFeeCents === 0,
+          });
+          setCurrentStep('documents');
+        } catch (err: unknown) {
+          if (cancelled) return;
+          const axiosErr = err as { response?: { status?: number; data?: { detail?: string } } };
+          const detail = axiosErr?.response?.data?.detail || 'Could not load filing';
+          setErrors([`Failed to resume filing #${numFilingId}: ${detail}`]);
+        }
+      })();
+      return () => { cancelled = true; };
+    }
+
     const caseId = searchParams.get('case_id');
     const courtId = searchParams.get('court_id');
     const caseTypeId = searchParams.get('case_type_id');
@@ -126,11 +198,14 @@ function FilingWizard() {
       setShowDraftBanner(false);
       // Fetch actual court name
       getCourt(numCourtId).then(court => {
+        if (cancelled) return;
         setFilingData(prev => ({ ...prev, courtName: court.name }));
       }).catch(() => {
+        if (cancelled) return;
         setFilingData(prev => ({ ...prev, courtName: `Court #${courtId}` }));
       });
     }
+    return () => { cancelled = true; };
   }, [searchParams]);
 
   const currentStepIndex = STEPS.findIndex((s) => s.key === currentStep);

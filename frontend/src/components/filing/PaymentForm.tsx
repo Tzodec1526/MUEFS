@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { calculateFees, processPayment } from '../../api/documents';
+import { calculateFees, processPayment } from '../../api/payments';
 
 interface Props {
   courtId: number;

@@ -13,6 +13,11 @@ from app.schemas.filing import (
 )
 
 
+async def _refresh_with_documents(db: AsyncSession, filing: FilingEnvelope) -> None:
+    """Refresh scalar columns + the documents collection in a single round trip."""
+    await db.refresh(filing, attribute_names=["documents"])
+
+
 async def create_filing(
     db: AsyncSession,
     filer_id: int,
@@ -32,8 +37,7 @@ async def create_filing(
     )
     db.add(envelope)
     await db.flush()
-    await db.refresh(envelope)
-    await db.refresh(envelope, ["documents"])
+    await _refresh_with_documents(db, envelope)
     return envelope
 
 
@@ -102,7 +106,7 @@ async def validate_filing(
             select(FilingRequirement).where(
                 FilingRequirement.court_id == filing.court_id,
                 FilingRequirement.case_type_id == filing.case_type_id,
-                FilingRequirement.is_required == True,  # noqa: E712
+                FilingRequirement.is_required.is_(True),
             )
         )
         required_docs = list(requirements.scalars().all())
@@ -118,28 +122,32 @@ async def validate_filing(
         if not filing.case_title and not filing.case_id:
             errors.append("Case title is required for new case filings")
 
-    # Check document sizes and types
+    # Document-level checks (text-searchability + PII).
+    # PII scan is only meaningful for searchable PDFs; for non-searchable PDFs we already
+    # surface a separate warning below, and downloading their bytes just to find no text
+    # would be wasted bandwidth (a 100 MB scanned PDF re-downloaded on every Validate click
+    # adds up quickly).
+    from app.services import document_service
+
     for doc in filing.documents:
-        if not doc.is_text_searchable and doc.mime_type == "application/pdf":
+        if doc.mime_type == "application/pdf" and not doc.is_text_searchable:
             warnings.append(
                 f"Document '{doc.title}' may not be text-searchable. "
                 "MCR 1.109 requires text-searchable PDFs."
             )
 
-    # PII detection on PDF documents (MCR 1.109 redaction requirements).
-    # Uses the unified PDF parser so we open each PDF exactly once.
-    from app.services import document_service
-
     for doc in filing.documents:
         if doc.mime_type != "application/pdf":
             continue
+        if not doc.is_text_searchable:
+            continue  # No extractable text → no PII signal to find.
         try:
             file_stream = await document_service.download_document(doc.file_key)
             file_data = file_stream.read()
         except Exception:
             continue  # Skip PII check if file can't be read
 
-        meta = document_service.parse_pdf_metadata(file_data, pii_scan_pages=5)
+        meta = document_service.parse_pdf_metadata(file_data, pii_scan_pages=3)
         for w in meta.pii_warnings:
             warnings.append(f"Document '{doc.title}': {w}")
 
@@ -178,8 +186,7 @@ async def submit_filing(
         filing.status = FilingStatus.SUBMITTED
 
     await db.flush()
-    await db.refresh(filing)
-    await db.refresh(filing, ["documents"])
+    await _refresh_with_documents(db, filing)
     return filing
 
 
@@ -230,8 +237,7 @@ async def review_filing(
         return None
 
     await db.flush()
-    await db.refresh(filing)
-    await db.refresh(filing, ["documents"])
+    await _refresh_with_documents(db, filing)
     return filing
 
 

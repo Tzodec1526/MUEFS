@@ -19,6 +19,7 @@ export interface FilingEnvelope {
   case_id: number | null;
   case_type_id: number;
   filer_id: number;
+  filing_type: string;
   status: string;
   case_title: string | null;
   filing_description: string | null;

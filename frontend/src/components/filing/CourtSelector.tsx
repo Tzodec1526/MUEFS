@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { listCourts, Court } from '../../api/courts';
 
 interface Props {
@@ -20,13 +20,19 @@ const MICHIGAN_COUNTIES = [
   'St. Clair', 'St. Joseph', 'Tuscola', 'Van Buren', 'Washtenaw', 'Wayne', 'Wexford',
 ];
 
+// Michigan has ~256 courts; pull the full set in one call so we don't hide the long tail
+// behind a 25-row pagination. The backend caps page_size at 500 which is comfortably above
+// the actual count.
+const FETCH_LIMIT = 500;
+
 function CourtSelector({ selectedCourtId, onSelect }: Props) {
   const [courts, setCourts] = useState<Court[]>([]);
+  const [total, setTotal] = useState(0);
   const [countyFilter, setCountyFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [nameQuery, setNameQuery] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Debounce filter changes to avoid excessive API calls
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -36,16 +42,28 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
         const result = await listCourts({
           county: countyFilter || undefined,
           court_type: typeFilter || undefined,
+          page_size: FETCH_LIMIT,
         });
         setCourts(result.courts);
+        setTotal(result.total);
       } catch {
         setCourts([]);
+        setTotal(0);
       } finally {
         setLoading(false);
       }
-    }, 300);
+    }, 250);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [countyFilter, typeFilter]);
+
+  const filtered = useMemo(() => {
+    if (!nameQuery.trim()) return courts;
+    const q = nameQuery.trim().toLowerCase();
+    return courts.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      (c.city || '').toLowerCase().includes(q),
+    );
+  }, [courts, nameQuery]);
 
   return (
     <div className="form-section">
@@ -86,16 +104,37 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
             <option value="supreme_court">Supreme Court</option>
           </select>
         </div>
+        <div className="form-group">
+          <label htmlFor="courtName">Search</label>
+          <input
+            id="courtName"
+            type="search"
+            value={nameQuery}
+            onChange={(e) => setNameQuery(e.target.value)}
+            placeholder="Court or city name…"
+          />
+        </div>
       </div>
 
       {loading && <p>Loading courts...</p>}
 
+      {!loading && (
+        <p className="results-count">
+          Showing {filtered.length} of {total} court{total === 1 ? '' : 's'}
+          {nameQuery.trim() ? ' (filtered by name)' : ''}
+        </p>
+      )}
+
       <div className="court-list">
-        {courts.map((court) => (
+        {filtered.map((court) => (
           <div
             key={court.id}
             className={`court-card ${selectedCourtId === court.id ? 'selected' : ''}`}
+            role="button"
+            tabIndex={0}
+            aria-pressed={selectedCourtId === court.id}
             onClick={() => onSelect(court.id, court.name)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(court.id, court.name); }}
           >
             <h4>{court.name}</h4>
             <p>
@@ -104,7 +143,7 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
             {court.address && <p className="court-address">{court.address}</p>}
           </div>
         ))}
-        {!loading && courts.length === 0 && (
+        {!loading && filtered.length === 0 && (
           <p className="no-results">
             No courts found. Try adjusting your filters.
           </p>

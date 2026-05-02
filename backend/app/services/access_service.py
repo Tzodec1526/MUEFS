@@ -11,7 +11,7 @@ the caller already holds them. The id-only signatures remain for back compat.
 
 from __future__ import annotations
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.case import Case, CaseParticipant, ParticipantRole
@@ -50,7 +50,7 @@ async def user_is_court_staff_for_court(
     return q.scalar_one_or_none() is not None
 
 
-async def _load_active_user(db: AsyncSession, user_id: int) -> User | None:
+async def load_active_user(db: AsyncSession, user_id: int) -> User | None:
     row = await db.execute(select(User).where(User.id == user_id))
     user = row.scalar_one_or_none()
     if not user or not user.is_active:
@@ -58,12 +58,12 @@ async def _load_active_user(db: AsyncSession, user_id: int) -> User | None:
     return user
 
 
-async def _load_case(db: AsyncSession, case_id: int) -> Case | None:
+async def load_case(db: AsyncSession, case_id: int) -> Case | None:
     row = await db.execute(select(Case).where(Case.id == case_id))
     return row.scalar_one_or_none()
 
 
-async def _user_may_read_sealed_case_resolved(
+async def user_may_read_sealed_case_resolved(
     db: AsyncSession, user: User, case: Case
 ) -> bool:
     """Sealed docket access using already-loaded user + case."""
@@ -87,19 +87,20 @@ async def _user_may_read_sealed_case_resolved(
     if litigant_q.scalar_one_or_none() is not None:
         return True
 
-    # Counsel of record only: attorney_* rows, matched by linked account or bar on that row.
-    counsel_cond = [
-        CaseParticipant.case_id == case.id,
-        CaseParticipant.role.in_(_ATTORNEY_OF_RECORD_ROLES),
-        or_(
-            CaseParticipant.user_id == user.id,
-            and_(
-                user.bar_number is not None,
-                CaseParticipant.attorney_bar_number == user.bar_number,
-            ),
-        ),
-    ]
-    counsel_q = await db.execute(select(CaseParticipant.id).where(*counsel_cond))
+    # Counsel of record only: attorney_* rows, matched by linked account or by bar number when
+    # the user is a barred attorney. We build the disjunction dynamically so the bar-number
+    # branch is omitted entirely when the user has no bar number (avoids a NULL == NULL match).
+    counsel_match: list = [CaseParticipant.user_id == user.id]
+    if user.bar_number:
+        counsel_match.append(CaseParticipant.attorney_bar_number == user.bar_number)
+
+    counsel_q = await db.execute(
+        select(CaseParticipant.id).where(
+            CaseParticipant.case_id == case.id,
+            CaseParticipant.role.in_(_ATTORNEY_OF_RECORD_ROLES),
+            or_(*counsel_match),
+        )
+    )
     if counsel_q.scalar_one_or_none() is not None:
         return True
 
@@ -114,26 +115,26 @@ async def _user_may_read_sealed_case_resolved(
 
 async def user_may_read_sealed_case(db: AsyncSession, user_id: int, case_id: int) -> bool:
     """Sealed docket: litigants, counsel of record, filer-on-case, court staff, admin."""
-    case = await _load_case(db, case_id)
+    case = await load_case(db, case_id)
     if not case or not case.is_sealed:
         return False
-    user = await _load_active_user(db, user_id)
+    user = await load_active_user(db, user_id)
     if not user:
         return False
-    return await _user_may_read_sealed_case_resolved(db, user, case)
+    return await user_may_read_sealed_case_resolved(db, user, case)
 
 
 async def user_may_read_case(db: AsyncSession, user_id: int, case_id: int) -> bool:
     """Non-sealed: any signed-in user. Sealed: restricted list."""
-    case = await _load_case(db, case_id)
+    case = await load_case(db, case_id)
     if not case:
         return False
-    user = await _load_active_user(db, user_id)
+    user = await load_active_user(db, user_id)
     if not user:
         return False
     if not case.is_sealed:
         return True
-    return await _user_may_read_sealed_case_resolved(db, user, case)
+    return await user_may_read_sealed_case_resolved(db, user, case)
 
 
 async def user_may_read_filing_envelope(
@@ -147,15 +148,15 @@ async def user_may_read_filing_envelope(
     if envelope.case_id is None:
         return False
 
-    case = await _load_case(db, envelope.case_id)
+    case = await load_case(db, envelope.case_id)
     if not case:
         return False
 
     if case.is_sealed:
-        user = await _load_active_user(db, user_id)
+        user = await load_active_user(db, user_id)
         if not user:
             return False
-        return await _user_may_read_sealed_case_resolved(db, user, case)
+        return await user_may_read_sealed_case_resolved(db, user, case)
 
     if envelope.status == FilingStatus.DRAFT:
         return False
@@ -186,7 +187,7 @@ async def user_may_read_envelope_with_case(
         return False
 
     if case.is_sealed:
-        return await _user_may_read_sealed_case_resolved(db, user, case)
+        return await user_may_read_sealed_case_resolved(db, user, case)
 
     if envelope.status == FilingStatus.DRAFT:
         return False

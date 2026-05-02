@@ -41,6 +41,7 @@ export async function listCourts(params?: {
   county?: string;
   court_type?: string;
   page?: number;
+  page_size?: number;
 }): Promise<{ courts: Court[]; total: number }> {
   const { data } = await apiClient.get('/courts', { params });
   return data;

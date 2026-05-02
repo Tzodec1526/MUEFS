@@ -4,6 +4,8 @@ import { apiClient } from './api/client';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Footer from './components/layout/Footer';
+import ErrorBoundary from './components/layout/ErrorBoundary';
+import NotFound from './components/layout/NotFound';
 import LoginScreen, { getDemoRole, getDemoCourtName } from './components/auth/LoginScreen';
 
 // Heavy/route-only components are lazy so the initial bundle covers only the shell + login.
@@ -181,38 +183,43 @@ function Dashboard() {
 
 function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginScreen />} />
-      {/* Authenticated routes */}
-      <Route
-        path="*"
-        element={
-          <RequireRole>
-            <div className="app-layout">
-              <Header />
-              <div className="app-body">
-                <Sidebar />
-                <main className="main-content">
-                  <Suspense fallback={<RouteFallback />}>
-                    <Routes>
-                      <Route path="/" element={<Dashboard />} />
-                      <Route path="/filing/new" element={<RequireFiler><FilingWizard /></RequireFiler>} />
-                      <Route path="/filings" element={<RequireFiler><MyFilings /></RequireFiler>} />
-                      <Route path="/cases/search" element={<CaseSearch />} />
-                      <Route path="/cases/:caseId" element={<CaseDetailPage />} />
-                      <Route path="/favorites" element={<RequireFiler><Favorites /></RequireFiler>} />
-                      <Route path="/clerk/queue" element={<RequireClerk><ReviewQueue /></RequireClerk>} />
-                      <Route path="/stats" element={<CoverageStats />} />
-                    </Routes>
-                  </Suspense>
-                </main>
+    <ErrorBoundary>
+      <Routes>
+        <Route path="/login" element={<LoginScreen />} />
+        {/* Authenticated routes */}
+        <Route
+          path="*"
+          element={
+            <RequireRole>
+              <div className="app-layout">
+                <Header />
+                <div className="app-body">
+                  <Sidebar />
+                  <main className="main-content">
+                    <ErrorBoundary>
+                      <Suspense fallback={<RouteFallback />}>
+                        <Routes>
+                          <Route path="/" element={<Dashboard />} />
+                          <Route path="/filing/new" element={<RequireFiler><FilingWizard /></RequireFiler>} />
+                          <Route path="/filings" element={<RequireFiler><MyFilings /></RequireFiler>} />
+                          <Route path="/cases/search" element={<CaseSearch />} />
+                          <Route path="/cases/:caseId" element={<CaseDetailPage />} />
+                          <Route path="/favorites" element={<RequireFiler><Favorites /></RequireFiler>} />
+                          <Route path="/clerk/queue" element={<RequireClerk><ReviewQueue /></RequireClerk>} />
+                          <Route path="/stats" element={<CoverageStats />} />
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </Suspense>
+                    </ErrorBoundary>
+                  </main>
+                </div>
+                <Footer />
               </div>
-              <Footer />
-            </div>
-          </RequireRole>
-        }
-      />
-    </Routes>
+            </RequireRole>
+          }
+        />
+      </Routes>
+    </ErrorBoundary>
   );
 }
 

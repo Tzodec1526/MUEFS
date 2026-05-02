@@ -20,7 +20,9 @@ async def list_courts(
     court_type: CourtType | None = None,
     efiling_only: bool = True,
     page: int = Query(1, ge=1),
-    page_size: int = Query(25, ge=1, le=100),
+    # Michigan has ~256 courts statewide; allow callers (court selectors) to fetch them
+    # all in one call when they want to render an unfiltered list.
+    page_size: int = Query(25, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
 ):
     query = select(Court)

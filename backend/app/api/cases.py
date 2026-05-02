@@ -106,7 +106,7 @@ async def get_case_filings(
 ):
     """Docket listing for a case. Resolves user/case/court-staff once, then filters
     envelopes in memory using the access-service fast path (avoids N+1 queries)."""
-    case = await access_service._load_case(db, case_id)
+    case = await access_service.load_case(db, case_id)
     if not case:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
 
@@ -116,7 +116,7 @@ async def get_case_filings(
 
     # Sealed case access still requires the full sealed check (litigant/counsel/etc.).
     if case.is_sealed and not is_court_staff:
-        may_view = await access_service._user_may_read_sealed_case_resolved(
+        may_view = await access_service.user_may_read_sealed_case_resolved(
             db, current_user, case
         )
         if not may_view:

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +8,8 @@ from app.api.auth import get_current_user_id, require_user_may_manage_efilings
 from app.database import get_db
 from app.models.case import Case
 from app.models.user import FavoriteCase, User
+from app.services import audit_service
+from app.utils.http_context import client_ip, client_user_agent
 
 router = APIRouter(prefix="/favorites", tags=["Favorites"])
 
@@ -61,18 +63,17 @@ async def list_favorites(
 
 @router.post("", response_model=FavoriteCaseResponse, status_code=status.HTTP_201_CREATED)
 async def add_favorite(
+    request: Request,
     data: FavoriteCaseCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
-    # Check case exists
     case_result = await db.execute(select(Case).where(Case.id == data.case_id))
     case = case_result.scalar_one_or_none()
     if not case:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
 
-    # Check not already favorited
     existing = await db.execute(
         select(FavoriteCase).where(
             FavoriteCase.user_id == user_id,
@@ -88,6 +89,17 @@ async def add_favorite(
     db.add(fav)
     await db.flush()
 
+    await audit_service.log_action(
+        db,
+        user_id=user_id,
+        action="add_favorite",
+        entity_type="favorite_case",
+        entity_id=fav.id,
+        details={"case_id": data.case_id},
+        ip_address=client_ip(request),
+        user_agent=client_user_agent(request),
+    )
+
     return FavoriteCaseResponse(
         id=fav.id,
         case_id=fav.case_id,
@@ -100,6 +112,7 @@ async def add_favorite(
 
 @router.delete("/{case_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_favorite(
+    request: Request,
     case_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_user_may_manage_efilings),
@@ -115,5 +128,17 @@ async def remove_favorite(
     if not fav:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Favorite not found")
 
+    fav_id = fav.id
     await db.delete(fav)
     await db.flush()
+
+    await audit_service.log_action(
+        db,
+        user_id=user_id,
+        action="remove_favorite",
+        entity_type="favorite_case",
+        entity_id=fav_id,
+        details={"case_id": case_id},
+        ip_address=client_ip(request),
+        user_agent=client_user_agent(request),
+    )

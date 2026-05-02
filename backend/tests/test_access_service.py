@@ -330,3 +330,36 @@ async def test_sealed_counsel_of_record_by_bar_and_role(db_session):
     ))
     await db_session.flush()
     assert await access_service.user_may_read_case(db_session, counsel.id, case.id) is True
+
+
+@pytest.mark.asyncio
+async def test_sealed_user_without_bar_number_does_not_match_null_bars(db_session):
+    """Regression: attorneys without a bar number must not match participant rows where
+    ``attorney_bar_number`` is NULL just because the user's bar is also NULL."""
+    no_bar_user = User(
+        email="no_bar@test.com", first_name="N", last_name="oBar",
+        user_type=UserType.SELF_REPRESENTED, bar_number=None,
+    )
+    db_session.add(no_bar_user)
+    court = Court(name="No Bar Court", county="N", court_type=CourtType.CIRCUIT)
+    db_session.add(court)
+    await db_session.flush()
+    ct = CaseType(
+        court_id=court.id, code="C", name="Civil",
+        category=CaseCategory.CIVIL, filing_fee_cents=100,
+    )
+    db_session.add(ct)
+    await db_session.flush()
+    case = Case(
+        court_id=court.id, case_number="NB-1", case_type_id=ct.id,
+        title="Sealed", status=CaseStatus.OPEN, filed_date=datetime.now(UTC),
+        is_sealed=True,
+    )
+    db_session.add(case)
+    await db_session.flush()
+    db_session.add(CaseParticipant(
+        case_id=case.id, role=ParticipantRole.ATTORNEY_PLAINTIFF,
+        party_name="Phantom Counsel", attorney_bar_number=None,
+    ))
+    await db_session.flush()
+    assert await access_service.user_may_read_case(db_session, no_bar_user.id, case.id) is False

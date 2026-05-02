@@ -1,13 +1,16 @@
-import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.router import api_router
 from app.config import settings
+from app.database import get_db
+from app.logging_config import configure_logging, get_logger
 from app.middleware import (
     RateLimitMiddleware,
     RequestIdMiddleware,
@@ -15,7 +18,8 @@ from app.middleware import (
     close_rate_limit_redis,
 )
 
-logger = logging.getLogger(__name__)
+configure_logging()
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
@@ -70,4 +74,32 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 @app.get("/health")
 async def health_check() -> dict[str, str]:
+    """Liveness probe: the process is up and the event loop is responsive.
+
+    Use ``/health/ready`` to also verify downstream dependencies before sending traffic.
+    """
     return {"status": "healthy", "service": "muefs-api"}
+
+
+@app.get("/health/ready")
+async def readiness_check(db: AsyncSession = Depends(get_db)) -> JSONResponse:
+    """Readiness probe: confirms the database is reachable.
+
+    Returns 200 with ``{"status": "ready", ...}`` when ``SELECT 1`` succeeds and 503 with
+    ``{"status": "unready", "reason": ...}`` otherwise so a load balancer can route around
+    a half-booted pod.
+    """
+    checks: dict[str, str] = {}
+    try:
+        await db.execute(text("SELECT 1"))
+        checks["database"] = "ok"
+    except Exception as exc:
+        logger.warning("Readiness probe: database unreachable: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unready", "reason": "database", "checks": checks},
+        )
+    return JSONResponse(
+        status_code=200,
+        content={"status": "ready", "service": "muefs-api", "checks": checks},
+    )
