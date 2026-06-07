@@ -1,0 +1,365 @@
+import io
+from datetime import UTC, datetime
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.integrations.jis_adapter import JISAdapter  # CMS integration (stub today)
+from app.models.case import Case, CaseStatus
+from app.models.court import FilingRequirement
+from app.models.filing import FilingEnvelope, FilingStatus
+from app.schemas.filing import (
+    FilingEnvelopeCreate,
+    FilingValidationResult,
+)
+
+# Document-code classifiers shared by the submission validator and the
+# requirements API, so the UI shows exactly the set the validator enforces.
+_SERVICE_PROOF_CODES = {"PROOF_SERVICE", "POS_ELECTRONIC", "CERT_SERVICE"}
+
+
+def _is_motion_code(code: str) -> bool:
+    c = code.upper()
+    return (
+        c.startswith("MOT_")
+        or c in (
+            "MOTION", "BRIEF", "BRIEF_SUPPORT", "BRIEF_RESPONSE", "BRIEF_REPLY",
+            "PROPOSED_ORDER", "NOTICE_HEARING", "DISC_CERT_GF",
+        )
+        or "MOTION" in c
+        or "BRIEF" in c
+    )
+
+
+def _is_response_code(code: str) -> bool:
+    c = code.upper()
+    return (
+        c in ("ANSWER", "REPLY", "RESPONSE_BRIEF", "BRIEF_RESPONSE", "BRIEF_REPLY")
+        or "ANSWER" in c
+        or "REPLY" in c
+    )
+
+
+def _is_service_proof_code(code: str) -> bool:
+    return code.upper() in _SERVICE_PROOF_CODES
+
+
+def requirements_for_filing_type(
+    requirements: list[FilingRequirement],
+    filing_type: str,
+) -> list[FilingRequirement]:
+    """Return the subset of court-rule requirements that apply to a filing context.
+
+    Mirrors the enforcement logic in :func:`validate_filing` so the requirements
+    panel can display exactly what the validator will enforce.
+
+    - ``initial`` (new case): initiating pleadings only. Motion companions,
+      responsive documents, and proof/certificate of service are dropped --
+      service (and its proof) happens *after* the case is filed and the summons
+      issued (MCR 2.104 / 2.107).
+    - ``subsequent`` / ``motion``: motion-related companions only; the original
+      complaint and similar initiating documents are already on file.
+    - any other type (e.g. service-only): returned unfiltered.
+    """
+    if filing_type == "initial":
+        return [
+            r
+            for r in requirements
+            if not (
+                _is_motion_code(r.document_type_code)
+                or _is_response_code(r.document_type_code)
+                or _is_service_proof_code(r.document_type_code)
+            )
+        ]
+    if filing_type in ("subsequent", "motion"):
+        return [r for r in requirements if _is_motion_code(r.document_type_code)]
+    return list(requirements)
+
+
+async def create_filing(
+    db: AsyncSession,
+    filer_id: int,
+    data: FilingEnvelopeCreate,
+) -> FilingEnvelope:
+    envelope = FilingEnvelope(
+        court_id=data.court_id,
+        case_id=data.case_id,
+        case_type_id=data.case_type_id,
+        filer_id=filer_id,
+        filing_type=data.filing_type,
+        case_title=data.case_title,
+        filing_description=data.filing_description,
+        fee_waiver_requested=data.fee_waiver_requested,
+        fee_waiver_reason=data.fee_waiver_reason,
+        status=FilingStatus.DRAFT,
+    )
+    db.add(envelope)
+    await db.flush()
+    await db.refresh(envelope)
+    await db.refresh(envelope, ["documents"])
+    return envelope
+
+
+async def get_filing(db: AsyncSession, filing_id: int) -> FilingEnvelope | None:
+    result = await db.execute(
+        select(FilingEnvelope)
+        .options(selectinload(FilingEnvelope.documents))
+        .where(FilingEnvelope.id == filing_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def list_filings(
+    db: AsyncSession,
+    filer_id: int,
+    status: FilingStatus | None = None,
+    page: int = 1,
+    page_size: int = 25,
+) -> tuple[list[FilingEnvelope], int]:
+    query = (
+        select(FilingEnvelope)
+        .options(selectinload(FilingEnvelope.documents))
+        .where(FilingEnvelope.filer_id == filer_id)
+        .order_by(FilingEnvelope.updated_at.desc())
+    )
+    count_query = select(func.count()).select_from(FilingEnvelope).where(
+        FilingEnvelope.filer_id == filer_id
+    )
+
+    if status:
+        query = query.where(FilingEnvelope.status == status)
+        count_query = count_query.where(FilingEnvelope.status == status)
+
+    total = (await db.execute(count_query)).scalar() or 0
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    return list(result.scalars().all()), total
+
+
+async def validate_filing(
+    db: AsyncSession,
+    filing_id: int,
+) -> FilingValidationResult:
+    filing = await get_filing(db, filing_id)
+    if not filing:
+        return FilingValidationResult(
+            is_valid=False, errors=["Filing not found"]
+        )
+
+    errors: list[str] = []
+    warnings: list[str] = []
+    missing_docs: list[str] = []
+
+    if not filing.documents:
+        errors.append("At least one document must be uploaded")
+
+    # Service-only filings have relaxed validation - just need docs and a case
+    is_service_only = filing.filing_type == "service_only"
+
+    if is_service_only:
+        if not filing.case_id:
+            errors.append("Service-only filings must reference an existing case")
+    else:
+        # Check required documents against court rules
+        requirements = await db.execute(
+            select(FilingRequirement).where(
+                FilingRequirement.court_id == filing.court_id,
+                FilingRequirement.case_type_id == filing.case_type_id,
+                FilingRequirement.is_required == True,  # noqa: E712
+            )
+        )
+        required_docs = list(requirements.scalars().all())
+
+        filed_doc_types = {doc.document_type_code for doc in filing.documents}
+
+        required_docs = requirements_for_filing_type(required_docs, filing.filing_type)
+
+        for req in required_docs:
+            code = req.document_type_code
+            satisfied = code in filed_doc_types
+            if not satisfied and code.startswith("MOT_"):
+                # Support specific motion types (MOT_SD, MOT_RECONSIDER, etc.)
+                # satisfying a generic MOTION requirement
+                satisfied = any(dt.startswith("MOT_") or dt == "MOTION" for dt in filed_doc_types)
+            if not satisfied:
+                missing_docs.append(
+                    f"{req.description} ({req.document_type_code})"
+                    + (f" - See {req.mcr_reference}" if req.mcr_reference else "")
+                )
+
+        if not filing.case_title and not filing.case_id:
+            errors.append("Case title is required for new case filings")
+
+    # Check document sizes and types
+    for doc in filing.documents:
+        if not doc.is_text_searchable and doc.mime_type == "application/pdf":
+            warnings.append(
+                f"Document '{doc.title}' may not be text-searchable. "
+                "MCR 1.109 requires text-searchable PDFs."
+            )
+
+    # PII detection on PDF documents (MCR 1.109 redaction requirements)
+    from app.services import document_service
+    from app.utils.pdf import check_pii_patterns
+
+    for doc in filing.documents:
+        if doc.mime_type == "application/pdf":
+            try:
+                file_stream = await document_service.download_document(doc.file_key)
+                file_data = file_stream.read()
+                from pypdf import PdfReader
+                reader = PdfReader(io.BytesIO(file_data))
+                for page in reader.pages[:5]:  # Check first 5 pages
+                    text = page.extract_text() or ""
+                    pii_warnings = check_pii_patterns(text)
+                    for w in pii_warnings:
+                        warnings.append(f"Document '{doc.title}': {w}")
+                    if pii_warnings:
+                        break  # One warning per doc is enough
+            except Exception:
+                pass  # Skip PII check if file can't be read
+
+    is_valid = len(errors) == 0 and len(missing_docs) == 0
+    return FilingValidationResult(
+        is_valid=is_valid,
+        errors=errors,
+        warnings=warnings,
+        missing_required_documents=missing_docs,
+    )
+
+
+async def submit_filing(
+    db: AsyncSession,
+    filing_id: int,
+) -> FilingEnvelope | None:
+    # Lock the row to prevent double-submit
+    result = await db.execute(
+        select(FilingEnvelope)
+        .options(selectinload(FilingEnvelope.documents))
+        .where(FilingEnvelope.id == filing_id)
+        .with_for_update()
+    )
+    filing = result.scalar_one_or_none()
+    if not filing or filing.status != FilingStatus.DRAFT:
+        return None
+
+    now = datetime.now(UTC)
+    filing.submitted_at = now
+
+    # Service-only filings skip clerk review entirely
+    if filing.filing_type == "service_only":
+        filing.status = FilingStatus.SERVED
+        filing.reviewed_at = now
+    else:
+        filing.status = FilingStatus.SUBMITTED
+
+    await db.flush()
+    await db.refresh(filing)
+    await db.refresh(filing, ["documents"])
+    return filing
+
+
+async def review_filing(
+    db: AsyncSession,
+    filing_id: int,
+    reviewer_id: int,
+    action: str,
+    reason: str | None = None,
+) -> FilingEnvelope | None:
+    # Lock the row to prevent concurrent review
+    result = await db.execute(
+        select(FilingEnvelope)
+        .options(selectinload(FilingEnvelope.documents))
+        .where(FilingEnvelope.id == filing_id)
+        .with_for_update()
+    )
+    filing = result.scalar_one_or_none()
+    if not filing or filing.status not in (FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW):
+        return None
+
+    now = datetime.now(UTC)
+    filing.reviewer_id = reviewer_id
+    filing.reviewed_at = now
+
+    if action == "accept":
+        filing.status = FilingStatus.ACCEPTED
+        # Create case if this is a new filing (no existing case_id)
+        if not filing.case_id:
+            case = Case(
+                court_id=filing.court_id,
+                case_number=f"MI-{filing.court_id}-{now.strftime('%Y')}-{filing.id:06d}",
+                case_type_id=filing.case_type_id,
+                title=filing.case_title or "Untitled Case",
+                status=CaseStatus.OPEN,
+                filed_date=now,
+            )
+            db.add(case)
+            await db.flush()
+            filing.case_id = case.id
+
+        # CMS adapter integration: push accepted filing to court's case management system.
+        # For MVP this is a no-op stub (JISAdapter); production would select adapter by
+        # court.cms_type and persist external ids / errors.
+        try:
+            adapter = JISAdapter()
+            await adapter.submit_filing(
+                case_number=None,  # would resolve from created case or filing
+                case_title=filing.case_title or "Untitled Case",
+                documents=[
+                    {"title": d.title, "type": d.document_type_code}
+                    for d in (filing.documents or [])
+                ],
+                parties=[],
+                filing_metadata={
+                    "filing_id": filing.id,
+                    "court_id": filing.court_id,
+                    "filing_type": filing.filing_type,
+                },
+            )
+        except Exception:
+            # Never fail the review on CMS issues in this build; log/audit in prod.
+            pass
+    elif action == "reject":
+        filing.status = FilingStatus.REJECTED
+        filing.rejection_reason = reason
+    elif action == "return":
+        filing.status = FilingStatus.RETURNED
+        filing.rejection_reason = reason
+    else:
+        return None
+
+    await db.flush()
+    await db.refresh(filing)
+    await db.refresh(filing, ["documents"])
+    return filing
+
+
+async def get_clerk_queue(
+    db: AsyncSession,
+    court_id: int,
+    page: int = 1,
+    page_size: int = 25,
+) -> tuple[list[FilingEnvelope], int]:
+    query = (
+        select(FilingEnvelope)
+        .options(selectinload(FilingEnvelope.documents))
+        .where(
+            FilingEnvelope.court_id == court_id,
+            FilingEnvelope.status.in_([FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW]),
+        )
+        .order_by(FilingEnvelope.submitted_at.asc())
+    )
+    count_query = (
+        select(func.count())
+        .select_from(FilingEnvelope)
+        .where(
+            FilingEnvelope.court_id == court_id,
+            FilingEnvelope.status.in_([FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW]),
+        )
+    )
+
+    total = (await db.execute(count_query)).scalar() or 0
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    return list(result.scalars().all()), total

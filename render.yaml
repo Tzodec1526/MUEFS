@@ -1,0 +1,32 @@
+# Render Blueprint for the public hosted demo.
+# In Render: New > Blueprint, point it at this repo, and it provisions the service below.
+# Then add the custom domain demo.tomcedoz.com in the service settings.
+services:
+  - type: web
+    name: muefs-demo
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: standard        # 2 GB / always-on (~$25/mo). Use "starter" for a cheaper 512 MB box.
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: true      # redeploy on push to the default branch
+    # Single instance only — the per-session sandboxes live on this box's local disk.
+    envVars:
+      - key: DEMO_ISOLATED_SESSIONS
+        value: "true"
+      - key: ALLOW_DEMO_MODE
+        value: "true"
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./demo_data/unused.db
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      - key: RATE_LIMIT_BACKEND
+        value: memory
+      - key: PAYMENTS_ARE_SIMULATED
+        value: "true"
+      - key: DEMO_MAX_SESSIONS
+        value: "100"
+      - key: DEMO_SESSION_TTL_MINUTES
+        value: "60"
+      - key: ALLOWED_ORIGINS
+        value: https://demo.tomcedoz.com
