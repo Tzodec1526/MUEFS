@@ -137,7 +137,7 @@ function Favorites() {
                 </span>
               </div>
               <div className="favorite-card-actions">
-                <Link to="/filing/new" className="btn btn-secondary btn-small">
+                <Link to={`/filing/new?court_id=${fav.court_id}`} className="btn btn-secondary btn-small">
                   Use for Filing
                 </Link>
                 <button

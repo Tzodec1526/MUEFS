@@ -154,6 +154,19 @@ function FilingWizard() {
         const match = types.find(t => t.id === Number(caseTypeId));
         if (match) setFilingData(prev => ({ ...prev, caseTypeName: match.name }));
       }).catch(() => { /* name is a display nicety; ignore */ });
+    } else if (courtId) {
+      // Court-only prefill (e.g., "Use for Filing" from a favorite court): start a new
+      // filing pre-set to that court and jump to the case step (the court is chosen).
+      clearDraft();
+      const numCourtId = Number(courtId);
+      setFilingData({ ...defaultFilingData, courtId: numCourtId, filingType: 'initial' });
+      setCurrentStep('case');
+      setShowDraftBanner(false);
+      getCourt(numCourtId).then(court => {
+        setFilingData(prev => ({ ...prev, courtName: court.name }));
+      }).catch(() => {
+        setFilingData(prev => ({ ...prev, courtName: `Court #${courtId}` }));
+      });
     }
   }, [searchParams]);
 
