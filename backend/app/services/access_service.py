@@ -7,8 +7,9 @@ confidential, or draft check fails closed for it.
 
 Non-sealed matters: anyone (including anonymous) may view the case docket and non-confidential
 documents. Draft filings remain visible only to the filer and court staff.
-Sealed matters: litigants (party-linked accounts), counsel of record (attorney_* rows only),
-filer-on-case, court staff, and system admin — never anonymous.
+Sealed matters: litigants (party-linked accounts), counsel of record (attorney_* rows,
+matched by linked account or a verified bar number), filer-on-case, court staff, and
+system admin — never anonymous.
 """
 
 from __future__ import annotations
@@ -85,13 +86,16 @@ async def user_may_read_sealed_case(db: AsyncSession, user_id: int | None, case_
     if litigant_q.scalar_one_or_none() is not None:
         return True
 
-    # Counsel of record only: attorney_* rows, matched by linked account or bar on that row.
+    # Counsel of record only: attorney_* rows, matched by linked account or a *verified*
+    # bar number on that row. A self-asserted (unverified) bar number never grants sealed
+    # access — public self-registration leaves bar_number_verified False, so it cannot be
+    # used to impersonate counsel of record.
     bar_match = (
         and_(
             CaseParticipant.attorney_bar_number.is_not(None),
             CaseParticipant.attorney_bar_number == user.bar_number,
         )
-        if user.bar_number is not None
+        if user.bar_number is not None and user.bar_number_verified
         else false()
     )
     counsel_cond = [

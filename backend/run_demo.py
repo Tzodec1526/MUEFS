@@ -58,6 +58,7 @@ def setup_demo_db():
                 email="attorney@demo.muefs.gov",
                 first_name="Jane", last_name="Doe",
                 user_type=UserType.ATTORNEY, bar_number="P12345",
+                bar_number_verified=True,
                 firm_name="Doe & Associates PLLC",
             ))
             session.add(User(

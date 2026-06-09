@@ -5,9 +5,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.integrations.jis_adapter import JISAdapter  # CMS integration (stub today)
+from app.integrations.cms_adapter import get_cms_adapter  # CMS integration (stubs today)
 from app.models.case import Case, CaseStatus
-from app.models.court import FilingRequirement
+from app.models.court import Court, FilingRequirement
 from app.models.filing import FilingEnvelope, FilingStatus
 from app.schemas.filing import (
     FilingEnvelopeCreate,
@@ -299,10 +299,13 @@ async def review_filing(
             filing.case_id = case.id
 
         # CMS adapter integration: push accepted filing to court's case management system.
-        # For MVP this is a no-op stub (JISAdapter); production would select adapter by
-        # court.cms_type and persist external ids / errors.
+        # The adapter is selected by court.cms_type (JIS vs Tyler Odyssey); both are no-op
+        # stubs in this build. Production would persist external ids / errors.
         try:
-            adapter = JISAdapter()
+            cms_type_row = await db.execute(
+                select(Court.cms_type).where(Court.id == filing.court_id)
+            )
+            adapter = get_cms_adapter(cms_type_row.scalar_one_or_none())
             await adapter.submit_filing(
                 case_number=None,  # would resolve from created case or filing
                 case_title=filing.case_title or "Untitled Case",

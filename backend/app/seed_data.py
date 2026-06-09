@@ -680,6 +680,7 @@ def seed_database():
                 last_name="Doe",
                 user_type=UserType.ATTORNEY,
                 bar_number="P12345",
+                bar_number_verified=True,
                 firm_name="Doe & Associates PLLC",
                 phone="313-555-0100",
             ),

@@ -55,3 +55,19 @@ class CMSAdapter(ABC):
     async def health_check(self) -> bool:
         """Check if the CMS integration is operational."""
         ...
+
+
+def get_cms_adapter(cms_type: str | None) -> CMSAdapter:
+    """Return the CMS adapter for a court's case-management system.
+
+    Selection is by ``Court.cms_type``: Tyler Odyssey / TrueFiling courts use the Odyssey
+    adapter; everything else defaults to JIS (the CMS used by ~80% of Michigan trial
+    courts). Imports are deferred to avoid a circular import with the concrete adapters.
+    """
+    from app.integrations.jis_adapter import JISAdapter
+    from app.integrations.tyler_adapter import TylerOdysseyAdapter
+
+    key = (cms_type or "").strip().lower()
+    if key in {"tyler", "odyssey", "tyler odyssey", "truefiling"}:
+        return TylerOdysseyAdapter()
+    return JISAdapter()

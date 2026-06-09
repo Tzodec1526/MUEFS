@@ -9,6 +9,8 @@ class DocumentUploadResponse(BaseModel):
     sha256_hash: str
     is_text_searchable: bool
     page_count: int | None
+    # Advisory MCR 1.109 PII warnings detected at upload time (empty when none).
+    warnings: list[str] = []
 
 
 class DocumentVerifyResponse(BaseModel):

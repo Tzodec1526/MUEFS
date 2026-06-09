@@ -39,6 +39,9 @@ class User(Base):
     first_name: Mapped[str] = mapped_column(String(100))
     last_name: Mapped[str] = mapped_column(String(100))
     bar_number: Mapped[str | None] = mapped_column(String(20), index=True)
+    # Set True only by an admin or a verified IdP claim. Self-asserted bar numbers from
+    # public self-registration stay False and never grant sealed-case (counsel) access.
+    bar_number_verified: Mapped[bool] = mapped_column(default=False)
     user_type: Mapped[UserType] = mapped_column(Enum(UserType))
     phone: Mapped[str | None] = mapped_column(String(20))
     firm_name: Mapped[str | None] = mapped_column(String(255))

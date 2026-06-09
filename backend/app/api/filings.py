@@ -28,6 +28,7 @@ from app.schemas.filing import (
     FilingValidationResult,
 )
 from app.services import access_service, audit_service, document_service, filing_service
+from app.utils import malware_scan
 from app.utils.http_context import client_ip, client_user_agent
 
 router = APIRouter(prefix="/filings", tags=["Filings"])
@@ -254,6 +255,15 @@ async def upload_document(
             detail="Unsupported file type. Accepted: PDF, Word, TXT, RTF, TIFF, JPG, PNG",
         )
 
+    # Malware screening (defense in depth): reject executables / known-bad signatures
+    # regardless of the declared MIME type.
+    scan = malware_scan.scan_upload(file_data, content_type)
+    if not scan.is_clean:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=scan.reason or "File rejected by malware screening",
+        )
+
     sha256 = document_service.compute_sha256(file_data)
     safe_name = re.sub(r'[^\w\s\-.]', '', file.filename or 'document') or 'document'
     file_key = f"filings/{filing_id}/{uuid.uuid4()}/{safe_name}"
@@ -262,9 +272,12 @@ async def upload_document(
 
     page_count = None
     is_searchable = False
+    pii_warnings: list[str] = []
     if content_type == "application/pdf":
         page_count = document_service.get_pdf_page_count(file_data)
         is_searchable = document_service.is_pdf_text_searchable(file_data)
+        # MCR 1.109 PII screening at upload (advisory; re-run at filing validation).
+        pii_warnings = document_service.scan_pdf_pii(file_data)
 
     try:
         doc = FilingDocument(
@@ -306,6 +319,7 @@ async def upload_document(
         sha256_hash=doc.sha256_hash,
         is_text_searchable=doc.is_text_searchable,
         page_count=doc.page_count,
+        warnings=pii_warnings,
     )
 
 

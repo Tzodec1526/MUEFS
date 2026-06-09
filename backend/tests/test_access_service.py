@@ -301,11 +301,11 @@ async def test_sealed_bar_on_party_row_does_not_grant_counsel_access(db_session)
 
 
 @pytest.mark.asyncio
-async def test_sealed_counsel_of_record_by_bar_and_role(db_session):
-    """Counsel listed on attorney_* participant rows may access sealed cases."""
+async def test_sealed_counsel_of_record_by_verified_bar_and_role(db_session):
+    """Counsel on an attorney_* row may access a sealed case via a *verified* bar number."""
     counsel = User(
         email="on_file@test.com", first_name="C", last_name="ounsel",
-        user_type=UserType.ATTORNEY, bar_number="P888",
+        user_type=UserType.ATTORNEY, bar_number="P888", bar_number_verified=True,
     )
     db_session.add(counsel)
     court = Court(name="Counsel Court", county="C", court_type=CourtType.CIRCUIT)
@@ -327,6 +327,77 @@ async def test_sealed_counsel_of_record_by_bar_and_role(db_session):
     db_session.add(CaseParticipant(
         case_id=case.id, role=ParticipantRole.ATTORNEY_DEFENDANT,
         party_name="Lawyer", attorney_bar_number="P888",
+    ))
+    await db_session.flush()
+    assert await access_service.user_may_read_case(db_session, counsel.id, case.id) is True
+
+
+@pytest.mark.asyncio
+async def test_sealed_self_asserted_bar_denied(db_session):
+    """A self-asserted (unverified) bar number must NOT open a sealed case.
+
+    Regression test: public self-registration sets bar_number but leaves
+    bar_number_verified False, so an attacker cannot impersonate counsel of record by
+    claiming a real attorney's (public) bar number.
+    """
+    attacker = User(
+        email="attacker@test.com", first_name="A", last_name="ttacker",
+        user_type=UserType.ATTORNEY, bar_number="P888",  # bar_number_verified defaults False
+    )
+    db_session.add(attacker)
+    court = Court(name="Unverified Bar Court", county="U", court_type=CourtType.CIRCUIT)
+    db_session.add(court)
+    await db_session.flush()
+    ct = CaseType(
+        court_id=court.id, code="C", name="Civil",
+        category=CaseCategory.CIVIL, filing_fee_cents=100,
+    )
+    db_session.add(ct)
+    await db_session.flush()
+    case = Case(
+        court_id=court.id, case_number="UB-1", case_type_id=ct.id,
+        title="Sealed", status=CaseStatus.OPEN, filed_date=datetime.now(UTC),
+        is_sealed=True,
+    )
+    db_session.add(case)
+    await db_session.flush()
+    db_session.add(CaseParticipant(
+        case_id=case.id, role=ParticipantRole.ATTORNEY_DEFENDANT,
+        party_name="Real Counsel", attorney_bar_number="P888",
+    ))
+    await db_session.flush()
+    assert await access_service.user_may_read_case(db_session, attacker.id, case.id) is False
+
+
+@pytest.mark.asyncio
+async def test_sealed_counsel_of_record_by_user_id(db_session):
+    """Counsel linked to an attorney_* row by user_id may access the sealed case even
+    without a verified bar number (the account-linkage path)."""
+    counsel = User(
+        email="linked_counsel@test.com", first_name="L", last_name="inked",
+        user_type=UserType.ATTORNEY, bar_number="P555",  # unverified
+    )
+    db_session.add(counsel)
+    await db_session.flush()
+    court = Court(name="Linked Counsel Court", county="L", court_type=CourtType.CIRCUIT)
+    db_session.add(court)
+    await db_session.flush()
+    ct = CaseType(
+        court_id=court.id, code="C", name="Civil",
+        category=CaseCategory.CIVIL, filing_fee_cents=100,
+    )
+    db_session.add(ct)
+    await db_session.flush()
+    case = Case(
+        court_id=court.id, case_number="LC-1", case_type_id=ct.id,
+        title="Sealed", status=CaseStatus.OPEN, filed_date=datetime.now(UTC),
+        is_sealed=True,
+    )
+    db_session.add(case)
+    await db_session.flush()
+    db_session.add(CaseParticipant(
+        case_id=case.id, user_id=counsel.id, role=ParticipantRole.ATTORNEY_PLAINTIFF,
+        party_name="Linked Lawyer", attorney_bar_number="P555",
     ))
     await db_session.flush()
     assert await access_service.user_may_read_case(db_session, counsel.id, case.id) is True

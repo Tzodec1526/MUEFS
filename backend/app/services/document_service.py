@@ -127,14 +127,40 @@ def get_pdf_page_count(file_data: bytes) -> int | None:
         return None
 
 
-def is_pdf_text_searchable(file_data: bytes) -> bool:
+def is_pdf_text_searchable(file_data: bytes, max_pages: int = 5) -> bool:
+    """True if any of the first ``max_pages`` pages yields extractable text.
+
+    Sampling several pages (not just page 1) avoids mislabeling documents whose first
+    page is a scanned cover sheet.
+    """
     try:
         from pypdf import PdfReader
         reader = PdfReader(io.BytesIO(file_data))
         if len(reader.pages) == 0:
             return False
-        text = reader.pages[0].extract_text()
-        return bool(text and text.strip())
+        for page in reader.pages[:max_pages]:
+            text = page.extract_text()
+            if text and text.strip():
+                return True
+        return False
     except Exception as e:
         logger.warning("Failed to check PDF text searchability: %s", e)
         return False
+
+
+def scan_pdf_pii(file_data: bytes, max_pages: int = 5) -> list[str]:
+    """Return MCR 1.109 PII warnings for the first ``max_pages`` pages of a PDF (advisory)."""
+    from app.utils.pdf import check_pii_patterns
+
+    warnings: list[str] = []
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(file_data))
+        for page in reader.pages[:max_pages]:
+            text = page.extract_text() or ""
+            for w in check_pii_patterns(text):
+                if w not in warnings:
+                    warnings.append(w)
+    except Exception as e:
+        logger.warning("Failed to scan PDF for PII: %s", e)
+    return warnings

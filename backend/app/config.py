@@ -37,6 +37,18 @@ class Settings(BaseSettings):
     # Document processing
     max_file_size_mb: int = 100
 
+    # Upload malware screening (defense in depth on top of the MIME allowlist).
+    # The built-in heuristic scan is offline and always-on so the demo needs no extra
+    # services; ClamAV is an optional production backend.
+    malware_scan_enabled: bool = True
+    malware_scan_clamav_enabled: bool = False
+    clamav_host: str = "clamav"
+    clamav_port: int = 3310
+    clamav_socket: str = ""  # unix socket path; preferred over host/port when set
+    # When ClamAV is enabled but unreachable: True rejects the upload, False falls back
+    # to the built-in scan only.
+    malware_scan_fail_closed: bool = False
+
     # Registration: self-serve POST /auth/register (demo only in typical court deploys)
     allow_public_registration: bool = False
 
