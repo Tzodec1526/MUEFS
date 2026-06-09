@@ -1,0 +1,75 @@
+name: Security Scan
+
+# Informational/non-blocking security scanning. These jobs report findings (and upload
+# results to the Security tab) but do not fail the build yet — range-pinned dependencies
+# will surface pre-existing advisories. Tighten to block on HIGH/CRITICAL once the
+# baseline noise is known (drop `continue-on-error` and set Trivy `exit-code: '1'`).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1" # weekly, Mondays 06:00 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  trivy:
+    name: Trivy filesystem scan
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy filesystem scan (SARIF)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          exit-code: "0" # informational; do not fail the build yet
+      - name: Upload Trivy results to the Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: trivy-results.sarif
+
+  pip-audit:
+    name: Python dependency audit
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Audit backend dependencies (pip-audit)
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pip-audit
+          pip-audit || true # informational; do not fail the build yet
+
+  npm-audit:
+    name: Frontend dependency audit
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Audit frontend dependencies (production only)
+        run: |
+          cd frontend
+          npm install
+          npm audit --omit=dev || true # informational; do not fail the build yet
