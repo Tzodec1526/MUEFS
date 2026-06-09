@@ -90,13 +90,24 @@ export async function submitFiling(filingId: number): Promise<FilingEnvelope> {
   return data;
 }
 
+export interface DocumentUploadResult {
+  id: number;
+  title: string;
+  file_size_bytes: number;
+  mime_type: string;
+  sha256_hash: string;
+  is_text_searchable: boolean;
+  page_count: number | null;
+  warnings: string[];
+}
+
 export async function uploadDocument(
   filingId: number,
   file: File,
   documentTypeCode: string,
   title: string,
   isConfidential: boolean = false,
-): Promise<FilingDocument> {
+): Promise<DocumentUploadResult> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('document_type_code', documentTypeCode);

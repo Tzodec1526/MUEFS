@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { uploadDocument, removeDocument } from '../../api/filings';
 import { getFilingChecklists, FilingChecklist } from '../../api/courts';
+import { getErrorDetail } from '../../utils/errors';
 
 interface DocumentInfo {
   id: number;
@@ -343,6 +344,7 @@ function DocumentUpload({
   const [docTitle, setDocTitle] = useState('');
   const [isConfidential, setIsConfidential] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dynamicChecklist, setDynamicChecklist] = useState<FilingChecklist | null>(null);
 
@@ -376,6 +378,7 @@ function DocumentUpload({
 
     setUploading(true);
     setError(null);
+    setWarnings([]);
 
     try {
       const result = await uploadDocument(filingId, file, docType, docTitle, isConfidential);
@@ -389,12 +392,15 @@ function DocumentUpload({
           isSearchable: result.is_text_searchable ?? false,
         },
       ]);
+      setWarnings(result.warnings ?? []);
       setDocTitle('');
       setDocType('');
       setIsConfidential(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Upload failed';
+      // Surface the backend detail (e.g. malware 422 "Rejected: ...", unsupported-type 415).
+      const detail = getErrorDetail(err);
+      const message = detail || (err instanceof Error ? err.message : 'Upload failed');
       setError(message);
     } finally {
       setUploading(false);
@@ -460,6 +466,15 @@ function DocumentUpload({
       </p>
 
       {error && <div className="alert alert-error">{error}</div>}
+
+      {warnings.length > 0 && (
+        <div className="alert alert-warning" role="status">
+          <strong>Possible PII detected (MCR 1.109)</strong> — review and redact before submitting.
+          <ul className="pii-warning-list">
+            {warnings.map((w, i) => <li key={i}>{w}</li>)}
+          </ul>
+        </div>
+      )}
 
       {/* Upload Form */}
       <div className="upload-form">
