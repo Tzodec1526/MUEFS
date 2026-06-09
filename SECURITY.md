@@ -55,6 +55,24 @@ regardless of demo mode:
 - **SQL injection / path traversal.** All database access is parameterized via SQLAlchemy;
   document storage paths are containment-checked.
 
+## Threat model & responsibility boundaries
+
+MUEFS is a filing *front end* and workflow engine. It deliberately does **not** take over
+identity, payments, or the court's official record — those stay with established systems,
+which is what keeps adoption low-risk and avoids vendor lock-in.
+
+| Concern | Owned by | MUEFS's role |
+| --- | --- | --- |
+| User identity & credentials | The court's IdP (Keycloak / state SSO) | Validates IdP-issued RS256 JWTs; stores no passwords. |
+| Payment / card data | The payment processor (PCI scope) | Records fee/waiver status only; no card data touches MUEFS (simulated in the demo). |
+| System of record (official docket) | The court's existing CMS (JIS, Tyler Odyssey) | Pushes accepted filings via the adapter layer; the CMS stays authoritative. |
+| Application authorization (who may read/file what) | **MUEFS** | Sealed/confidential access control, ownership/IDOR checks, audit logging. |
+| Upload safety (type, size, malware, PII) | **MUEFS** | MIME allowlist, size cap, malware screening, MCR 1.109 PII warnings. |
+
+In short, MUEFS owns *application-layer* security (authorization, upload safety, audit);
+identity assurance, payment security, and the authoritative record remain with the court's
+existing infrastructure.
+
 ## Upload malware screening
 
 Every uploaded file is screened before it is stored (`backend/app/utils/malware_scan.py`),
@@ -72,9 +90,14 @@ A rejected upload returns `422 Unprocessable Entity` and is never persisted.
 
 ## Hardening checklist for a real deployment
 
-- Set `ALLOW_DEMO_MODE=false`, `ALLOW_PUBLIC_REGISTRATION=false`.
+Configuration:
+
+- Set `ALLOW_DEMO_MODE=false` and `ALLOW_PUBLIC_REGISTRATION=false`.
 - Replace every `change-me*` / `*_dev` secret (`SECRET_KEY`, Keycloak client secret, DB and
-  MinIO credentials) with strong, externally-managed values.
+  MinIO credentials) with strong, externally-managed values. Generate them with:
+  ```bash
+  openssl rand -hex 32
+  ```
 - Configure Keycloak to require **verified email** before issuing tokens; provision
   privileged accounts (admin/clerk/judge) by binding their `keycloak_id` explicitly rather
   than relying on first-login auto-provisioning.
@@ -82,11 +105,48 @@ A rejected upload returns `422 Unprocessable Entity` and is never persisted.
 - Integrate a real payment processor and set `PAYMENTS_ARE_SIMULATED=false`.
 - Serve over TLS, restrict `ALLOWED_ORIGINS`, and run the rate limiter against Redis.
 
-## Reporting a vulnerability
+Scan before and after changes:
 
-This is a personal proof-of-concept. If you find a security issue, please open an issue
-(without sensitive exploit details) or contact the maintainer privately via the repository
-at <https://github.com/Tzodec1526/MUEFS>. Because the hosted demo is intentionally open as
-described above, please scope reports to issues **beyond** the documented demo-mode
-relaxations (for example: reading a sealed or confidential filing you should not be able
-to, authentication bypass against the production code paths, injection, or storage escape).
+```bash
+# Python dependency CVEs
+pip install pip-audit && pip-audit
+
+# Filesystem / image vulnerability + secret scan
+trivy fs .
+trivy image muefs-backend:latest
+
+# Container image vulnerability summary
+docker scout cves muefs-backend:latest
+
+# Frontend dependency CVEs (production deps only)
+npm --prefix frontend audit --omit=dev
+
+# Docker daemon / host CIS benchmark
+# https://github.com/docker/docker-bench-security
+```
+
+### Supported configurations
+
+| | Demo (hosted / `run_demo.py`) | Recommended production |
+| --- | --- | --- |
+| Auth | Role-picker via `X-Demo-User-Id` | Keycloak (or state SSO) RS256 JWT only |
+| Registration | Open self-registration | IdP / admin invite only |
+| Database | SQLite | PostgreSQL |
+| Object storage | Local filesystem | MinIO / S3 with restricted credentials |
+| Malware scanning | Built-in heuristic | Built-in + ClamAV, fail-closed |
+| Payments | Simulated | Real payment processor |
+| Transport | HTTP (localhost) | TLS via reverse proxy |
+
+## Reporting a vulnerability (responsible disclosure)
+
+Please report security issues **privately** — do not open a public issue with exploit details.
+
+- **Preferred:** GitHub private vulnerability reporting — open a draft advisory at
+  <https://github.com/Tzodec1526/MUEFS/security/advisories/new>.
+- **Email:** <tom@tomcedoz.com>.
+
+Include the affected endpoint/file, a description, and reproduction steps. Because the hosted
+demo is intentionally open as described above, please scope reports to issues **beyond** the
+documented demo-mode relaxations — for example: reading a sealed or confidential filing you
+should not be able to, an authentication bypass against the production code paths, injection,
+or a storage escape. We aim to acknowledge reports within a few days.

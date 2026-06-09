@@ -138,14 +138,36 @@ npx tsc --noEmit          # Type check
 npm run build             # Production build
 ```
 
-## Compliance
+## Security & Compliance
 
-- **MCR 1.109**: Text-searchable PDFs, electronic signatures, PII detection
-- **MCR 2.002**: Fee waiver support for indigent filers
-- **MCR 2.119**: Motion companion document requirements (brief, proposed order)
-- **MCR 2.313**: Meet-and-confer certification for discovery motions
-- **WCAG 2.1 AA**: Accessibility compliance
-- **Security**: Content-type validation, input sanitization, rate limiting, audit logging
+Opening the public demo's *front door* never opens the *rooms inside* — application-layer
+security is enforced server-side and covered by the test suite. See **[SECURITY.md](SECURITY.md)**
+for the full security model, threat boundaries, and hardening guide.
+
+**Security**
+- **Sealed & confidential access control** — restricted to parties, counsel of record, the filer, and court staff; counsel is matched by account linkage or a *verified* bar number, never a self-asserted one.
+- **Upload malware screening** — every upload is screened (built-in executable/EICAR heuristic, optional ClamAV) and rejected before storage.
+- **MCR 1.109 PII warnings at upload** — likely SSNs, dates of birth, and account numbers are flagged for redaction.
+- **Hardened authentication** — Keycloak RS256 JWTs (signature, issuer, expiry verified; no `none` algorithm); OIDC auto-provisioning requires a verified email and won't adopt privileged accounts.
+- **Audit logging & ownership checks** on every object, with parameterized queries throughout.
+
+**Court Rule compliance**
+- **MCR 1.109** — text-searchable PDFs, electronic signatures, PII detection
+- **MCR 2.002** — fee waiver support for indigent filers
+- **MCR 2.119** — motion companion documents (brief, proposed order)
+- **MCR 2.313** — meet-and-confer certification for discovery motions
+- **WCAG 2.1 AA** — accessibility compliance
+
+**Why this is lower-risk than the status quo:** one auditable, open-source codebase (shipping
+a documented security review and `SECURITY.md`) instead of multiple closed vendor systems —
+and no lock-in: identity, payments, and the system-of-record CMS stay with the court (see the
+threat-boundary table in SECURITY.md).
+
+## Known Limitations & Roadmap
+
+MUEFS is a working proof of concept — some parts (live CMS integration, payments) are
+deliberately demo-grade. See **[docs/ROADMAP.md](docs/ROADMAP.md)** for an honest accounting
+of what is production-ready vs. demonstration, plus the planned roadmap.
 
 ## License
 
