@@ -55,6 +55,10 @@ Log in as an **Attorney**, **Court Clerk**, or **Self-Represented Litigant**, or
 
 ## Production Setup (Docker)
 
+> For a real (non-demo) deployment — secrets, TLS, backups, ClamAV, and the production
+> toggles — follow **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**. The commands below bring up
+> the full local stack.
+
 ```bash
 git clone https://github.com/Tzodec1526/MUEFS.git
 cd MUEFS

@@ -114,6 +114,12 @@ services:
       SMTP_HOST: ${SMTP_HOST:-mailhog}
       SMTP_PORT: ${SMTP_PORT:-1025}
       SMTP_FROM: ${SMTP_FROM:-noreply@michigan-efiling.gov}
+      # Optional ClamAV scanning. Off by default; enable with the `security` profile and
+      # MALWARE_SCAN_CLAMAV_ENABLED=true (see the clamav service below). Built-in heuristic
+      # screening runs regardless.
+      MALWARE_SCAN_CLAMAV_ENABLED: ${MALWARE_SCAN_CLAMAV_ENABLED:-false}
+      CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
     ports:
       - "8000:8000"
     volumes:
@@ -183,7 +189,19 @@ services:
       - "1025:1025"
       - "8025:8025"
 
+  # Optional malware scanner — opt-in so the default stack stays fast.
+  #   docker compose --profile security up   (and set MALWARE_SCAN_CLAMAV_ENABLED=true)
+  # First boot downloads the signature database (a few minutes); it persists in a volume.
+  clamav:
+    image: clamav/clamav:1.4
+    profiles: ["security"]
+    ports:
+      - "3310:3310"
+    volumes:
+      - clamav_data:/var/lib/clamav
+
 volumes:
   postgres_data:
   redis_data:
   minio_data:
+  clamav_data:

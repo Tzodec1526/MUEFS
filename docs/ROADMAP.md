@@ -33,8 +33,9 @@ finished court system.
 - Payment-processor integration (PCI-scoped) replacing the simulated flow.
 - Deeper MCR 1.109 processing: server-side OCR / PDF-A conversion and structured PII
   redaction (not just warnings).
-- Container hardening and CI security scanning (Trivy, pip-audit, npm audit).
-- A production deployment guide and reference infrastructure.
+- Broaden container hardening to the dev images and pin base images by digest (the
+  production image already runs non-root with a healthcheck; CI security scanning and a
+  [deployment guide](DEPLOYMENT.md) now exist).
 
 > Courts and evaluators: if a capability matters for your evaluation and isn't listed here,
 > please ask — this list reflects current scope, not a ceiling.
