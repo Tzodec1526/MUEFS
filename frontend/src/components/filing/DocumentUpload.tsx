@@ -88,7 +88,7 @@ const FILING_CATEGORIES = [
       { code: 'DISC_IME', label: 'Request for Independent Medical Exam', mcr: 'MCR 2.311' },
       { code: 'DISC_INITIAL', label: 'Initial Disclosure', mcr: 'MCR 2.302(A)' },
       { code: 'DISC_SUPPL', label: 'Supplemental Disclosure', mcr: 'MCR 2.302(A)' },
-      { code: 'DISC_PRIVILEGE', label: 'Privilege Log', mcr: 'MCR 2.302(C)(2)' },
+      { code: 'DISC_PRIVILEGE', label: 'Privilege Log', mcr: 'MCR 2.302(B)(6)' },
       { code: 'DISC_EXPERT', label: 'Expert Witness Identification & Opinions', mcr: 'MCR 2.302(B)(4)' },
       { code: 'DISC_CERT_GF', label: 'Certification of Good Faith Discovery Effort', mcr: 'MCR 2.313(A)' },
     ],

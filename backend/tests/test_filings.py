@@ -203,8 +203,8 @@ def test_requirements_for_filing_type_initial_keeps_only_initiating_docs():
         _req(c)
         for c in (
             "COMPLAINT", "SUMMONS", "PROOF_SERVICE", "MOTION", "BRIEF",
-            "MOT_RECONSIDER", "NOTICE_HEARING", "ANSWER", "REPLY",
-            "CERT_SERVICE", "EXHIBIT", "JURY_DEMAND",
+            "MOT_RECONSIDER", "NOTICE_HEARING", "NOT_HEARING", "DISC_CERT_GF",
+            "ANSWER", "REPLY", "CERT_SERVICE", "EXHIBIT", "JURY_DEMAND",
         )
     ]
     kept = {

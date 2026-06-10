@@ -133,6 +133,20 @@ pytest tests/ -v          # Run full suite (includes HTTP smoke: /health, /docs)
 uvicorn app.main:app --reload
 ```
 
+#### Reseeding demo data
+
+Seeding runs once and then skips, so a database keeps old seed data after
+`app/seed_data.py` changes. To reseed:
+
+```bash
+docker compose exec backend python -m app.seed_data --reset   # Docker stack
+rm backend/demo.db                                            # run_demo.py reseeds on next start
+```
+
+`--reset` drops and recreates only the application tables — Keycloak's tables and
+stored documents are untouched. For a fully clean slate (all volumes, including
+uploaded documents), use `docker compose down -v && docker compose up --build`.
+
 ### Frontend
 ```bash
 cd frontend

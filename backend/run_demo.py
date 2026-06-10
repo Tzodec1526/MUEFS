@@ -121,8 +121,8 @@ def setup_demo_db():
                     # Basic + expanded motion companions
                     for code, reqd, desc, mcr in [
                         ("MOTION", True, "Motion", "MCR 2.119"),
-                        ("BRIEF", True, "Brief in Support", "MCR 2.119(A)(2)"),
-                        ("PROPOSED_ORDER", True, "Proposed Order", "MCR 2.602"),
+                        ("BRIEF_SUPPORT", False, "Brief in Support", "MCR 2.119(A)(2)"),
+                        ("PROPOSED_ORDER", False, "Proposed Order", "MCR 2.602"),
                         ("PROOF_SERVICE", True, "Proof of Service", "MCR 2.107"),
                         ("MOT_RECONSIDER", False, "Motion for Reconsideration", "MCR 2.119(F)"),
                         ("MOT_COMPEL", False, "Motion to Compel Discovery", "MCR 2.313"),

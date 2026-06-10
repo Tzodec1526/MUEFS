@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from app.models.case import Case, CaseParticipant, CaseStatus, ParticipantRole
-from app.models.court import CaseCategory, CaseType, Court, CourtType
+from app.models.court import CaseCategory, CaseType, Court, CourtType, FilingRequirement
 from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.models.user import FavoriteCase, User, UserType
 from app.schemas.filing import FilingEnvelopeCreate
@@ -529,3 +529,82 @@ async def test_favorite_case_unique_constraint(db_session):
     from sqlalchemy.exc import IntegrityError
     with pytest.raises(IntegrityError):
         await db_session.flush()
+
+
+# ========== DISCOVERY-MOTION CERTIFICATION (MCR 2.313(A)) ==========
+
+
+async def _seed_motion_requirements(db_session, court, case_type):
+    """Mirror the seeded motion requirements that matter to validation."""
+    db_session.add_all([
+        FilingRequirement(
+            court_id=court.id, case_type_id=case_type.id,
+            document_type_code="MOTION", is_required=True,
+            description="Motion", mcr_reference="MCR 2.119",
+        ),
+        FilingRequirement(
+            court_id=court.id, case_type_id=case_type.id,
+            document_type_code="DISC_CERT_GF", is_required=True,
+            description="Certification of Good Faith Effort (discovery motions)",
+            mcr_reference="MCR 2.313(A)",
+        ),
+    ])
+    await db_session.flush()
+
+
+def _motion_doc(envelope_id: int, code: str, title: str) -> FilingDocument:
+    return FilingDocument(
+        envelope_id=envelope_id, document_type_code=code, title=title,
+        file_key=f"test/{code.lower()}.pdf", file_size_bytes=1024,
+        mime_type="application/pdf", sha256_hash=f"hash-{code}",
+        is_text_searchable=True,
+    )
+
+
+@pytest.mark.asyncio
+async def test_general_motion_does_not_require_discovery_certification(db_session):
+    """A non-discovery motion must not be blocked for lacking a meet-and-confer cert."""
+    user, clerk, court, case_type, _, case = await create_court_with_case(db_session)
+    await _seed_motion_requirements(db_session, court, case_type)
+
+    motion = FilingEnvelope(
+        court_id=court.id, case_id=case.id, case_type_id=case_type.id,
+        filer_id=user.id, case_title=case.title,
+        filing_description="Motion for reconsideration",
+        filing_type="motion", status=FilingStatus.DRAFT,
+    )
+    db_session.add(motion)
+    await db_session.flush()
+    db_session.add(_motion_doc(motion.id, "MOT_RECONSIDER", "Motion for Reconsideration"))
+    await db_session.flush()
+
+    validation = await filing_service.validate_filing(db_session, motion.id)
+    assert validation.is_valid, validation.missing_required_documents
+
+
+@pytest.mark.asyncio
+async def test_discovery_motion_requires_certification(db_session):
+    """MCR 2.313(A): a motion to compel needs the good-faith certification."""
+    user, clerk, court, case_type, _, case = await create_court_with_case(db_session)
+    await _seed_motion_requirements(db_session, court, case_type)
+
+    motion = FilingEnvelope(
+        court_id=court.id, case_id=case.id, case_type_id=case_type.id,
+        filer_id=user.id, case_title=case.title,
+        filing_description="Motion to compel discovery",
+        filing_type="motion", status=FilingStatus.DRAFT,
+    )
+    db_session.add(motion)
+    await db_session.flush()
+    db_session.add(_motion_doc(motion.id, "MOT_COMPEL", "Motion to Compel Discovery"))
+    await db_session.flush()
+
+    validation = await filing_service.validate_filing(db_session, motion.id)
+    assert not validation.is_valid
+    assert any("DISC_CERT_GF" in m for m in validation.missing_required_documents)
+
+    db_session.add(_motion_doc(motion.id, "DISC_CERT_GF", "Certification of Good Faith Effort"))
+    await db_session.flush()
+    await db_session.refresh(motion, ["documents"])
+    validation = await filing_service.validate_filing(db_session, motion.id)
+    assert validation.is_valid, validation.missing_required_documents

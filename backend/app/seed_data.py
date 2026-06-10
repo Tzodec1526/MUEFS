@@ -3,13 +3,16 @@
 Populates the database with all Michigan courts, case types,
 filing requirements, and demo users.
 
-Usage: python -m app.seed_data
+Usage: python -m app.seed_data [--reset]
+
+--reset drops and recreates the application tables before seeding (use after
+changing seed data; Keycloak's tables and stored documents are untouched).
 """
 
 import os
 from datetime import UTC, datetime
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func
 from sqlalchemy.orm import Session
 
 from app.database import Base
@@ -28,6 +31,13 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL_SYNC",
     "postgresql://muefs:muefs_dev@localhost:5432/muefs",
 )
+
+
+def _ordinal(n: int) -> str:
+    """1 -> 1st, 2 -> 2nd, 21 -> 21st; but 11/12/13 -> 11th/12th/13th."""
+    if n % 100 in (11, 12, 13):
+        return f"{n}th"
+    return f"{n}{({1: 'st', 2: 'nd', 3: 'rd'}).get(n % 10, 'th')}"
 
 # Michigan Circuit Courts (57 circuits)
 CIRCUIT_COURTS = [
@@ -470,38 +480,6 @@ CIVIL_FILING_REQUIREMENTS = [
     ("JURY_DEMAND", False, "Jury Demand", "MCR 2.508", None, None),
 ]
 
-# Filing requirements for motions (MCR 2.119)
-MOTION_REQUIREMENTS = [
-    (
-        "MOT_SD", True, "Motion (any type)", "MCR 2.119", 20,
-        "Brief must not exceed 20 pages unless leave granted",
-    ),
-    ("BRIEF_SUPPORT", False, "Brief in Support of Motion", "MCR 2.119(A)(2)", 20, "May be combined with the motion as a single document; a separate brief is not required to file."),
-    ("PROPOSED_ORDER", False, "Proposed Order", "MCR 2.602", None, None),
-    ("POS_ELECTRONIC", True, "Proof of Service", "MCR 2.107", None, None),
-    (
-        "NOT_HEARING", False, "Notice of Hearing", "MCR 2.119(C)",
-        None, "Must be served at least 9 days before hearing",
-    ),
-    ("AFFIDAVIT", False, "Supporting Affidavit(s)", None, None, None),
-    ("EXHIBIT", False, "Exhibits", None, None, "Attach separately; label clearly"),
-]
-
-# Filing requirements for discovery filings
-DISCOVERY_REQUIREMENTS = [
-    (
-        "DISC_INTERROG", False, "Interrogatories", "MCR 2.309",
-        None, "Limited to 35 interrogatories including subparts",
-    ),
-    ("DISC_RFP", False, "Request for Production", "MCR 2.310", None, None),
-    (
-        "DISC_RFA", False, "Request for Admissions", "MCR 2.312",
-        None, "Deemed admitted if not responded to within 28 days",
-    ),
-    ("DISC_SUBPOENA", False, "Subpoena / Subpoena Duces Tecum", "MCR 2.506", None, None),
-    ("POS_ELECTRONIC", True, "Proof of Service", "MCR 2.107", None, None),
-]
-
 # Filing requirements for domesticating subpoena (Michigan Uniform Depositions Act, MCL 600.2163a)
 SUBPOENA_FILING_REQUIREMENTS = [
     ("SUBPOENA", True, "Out-of-State Subpoena (authenticated copy)", "MCL 600.2163a", None,
@@ -514,15 +492,16 @@ SUBPOENA_FILING_REQUIREMENTS = [
     ("FILING_FEE", True, "Filing Fee", None, None, None),
 ]
 
-# Filing requirements for motions
+# Filing requirements for motions (attached alongside the initiating civil list, so one
+# row per document code: EXHIBIT and PROOF_SERVICE already come from that list and are
+# not repeated here). Codes match the frontend document catalog; affidavit/exhibit
+# recommendations per motion type live in the catalog's companion rules.
 MOTION_FILING_REQUIREMENTS = [
     ("MOTION", True, "Motion", "MCR 2.119", 20, "Brief must not exceed 20 pages"),
-    ("BRIEF", False, "Brief in Support", "MCR 2.119(A)(2)", 20, "May be combined with the motion as a single document; a separate brief is not required to file."),
-    ("PROPOSED_ORDER", False, "Proposed Order", "MCR 2.119(D)", None, None),
-    ("PROOF_SERVICE", True, "Proof of Service", "MCR 2.107", None, None),
-    ("NOTICE_HEARING", False, "Notice of Hearing", "MCR 2.119(C)", None, None),
-    ("AFFIDAVIT", False, "Supporting Affidavit(s)", None, None, None),
-    ("EXHIBIT", False, "Exhibits", None, None, None),
+    ("BRIEF_SUPPORT", False, "Brief in Support", "MCR 2.119(A)(2)", 20, "May be combined with the motion as a single document; a separate brief is not required to file."),
+    ("PROPOSED_ORDER", False, "Proposed Order", "MCR 2.602", None, None),
+    ("NOT_HEARING", False, "Notice of Hearing", "MCR 2.119(C)", None, "Must be served at least 9 days before hearing"),
+    ("DISC_CERT_GF", True, "Certification of Good Faith Effort (discovery motions)", "MCR 2.313(A)", None, "Required only when the filing includes a discovery motion (compel, protective order, or discovery sanctions)"),
 ]
 
 # District court civil filing requirements
@@ -601,50 +580,6 @@ SUPREME_COURT_REQUIREMENTS = [
     ("APPENDIX", False, "Appendix", "MCR 7.305(B)(4)", None, None),
 ]
 
-# Expanded motion-specific and additional document requirements for richer coverage
-# These allow the system to enforce companions for many common motion types
-EXPANDED_MOTION_REQUIREMENTS = [
-    ("MOT_RECONSIDER", True, "Motion for Reconsideration", "MCR 2.119(F)", 10, "Generally no oral argument; 14-day window in many cases"),
-    ("MOT_INLIMINE", True, "Motion in Limine", "MRE 103", None, None),
-    ("MOT_AMEND", True, "Motion to Amend Pleadings", "MCR 2.118", None, None),
-    ("MOT_QUASH", True, "Motion to Quash Subpoena", "MCR 2.506(H)", None, None),
-    ("MOT_TRO", True, "Motion for Temporary Restraining Order", "MCR 3.310", None, "Often ex parte; requires specific findings"),
-    ("MOT_PRELIM_INJ", True, "Motion for Preliminary Injunction", "MCR 3.310", None, "Requires hearing and bond/security often"),
-    ("MOT_RELIEF", True, "Motion for Relief from Judgment/Order", "MCR 2.612", None, None),
-    ("MOT_SANCTIONS", True, "Motion for Sanctions", "MCR 1.109(E)", None, None),
-    ("MOT_TRANSFER", True, "Motion to Transfer Venue", "MCR 2.222", None, None),
-    ("MOT_CONSOLIDATE", True, "Motion to Consolidate", "MCR 2.505", None, None),
-    ("MOT_WITHDRAW", True, "Motion to Withdraw as Counsel", "MCR 2.117(C)", None, "Requires notice to client"),
-    ("MOT_FEES", True, "Motion for Attorney Fees and Costs", "MCR 2.625", None, None),
-    ("MOT_STAY", True, "Motion to Stay Proceedings or Execution", "MCR 2.614", None, None),
-    ("MOT_ADJOURN", True, "Motion to Adjourn Hearing or Trial", "MCR 2.503", None, None),
-    ("MOT_INTERVENE", True, "Motion to Intervene", "MCR 2.209", None, None),
-    ("MOT_LIMINE", True, "Motion in Limine (Evidentiary)", "MRE 103", None, None),
-    ("CERT_SERVICE", True, "Certificate / Proof of Service", "MCR 2.107", None, None),
-    ("AFFIDAVIT", False, "Affidavit in Support", None, None, None),
-    ("EXHIBIT", False, "Exhibits / Attachments", None, None, "Must be labeled and referenced"),
-    ("NOTICE_HEARING", False, "Notice of Hearing", "MCR 2.119(C)", None, "9 days for most civil motions"),
-]
-
-# Responsive and answer documents
-RESPONSIVE_REQUIREMENTS = [
-    ("ANSWER", True, "Answer to Complaint", "MCR 2.111(F)", None, None),
-    ("REPLY", True, "Reply to Counterclaim", "MCR 2.108 / 2.110", None, None),
-    ("RESPONSE_BRIEF", True, "Response Brief to Motion", "MCR 2.119(A)(2)", 20, "Due 21 days after service in many cases"),
-    ("REPLY_BRIEF", False, "Reply Brief", "MCR 2.119(A)(2)", 5, "Optional, short"),
-    ("AFFIRMATIVE_DEF", False, "Affirmative Defenses (in Answer)", "MCR 2.111(F)(3)", None, None),
-]
-
-# Additional discovery and post-discovery
-EXTENDED_DISCOVERY_REQUIREMENTS = [
-    ("DISC_ANSWERS", False, "Answers to Interrogatories", "MCR 2.309", None, None),
-    ("DISC_RFP_RESP", False, "Response to Requests for Production", "MCR 2.310", None, None),
-    ("DISC_RFA_RESP", False, "Response to Requests for Admission", "MCR 2.312", None, None),
-    ("DISC_PRIVILEGE", False, "Privilege Log", "MCR 2.302(C)(2)", None, None),
-    ("DISC_EXPERT", False, "Expert Witness Disclosure", "MCR 2.302(B)(4)", None, None),
-    ("DISC_CERT_GF", True, "Certification of Good Faith Effort (for compel motions)", "MCR 2.313(A)", None, None),
-]
-
 # Family law motion examples
 FAMILY_MOTION_REQUIREMENTS = [
     ("MOT_MODIFY", True, "Motion to Modify Custody/Support/Parenting Time", "MCR 3.207 / MCL 722.27", None, None),
@@ -659,8 +594,11 @@ PROBATE_MOTION_REQUIREMENTS = [
 ]
 
 
-def seed_database():
+def seed_database(reset: bool = False):
     engine = create_engine(DATABASE_URL, echo=False)
+    if reset:
+        print("Reset: dropping application tables...")
+        Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
 
     with Session(engine) as session:
@@ -722,13 +660,7 @@ def seed_database():
         # --- Circuit Courts ---
         for circuit_num, counties, city in CIRCUIT_COURTS:
             county = counties[0]
-            suffix = (
-                "st" if circuit_num == 1
-                else "nd" if circuit_num == 2
-                else "rd" if circuit_num == 3
-                else "th"
-            )
-            name = f"{circuit_num}{suffix} Circuit Court"
+            name = f"{_ordinal(circuit_num)} Circuit Court"
             if len(counties) > 1:
                 division = ", ".join(counties) + " Counties"
             else:
@@ -896,31 +828,6 @@ def seed_database():
                         page_limit=page_limit,
                         format_notes=notes,
                     ))
-                # Expanded specific motion and companion requirements (new coverage)
-                # Attached as required=True so that the validate filter can select them for motion filings.
-                for doc_code, required, desc, mcr, page_limit, notes in EXPANDED_MOTION_REQUIREMENTS:
-                    session.add(FilingRequirement(
-                        court_id=court.id,
-                        case_type_id=civil_ct.id,
-                        document_type_code=doc_code,
-                        is_required=required,
-                        description=desc,
-                        mcr_reference=mcr,
-                        page_limit=page_limit,
-                        format_notes=notes,
-                    ))
-                for doc_code, required, desc, mcr, page_limit, notes in EXTENDED_DISCOVERY_REQUIREMENTS:
-                    session.add(FilingRequirement(
-                        court_id=court.id,
-                        case_type_id=civil_ct.id,
-                        document_type_code=doc_code,
-                        is_required=required,
-                        description=desc,
-                        mcr_reference=mcr,
-                        page_limit=page_limit,
-                        format_notes=notes,
-                    ))
-
                 # Additional motion checklists
                 session.add(FilingChecklist(
                     court_id=court.id,
@@ -1407,6 +1314,8 @@ def seed_database():
             wayne_subp = session.query(CaseType).filter_by(
                 court_id=wayne_circuit.id, code="CIV-SUBP"
             ).first()
+            # CIV-GEN is seeded for every circuit court above; assert for type narrowing.
+            assert wayne_civil is not None
 
             # --- Case 1: Active breach of contract case ---
             case1 = Case(
@@ -1678,6 +1587,27 @@ def seed_database():
 
         session.commit()
 
+        # Guard: one row per (court, case type, document code). Duplicate rows render
+        # as duplicate checklist cards in the filing UI, so fail loudly at seed time.
+        dupes = (
+            session.query(
+                FilingRequirement.court_id,
+                FilingRequirement.case_type_id,
+                FilingRequirement.document_type_code,
+            )
+            .group_by(
+                FilingRequirement.court_id,
+                FilingRequirement.case_type_id,
+                FilingRequirement.document_type_code,
+            )
+            .having(func.count(FilingRequirement.id) > 1)
+            .all()
+        )
+        if dupes:
+            raise ValueError(
+                f"{len(dupes)} duplicate filing-requirement rows seeded; first: {dupes[:5]}"
+            )
+
         total = session.query(Court).count()
         total_types = session.query(CaseType).count()
         total_reqs = session.query(FilingRequirement).count()
@@ -1689,4 +1619,13 @@ def seed_database():
 
 
 if __name__ == "__main__":
-    seed_database()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Seed Michigan court demo data.")
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Drop and recreate the application tables before seeding "
+        "(Keycloak tables and stored documents are untouched).",
+    )
+    seed_database(reset=parser.parse_args().reset)

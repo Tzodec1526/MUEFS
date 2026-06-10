@@ -18,14 +18,19 @@ from app.schemas.filing import (
 # requirements API, so the UI shows exactly the set the validator enforces.
 _SERVICE_PROOF_CODES = {"PROOF_SERVICE", "POS_ELECTRONIC", "CERT_SERVICE"}
 
+# MCR 2.313(A): the good-faith (meet-and-confer) certification accompanies discovery
+# motions only; other motions do not need it.
+_DISCOVERY_MOTION_CODES = {"MOT_COMPEL", "MOT_PROTECTIVE", "MOT_SANCTIONS"}
+
 
 def _is_motion_code(code: str) -> bool:
     c = code.upper()
     return (
         c.startswith("MOT_")
         or c in (
+            # NOTICE_HEARING is the probate lists' spelling; the catalog uses NOT_HEARING.
             "MOTION", "BRIEF", "BRIEF_SUPPORT", "BRIEF_RESPONSE", "BRIEF_REPLY",
-            "PROPOSED_ORDER", "NOTICE_HEARING", "DISC_CERT_GF",
+            "PROPOSED_ORDER", "NOT_HEARING", "NOTICE_HEARING", "DISC_CERT_GF",
         )
         or "MOTION" in c
         or "BRIEF" in c
@@ -178,10 +183,18 @@ async def validate_filing(
         for req in required_docs:
             code = req.document_type_code
             satisfied = code in filed_doc_types
-            if not satisfied and code.startswith("MOT_"):
-                # Support specific motion types (MOT_SD, MOT_RECONSIDER, etc.)
-                # satisfying a generic MOTION requirement
+            if not satisfied and (code.startswith("MOT_") or code == "MOTION"):
+                # Any motion document satisfies a motion-document requirement, in both
+                # directions: a specific type (MOT_SD, MOT_RECONSIDER, ...) covers a
+                # generic MOTION row and vice versa.
                 satisfied = any(dt.startswith("MOT_") or dt == "MOTION" for dt in filed_doc_types)
+            if (
+                not satisfied
+                and code == "DISC_CERT_GF"
+                and not (filed_doc_types & _DISCOVERY_MOTION_CODES)
+            ):
+                # The certification requirement applies only to discovery motions.
+                satisfied = True
             if not satisfied:
                 missing_docs.append(
                     f"{req.description} ({req.document_type_code})"
