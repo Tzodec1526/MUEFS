@@ -86,11 +86,13 @@ def test_circuit_civil_checklist_is_curated(seeded_session):
     }
 
     motion = requirements_for_filing_type(reqs, "motion")
+    # DISC_CERT_GF is recommended, not required: MCR 2.313(A)(5) makes a good-faith effort
+    # a factor in awarding motion expenses, not a required filing.
     assert {r.document_type_code for r in motion if r.is_required} == {
-        "MOTION", "DISC_CERT_GF",
+        "MOTION",
     }
     assert {r.document_type_code for r in motion if not r.is_required} == {
-        "BRIEF_SUPPORT", "PROPOSED_ORDER", "NOT_HEARING",
+        "BRIEF_SUPPORT", "PROPOSED_ORDER", "NOT_HEARING", "DISC_CERT_GF",
     }
 
 

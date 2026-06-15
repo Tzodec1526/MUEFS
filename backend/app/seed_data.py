@@ -501,7 +501,7 @@ MOTION_FILING_REQUIREMENTS = [
     ("BRIEF_SUPPORT", False, "Brief in Support", "MCR 2.119(A)(2)", 20, "May be combined with the motion as a single document; a separate brief is not required to file."),
     ("PROPOSED_ORDER", False, "Proposed Order", "MCR 2.602", None, None),
     ("NOT_HEARING", False, "Notice of Hearing", "MCR 2.119(C)", None, "Must be served at least 9 days before hearing"),
-    ("DISC_CERT_GF", True, "Certification of Good Faith Effort (discovery motions)", "MCR 2.313(A)", None, "Required only when the filing includes a discovery motion (compel, protective order, or discovery sanctions)"),
+    ("DISC_CERT_GF", False, "Certification of Good Faith Effort (discovery motions)", "MCR 2.313(A)(5)", None, "Recommended best practice. MCR 2.313(A)(5) makes a good-faith effort to resolve the dispute a factor in awarding motion expenses, not a required filing. A motion to compel a non-party subpoena must include the subpoena and proof of service under MCR 2.313(A)(2)(c)."),
 ]
 
 # District court civil filing requirements
@@ -734,8 +734,8 @@ def seed_database(reset: bool = False):
                         "items": [
                             {"label": "Motion for Summary Disposition", "required": True},
                             {"label": "Brief in Support of Motion", "required": True},
-                            {"label": "Statement of Material Facts", "required": True},
-                            {"label": "Proposed Order", "required": True},
+                            {"label": "Statement of Material Facts", "required": False},
+                            {"label": "Proposed Order", "required": False},
                             {"label": "Proof of Service", "required": True},
                             {"label": "Supporting Affidavits", "required": False},
                             {"label": "Exhibits", "required": False},
@@ -836,18 +836,21 @@ def seed_database(reset: bool = False):
                     checklist_items={
                         "items": [
                             {"label": "Motion", "required": True},
-                            {"label": "Brief in Support", "required": True},
-                            {"label": "Proposed Order", "required": True},
+                            {"label": "Brief in Support", "required": False},
+                            {"label": "Proposed Order", "required": False},
                             {"label": "Notice of Hearing (9 days before)", "required": True},
                             {"label": "Proof of Service", "required": True},
                             {"label": "Supporting Affidavits", "required": False},
                         ]
                     },
                     help_text=(
-                        "MCR 2.119 governs all motion practice."
-                        " Brief limited to 20 pages. Notice of"
-                        " hearing must be served at least 9 days"
-                        " before the hearing date."
+                        "MCR 2.119 governs all motion practice. A brief"
+                        " is required only when the motion presents an"
+                        " issue of law (MCR 2.119(A)(2)) and may be"
+                        " combined with the motion; a proposed order is"
+                        " best practice (entry under MCR 2.602). Brief"
+                        " limited to 20 pages; notice of hearing served"
+                        " at least 9 days before the hearing date."
                     ),
                     mcr_url=(
                         "https://courts.michigan.gov/courts/"
@@ -865,17 +868,20 @@ def seed_database(reset: bool = False):
                         "items": [
                             {"label": "Motion to Compel / Protective Order", "required": True},
                             {"label": "Brief in Support", "required": True},
-                            {"label": "Meet-and-Confer Certification", "required": True},
-                            {"label": "Proposed Order", "required": True},
+                            {"label": "Meet-and-Confer Certification", "required": False},
+                            {"label": "Proposed Order", "required": False},
                             {"label": "Proof of Service", "required": True},
                             {"label": "Copy of Discovery Request at Issue", "required": False},
                         ]
                     },
                     help_text=(
-                        "MCR 2.313 requires a meet-and-confer"
-                        " certification stating counsel attempted"
-                        " to resolve the dispute before filing."
-                        " Failure to include may result in denial."
+                        "Under MCR 2.313(A)(5), a good-faith effort to"
+                        " resolve the dispute is a factor in awarding"
+                        " motion expenses, so a meet-and-confer"
+                        " certification is recommended best practice,"
+                        " not a required filing. A motion to compel a"
+                        " non-party subpoena must include the subpoena"
+                        " and proof of service (MCR 2.313(A)(2)(c))."
                     ),
                     mcr_url=(
                         "https://courts.michigan.gov/courts/"

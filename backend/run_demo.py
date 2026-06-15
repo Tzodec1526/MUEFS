@@ -144,8 +144,8 @@ def setup_demo_db():
                         motion_type="General Motion (MCR 2.119)",
                         checklist_items={"items": [
                             {"label": "Motion", "required": True},
-                            {"label": "Brief in Support", "required": True},
-                            {"label": "Proposed Order", "required": True},
+                            {"label": "Brief in Support", "required": False},
+                            {"label": "Proposed Order", "required": False},
                             {"label": "Proof of Service", "required": True},
                             {"label": "Notice of Hearing (9 days)", "required": True},
                         ]},
@@ -158,8 +158,8 @@ def setup_demo_db():
                         checklist_items={"items": [
                             {"label": "Motion for Summary Disposition", "required": True},
                             {"label": "Brief in Support", "required": True},
-                            {"label": "Statement of Material Facts Not in Dispute", "required": True},
-                            {"label": "Proposed Order", "required": True},
+                            {"label": "Statement of Material Facts Not in Dispute", "required": False},
+                            {"label": "Proposed Order", "required": False},
                             {"label": "Proof of Service", "required": True},
                             {"label": "Supporting Affidavits / Evidence", "required": False},
                         ]},

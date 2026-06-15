@@ -271,12 +271,15 @@ const COMPANION_RULES: {
     ],
   },
   {
-    // Discovery motions also require meet-and-confer certification
+    // Discovery motions: a good-faith effort to resolve is a factor in awarding motion
+    // expenses (MCR 2.313(A)(5)) -- a certification is recommended best practice, not a
+    // required filing. (A non-party motion to compel must include the subpoena + proof of
+    // service, MCR 2.313(A)(2)(c).)
     trigger: ['MOT_COMPEL', 'MOT_PROTECTIVE', 'MOT_SANCTIONS'],
-    required: [
-      { code: 'DISC_CERT_GF', label: 'Certification of Good Faith Discovery Effort', rule: 'MCR 2.313(A)' },
+    required: [],
+    recommended: [
+      { code: 'DISC_CERT_GF', label: 'Certification of Good Faith Discovery Effort', rule: 'MCR 2.313(A)(5)' },
     ],
-    recommended: [],
   },
   {
     // Summary disposition motions benefit from affidavits
