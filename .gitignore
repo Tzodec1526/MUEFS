@@ -56,3 +56,9 @@ graphify-out/
 
 # MinIO data (local dev)
 minio_data/
+
+# Draft MCR extraction work product + article draft (local only — keep off the public repo)
+/article-edited.txt
+backend/app/data/mcr_filing_requirements_ch1_ch2.json
+backend/app/data/mcr_filing_requirements_draft.json
+docs/mcr_filing_requirements_decisions.md
