@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { listFilings, FilingEnvelope } from '../../api/filings';
 import { getCourt } from '../../api/courts';
 import LoadError from '../common/LoadError';
+import { parseServerDate } from '../../utils/format';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -58,7 +59,7 @@ function MyFilings() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '--';
-    return new Date(dateStr).toLocaleDateString('en-US', {
+    return parseServerDate(dateStr).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

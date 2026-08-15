@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { batchReview, getClerkQueue, reviewFiling, FilingEnvelope } from '../../api/filings';
 import { getDemoCourtName } from '../auth/LoginScreen';
 import LoadError from '../common/LoadError';
-import { getDocumentLabel } from '../../utils/format';
+import { getDocumentLabel, parseServerDate } from '../../utils/format';
 
 function ReviewQueue() {
   const clerkCourtId = parseInt(localStorage.getItem('demo_court_id') || '3', 10);
@@ -110,14 +110,16 @@ function ReviewQueue() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleString();
+    return parseServerDate(dateStr).toLocaleString();
   };
 
   const getAge = (dateStr: string | null): { text: string; level: string } => {
     if (!dateStr) return { text: 'N/A', level: '' };
     // eslint-disable-next-line react-hooks/purity -- age computation is intentionally live at render time for queue freshness display
-    const hours = (Date.now() - new Date(dateStr).getTime()) / 3600000;
-    if (hours < 2) return { text: `${Math.round(hours * 60)}m`, level: 'fresh' };
+    const minutes = Math.max(0, (Date.now() - parseServerDate(dateStr).getTime()) / 60000);
+    if (minutes < 1) return { text: 'just now', level: 'fresh' };
+    if (minutes < 120) return { text: `${Math.round(minutes)}m`, level: 'fresh' };
+    const hours = minutes / 60;
     if (hours < 24) return { text: `${Math.round(hours)}h`, level: 'normal' };
     if (hours < 48) return { text: '1d', level: 'aging' };
     return { text: `${Math.floor(hours / 24)}d`, level: 'overdue' };

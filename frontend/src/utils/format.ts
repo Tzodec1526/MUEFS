@@ -15,10 +15,23 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
+/**
+ * Parse a server timestamp. The API serializes datetimes in UTC, but the demo
+ * (SQLite) emits them without a timezone suffix, which `new Date` would misread
+ * as local time. Treat suffix-less datetime strings as UTC; leave date-only
+ * strings and offset-carrying strings alone.
+ */
+export function parseServerDate(d: string): Date {
+  if (d.includes('T') && !/(?:[Zz]|[+-]\d\d:?\d\d)$/.test(d)) {
+    return new Date(`${d}Z`);
+  }
+  return new Date(d);
+}
+
 /** Format an ISO date string as a short US date, e.g. "Jun 7, 2026". */
 export function formatShortDate(d: string | null): string {
   if (!d) return '--';
-  return new Date(d).toLocaleDateString('en-US', {
+  return parseServerDate(d).toLocaleDateString('en-US', {
     year: 'numeric', month: 'short', day: 'numeric',
   });
 }

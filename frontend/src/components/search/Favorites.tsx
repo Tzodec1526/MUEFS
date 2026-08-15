@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { listFavorites, removeFavorite, FavoriteCase, listFavoriteCourts, removeFavoriteCourt, FavoriteCourt } from '../../api/favorites';
+import { parseServerDate } from '../../utils/format';
 
 function Favorites() {
   const [caseFavorites, setCaseFavorites] = useState<FavoriteCase[]>([]);
@@ -85,7 +86,7 @@ function Favorites() {
                 </div>
                 {fav.notes && <p className="favorite-card-notes">{fav.notes}</p>}
                 <span className="favorite-card-date">
-                  Added {new Date(fav.created_at).toLocaleDateString()}
+                  Added {parseServerDate(fav.created_at).toLocaleDateString()}
                 </span>
               </div>
               <div className="favorite-card-actions">
@@ -133,7 +134,7 @@ function Favorites() {
                 </div>
                 {fav.notes && <p className="favorite-card-notes">{fav.notes}</p>}
                 <span className="favorite-card-date">
-                  Added {new Date(fav.created_at).toLocaleDateString()}
+                  Added {parseServerDate(fav.created_at).toLocaleDateString()}
                 </span>
               </div>
               <div className="favorite-card-actions">

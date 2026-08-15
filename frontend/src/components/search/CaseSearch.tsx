@@ -4,6 +4,7 @@ import { searchCases } from '../../api/cases';
 import { listFavorites, addFavorite, removeFavorite } from '../../api/favorites';
 import { getDemoRole } from '../auth/LoginScreen';
 import LoadError from '../common/LoadError';
+import { parseServerDate } from '../../utils/format';
 
 interface CaseResult {
   id: number;
@@ -188,7 +189,7 @@ function CaseSearch() {
                     <td>
                       <span className={`status-badge ${c.status}`}>{c.status}</span>
                     </td>
-                    <td>{new Date(c.filed_date).toLocaleDateString()}</td>
+                    <td>{parseServerDate(c.filed_date).toLocaleDateString()}</td>
                     <td>
                       {c.participants.map((p) => `${p.party_name} (${p.role})`).join(', ')}
                     </td>

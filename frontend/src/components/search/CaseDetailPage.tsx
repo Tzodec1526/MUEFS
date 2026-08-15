@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { addFavorite, removeFavorite, listFavorites } from '../../api/favorites';
 import { getCaseTypes } from '../../api/courts';
-import { getDocumentLabel } from '../../utils/format';
+import { getDocumentLabel, parseServerDate } from '../../utils/format';
 import { getDemoRole } from '../auth/LoginScreen';
 
 interface CaseDetail {
@@ -113,7 +113,7 @@ function CaseDetailPage() {
 
   const formatDate = (d: string | null) => {
     if (!d) return '--';
-    return new Date(d).toLocaleDateString('en-US', {
+    return parseServerDate(d).toLocaleDateString('en-US', {
       year: 'numeric', month: 'short', day: 'numeric',
     });
   };
