@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { isDemoBuild } from '../../config/demoMode';
 import { getDemoRole } from '../auth/LoginScreen';
+import MichiganMark from '../common/MichiganMark';
 
 function Header() {
   const navigate = useNavigate();
@@ -41,8 +42,13 @@ function Header() {
       )}
     <header className="app-header">
       <div className="header-brand">
-        <h1>Michigan Unified E-Filing System</h1>
-        <span className="header-subtitle">Statewide Electronic Filing Portal</span>
+        <div className="header-seal">
+          <MichiganMark size={24} />
+        </div>
+        <div>
+          <h1>Michigan Unified E-Filing System</h1>
+          <span className="header-subtitle">Statewide Electronic Filing Portal</span>
+        </div>
       </div>
       <nav className="header-nav">
         {role && <Link to="/">Dashboard</Link>}

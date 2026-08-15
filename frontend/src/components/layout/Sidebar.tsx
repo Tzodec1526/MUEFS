@@ -1,4 +1,5 @@
 import { useLocation, Link } from 'react-router-dom';
+import { LayoutDashboard, FilePlus2, FolderOpen, Search, Star, ClipboardCheck } from 'lucide-react';
 import { getDemoRole } from '../auth/LoginScreen';
 
 function Sidebar() {
@@ -6,12 +7,12 @@ function Sidebar() {
   const role = getDemoRole();
 
   const allLinks = [
-    { path: '/', label: 'Dashboard', roles: ['attorney', 'clerk', 'srl', 'public'] },
-    { path: '/filing/new', label: 'New Filing', roles: ['attorney', 'srl'] },
-    { path: '/filings', label: 'My Filings', roles: ['attorney', 'srl'] },
-    { path: '/cases/search', label: 'Case Search', roles: ['attorney', 'clerk', 'srl', 'public'] },
-    { path: '/favorites', label: 'Favorites', roles: ['attorney', 'srl'] },
-    { path: '/clerk/queue', label: 'Review Queue', roles: ['clerk'] },
+    { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['attorney', 'clerk', 'srl', 'public'] },
+    { path: '/filing/new', label: 'New Filing', icon: FilePlus2, roles: ['attorney', 'srl'] },
+    { path: '/filings', label: 'My Filings', icon: FolderOpen, roles: ['attorney', 'srl'] },
+    { path: '/cases/search', label: 'Case Search', icon: Search, roles: ['attorney', 'clerk', 'srl', 'public'] },
+    { path: '/favorites', label: 'Favorites', icon: Star, roles: ['attorney', 'srl'] },
+    { path: '/clerk/queue', label: 'Review Queue', icon: ClipboardCheck, roles: ['clerk'] },
   ];
 
   // Guests (no role) see only the public docket routes; signed-in roles see their own set.
@@ -29,6 +30,7 @@ function Sidebar() {
                 to={link.path}
                 className={(link.path === '/' ? location.pathname === '/' : location.pathname.startsWith(link.path)) ? 'active' : ''}
               >
+                <link.icon size={17} strokeWidth={2} aria-hidden="true" />
                 {link.label}
               </Link>
             </li>

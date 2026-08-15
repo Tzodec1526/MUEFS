@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
+import { FilePlus2, FolderOpen, Search, ClipboardCheck } from 'lucide-react';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Footer from './components/layout/Footer';
@@ -70,19 +71,19 @@ function FilerDashboard() {
 
       <div className="dashboard-cards">
         <div className="card card-primary">
-          <div className="card-icon">+</div>
+          <div className="card-icon"><FilePlus2 size={22} aria-hidden="true" /></div>
           <h3>New Filing</h3>
           <p>File a new document with any Michigan court.</p>
           <Link to="/filing/new" className="btn btn-primary">Start Filing</Link>
         </div>
         <div className="card">
-          <div className="card-icon">&#128196;</div>
+          <div className="card-icon"><FolderOpen size={22} aria-hidden="true" /></div>
           <h3>My Filings</h3>
           <p>View and manage your submitted filings.</p>
           <Link to="/filings" className="btn btn-secondary">View Filings</Link>
         </div>
         <div className="card">
-          <div className="card-icon">&#128269;</div>
+          <div className="card-icon"><Search size={22} aria-hidden="true" /></div>
           <h3>Case Search</h3>
           <p>Search cases across all Michigan courts.</p>
           <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>
@@ -104,7 +105,7 @@ function PublicDashboard() {
       </div>
       <div className="dashboard-cards">
         <div className="card card-primary">
-          <div className="card-icon">&#128269;</div>
+          <div className="card-icon"><Search size={22} aria-hidden="true" /></div>
           <h3>Case Search</h3>
           <p>Browse the public docket index (sealed cases are excluded from search).</p>
           <Link to="/cases/search" className="btn btn-primary">Search Cases</Link>
@@ -134,13 +135,13 @@ function ClerkDashboard() {
 
       <div className="dashboard-cards">
         <div className="card card-primary">
-          <div className="card-icon">&#128203;</div>
+          <div className="card-icon"><ClipboardCheck size={22} aria-hidden="true" /></div>
           <h3>Review Queue</h3>
           <p>Review and process pending filings for your court.</p>
           <Link to="/clerk/queue" className="btn btn-primary">Open Queue</Link>
         </div>
         <div className="card">
-          <div className="card-icon">&#128269;</div>
+          <div className="card-icon"><Search size={22} aria-hidden="true" /></div>
           <h3>Case Search</h3>
           <p>Search cases across all Michigan courts.</p>
           <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>
