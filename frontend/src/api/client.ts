@@ -6,6 +6,13 @@ import { emitToast } from '../utils/toastBus';
 // deployment (separate frontend host + backend host).
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
+function demoModeSecret(): string | undefined {
+  const fromBuild = import.meta.env.VITE_DEMO_MODE_SECRET;
+  if (fromBuild) return fromBuild;
+  const runtime = (window as Window & { __MUEFS_DEMO_SECRET__?: string }).__MUEFS_DEMO_SECRET__;
+  return runtime || undefined;
+}
+
 export const apiClient = axios.create({
   baseURL: `${API_BASE_URL}/api/v1`,
   headers: {
@@ -30,7 +37,7 @@ apiClient.interceptors.request.use((config) => {
     rawDemo === 'true' ||
     rawDemo === '1' ||
     (import.meta.env.DEV && rawDemo !== 'false' && rawDemo !== '0');
-  if (demoHeadersOn) {
+    if (demoHeadersOn) {
     const demoRole = localStorage.getItem('demo_role');
     const roleToUserId: Record<string, number> = {
       attorney: 1,
@@ -42,6 +49,10 @@ apiClient.interceptors.request.use((config) => {
     };
     if (demoRole && roleToUserId[demoRole]) {
       config.headers['X-Demo-User-Id'] = String(roleToUserId[demoRole]);
+    }
+    const demoSecret = demoModeSecret();
+    if (demoSecret) {
+      config.headers['X-Demo-Auth-Secret'] = demoSecret;
     }
   }
 

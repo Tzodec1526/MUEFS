@@ -10,10 +10,11 @@ The core app (app.main) is untouched; this module wraps it.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from fastapi import HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.config import settings
@@ -66,12 +67,24 @@ class DemoSessionMiddleware:
 app.add_middleware(DemoSessionMiddleware)
 
 
+@app.get("/config.js", include_in_schema=False)
+async def runtime_frontend_config() -> Response:
+    """Inject demo auth secret at runtime (hosted demo) without rebaking the SPA."""
+    secret = settings.demo_mode_secret or ""
+    body = f"window.__MUEFS_DEMO_SECRET__={json.dumps(secret)};"
+    return Response(
+        content=body,
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @app.get("/{full_path:path}", include_in_schema=False)
 async def spa(full_path: str) -> FileResponse:
     """Serve the built SPA — a real static file if one exists, else index.html so
     client-side routes (e.g. /cases/search) survive a refresh. API and docs paths
     are handled by earlier routes; anything else under them 404s rather than serving HTML."""
-    if full_path.startswith(("api/", "docs", "redoc", "openapi", "health")):
+    if full_path.startswith(("api/", "docs", "redoc", "openapi", "health", "config.js")):
         raise HTTPException(status_code=404)
     candidate = (_STATIC_ROOT / full_path).resolve()
     if full_path and candidate.is_file() and candidate.is_relative_to(_STATIC_ROOT):

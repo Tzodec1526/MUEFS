@@ -7,6 +7,7 @@ from app.config import settings
 from app.database import get_db
 from app.models.user import User, UserType
 from app.schemas.user import UserCreate, UserProfile, UserResponse
+from app.security.demo_auth import demo_headers_permitted
 from app.services.user_provision_service import provision_user_from_oidc
 from app.utils.keycloak_jwt import decode_keycloak_access_token
 
@@ -36,6 +37,7 @@ async def get_current_user_id(
     db: AsyncSession = Depends(get_db),
     authorization: str | None = Header(None),
     x_demo_user_id: int | None = Header(default=None, alias="X-Demo-User-Id"),
+    x_demo_auth_secret: str | None = Header(default=None, alias="X-Demo-Auth-Secret"),
 ) -> int:
     """Resolve the authenticated internal user id. Fail closed.
 
@@ -50,7 +52,11 @@ async def get_current_user_id(
         try:
             claims = await decode_keycloak_access_token(token)
         except JWTError:
-            if settings.allow_demo_mode and x_demo_user_id is not None:
+            if (
+                settings.allow_demo_mode
+                and x_demo_user_id is not None
+                and demo_headers_permitted(x_demo_auth_secret)
+            ):
                 return await _resolve_demo_user_id(db, x_demo_user_id)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -78,7 +84,11 @@ async def get_current_user_id(
             )
         return user.id
 
-    if settings.allow_demo_mode and x_demo_user_id is not None:
+    if (
+        settings.allow_demo_mode
+        and x_demo_user_id is not None
+        and demo_headers_permitted(x_demo_auth_secret)
+    ):
         return await _resolve_demo_user_id(db, x_demo_user_id)
 
     raise HTTPException(
@@ -91,6 +101,7 @@ async def get_optional_user_id(
     db: AsyncSession = Depends(get_db),
     authorization: str | None = Header(None),
     x_demo_user_id: int | None = Header(default=None, alias="X-Demo-User-Id"),
+    x_demo_auth_secret: str | None = Header(default=None, alias="X-Demo-Auth-Secret"),
 ) -> int | None:
     """Resolve the user id if valid credentials are present, else return None (anonymous).
 
@@ -118,7 +129,11 @@ async def get_optional_user_id(
                 if user and user.is_active:
                     return user.id
 
-    if settings.allow_demo_mode and x_demo_user_id is not None:
+    if (
+        settings.allow_demo_mode
+        and x_demo_user_id is not None
+        and demo_headers_permitted(x_demo_auth_secret)
+    ):
         demo_result = await db.execute(select(User.id).where(User.id == x_demo_user_id))
         return demo_result.scalar_one_or_none()
 

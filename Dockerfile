@@ -12,7 +12,9 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
 # Same-origin: leave VITE_API_URL empty so the app calls /api/v1 on its own host.
-ENV VITE_ALLOW_DEMO_MODE=true
+ARG DEMO_MODE_SECRET
+ENV VITE_ALLOW_DEMO_MODE=true \
+    VITE_DEMO_MODE_SECRET=${DEMO_MODE_SECRET}
 RUN npm run build
 
 # ---- Stage 2: backend serving the API + the built SPA ----
@@ -37,6 +39,8 @@ USER appuser
 
 ENV DEMO_ISOLATED_SESSIONS=true \
     ALLOW_DEMO_MODE=true \
+    DEBUG=false \
+    ENABLE_API_DOCS=false \
     DATABASE_URL=sqlite+aiosqlite:///./demo_data/unused.db \
     RATE_LIMIT_ENABLED=true \
     RATE_LIMIT_BACKEND=memory \

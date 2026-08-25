@@ -63,3 +63,16 @@ jobs:
           cd frontend
           npm install
           npm audit --omit=dev --audit-level=high
+
+  bandit:
+    name: Python SAST (Bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run Bandit on backend application code
+        run: |
+          pip install bandit
+          bandit -r backend/app -ll -q

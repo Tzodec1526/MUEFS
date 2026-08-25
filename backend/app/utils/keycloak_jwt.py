@@ -53,15 +53,21 @@ async def decode_keycloak_access_token(token: str) -> dict[str, Any]:
     rsa_key = jwk.construct(key_dict)
 
     issuer = f"{settings.keycloak_url.rstrip('/')}/realms/{settings.keycloak_realm}"
+    decode_kwargs: dict = {
+        "algorithms": ["RS256"],
+        "issuer": issuer,
+        "options": {
+            "verify_aud": settings.jwt_audience_verify_enabled,
+            "require_exp": True,
+        },
+    }
+    if settings.jwt_audience_verify_enabled:
+        decode_kwargs["audience"] = settings.jwt_audiences_list
+
     claims = jwt.decode(
         token,
         rsa_key,
-        algorithms=["RS256"],
-        issuer=issuer,
-        options={
-            "verify_aud": False,
-            "require_exp": True,
-        },
+        **decode_kwargs,
     )
 
     if not claims.get("sub"):

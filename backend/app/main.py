@@ -9,12 +9,15 @@ from fastapi.responses import JSONResponse
 from app.api.router import api_router
 from app.config import settings
 from app.middleware.rate_limit import RateLimitMiddleware, close_rate_limit_redis
+from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.security.startup import validate_security_config
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    validate_security_config()
     yield
     await close_rate_limit_redis()
 
@@ -24,16 +27,23 @@ app = FastAPI(
     description="Statewide unified e-filing platform for Michigan courts",
     version="0.1.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/docs" if settings.api_docs_enabled else None,
+    redoc_url="/redoc" if settings.api_docs_enabled else None,
+    openapi_url="/openapi.json" if settings.api_docs_enabled else None,
 )
 
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins_list,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Demo-User-Id"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-Demo-User-Id",
+        "X-Demo-Auth-Secret",
+    ],
 )
 app.add_middleware(RateLimitMiddleware)
 

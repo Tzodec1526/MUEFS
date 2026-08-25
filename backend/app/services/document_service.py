@@ -43,6 +43,18 @@ def detect_mime_type(file_data: bytes) -> str:
         return "application/octet-stream"
 
 
+def resolve_upload_mime_type(file_data: bytes, http_type: str | None) -> str:
+    """Pick a MIME type for an upload; strict mode rejects unknown content."""
+    detected = detect_mime_type(file_data)
+    if detected != "application/octet-stream":
+        return detected
+    if settings.strict_mime_detection_enabled:
+        raise ValueError(
+            "Could not verify file type from content; upload rejected"
+        )
+    return http_type or "application/octet-stream"
+
+
 def compute_sha256(file_data: bytes) -> str:
     return hashlib.sha256(file_data).hexdigest()
 

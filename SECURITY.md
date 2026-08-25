@@ -93,6 +93,15 @@ A rejected upload returns `422 Unprocessable Entity` and is never persisted.
 Configuration:
 
 - Set `ALLOW_DEMO_MODE=false` and `ALLOW_PUBLIC_REGISTRATION=false`.
+- Set `DEBUG=false`, `ENABLE_API_DOCS=false`, and `SECURITY_STRICT_STARTUP=true` for court deploys.
+- When demo mode must stay on (public sandbox), set a strong `DEMO_MODE_SECRET` and serve it to
+  the SPA via `/config.js` (hosted demo) or `VITE_DEMO_MODE_SECRET` at build time. The secret
+  blocks casual `curl` impersonation of `X-Demo-User-Id`; it is not a substitute for IdP auth.
+- Enable JWT audience verification (`JWT_VERIFY_AUDIENCE=true`, default outside DEBUG) and
+  configure `JWT_AUDIENCES` if multiple Keycloak clients issue tokens.
+- Set `STRICT_MIME_DETECTION=true` so uploads are rejected when libmagic cannot identify type.
+- Set `TRUSTED_PROXY_IPS` to your load balancer so rate limits use the real client IP.
+- Set `RATE_LIMIT_FAIL_CLOSED=true` when using Redis-backed rate limiting.
 - Replace every `change-me*` / `*_dev` secret (`SECRET_KEY`, Keycloak client secret, DB and
   MinIO credentials) with strong, externally-managed values. Generate them with:
   ```bash
@@ -129,7 +138,7 @@ npm --prefix frontend audit --omit=dev
 
 | | Demo (hosted / `run_demo.py`) | Recommended production |
 | --- | --- | --- |
-| Auth | Role-picker via `X-Demo-User-Id` | Keycloak (or state SSO) RS256 JWT only |
+| Auth | Role-picker via `X-Demo-User-Id` + `X-Demo-Auth-Secret` (when `DEBUG=false`) | Keycloak (or state SSO) RS256 JWT only |
 | Registration | Open self-registration | IdP / admin invite only |
 | Database | SQLite | PostgreSQL |
 | Object storage | Local filesystem | MinIO / S3 with restricted credentials |

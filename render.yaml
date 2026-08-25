@@ -16,6 +16,13 @@ services:
         value: "true"
       - key: ALLOW_DEMO_MODE
         value: "true"
+      - key: DEBUG
+        value: "false"
+      - key: ENABLE_API_DOCS
+        value: "false"
+      - key: DEMO_MODE_SECRET
+        generateValue: true
+        sync: false
       - key: DATABASE_URL
         value: sqlite+aiosqlite:///./demo_data/unused.db
       - key: RATE_LIMIT_ENABLED

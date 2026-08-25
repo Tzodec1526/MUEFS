@@ -2,10 +2,21 @@
 
 from fastapi import Request
 
+from app.config import settings
+
 
 def client_ip(request: Request) -> str | None:
-    # Trusted proxy / X-Forwarded-For should be configured at the edge in production.
-    return request.client.host if request.client else None
+    """Client IP, honoring X-Forwarded-For only from trusted proxies."""
+    if request.client is None:
+        return None
+    direct = request.client.host
+    if direct not in settings.trusted_proxy_ips_list:
+        return direct
+    forwarded = request.headers.get("x-forwarded-for")
+    if not forwarded:
+        return direct
+    # First hop in the chain is the original client.
+    return forwarded.split(",")[0].strip() or direct
 
 
 def client_user_agent(request: Request) -> str | None:

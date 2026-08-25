@@ -244,11 +244,16 @@ async def upload_document(
         chunks.append(chunk)
     file_data = b"".join(chunks)
 
-    # Validate MIME type: try content detection first, fall back to HTTP header
-    detected_type = document_service.detect_mime_type(file_data)
-    http_type = file.content_type or "application/octet-stream"
-    # Use detected type if it's specific, otherwise trust the HTTP header
-    content_type = detected_type if detected_type != "application/octet-stream" else http_type
+    # Validate MIME type from file content (never trust client Content-Type alone).
+    try:
+        content_type = document_service.resolve_upload_mime_type(
+            file_data, file.content_type
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=str(exc),
+        ) from exc
     if not document_service.validate_mime_type(content_type):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,

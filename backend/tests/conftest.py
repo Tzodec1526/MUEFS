@@ -8,6 +8,8 @@ import os
 # value) untouched.
 os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault("DEBUG", "true")
+os.environ.setdefault("ALLOW_DEMO_MODE", "true")
 
 import asyncio
 from collections.abc import AsyncGenerator

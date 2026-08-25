@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -25,7 +26,15 @@ class Settings(BaseSettings):
     debug: bool = True
     # Court compliance: NEVER enable in production. Allows X-Demo-User-Id header auth.
     allow_demo_mode: bool = False
+    # Required when ALLOW_DEMO_MODE=true and DEBUG=false (hosted demo / staging).
+    demo_mode_secret: str = ""
     allowed_origins: str = "http://localhost:3000,http://localhost:5173,http://0.0.0.0:3000"
+    # OpenAPI /docs and /redoc (default follows debug; set false in production).
+    enable_api_docs: bool | None = None
+    # Raise on unsafe production config at startup (recommended for court deploys).
+    security_strict_startup: bool = False
+    # Comma-separated trusted proxy IPs for X-Forwarded-For (Render, nginx, etc.).
+    trusted_proxy_ips: str = ""
 
     # Email
     smtp_host: str = "localhost"
@@ -49,6 +58,14 @@ class Settings(BaseSettings):
     # to the built-in scan only.
     malware_scan_fail_closed: bool = False
 
+    # Reject uploads when libmagic cannot identify type (recommended outside DEBUG).
+    strict_mime_detection: bool | None = None
+
+    # JWT: validate `aud` claim against Keycloak client id(s).
+    jwt_verify_audience: bool | None = None
+    # Optional extra audiences (comma-separated), e.g. muefs-frontend,muefs-api
+    jwt_audiences: str = ""
+
     # Registration: self-serve POST /auth/register (demo only in typical court deploys)
     allow_public_registration: bool = False
 
@@ -61,6 +78,8 @@ class Settings(BaseSettings):
     rate_limit_default_per_minute: int = 120
     rate_limit_search_per_minute: int = 30
     rate_limit_document_per_minute: int = 60
+    # When Redis rate limiting is enabled, reject requests if Redis is unreachable.
+    rate_limit_fail_closed: bool | None = None
 
     # Payments: no PSP integration in this repo — UI/API must reflect simulation
     payments_are_simulated: bool = True
@@ -75,7 +94,46 @@ class Settings(BaseSettings):
 
     @property
     def allowed_origins_list(self) -> list[str]:
-        return [o.strip() for o in self.allowed_origins.split(",")]
+        return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
+    @property
+    def trusted_proxy_ips_list(self) -> list[str]:
+        return [ip.strip() for ip in self.trusted_proxy_ips.split(",") if ip.strip()]
+
+    @property
+    def api_docs_enabled(self) -> bool:
+        if self.enable_api_docs is not None:
+            return self.enable_api_docs
+        return self.debug
+
+    @property
+    def strict_mime_detection_enabled(self) -> bool:
+        if self.strict_mime_detection is not None:
+            return self.strict_mime_detection
+        return not self.debug
+
+    @property
+    def jwt_audience_verify_enabled(self) -> bool:
+        if self.jwt_verify_audience is not None:
+            return self.jwt_verify_audience
+        return not self.debug
+
+    @property
+    def jwt_audiences_list(self) -> list[str]:
+        extras = [a.strip() for a in self.jwt_audiences.split(",") if a.strip()]
+        base = [self.keycloak_client_id, "account"]
+        return list(dict.fromkeys([*extras, *base]))
+
+    @property
+    def rate_limit_fail_closed_enabled(self) -> bool:
+        if self.rate_limit_fail_closed is not None:
+            return self.rate_limit_fail_closed
+        return not self.debug
+
+    @field_validator("demo_mode_secret")
+    @classmethod
+    def _strip_demo_secret(cls, value: str) -> str:
+        return value.strip()
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

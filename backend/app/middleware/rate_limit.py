@@ -10,6 +10,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from app.config import settings
+from app.utils.http_context import client_ip
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,9 @@ async def _redis_check_allow(client_ip: str, bucket: str) -> bool:
             await _redis_client.expire(key, 120)
         return n <= limit
     except Exception as exc:
-        logger.warning("Redis rate limit failed; allowing request: %s", exc)
+        logger.warning("Redis rate limit failed: %s", exc)
+        if settings.rate_limit_fail_closed_enabled:
+            return False
         return True
 
 
@@ -92,13 +95,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not path.startswith("/api/"):
             return await call_next(request)
 
-        client_ip = request.client.host if request.client else "unknown"
+        client_ip_addr = client_ip(request) or "unknown"
         bucket = _path_bucket(path)
 
         if settings.rate_limit_backend == "redis":
-            allowed = await _redis_check_allow(client_ip, bucket)
+            allowed = await _redis_check_allow(client_ip_addr, bucket)
         else:
-            allowed = _memory_check_allow(client_ip, bucket)
+            allowed = _memory_check_allow(client_ip_addr, bucket)
 
         if not allowed:
             return Response(
