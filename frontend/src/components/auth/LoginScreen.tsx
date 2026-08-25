@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import { Scale, ClipboardCheck, UserRound, BookOpen } from 'lucide-react';
+import { Scale, ClipboardCheck, UserRound, BookOpen, Bot } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { isDemoBuild } from '../../config/demoMode';
 import MichiganMark from '../common/MichiganMark';
+import MifileComparison from '../marketing/MifileComparison';
+import { keycloakConfigured, startKeycloakLogin } from '../../auth/keycloakPkce';
 
 export function getDemoRole(): string | null {
   return localStorage.getItem('demo_role');
@@ -98,6 +100,34 @@ function LoginScreen() {
             </div>
           ))}
         </div>
+
+        {keycloakConfigured() && (
+          <div className="login-keycloak">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => startKeycloakLogin()}
+            >
+              Sign in with Keycloak (PKCE)
+            </button>
+            <p className="login-keycloak-note">
+              Production identity provider — uses authorization code + PKCE when configured.
+            </p>
+          </div>
+        )}
+
+        <MifileComparison variant="login" />
+
+        {isDemoBuild() && (
+          <div className="login-webmcp-hint">
+            <Bot size={18} aria-hidden="true" />
+            <span>
+              <strong>Agent-ready:</strong> enable{' '}
+              <code>chrome://flags/#enable-webmcp-testing</code> to expose case search and
+              filing tools to browser AI agents (WebMCP).
+            </span>
+          </div>
+        )}
       </div>
       {isDemoBuild() && (
         <div className="demo-stakeholder-banner demo-stakeholder-banner--login" role="status">

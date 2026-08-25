@@ -38,6 +38,12 @@ def setup_demo_db():
     from app.models.court import Court
     with Session(engine) as session:
         if session.query(Court).first():
+            from app.seed_data import ensure_demo_notifications
+            with Session(engine) as session:
+                added = ensure_demo_notifications(session)
+                session.commit()
+                if added:
+                    print(f"Added {added} demo notifications.")
             print("Database already seeded.")
             return
 

@@ -6,21 +6,23 @@ A modern, open-source statewide e-filing platform for Michigan courts. Designed 
 
 ## MUEFS vs MiFILE
 
-| Feature | MiFILE (Current) | MUEFS |
+| Capability | MiFILE / current landscape | MUEFS (this demo) |
 |---|---|---|
-| **Court coverage** | Fragmented across vendors | All Michigan courts, one login |
-| **Public records access** | Separate systems, varies by court | Statewide docket search & public document download, no account needed |
-| **Document types** | Varies by vendor | 135+ MCR-referenced types |
-| **Upload limit** | 25 MB | 100 MB |
-| **Fee waiver (MCR 2.002)** | Manual/unclear | Built into payment flow |
-| **Motion companions** | No guidance | Auto-prompts for briefs, proposed orders (MCR 2.119) |
-| **Case favorites** | Not available | Star cases, quick access across sessions |
-| **One-click motion filing** | Re-enter case info every time | Pre-fills court, case, type from case detail |
-| **Clerk review tools** | Basic | Batch accept, age tracking, common rejection reasons |
-| **Cost model** | Per-transaction vendor fees | Open source, no licensing fees |
-| **Vendor lock-in** | Yes | AGPL-3.0, community-driven |
+| **Court coverage** | Not all courts or case types | Demo portal (seeded courts) |
+| **Public docket search** | Varies by court; often separate portals | Built-in; no account in demo |
+| **Document types** | Varies by vendor | MCR-referenced catalog (count from live seed data) |
+| **Upload limit** | 25 MB (SCAO standard) | 100 MB |
+| **Fee waiver (MCR 2.002)** | Payment screen; court must grant | In filing wizard (demo payments) |
+| **Motion companions** | Filers must know MCR rules | Validates & prompts (MCR 2.119) |
+| **File from case docket** | Existing-case filing supported | Pre-filled from case detail |
+| **Case favorites** | Not available | Star cases, quick access |
+| **Serve documents only** | Varies; often separate workflow | One-click from case docket |
+| **Draft autosave** | Vendor-dependent | Browser draft recovery |
+| **Clerk review tools** | Queue tools vary by court | Batch accept, age badges, quick reject reasons |
+| **AI agent tools (WebMCP)** | Not available | Experimental (Chrome flag) |
+| **Cost / licensing** | Per-transaction vendor fees | AGPL-3.0 (no license fee) |
 
-> **Status:** Open source and under active development — core filing, clerk review, and public docket search work today.
+> **Status:** Open source demo — core filing, clerk review, and public docket search work today. CMS integration is a **stub** until a court JIS/CMS adapter is wired in production.
 
 ---
 
@@ -40,6 +42,8 @@ python run_demo.py
 - **API Docs**: http://localhost:8000/docs
 
 Log in as an **Attorney**, **Court Clerk**, or **Self-Represented Litigant**, or **browse public court records without signing in**.
+
+A **60-second attorney walkthrough** is in [`demo/muefs-walkthrough-60s.mp4`](demo/muefs-walkthrough-60s.mp4) (regenerate with `scripts/record-walkthrough.ps1`).
 
 ---
 
@@ -96,7 +100,7 @@ MUEFS/
 
 ### For Attorneys
 - **Unified filing** across Michigan courts from a single login
-- **135+ MCR-referenced document types** with court rule guidance
+- **MCR-referenced document types** (live count on the dashboard) with court rule guidance
 - **Companion document alerts** — system tells you when a motion requires a brief (MCR 2.119), meet-and-confer certification (MCR 2.313), or proposed order
 - **One-click motion filing** — open a case, click "File with Court", and court/case/type are pre-filled
 - **Case favorites** — star cases for quick access across sessions
@@ -155,6 +159,18 @@ npm run dev               # Development server
 npx tsc --noEmit          # Type check
 npm run build             # Production build
 ```
+
+From the repo root you can also run `npm run dev` (full demo stack), `npm test`, and `npm run lint`.
+
+#### WebMCP (experimental)
+
+MUEFS registers browser agent tools when `document.modelContext` is available:
+
+1. Chrome: enable `chrome://flags/#enable-webmcp-testing`
+2. Open the app and use the [Model Context Tool Inspector](https://developer.chrome.com/docs/ai/webmcp) extension
+3. Tools: `search_cases`, `get_case_docket`, `list_my_filings`, `get_clerk_review_queue`
+
+Vite dev server sends COOP/COEP headers required for origin isolation.
 
 ## Security & Compliance
 

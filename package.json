@@ -1,0 +1,17 @@
+{
+  "name": "muefs",
+  "private": true,
+  "description": "Michigan Unified E-Filing System — monorepo scripts",
+  "scripts": {
+    "dev": "python backend/run_demo.py",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && python -m pytest tests/ -v --tb=short",
+    "test:frontend": "cd frontend && npm run test -- --run",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "lint:backend": "cd backend && ruff check app/ tests/",
+    "lint:frontend": "cd frontend && npm run lint",
+    "typecheck": "cd backend && mypy app/ && cd ../frontend && npx tsc --noEmit",
+    "build": "cd frontend && npm run build",
+    "install:all": "cd backend && python -m pip install -e \".[test]\" && cd ../frontend && npm install"
+  }
+}

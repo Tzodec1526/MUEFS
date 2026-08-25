@@ -32,6 +32,57 @@ DATABASE_URL = os.getenv(
     "postgresql://muefs:muefs_dev@localhost:5432/muefs",
 )
 
+_DEMO_NOTIFICATIONS = [
+    (
+        "filing_accepted",
+        "Filing accepted",
+        "Your motion in Smith v. Jones was accepted by the clerk.",
+    ),
+    (
+        "case_update",
+        "Hearing scheduled",
+        "A status conference was set for Case 2024-001234.",
+    ),
+    (
+        "service_of_process",
+        "Service completed",
+        "Summons and complaint were electronically served on all parties.",
+    ),
+]
+
+
+def ensure_demo_notifications(session: Session) -> int:
+    """Idempotent: seed attorney demo notifications when missing."""
+    from app.models.notification import (
+        DeliveryStatus,
+        Notification,
+        NotificationType,
+    )
+
+    attorney = session.query(User).filter_by(email="attorney@demo.muefs.gov").first()
+    if not attorney:
+        return 0
+    existing = (
+        session.query(Notification)
+        .filter(Notification.recipient_id == attorney.id)
+        .count()
+    )
+    if existing:
+        return 0
+
+    type_map = {t.value: t for t in NotificationType}
+    for ntype, subject, body in _DEMO_NOTIFICATIONS:
+        session.add(
+            Notification(
+                notification_type=type_map[ntype],
+                recipient_id=attorney.id,
+                subject=subject,
+                body=body,
+                delivery_status=DeliveryStatus.SENT,
+            )
+        )
+    return len(_DEMO_NOTIFICATIONS)
+
 
 def _ordinal(n: int) -> str:
     """1 -> 1st, 2 -> 2nd, 21 -> 21st; but 11/12/13 -> 11th/12th/13th."""
@@ -605,6 +656,10 @@ def seed_database(reset: bool = False):
         # Check if already seeded
         existing = session.query(Court).first()
         if existing:
+            added = ensure_demo_notifications(session)
+            if added:
+                print(f"  Added {added} demo notifications for existing database.")
+            session.commit()
             print("Database already seeded. Skipping.")
             return
 
@@ -1590,6 +1645,10 @@ def seed_database(reset: bool = False):
             demo_cases = session.query(Case).count()
             demo_filings = session.query(FilingEnvelope).count()
             print(f"  Created {demo_cases} demo cases with {demo_filings} filings")
+
+        added = ensure_demo_notifications(session)
+        if added:
+            print(f"  Created {added} demo notifications")
 
         session.commit()
 

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { Link2 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { addFavorite, removeFavorite, listFavorites } from '../../api/favorites';
 import { getCaseTypes } from '../../api/courts';
 import { getDocumentLabel, parseServerDate } from '../../utils/format';
 import { getDemoRole } from '../auth/LoginScreen';
+import { useToast } from '../common/Toast';
 
 interface CaseDetail {
   id: number;
@@ -46,6 +48,7 @@ interface CaseFiling {
 
 function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const { pushToast } = useToast();
   // Read-only viewers: the signed-in 'public' role and anonymous guests (no role).
   const isPublicViewer = getDemoRole() === 'public' || !getDemoRole();
   const [caseData, setCaseData] = useState<CaseDetail | null>(null);
@@ -95,6 +98,16 @@ function CaseDetailPage() {
     }
     load();
   }, [caseId, isPublicViewer]);
+
+  const copyShareLink = async () => {
+    const url = `${window.location.origin}/cases/${caseId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      pushToast('Case link copied to clipboard', 'success');
+    } catch {
+      pushToast('Could not copy link', 'error');
+    }
+  };
 
   const toggleFavorite = async () => {
     if (!caseData) return;
@@ -162,6 +175,15 @@ function CaseDetailPage() {
           <h2>{caseData.title}</h2>
         </div>
         <div className="case-detail-actions">
+          <button
+            type="button"
+            className="btn btn-secondary btn-icon"
+            onClick={copyShareLink}
+            title="Copy shareable case link"
+          >
+            <Link2 size={16} aria-hidden="true" />
+            <span className="sr-only">Copy shareable case link</span>
+          </button>
           {!isPublicViewer && (
             <button
               className={`fav-btn-large ${isFavorited ? 'favorited' : ''}`}

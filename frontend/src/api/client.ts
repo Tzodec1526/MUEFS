@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { emitToast } from '../utils/toastBus';
 
 // Same-origin by default: the hosted demo serves the API and UI together, and the
 // Vite dev proxy forwards /api to the backend. Set VITE_API_URL only for a split
@@ -51,7 +52,20 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const detail = error.response?.data?.detail;
+    const message =
+      typeof detail === 'string'
+        ? detail
+        : status === 429
+          ? 'Too many requests. Please wait a moment and try again.'
+          : status === 403
+            ? 'You do not have permission to do that.'
+            : null;
+    if (message && status !== 401) {
+      emitToast(message, 'error');
+    }
+    if (status === 401) {
       localStorage.removeItem('auth_token');
       // Only send a genuinely authenticated session back to login. Never bounce an
       // anonymous/public visitor browsing the public records path -- that would

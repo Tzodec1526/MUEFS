@@ -11,6 +11,9 @@ import CaseSearch from './components/search/CaseSearch';
 import Favorites from './components/search/Favorites';
 import CaseDetailPage from './components/search/CaseDetailPage';
 import LoginScreen, { getDemoRole, getDemoCourtName } from './components/auth/LoginScreen';
+import AuthCallback from './components/auth/AuthCallback';
+import PlatformStats from './components/marketing/PlatformStats';
+import MifileComparison from './components/marketing/MifileComparison';
 import { listFilings, getClerkQueue } from './api/filings';
 
 function RequireRole({ children }: { children: React.ReactNode }) {
@@ -89,6 +92,8 @@ function FilerDashboard() {
           <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>
         </div>
       </div>
+      <PlatformStats />
+      <MifileComparison variant="dashboard" />
     </div>
   );
 }
@@ -111,6 +116,8 @@ function PublicDashboard() {
           <Link to="/cases/search" className="btn btn-primary">Search Cases</Link>
         </div>
       </div>
+      <PlatformStats />
+      <MifileComparison variant="dashboard" />
     </div>
   );
 }
@@ -147,6 +154,7 @@ function ClerkDashboard() {
           <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>
         </div>
       </div>
+      <PlatformStats />
     </div>
   );
 }
@@ -176,6 +184,7 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginScreen />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       {/* Authenticated routes */}
       <Route
         path="*"

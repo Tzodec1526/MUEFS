@@ -4,9 +4,38 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user_id
 from app.database import get_db
-from app.models.notification import Notification
+from app.models.notification import DeliveryStatus, Notification
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
+
+
+@router.get("/summary")
+async def notification_summary(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """Unread count for header badge."""
+    total = (
+        await db.execute(
+            select(func.count())
+            .select_from(Notification)
+            .where(Notification.recipient_id == user_id)
+        )
+    ).scalar() or 0
+    # Demo: treat pending/sent as unread until delivered.
+    unread = (
+        await db.execute(
+            select(func.count())
+            .select_from(Notification)
+            .where(
+                Notification.recipient_id == user_id,
+                Notification.delivery_status.in_(
+                    [DeliveryStatus.PENDING, DeliveryStatus.SENT]
+                ),
+            )
+        )
+    ).scalar() or 0
+    return {"total": total, "unread": unread}
 
 
 @router.get("")
@@ -33,6 +62,19 @@ async def list_notifications(
     result = await db.execute(query)
     notifications = result.scalars().all()
 
+    unread = (
+        await db.execute(
+            select(func.count())
+            .select_from(Notification)
+            .where(
+                Notification.recipient_id == user_id,
+                Notification.delivery_status.in_(
+                    [DeliveryStatus.PENDING, DeliveryStatus.SENT]
+                ),
+            )
+        )
+    ).scalar() or 0
+
     return {
         "notifications": [
             {
@@ -46,6 +88,7 @@ async def list_notifications(
             for n in notifications
         ],
         "total": total,
+        "unread": unread,
         "page": page,
         "page_size": page_size,
     }

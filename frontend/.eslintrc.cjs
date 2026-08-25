@@ -29,6 +29,7 @@ module.exports = {
     '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/no-explicit-any': 'warn',
     'no-console': 'off',
+    'react/no-unknown-property': ['error', { ignore: ['toolname', 'tooldescription', 'toolparamdescription'] }],
   },
   settings: {
     react: {

@@ -10,6 +10,12 @@ import { formatFee } from '../../utils/format';
 import { getErrorDetail } from '../../utils/errors';
 import { createFiling } from '../../api/filings';
 import { getCourt, getCaseTypes, getFilingChecklists, FilingChecklist } from '../../api/courts';
+import { getDemoRole } from '../auth/LoginScreen';
+import {
+  isPlainLanguageMode,
+  setPlainLanguageMode,
+  stepLabel,
+} from '../../utils/srlMode';
 
 type WizardStep = 'court' | 'case' | 'case-type' | 'details' | 'documents' | 'service' | 'payment' | 'review';
 
@@ -112,6 +118,13 @@ function FilingWizard() {
   const [isMotionMode, setIsMotionMode] = useState(false);
   const [motionChecklists, setMotionChecklists] = useState<FilingChecklist[]>([]);
   const [loadingChecklists, setLoadingChecklists] = useState(false);
+  const [plainLanguage, setPlainLanguage] = useState(() => {
+    if (getDemoRole() === 'srl') {
+      if (!isPlainLanguageMode()) setPlainLanguageMode(true);
+      return true;
+    }
+    return isPlainLanguageMode();
+  });
 
   // Pre-fill from URL params (e.g., "File a Motion" from case detail page)
   useEffect(() => {
@@ -196,7 +209,10 @@ function FilingWizard() {
     fetchChecklists();
   }, [isMotionMode, filingData.courtId, filingData.caseTypeId]);
 
-  const steps = buildSteps(filingData.filingType);
+  const steps = buildSteps(filingData.filingType).map((s) => ({
+    ...s,
+    label: plainLanguage ? stepLabel(s.key, s.label) : s.label,
+  }));
   const currentStepIndex = steps.findIndex((s) => s.key === currentStep);
 
   const updateData = useCallback((updates: Partial<FilingData>) => {
@@ -288,6 +304,16 @@ function FilingWizard() {
   };
 
   const getStepError = (): string => {
+    if (plainLanguage) {
+      switch (currentStep) {
+        case 'court': return 'Choose the court where you want to file.';
+        case 'case': return 'Pick an existing case or start a new one.';
+        case 'case-type': return 'Select what kind of case this is.';
+        case 'details': return 'Add a short title describing your filing.';
+        case 'documents': return 'Upload at least one PDF or document.';
+        default: return 'Finish this step to continue.';
+      }
+    }
     switch (currentStep) {
       case 'court': return 'Please select a court to continue.';
       case 'case': return 'Please choose an existing case or start a new case.';
@@ -315,8 +341,27 @@ function FilingWizard() {
   return (
     <div className="filing-wizard">
       <div className="wizard-header">
-        <h2>{isMotionMode ? 'File a Motion' : 'New E-Filing'}</h2>
+        <h2>
+          {isMotionMode
+            ? plainLanguage
+              ? 'File papers in an existing case'
+              : 'File a Motion'
+            : plainLanguage
+              ? 'Start a new court filing'
+              : 'New E-Filing'}
+        </h2>
         <div className="wizard-header-badges">
+          <label className="srl-plain-toggle">
+            <input
+              type="checkbox"
+              checked={plainLanguage}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                setPlainLanguage(e.target.checked);
+                setPlainLanguageMode(e.target.checked);
+              }}
+            />
+            Plain-language guidance
+          </label>
           {isMotionMode && filingData.caseId && (
             <span className="motion-badge">Motion to Case #{filingData.caseId}</span>
           )}

@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Link2 } from 'lucide-react';
 import { searchCases } from '../../api/cases';
 import { listFavorites, addFavorite, removeFavorite } from '../../api/favorites';
 import { getDemoRole } from '../auth/LoginScreen';
 import LoadError from '../common/LoadError';
+import { useToast } from '../common/Toast';
 import { parseServerDate } from '../../utils/format';
 
 interface CaseResult {
@@ -21,59 +23,85 @@ interface CaseResult {
 }
 
 function CaseSearch() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { pushToast } = useToast();
   const demoRole = getDemoRole();
-  // Favorites require a signed-in filer; guests (no role) and public viewers browse read-only.
   const showFavorites = demoRole === 'attorney' || demoRole === 'srl';
-  const [caseNumber, setCaseNumber] = useState('');
-  const [partyName, setPartyName] = useState('');
+
+  const initialParty = searchParams.get('party') || '';
+  const initialCase = searchParams.get('case') || '';
+  const initialPage = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+  const urlDrivenSearch = Boolean(initialParty || initialCase);
+
+  const [caseNumber, setCaseNumber] = useState(initialCase);
+  const [partyName, setPartyName] = useState(initialParty);
   const [results, setResults] = useState<CaseResult[]>([]);
   const [total, setTotal] = useState(0);
   const [searching, setSearching] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [hasSearched, setHasSearched] = useState(urlDrivenSearch);
   const [favoritedIds, setFavoritedIds] = useState<Set<number>>(new Set());
   const [togglingFav, setTogglingFav] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(initialPage);
 
-  // Load user's favorites on mount (filers and counsel only)
   useEffect(() => {
     if (!showFavorites) return;
     async function loadFavorites() {
       try {
         const data = await listFavorites();
-        setFavoritedIds(new Set(data.favorites.map(f => f.case_id)));
+        setFavoritedIds(new Set(data.favorites.map((f) => f.case_id)));
       } catch {
-        // API not available or not authenticated
+        // not authenticated
       }
     }
     loadFavorites();
   }, [showFavorites]);
 
-  const runSearch = async (opts: { num: string; party: string; page: number; searched: boolean }) => {
-    setSearching(true);
-    setError(null);
-    try {
-      const data = await searchCases({
-        case_number: opts.num || undefined,
-        party_name: opts.party || undefined,
-        page: opts.page,
-      });
-      setResults(data.cases);
-      setTotal(data.total);
-      setHasSearched(opts.searched);
-    } catch {
-      setError("We couldn't reach the records system. Please try again.");
-      setResults([]);
-      setTotal(0);
-    } finally {
-      setSearching(false);
-    }
-  };
+  const syncUrl = useCallback(
+    (opts: { num: string; party: string; page: number }) => {
+      const next = new URLSearchParams();
+      if (opts.party) next.set('party', opts.party);
+      if (opts.num) next.set('case', opts.num);
+      if (opts.page > 1) next.set('page', String(opts.page));
+      setSearchParams(next, { replace: true });
+    },
+    [setSearchParams],
+  );
 
-  // Auto-load recent public filings on mount so an empty search isn't a dead end.
+  const runSearch = useCallback(
+    async (opts: { num: string; party: string; page: number; searched: boolean }) => {
+      setSearching(true);
+      setError(null);
+      try {
+        const data = await searchCases({
+          case_number: opts.num || undefined,
+          party_name: opts.party || undefined,
+          page: opts.page,
+        });
+        setResults(data.cases);
+        setTotal(data.total);
+        setHasSearched(opts.searched);
+        syncUrl(opts);
+      } catch {
+        setError("We couldn't reach the records system. Please try again.");
+        setResults([]);
+        setTotal(0);
+      } finally {
+        setSearching(false);
+      }
+    },
+    [syncUrl],
+  );
+
   useEffect(() => {
+    // Initial load from URL params or recent filings list
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    runSearch({ num: '', party: '', page: 1, searched: false });
+    runSearch({
+      num: initialCase,
+      party: initialParty,
+      page: initialPage,
+      searched: urlDrivenSearch,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -87,22 +115,38 @@ function CaseSearch() {
     runSearch({ num: caseNumber, party: partyName, page: p, searched: hasSearched });
   };
 
+  const copyShareLink = async () => {
+    const params = new URLSearchParams();
+    if (partyName) params.set('party', partyName);
+    if (caseNumber) params.set('case', caseNumber);
+    if (page > 1) params.set('page', String(page));
+    const url = `${window.location.origin}/cases/search${params.toString() ? `?${params}` : ''}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      pushToast('Search link copied to clipboard', 'success');
+    } catch {
+      pushToast('Could not copy link', 'error');
+    }
+  };
+
   const toggleFavorite = async (caseId: number) => {
     setTogglingFav(caseId);
     try {
       if (favoritedIds.has(caseId)) {
         await removeFavorite(caseId);
-        setFavoritedIds(prev => {
+        setFavoritedIds((prev) => {
           const next = new Set(prev);
           next.delete(caseId);
           return next;
         });
+        pushToast('Removed from favorites', 'success');
       } else {
         await addFavorite(caseId);
-        setFavoritedIds(prev => new Set(prev).add(caseId));
+        setFavoritedIds((prev) => new Set(prev).add(caseId));
+        pushToast('Added to favorites', 'success');
       }
     } catch {
-      // Silently fail - might not be authenticated
+      pushToast('Could not update favorite', 'error');
     } finally {
       setTogglingFav(null);
     }
@@ -114,42 +158,67 @@ function CaseSearch() {
 
   return (
     <div className="case-search">
-      <h2>Case Search</h2>
-      <p className="info-text">
-        Search non-sealed cases across Michigan courts by case number or party name &mdash; no account
-        needed. Partial numbers and names work.
-        {showFavorites ? ' Click the star to add a case to your favorites.' : ''}
-      </p>
+      <div className="case-search-hero">
+        <h2>Statewide case search</h2>
+        <p className="info-text">
+          One search across Michigan courts — no account, no vendor portal hopping. Sealed matters
+          stay off the index. Partial names and case numbers work.
+          {showFavorites ? ' Star cases to file motions faster.' : ''}
+        </p>
+      </div>
 
-      <div className="search-form">
+      <form
+        className="search-form"
+        toolname="search_cases"
+        tooldescription="Search Michigan public court records by party name and case number"
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSearch();
+        }}
+      >
         <div className="form-row">
           <div className="form-group">
             <label htmlFor="caseNum">Case Number</label>
             <input
               id="caseNum"
+              name="case_number"
               type="text"
               value={caseNumber}
               onChange={(e) => setCaseNumber(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="e.g., 25-000001-CZ"
+              toolparamdescription="Case number (partial match)"
             />
           </div>
           <div className="form-group">
             <label htmlFor="partyName">Party Name</label>
             <input
               id="partyName"
+              name="party_name"
               type="text"
               value={partyName}
               onChange={(e) => setPartyName(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="e.g., Smith"
+              toolparamdescription="Party or litigant name"
             />
           </div>
-          <button className="btn btn-primary" onClick={handleSearch} disabled={searching}>
+          <button className="btn btn-primary" type="submit" disabled={searching}>
             {searching ? 'Searching...' : 'Search'}
           </button>
+          {(hasSearched || partyName || caseNumber) && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-icon"
+              onClick={copyShareLink}
+              title="Copy shareable link"
+            >
+              <Link2 size={16} aria-hidden="true" />
+              <span className="sr-only">Copy shareable link</span>
+            </button>
+          )}
         </div>
-      </div>
+      </form>
 
       {error ? (
         <LoadError message={error} onRetry={() => goToPage(page)} />

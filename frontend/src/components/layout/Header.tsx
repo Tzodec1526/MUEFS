@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { isDemoBuild } from '../../config/demoMode';
 import { getDemoRole } from '../auth/LoginScreen';
 import MichiganMark from '../common/MichiganMark';
+import NotificationBell from './NotificationBell';
 
 function Header() {
   const navigate = useNavigate();
@@ -57,6 +58,7 @@ function Header() {
         {role === 'clerk' && <Link to="/clerk/queue">Review Queue</Link>}
       </nav>
       <div className="header-user">
+        <NotificationBell />
         {role ? (
           <span className={`user-badge ${role === 'srl' ? 'user-badge-srl' : ''}`}>
             {roleLabel}

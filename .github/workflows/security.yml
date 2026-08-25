@@ -1,9 +1,6 @@
 name: Security Scan
 
-# Informational/non-blocking security scanning. These jobs report findings (and upload
-# results to the Security tab) but do not fail the build yet — range-pinned dependencies
-# will surface pre-existing advisories. Tighten to block on HIGH/CRITICAL once the
-# baseline noise is known (drop `continue-on-error` and set Trivy `--exit-code 1`).
+# Block merges on HIGH/CRITICAL findings in backend deps and repo filesystem.
 
 on:
   push:
@@ -20,18 +17,15 @@ jobs:
   trivy:
     name: Trivy filesystem scan
     runs-on: ubuntu-latest
-    continue-on-error: true
     permissions:
       contents: read
       security-events: write
     steps:
       - uses: actions/checkout@v4
-      # Install Trivy directly rather than via the trivy-action composite action, whose
-      # internal setup-trivy pin has been broken by upstream tag deletions.
       - name: Install Trivy
         run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
       - name: Trivy filesystem scan (SARIF)
-        run: trivy fs --scanners vuln --severity HIGH,CRITICAL --format sarif --output trivy-results.sarif --exit-code 0 .
+        run: trivy fs --scanners vuln --severity HIGH,CRITICAL --format sarif --output trivy-results.sarif --exit-code 1 .
       - name: Upload Trivy results to the Security tab
         uses: github/codeql-action/upload-sarif@v3
         if: always()
@@ -42,7 +36,6 @@ jobs:
   pip-audit:
     name: Python dependency audit
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -54,7 +47,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
           pip install pip-audit
-          pip-audit || true # informational; do not fail the build yet
+          pip-audit --desc on
 
   npm-audit:
     name: Frontend dependency audit
@@ -69,4 +62,4 @@ jobs:
         run: |
           cd frontend
           npm install
-          npm audit --omit=dev || true # informational; do not fail the build yet
+          npm audit --omit=dev --audit-level=high

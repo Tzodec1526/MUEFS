@@ -11,6 +11,7 @@ from app.api.favorites import router as favorites_router
 from app.api.filings import router as filings_router
 from app.api.notifications import router as notifications_router
 from app.api.payments import router as payments_router
+from app.api.public import router as public_router
 
 api_router = APIRouter()
 
@@ -25,3 +26,4 @@ api_router.include_router(favorites_router)
 api_router.include_router(notifications_router)
 api_router.include_router(payments_router)
 api_router.include_router(admin_router)
+api_router.include_router(public_router)
