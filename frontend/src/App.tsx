@@ -12,6 +12,7 @@ import Favorites from './components/search/Favorites';
 import CaseDetailPage from './components/search/CaseDetailPage';
 import LoginScreen, { getDemoRole, getDemoCourtName } from './components/auth/LoginScreen';
 import AuthCallback from './components/auth/AuthCallback';
+import WebMcpAgentPage from './components/agent/WebMcpAgentPage';
 import PlatformStats from './components/marketing/PlatformStats';
 import MifileComparison from './components/marketing/MifileComparison';
 import { listFilings, getClerkQueue } from './api/filings';
@@ -20,7 +21,8 @@ function RequireRole({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   // Public docket routes are open to anonymous visitors (no account). Everything else
   // requires a (demo) role and bounces unauthenticated visitors to the login screen.
-  const isPublicPath = location.pathname.startsWith('/cases');
+  const isPublicPath =
+    location.pathname.startsWith('/cases') || location.pathname.startsWith('/agent');
   if (!getDemoRole() && !isPublicPath && location.pathname !== '/login') {
     return <Navigate to="/login" replace />;
   }
@@ -185,6 +187,7 @@ function App() {
     <Routes>
       <Route path="/login" element={<LoginScreen />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/agent" element={<WebMcpAgentPage />} />
       {/* Authenticated routes */}
       <Route
         path="*"

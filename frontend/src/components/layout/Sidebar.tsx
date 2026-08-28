@@ -1,5 +1,5 @@
 import { useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, FilePlus2, FolderOpen, Search, Star, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, FilePlus2, FolderOpen, Search, Star, ClipboardCheck, Bot } from 'lucide-react';
 import { getDemoRole } from '../auth/LoginScreen';
 
 function Sidebar() {
@@ -7,6 +7,7 @@ function Sidebar() {
   const role = getDemoRole();
 
   const allLinks = [
+    { path: '/agent', label: 'Agent Hub', icon: Bot, roles: ['attorney', 'clerk', 'srl', 'public'] },
     { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['attorney', 'clerk', 'srl', 'public'] },
     { path: '/filing/new', label: 'New Filing', icon: FilePlus2, roles: ['attorney', 'srl'] },
     { path: '/filings', label: 'My Filings', icon: FolderOpen, roles: ['attorney', 'srl'] },
@@ -17,7 +18,7 @@ function Sidebar() {
 
   // Guests (no role) see only the public docket routes; signed-in roles see their own set.
   const links = allLinks.filter(link =>
-    role ? link.roles.includes(role) : ['/cases/search'].includes(link.path)
+    role ? link.roles.includes(role) : link.path === '/cases/search' || link.path === '/agent'
   );
 
   return (

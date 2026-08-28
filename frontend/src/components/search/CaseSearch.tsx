@@ -7,6 +7,7 @@ import { getDemoRole } from '../auth/LoginScreen';
 import LoadError from '../common/LoadError';
 import { useToast } from '../common/Toast';
 import { parseServerDate } from '../../utils/format';
+import { logAgentActivity } from '../../webmcp/activity';
 
 interface CaseResult {
   id: number;
@@ -173,6 +174,12 @@ function CaseSearch() {
         tooldescription="Search Michigan public court records by party name and case number"
         onSubmit={(e) => {
           e.preventDefault();
+          logAgentActivity(
+            'search_cases',
+            { case_number: caseNumber, party_name: partyName, via: 'declarative_form' },
+            true,
+            0,
+          );
           handleSearch();
         }}
       >

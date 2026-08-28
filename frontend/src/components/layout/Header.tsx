@@ -1,8 +1,9 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { isDemoBuild } from '../../config/demoMode';
-import { getDemoRole } from '../auth/LoginScreen';
+import { getDemoRole, notifyDemoRoleChanged } from '../auth/LoginScreen';
 import MichiganMark from '../common/MichiganMark';
 import NotificationBell from './NotificationBell';
+import WebMcpHeaderLink from './WebMcpHeaderLink';
 
 function Header() {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ function Header() {
     localStorage.removeItem('demo_court_name');
     localStorage.removeItem('muefs_filing_draft');
     localStorage.removeItem('auth_token');
+    notifyDemoRoleChanged();
     navigate('/login');
   };
 
@@ -52,6 +54,7 @@ function Header() {
         </div>
       </div>
       <nav className="header-nav">
+        <WebMcpHeaderLink />
         {role && <Link to="/">Dashboard</Link>}
         {(role === 'attorney' || role === 'srl') && <Link to="/filing/new">New Filing</Link>}
         <Link to="/cases/search">Case Search</Link>

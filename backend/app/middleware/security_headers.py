@@ -45,4 +45,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 "max-age=31536000; includeSubDomains; preload"
             )
         response.headers["Content-Security-Policy"] = _csp_for_path(request.url.path)
+        if not request.url.path.startswith("/api/"):
+            response.headers["Cross-Origin-Embedder-Policy"] = "credentialless"
         return response

@@ -1,3 +1,5 @@
+import { READ_ONLY } from '../annotations';
+import { toolOk } from '../output';
 import type { ModelContext } from '../types';
 
 export async function registerFilingNavTools(mc: ModelContext, signal?: AbortSignal): Promise<void> {
@@ -19,6 +21,7 @@ export async function registerFilingNavTools(mc: ModelContext, signal?: AbortSig
           service_only: { type: 'boolean', default: false },
         },
       },
+      annotations: READ_ONLY,
       async execute(input) {
         const params = new URLSearchParams({
           case_id: String(input.case_id),
@@ -31,9 +34,9 @@ export async function registerFilingNavTools(mc: ModelContext, signal?: AbortSig
         if (input.service_only) {
           params.set('service_only', 'true');
         }
-        return JSON.stringify({
+        return toolOk({
           path: `/filing/new?${params}`,
-          hint: 'Open this path in MUEFS to start a pre-filled filing wizard.',
+          hint: 'Open this path in MUEFS or call navigate_to with this path.',
         });
       },
     },

@@ -50,6 +50,12 @@ declare module 'react' {
 
   }
 
+  interface SelectHTMLAttributes<T> {
+
+    toolparamdescription?: string;
+
+  }
+
 }
 
 
