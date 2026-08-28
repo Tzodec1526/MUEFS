@@ -86,6 +86,14 @@ function WebMcpAgentPage() {
           <p>
             WebMCP Challenge build — {tools.length} role-aware tools · declarative forms + imperative workflows
           </p>
+          <nav className="agent-hub-nav" aria-label="Agent hub">
+            <Link to="/login">Sign in</Link>
+            <Link to="/cases/search">Case search</Link>
+            <Link to="/">App home</Link>
+            <a href="https://github.com/Tzodec1526/MUEFS" target="_blank" rel="noreferrer">
+              AGPL repo
+            </a>
+          </nav>
         </div>
       </header>
 

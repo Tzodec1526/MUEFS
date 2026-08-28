@@ -51,6 +51,17 @@ https://github.com/Tzodec1526/MUEFS (AGPL-3.0)
 
 **WebMCP work during challenge period:** commits on `main` adding `frontend/src/webmcp/`, `/agent` hub, orchestration tools, and `docs/WEBMCP.md`.
 
+## Operator go-live (when you are ready)
+
+`render.yaml` has `autoDeploy: false`. WebMCP is on `main` but `demo.tomcedoz.com` stays on the old build until you deploy manually.
+
+1. In Render → `muefs-demo` → **Manual Deploy** → deploy latest `main`.
+2. Confirm https://demo.tomcedoz.com/agent shows Agent Hub + Flagship demos.
+3. Confirm role switch works (demo secret via `/config.js`).
+4. Record the YouTube video with audio using the voiceover script above (ChatGPT path preferred; Flagship buttons as B-roll).
+5. Optional: set `autoDeploy: true` again after the challenge build is frozen.
+6. Submit on Devpost before Sep 3, 2026 @ 1:00 PM PT.
+
 ## Demo video outline (< 3 min)
 
 **Required:** public YouTube with **audio** explaining what you built and how WebMCP is used. Silent slideshows fail the gate.
