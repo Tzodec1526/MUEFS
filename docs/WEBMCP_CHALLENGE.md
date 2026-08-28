@@ -39,8 +39,8 @@ Agent hub: https://webmcp.tomcedoz.com/agent
 ## Testing instructions for judges
 
 1. Open the URL in **ChatGPT in-app browser** (WebMCP on) or Chrome with `#enable-webmcp-testing`.
-2. Visit `/agent` — status should show **Active** with ~14–20 tools (depends on role); activity feed updates on each tool call.
-3. Prompt: *"Call get_agent_session and get_agent_catalog."*
+2. Visit `/agent` — status should show **Active** with **16 / 20 / 19** tools by role; activity feed updates on each tool call.
+3. Prompt: *"Call get_challenge_briefing, then get_agent_session and get_agent_catalog."*
 4. Prompt: *"Sign in as attorney, run attorney_motion_workflow for party Smith, navigate to the wizard."*
 5. Optional clerk: *"Sign in as clerk and run clerk_triage_workflow."*
 6. Optional SRL: *"Sign in as srl and run explain_mcr_for_filing for court 3 case type 35 motion."*
@@ -72,13 +72,13 @@ https://github.com/Tzodec1526/MUEFS (AGPL-3.0 — GitHub license badge)
 ### Voiceover script (read aloud)
 
 1. *(0:00)* "Michigan e-filing is fragmented. Motions under MCR 2.119 need briefs, proposed orders, and proof of service. Agents used to scrape HTML or invent requirements."
-2. *(0:20)* Open https://demo.tomcedoz.com/agent. "This is the MUEFS Agent Hub. WebMCP exposes a role-aware tool catalog — fifteen to nineteen tools depending on sign-in — so ChatGPT works the same portal a human attorney uses."
-3. *(0:40)* In ChatGPT in-app browser, paste the attorney flagship prompt. Show activity feed filling. "One call runs search, docket, MCR checklist, and a pre-filled wizard URL. The human still clicks Submit."
+2. *(0:20)* Open https://webmcp.tomcedoz.com/agent. "This is the MUEFS Agent Hub. WebMCP exposes twenty-three role-aware tools — sixteen public, twenty filer, nineteen clerk — so ChatGPT works the same portal a human attorney uses."
+3. *(0:45)* In ChatGPT in-app browser, paste the attorney flagship prompt. Show activity feed filling. "One call runs search, docket, MCR checklist, and a pre-filled wizard URL. The human still clicks Submit."
 4. *(1:15)* Open the wizard from the result. "Human in the loop by design. Agents research and navigate. They never file."
 5. *(1:35)* Clerk prompt: triage workflow then queue. "Same site, different tool set when you sign in as clerk."
 6. *(1:55)* Case search form with toolname search_cases. "Declarative WebMCP. The agent fills the form humans already use."
 7. *(2:15)* Show GitHub AGPL repo and the Run attorney_motion_workflow button on /agent for backup B-roll without ChatGPT.
-8. *(2:40)* "MUEFS: agent-native Michigan court e-filing. Live at demo.tomcedoz.com."
+8. *(2:40)* "MUEFS: agent-native Michigan court e-filing. Live at webmcp.tomcedoz.com."
 
 ### Shot list
 

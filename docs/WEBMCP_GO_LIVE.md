@@ -8,7 +8,10 @@
 - Docker image `muefs-demo:webmcp` builds and `scripts/verify-webmcp-image.ps1` PASS
 - `render.yaml` `autoDeploy: false` (no surprise prod deploys)
 - Silent B-roll: `demo/muefs-webmcp-challenge-broll.mp4` + VO script `demo/webmcp-voiceover.txt`
-- Draft video **with audio** (~67s TTS): `demo/muefs-webmcp-challenge.mp4` (prefer re-record with ChatGPT before Devpost)
+- Draft video **with audio** (~95s TTS): `demo/muefs-webmcp-challenge.mp4` (prefer re-record with ChatGPT before Devpost)
+- Live front door (tunnel-backed): **https://webmcp.tomcedoz.com/agent** (+ workers.dev)
+- Devpost paste: `docs/WEBMCP_DEVPOST.md`
+- Playwright hub smoke: `frontend/scripts/smoke-webmcp-ui.mjs` (11/11 against workers.dev)
 
 ## Interim public URL (this machine)
 
@@ -18,22 +21,16 @@ While `demo.tomcedoz.com` awaits Manual Deploy:
 - Quick tunnel: `cloudflared tunnel --url http://127.0.0.1:8010`
 - Stable front door: **https://webmcp.tomcedoz.com/agent** (Workers Custom Domain → tunnel)
 - Also: https://muefs-webmcp-live.tom-72b.workers.dev/agent
-- Raw tunnel: https://specifies-dna-bird-obligation.trycloudflare.com/agent
+- Keep-alive: `powershell -File scripts/keep-webmcp-tunnel.ps1`
 
 Dies when the tunnel process or PC sleeps. Prefer Render Manual Deploy for Devpost freeze.
+
+**Blocked without your click:** DNS OAuth cannot edit `demo.tomcedoz.com` (Render CNAME / orange-to-orange). Worker routes on that host do not override Render. `RENDER_DEPLOY_HOOK_URL` GitHub secret is not set.
 
 After Manual Deploy, verify:
 
 ```powershell
 powershell -File scripts/verify-live-webmcp.ps1
-```
-
-Optional full Containers deploy (needs Wrangler re-login with Containers scope): see `cf-webmcp/README.md`.
-
-Optional keep-alive while the PC is the origin:
-
-```powershell
-powershell -File scripts/keep-webmcp-tunnel.ps1
 ```
 
 ## Not done (blocks goal complete)
@@ -44,6 +41,6 @@ powershell -File scripts/keep-webmcp-tunnel.ps1
 
 ## Your next three clicks
 
-1. Render → muefs-demo → Manual Deploy (dashboard should already be open)
+1. Render → muefs-demo → Manual Deploy (or `gh secret set RENDER_DEPLOY_HOOK_URL` then Actions → Deploy demo)
 2. Upload `demo/muefs-webmcp-challenge.mp4` to YouTube (or re-record with ChatGPT + `demo/webmcp-voiceover.txt`)
 3. Submit on Devpost using `docs/WEBMCP_DEVPOST.md`

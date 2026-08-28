@@ -41,11 +41,17 @@ function FlagshipDemoRunner() {
     }
     const hit = search.cases[0];
     const docket = await getCase(hit.id);
-    const [requirements, checklists, drafts] = await Promise.all([
+    const [requirements, checklists] = await Promise.all([
       getFilingRequirements(docket.court_id, docket.case_type_id, 'subsequent'),
       getFilingChecklists(docket.court_id, docket.case_type_id),
-      listFilings({ status: 'draft', page: 1 }),
     ]);
+    let draftTotal = 0;
+    try {
+      const drafts = await listFilings({ status: 'draft', page: 1 });
+      draftTotal = drafts.total;
+    } catch {
+      // Demo auth may still be settling; drafts are optional for the flagship path.
+    }
     const params = new URLSearchParams({
       case_id: String(docket.id),
       court_id: String(docket.court_id),
@@ -57,7 +63,7 @@ function FlagshipDemoRunner() {
     record(
       'attorney_motion_workflow',
       true,
-      `${sanitizeAgentText(docket.title)} · ${requirements.filter((r) => r.is_required).length} required docs · ${checklists.length} motion types · ${drafts.total} drafts`,
+      `${sanitizeAgentText(docket.title)} · ${requirements.filter((r) => r.is_required).length} required docs · ${checklists.length} motion types · ${draftTotal} drafts`,
       { party_name: 'Smith' },
     );
     pushToast('Attorney workflow ready — open the wizard when ready', 'success');

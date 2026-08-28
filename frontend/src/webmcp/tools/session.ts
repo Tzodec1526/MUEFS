@@ -95,9 +95,11 @@ export async function registerSessionTools(mc: ModelContext, signal?: AbortSigna
           product: 'MUEFS — Michigan Unified E-Filing System',
           challenge: 'OpenAI WebMCP Challenge',
           live_agent_hub: 'https://webmcp.tomcedoz.com/agent',
-          canonical_demo: 'https://demo.tomcedoz.com',
+          also_live: 'https://muefs-webmcp-live.tom-72b.workers.dev/agent',
+          canonical_after_render_deploy: 'https://demo.tomcedoz.com/agent',
           repo: 'https://github.com/Tzodec1526/MUEFS',
           license: 'AGPL-3.0',
+          tool_catalog: { total: 23, by_role: { public: 16, filer: 20, clerk: 19 } },
           why_webmcp:
             'Court e-filing needs structured docket research, role-aware tools, and MCR checklists — without agents submitting filings.',
           human_in_the_loop: 'Agents research and navigate; only humans click Submit in the filing wizard.',
@@ -106,7 +108,7 @@ export async function registerSessionTools(mc: ModelContext, signal?: AbortSigna
             declarative: ['search_cases', 'sign_in_demo_role', 'get_clerk_review_queue'],
           },
           flagship_prompts: [
-            'Call get_agent_session, then get_agent_catalog.',
+            'Call get_challenge_briefing, then get_agent_session and get_agent_catalog.',
             'Sign in as attorney, run attorney_motion_workflow for party Smith, then get_agent_activity.',
             'Sign in as clerk, run clerk_triage_workflow, open the review queue.',
             'Sign in as srl, run explain_mcr_for_filing for court_id 3 case_type_id 35 filing_type motion.',
