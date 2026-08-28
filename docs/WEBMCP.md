@@ -2,8 +2,8 @@
 
 MUEFS is a **WebMCP Challenge** entry: a real court-filing domain where humans and AI agents collaborate through the browser — not a toy CRUD demo.
 
-**Live demo:** https://demo.tomcedoz.com  
-**Agent hub:** https://demo.tomcedoz.com/agent
+**Live (challenge):** https://webmcp.tomcedoz.com/agent  
+**Canonical demo:** https://demo.tomcedoz.com/agent *(Manual Deploy latest `main` on Render to refresh)*
 
 ## Why WebMCP fits e-filing
 
@@ -33,7 +33,7 @@ Court filing is multi-step, rule-bound, and role-specific. Agents excel at resea
 
 ## Judge quick test (2 minutes)
 
-1. Open https://demo.tomcedoz.com/agent — confirm **WebMCP status: Active** and live activity feed
+1. Open https://webmcp.tomcedoz.com/agent (or https://demo.tomcedoz.com/agent after Manual Deploy) — confirm **WebMCP status: Active** and live activity feed
 2. Ask your agent:
 
    > Call `get_agent_session`, then `get_agent_catalog`. Summarize available tools.

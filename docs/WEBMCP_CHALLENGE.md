@@ -31,8 +31,10 @@ Court filing combines public records research, role-based access (public / filer
 
 ## Live URL
 
-https://demo.tomcedoz.com  
-Agent hub: https://demo.tomcedoz.com/agent
+**Working now:** https://webmcp.tomcedoz.com  
+Agent hub: https://webmcp.tomcedoz.com/agent
+
+**After Manual Deploy:** https://demo.tomcedoz.com/agent
 
 ## Testing instructions for judges
 
