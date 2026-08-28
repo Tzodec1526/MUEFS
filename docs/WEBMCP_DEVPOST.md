@@ -12,11 +12,11 @@ Statewide e-filing where agents research dockets and MCR checklists; humans keep
 
 ## Live demo URL
 
-https://demo.tomcedoz.com
+**Preferred (after Manual Deploy):** https://demo.tomcedoz.com — hub: https://demo.tomcedoz.com/agent
 
-Agent hub: https://demo.tomcedoz.com/agent
+**Working now (stable workers.dev → local Docker via tunnel):** https://muefs-webmcp-live.tom-72b.workers.dev/agent
 
-*(Operator: Manual Deploy latest `main` on Render `muefs-demo` before submit — `autoDeploy` is off.)*
+*(Operator: Manual Deploy latest `main` on Render `muefs-demo` before freeze — `autoDeploy` is off. Or add secret `RENDER_DEPLOY_HOOK_URL` and run Actions → "Deploy demo (Render hook)". Quick-tunnel origin must stay up for the workers.dev front door.)*
 
 ## Demo video URL
 

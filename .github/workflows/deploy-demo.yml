@@ -1,0 +1,39 @@
+# Trigger a Render Manual-style deploy via Deploy Hook (does not enable autoDeploy).
+# Setup: Render → muefs-demo → Settings → Deploy Hook → copy URL →
+#   gh secret set RENDER_DEPLOY_HOOK_URL --body "https://api.render.com/deploy/..."
+name: Deploy demo (Render hook)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Optional git SHA to deploy (leave empty for latest main tip Render sees)'
+        required: false
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require deploy hook secret
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "Add GitHub secret RENDER_DEPLOY_HOOK_URL from Render → muefs-demo → Deploy Hook"
+            exit 1
+          fi
+
+      - name: Trigger Render deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          REF: ${{ inputs.ref }}
+        run: |
+          URL="$HOOK"
+          if [ -n "$REF" ]; then
+            if [[ "$URL" == *\?* ]]; then URL="${URL}&ref=${REF}"; else URL="${URL}?ref=${REF}"; fi
+          fi
+          echo "POST deploy hook (ref=${REF:-latest})"
+          curl -fsS -X POST "$URL"
+          echo
+          echo "Poll live with: powershell -File scripts/verify-live-webmcp.ps1"

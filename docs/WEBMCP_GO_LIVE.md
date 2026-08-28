@@ -12,13 +12,14 @@
 
 ## Interim public URL (this machine)
 
-While `demo.tomcedoz.com` awaits Manual Deploy, a Cloudflare quick tunnel can expose the local Docker image:
+While `demo.tomcedoz.com` awaits Manual Deploy:
 
 - Container: `muefs-webmcp-tunnel` on `:8010` (`muefs-demo:webmcp`)
-- Tunnel: `cloudflared tunnel --url http://127.0.0.1:8010`
-- Current (ephemeral): https://specifies-dna-bird-obligation.trycloudflare.com/agent
+- Quick tunnel: `cloudflared tunnel --url http://127.0.0.1:8010`
+- Stable front door: **https://muefs-webmcp-live.tom-72b.workers.dev/agent** (`cf-webmcp/wrangler.proxy.toml`)
+- Raw tunnel: https://specifies-dna-bird-obligation.trycloudflare.com/agent
 
-Dies when the tunnel process or PC sleeps. Prefer Render Manual Deploy for Devpost.
+Dies when the tunnel process or PC sleeps. Prefer Render Manual Deploy for Devpost freeze.
 
 After Manual Deploy, verify:
 
@@ -26,7 +27,9 @@ After Manual Deploy, verify:
 powershell -File scripts/verify-live-webmcp.ps1
 ```
 
-Optional durable backup (Cloudflare Containers): see `cf-webmcp/README.md` — needs Wrangler re-login with Containers scope, then `npm run deploy` for a `*.workers.dev` URL.
+Optional full Containers deploy (needs Wrangler re-login with Containers scope): see `cf-webmcp/README.md`.
+
+Deploy hook (no autoDeploy): add GitHub secret `RENDER_DEPLOY_HOOK_URL`, then Actions → **Deploy demo (Render hook)**.
 
 ## Not done (blocks goal complete)
 
