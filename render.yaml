@@ -9,7 +9,7 @@ services:
     plan: standard        # 2 GB / always-on (~$25/mo). Use "starter" for a cheaper 512 MB box.
     region: oregon
     healthCheckPath: /health
-    autoDeploy: true      # redeploy on push to the default branch
+    autoDeploy: false     # hold deploys until challenge build is ready to go live
     # Single instance only — the per-session sandboxes live on this box's local disk.
     envVars:
       - key: DEMO_ISOLATED_SESSIONS
