@@ -1,33 +1,13 @@
-import { hasWebMcp } from './types';
-import { registerSearchTools } from './tools/search';
-import { registerFilingTools } from './tools/filings';
-import { registerClerkTools } from './tools/clerk';
-import { registerDemoTools } from './tools/demo';
-import { registerFilingNavTools } from './tools/filings-nav';
+import { initMuefsWebMcp } from './registry';
 
-let registered = false;
+export { initMuefsWebMcp, refreshMuefsWebMcpTools, webMcpStatus, listRegisteredToolsFromBrowser } from './registry';
+export { catalogForRole, TOOL_CATALOG, toolsForRole } from './catalog';
+export { getAgentActivity, clearAgentActivity, type AgentActivityEntry } from './activity';
+export { hasWebMcp } from './types';
+export { publishAgentPageContext } from './context';
+export { isSafeAppPath, navigateApp, MUEFS_NAVIGATE_EVENT } from './navigate';
 
 /** Register MUEFS WebMCP tools when the browser supports document.modelContext. */
-export async function registerMuefsWebMcpTools(): Promise<void> {
-  if (registered || !hasWebMcp() || !document.modelContext) return;
-
-  const mc = document.modelContext;
-  const controller = new AbortController();
-
-  await registerSearchTools(mc, controller.signal);
-  await registerFilingTools(mc, controller.signal);
-  await registerClerkTools(mc, controller.signal);
-  await registerDemoTools(mc, controller.signal);
-  await registerFilingNavTools(mc, controller.signal);
-
-  registered = true;
-
-  if (import.meta.env.DEV) {
-    console.info(
-      '[MUEFS WebMCP] Tools registered. Enable chrome://flags/#enable-webmcp-testing ' +
-        'and use the Model Context Tool Inspector extension to experiment.',
-    );
-  }
-
-  window.addEventListener('beforeunload', () => controller.abort());
+export function registerMuefsWebMcpTools(): void {
+  initMuefsWebMcp();
 }

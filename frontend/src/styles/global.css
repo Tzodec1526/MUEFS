@@ -3494,3 +3494,257 @@ textarea:focus-visible {
 .toast-dismiss:hover {
   opacity: 1;
 }
+
+/* WebMCP Agent Hub (/agent) */
+.agent-hub-page {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.agent-hub-header {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+}
+
+.agent-hub-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.75rem;
+}
+
+.agent-hub-header p {
+  margin: 0;
+  color: var(--gray-600);
+}
+
+.agent-hub-status,
+.agent-hub-tools,
+.agent-hub-prompts,
+.agent-hub-why {
+  margin-bottom: 2rem;
+}
+
+.agent-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.agent-status-pill.ok {
+  background: #e8f5e9;
+  color: #1b5e20;
+}
+
+.agent-status-pill.off {
+  background: #ffebee;
+  color: #b71c1c;
+}
+
+.agent-setup-steps {
+  margin: 0.75rem 0;
+  padding-left: 1.25rem;
+}
+
+.agent-tool-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.agent-tool-list li {
+  border: 1px solid var(--gray-200);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--white);
+}
+
+.agent-tool-list code {
+  font-weight: 600;
+  margin-right: 0.5rem;
+}
+
+.agent-tool-list p {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  color: var(--gray-600);
+}
+
+.agent-tag {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gray-500);
+}
+
+.agent-prompt-card {
+  border: 1px solid var(--gray-200);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: var(--gray-50);
+}
+
+.agent-prompt-card blockquote {
+  margin: 0.5rem 0;
+  font-style: italic;
+  border-left: 3px solid var(--gold-500, #c9a227);
+  padding-left: 0.75rem;
+}
+
+.agent-prompt-tools code {
+  margin-right: 0.35rem;
+}
+
+.agent-hub-note {
+  color: var(--gray-600);
+  font-size: 0.9rem;
+}
+
+.agent-hub-activity,
+.agent-hub-workflows {
+  margin-bottom: 2rem;
+}
+
+.agent-activity-empty {
+  font-size: 0.9rem;
+  color: var(--gray-500);
+}
+
+.agent-activity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 14rem;
+  overflow: auto;
+  border: 1px solid var(--gray-200);
+  border-radius: 0.5rem;
+}
+
+.agent-activity-list li {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--gray-100);
+  font-size: 0.85rem;
+}
+
+.agent-activity-list li.fail {
+  background: #fff5f5;
+}
+
+.agent-activity-tool {
+  font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  margin-right: 0.5rem;
+}
+
+.agent-activity-meta {
+  color: var(--gray-500);
+  font-size: 0.75rem;
+}
+
+.agent-activity-summary {
+  display: block;
+  color: var(--gray-600);
+  margin-top: 0.15rem;
+}
+
+.agent-workflow-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.agent-workflow-card {
+  border: 2px solid var(--navy-700, #122c50);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+}
+
+.agent-workflow-card code {
+  font-size: 0.75rem;
+  color: var(--navy-700, #122c50);
+}
+
+.agent-workflow-card h3 {
+  margin: 0.35rem 0;
+  font-size: 1rem;
+}
+
+.agent-workflow-card p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--gray-600);
+}
+
+.agent-prompt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.agent-prompt-header h3 {
+  margin: 0;
+}
+
+.agent-browser-tools {
+  font-size: 0.85rem;
+  color: var(--gray-600);
+}
+
+.header-webmcp-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--white);
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.header-webmcp-link:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.header-webmcp-count {
+  background: var(--gold-500, #c9a227);
+  color: var(--navy-900, #0a1628);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+}
+
+.login-webmcp-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  border: 1px dashed var(--gray-300);
+  border-radius: 0.5rem;
+  background: var(--gray-50);
+}
+
+.login-webmcp-select {
+  min-width: 12rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.login-webmcp-submit {
+  font-size: 0.85rem;
+}
+

@@ -1,10 +1,12 @@
-import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Scale, ClipboardCheck, UserRound, BookOpen, Bot } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { isDemoBuild } from '../../config/demoMode';
 import MichiganMark from '../common/MichiganMark';
 import MifileComparison from '../marketing/MifileComparison';
 import { keycloakConfigured, startKeycloakLogin } from '../../auth/keycloakPkce';
+import { logAgentActivity } from '../../webmcp/activity';
 
 export function getDemoRole(): string | null {
   return localStorage.getItem('demo_role');
@@ -48,18 +50,35 @@ const roles: RoleOption[] = [
   },
 ];
 
+export function notifyDemoRoleChanged(): void {
+  window.dispatchEvent(new Event('muefs-demo-role-changed'));
+}
+
+function applyDemoRole(role: string): void {
+  localStorage.setItem('demo_role', role);
+  if (role === 'clerk') {
+    localStorage.setItem('demo_court_id', '3');
+    localStorage.setItem('demo_court_name', '3rd Circuit Court - Wayne County');
+  } else {
+    localStorage.removeItem('demo_court_id');
+    localStorage.removeItem('demo_court_name');
+  }
+  notifyDemoRoleChanged();
+}
+
 function LoginScreen() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const role = searchParams.get('role');
+    if (!role || !roles.some((r) => r.role === role)) return;
+    applyDemoRole(role);
+    navigate(role === 'public' ? '/cases/search' : '/', { replace: true });
+  }, [searchParams, navigate]);
 
   const handleSignIn = (option: RoleOption) => {
-    localStorage.setItem('demo_role', option.role);
-    if (option.role === 'clerk') {
-      localStorage.setItem('demo_court_id', '3');
-      localStorage.setItem('demo_court_name', '3rd Circuit Court - Wayne County');
-    } else {
-      localStorage.removeItem('demo_court_id');
-      localStorage.removeItem('demo_court_name');
-    }
+    applyDemoRole(option.role);
     navigate(option.role === 'public' ? '/cases/search' : '/');
   };
 
@@ -76,6 +95,32 @@ function LoginScreen() {
         </div>
 
         <div className="login-cards">
+          <form
+            className="login-webmcp-form"
+            toolname="sign_in_demo_role"
+            tooldescription="Sign in to the MUEFS demo as attorney, clerk, self-represented litigant, or public visitor"
+            onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
+              e.preventDefault();
+              const role = new FormData(e.currentTarget).get('role') as string;
+              if (!roles.some((r) => r.role === role)) return;
+              logAgentActivity('sign_in_demo_role', { role, via: 'declarative_form' }, true, 0);
+              applyDemoRole(role);
+              navigate(role === 'public' ? '/cases/search' : '/');
+            }}
+          >
+            <label className="sr-only" htmlFor="demoRoleSelect">
+              Demo role
+            </label>
+            <select id="demoRoleSelect" name="role" defaultValue="attorney" className="login-webmcp-select">
+              <option value="attorney">Attorney</option>
+              <option value="clerk">Court Clerk</option>
+              <option value="srl">Self-Represented Litigant</option>
+              <option value="public">Public</option>
+            </select>
+            <button type="submit" className="btn btn-secondary login-webmcp-submit">
+              Agent: sign in selected role
+            </button>
+          </form>
           {roles.map((option) => (
             <div
               key={option.role}
@@ -122,9 +167,9 @@ function LoginScreen() {
           <div className="login-webmcp-hint">
             <Bot size={18} aria-hidden="true" />
             <span>
-              <strong>Agent-ready:</strong> enable{' '}
-              <code>chrome://flags/#enable-webmcp-testing</code> to expose case search and
-              filing tools to browser AI agents (WebMCP).
+              <strong>WebMCP Challenge build:</strong> open{' '}
+              <a href="/agent">/agent</a> for judge prompts, or ask your agent to call{' '}
+              <code>research_case_for_motion</code> after enabling WebMCP in Chrome or ChatGPT.
             </span>
           </div>
         )}

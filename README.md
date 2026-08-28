@@ -1,6 +1,10 @@
 # Michigan Unified E-Filing System (MUEFS)
 
+Copyright (c) 2026 Thomas Cedoz. Licensed under [AGPL-3.0-or-later](LICENSE).
+
 A modern, open-source statewide e-filing platform for Michigan courts. Designed to unify filing across all of Michigan's courts into a single, standards-compliant portal.
+
+**[WebMCP Challenge entry](https://openai.com/webmcp-challenge/).** Live demo: https://demo.tomcedoz.com · Agent hub: https://demo.tomcedoz.com/agent · Guide: [docs/WEBMCP.md](docs/WEBMCP.md)
 
 **Why this exists**: Michigan's current e-filing landscape is fragmented across multiple vendors and systems. Attorneys waste hours navigating incompatible platforms. Self-represented litigants face complex procedures with no guidance. MUEFS is a unified, modern alternative — one login and one interface for filing across Michigan's courts.
 
@@ -162,15 +166,17 @@ npm run build             # Production build
 
 From the repo root you can also run `npm run dev` (full demo stack), `npm test`, and `npm run lint`.
 
-#### WebMCP (experimental)
+#### WebMCP (OpenAI Challenge)
 
-MUEFS registers browser agent tools when `document.modelContext` is available:
+MUEFS is built for the [WebMCP Challenge](https://openai.com/webmcp-challenge/) — agent-native Michigan e-filing.
 
-1. Chrome: enable `chrome://flags/#enable-webmcp-testing`
-2. Open the app and use the [Model Context Tool Inspector](https://developer.chrome.com/docs/ai/webmcp) extension
-3. Tools: `search_cases`, `get_case_docket`, `list_my_filings`, `get_clerk_review_queue`
+- **Agent hub:** `/agent` — tool catalog, workflow cards, live activity feed, judge prompts
+- **Flagship workflows:** `attorney_motion_workflow`, `research_case_for_motion` — search → MCR checklist → wizard URL
+- **21 role-aware tools** — discovery, workflow, and action tiers for public, filer, and clerk
 
-Vite dev server sends COOP/COEP headers required for origin isolation.
+Full guide: **[docs/WEBMCP.md](docs/WEBMCP.md)** · Submission draft: **[docs/WEBMCP_CHALLENGE.md](docs/WEBMCP_CHALLENGE.md)**
+
+**Enable WebMCP:** ChatGPT in-app browser (default), or Chrome 149+ with `chrome://flags/#enable-webmcp-testing`.
 
 ## Security & Compliance
 
