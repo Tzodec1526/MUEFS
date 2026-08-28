@@ -4,7 +4,7 @@ Copyright (c) 2026 Thomas Cedoz. Licensed under [AGPL-3.0-or-later](LICENSE).
 
 A modern, open-source statewide e-filing platform for Michigan courts. Designed to unify filing across all of Michigan's courts into a single, standards-compliant portal.
 
-**[WebMCP Challenge entry](https://openai.com/webmcp-challenge/).** Live (workers.dev while Render Manual Deploy pending): https://muefs-webmcp-live.tom-72b.workers.dev/agent · Canonical: https://demo.tomcedoz.com · Guide: [docs/WEBMCP.md](docs/WEBMCP.md)
+**[WebMCP Challenge entry](https://openai.com/webmcp-challenge/).** Live: https://webmcp.tomcedoz.com/agent · Canonical demo: https://demo.tomcedoz.com · Guide: [docs/WEBMCP.md](docs/WEBMCP.md)
 
 
 **Why this exists**: Michigan's current e-filing landscape is fragmented across multiple vendors and systems. Attorneys waste hours navigating incompatible platforms. Self-represented litigants face complex procedures with no guidance. MUEFS is a unified, modern alternative — one login and one interface for filing across Michigan's courts.

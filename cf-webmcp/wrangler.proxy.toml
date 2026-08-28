@@ -5,3 +5,8 @@ main = "src/proxy.js"
 compatibility_date = "2026-08-01"
 account_id = "72b88976acc5bc6d8cae287f05bde80a"
 workers_dev = true
+
+# Custom Domain creates DNS + certs automatically (preferred over bare zone routes).
+[[routes]]
+pattern = "webmcp.tomcedoz.com"
+custom_domain = true

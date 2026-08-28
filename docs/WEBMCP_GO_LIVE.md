@@ -16,7 +16,8 @@ While `demo.tomcedoz.com` awaits Manual Deploy:
 
 - Container: `muefs-webmcp-tunnel` on `:8010` (`muefs-demo:webmcp`)
 - Quick tunnel: `cloudflared tunnel --url http://127.0.0.1:8010`
-- Stable front door: **https://muefs-webmcp-live.tom-72b.workers.dev/agent** (`cf-webmcp/wrangler.proxy.toml`)
+- Stable front door: **https://webmcp.tomcedoz.com/agent** (Workers Custom Domain → tunnel)
+- Also: https://muefs-webmcp-live.tom-72b.workers.dev/agent
 - Raw tunnel: https://specifies-dna-bird-obligation.trycloudflare.com/agent
 
 Dies when the tunnel process or PC sleeps. Prefer Render Manual Deploy for Devpost freeze.
