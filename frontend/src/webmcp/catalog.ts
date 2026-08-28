@@ -24,6 +24,13 @@ export const TOOL_CATALOG: CatalogEntry[] = [
     tier: 'discovery',
   },
   {
+    name: 'get_agent_activity',
+    title: 'Agent activity log',
+    description: 'Recent WebMCP tool calls in this tab (same feed as /agent).',
+    readOnly: true,
+    tier: 'discovery',
+  },
+  {
     name: 'search_cases',
     title: 'Search public docket',
     description: 'Search Michigan public court records by party or case number (declarative form too).',
@@ -161,6 +168,7 @@ export const TOOL_CATALOG: CatalogEntry[] = [
 const PUBLIC_TOOLS = new Set([
   'get_agent_catalog',
   'get_agent_session',
+  'get_agent_activity',
   'search_cases',
   'get_case_docket',
   'list_courts',

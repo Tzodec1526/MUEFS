@@ -1,5 +1,6 @@
 import { listFilings } from '../../api/filings';
 import { getDemoRole } from '../../components/auth/LoginScreen';
+import { getAgentActivity } from '../activity';
 import { catalogForRole } from '../catalog';
 import { READ_ONLY } from '../annotations';
 import { toolOk } from '../output';
@@ -40,9 +41,40 @@ export async function registerSessionTools(mc: ModelContext, signal?: AbortSigna
           tool_count: tools.length,
           draft_filings: drafts,
           agent_hub: '/agent',
+          recent_activity_count: getAgentActivity().length,
           suggested_next_tool: suggested,
           human_in_the_loop:
             'Agents may research and navigate; only humans submit filings in the wizard.',
+        });
+      },
+    },
+    { signal },
+  );
+
+  await mc.registerTool(
+    {
+      name: 'get_agent_activity',
+      title: 'Agent activity log',
+      description:
+        'Return recent WebMCP tool calls from this browser tab (same feed shown on /agent). ' +
+        'Use after workflows to summarize what the agent already did for the human.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          limit: {
+            type: 'integer',
+            description: 'Max entries to return (default 15, max 40)',
+          },
+        },
+      },
+      annotations: READ_ONLY,
+      async execute(input) {
+        const limit = Math.min(40, Math.max(1, Number(input.limit) || 15));
+        const activity = getAgentActivity().slice(0, limit);
+        return toolOk({
+          count: activity.length,
+          activity,
+          note: 'Also visible live on /agent for judges and demos.',
         });
       },
     },

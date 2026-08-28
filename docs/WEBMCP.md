@@ -46,12 +46,13 @@ Court filing is multi-step, rule-bound, and role-specific. Agents excel at resea
 
    > `sign_in_demo_role` clerk → `clerk_triage_workflow` → `navigate_to` /clerk/queue
 
-## Tool catalog (21 tools, role-filtered)
+## Tool catalog (22+ tools, role-filtered)
 
 | Tool | Tier | Role | Description |
 |---|---|---|---|
 | `get_agent_catalog` | discovery | all | Discover tools for current session |
 | `get_agent_session` | discovery | all | Role, path, drafts — **start here** |
+| `get_agent_activity` | discovery | all | Recent tool calls (same feed as `/agent`) |
 | `search_cases` | discovery | all | Public docket search (+ declarative form) |
 | `get_case_docket` | discovery | all | Case detail by id |
 | `list_courts` | discovery | all | E-filing enabled courts by county |
@@ -76,14 +77,14 @@ Court filing is multi-step, rule-bound, and role-specific. Agents excel at resea
 
 ## Live activity feed
 
-Every tool execution is logged client-side and shown on `/agent`. Judges can verify agent calls without opening DevTools — useful for demo videos and Devpost review.
+Every tool execution is logged client-side and shown on `/agent`. Agents can re-read that feed via `get_agent_activity`. Judges can verify calls without DevTools — useful for demo videos and Devpost review.
 
 ## Architecture
 
 ```
 frontend/src/webmcp/
   registry.ts          # Role-aware register + refresh on role change
-  catalog.ts           # Tool metadata for /agent page (21 tools, 3 tiers)
+  catalog.ts           # Tool metadata for /agent page (22+ tools, 3 tiers)
   activity.ts          # Live execution log for /agent
   registerTool.ts      # Logging wrapper for every registerTool call
   annotations.ts       # readOnlyHint / untrustedContentHint

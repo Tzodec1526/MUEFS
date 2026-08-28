@@ -22,8 +22,8 @@ const JUDGE_PROMPTS = [
   {
     title: 'Attorney motion workflow (flagship)',
     prompt:
-      'Sign in as attorney, run attorney_motion_workflow for party Smith, explain the MCR plan in plain language, then navigate_to the filing wizard.',
-    tools: ['sign_in_demo_role', 'attorney_motion_workflow', 'navigate_to'],
+      'Sign in as attorney, run attorney_motion_workflow for party Smith, explain the MCR plan in plain language, navigate_to the filing wizard, then call get_agent_activity.',
+    tools: ['sign_in_demo_role', 'attorney_motion_workflow', 'navigate_to', 'get_agent_activity'],
   },
   {
     title: 'SRL MCR explainer',

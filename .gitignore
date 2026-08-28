@@ -62,3 +62,6 @@ minio_data/
 backend/app/data/mcr_filing_requirements_ch1_ch2.json
 backend/app/data/mcr_filing_requirements_draft.json
 docs/mcr_filing_requirements_decisions.md
+
+# Local TTS / voiceover scratch (not for repo)
+demo/webmcp-vo-plain.txt
