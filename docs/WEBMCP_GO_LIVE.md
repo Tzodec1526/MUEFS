@@ -8,15 +8,16 @@
 - Docker image `muefs-demo:webmcp` builds and `scripts/verify-webmcp-image.ps1` PASS
 - `render.yaml` `autoDeploy: false` (no surprise prod deploys)
 - Silent B-roll: `demo/muefs-webmcp-challenge-broll.mp4` + VO script `demo/webmcp-voiceover.txt`
+- Draft video **with audio** (~67s TTS): `demo/muefs-webmcp-challenge.mp4` (prefer re-record with ChatGPT before Devpost)
 
 ## Not done (blocks goal complete)
 
 1. **Manual Render deploy** of latest `main` so https://demo.tomcedoz.com/agent serves the hub
-2. **YouTube video with audio** narrating WebMCP (B-roll alone fails the Devpost gate)
+2. Prefer a live ChatGPT capture over the TTS draft before YouTube upload
 3. **Devpost submission** before Sep 3, 2026 @ 1:00 PM PT
 
 ## Your next three clicks
 
 1. Render → muefs-demo → Manual Deploy
-2. Record screen + mic with `demo/webmcp-voiceover.txt` (ChatGPT in-app browser preferred)
-3. Upload to YouTube + submit on Devpost
+2. Upload `demo/muefs-webmcp-challenge.mp4` to YouTube (or re-record with ChatGPT + `demo/webmcp-voiceover.txt`)
+3. Submit on Devpost
