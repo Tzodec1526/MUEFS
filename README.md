@@ -4,7 +4,7 @@ Copyright (c) 2026 Thomas Cedoz. Licensed under [AGPL-3.0-or-later](LICENSE).
 
 A modern, open-source statewide e-filing platform for Michigan courts. Designed to unify filing across all of Michigan's courts into a single, standards-compliant portal.
 
-**[WebMCP Challenge entry](https://openai.com/webmcp-challenge/).** Live: https://webmcp.tomcedoz.com/agent · Canonical demo: https://demo.tomcedoz.com · Guide: [docs/WEBMCP.md](docs/WEBMCP.md)
+**[WebMCP Challenge entry](https://openai.com/webmcp-challenge/).** Live: https://webmcp.tomcedoz.com/agent (also https://muefs.tomcedoz.com/agent) · Canonical demo: https://demo.tomcedoz.com · Guide: [docs/WEBMCP.md](docs/WEBMCP.md)
 
 
 **Why this exists**: Michigan's current e-filing landscape is fragmented across multiple vendors and systems. Attorneys waste hours navigating incompatible platforms. Self-represented litigants face complex procedures with no guidance. MUEFS is a unified, modern alternative — one login and one interface for filing across Michigan's courts.
@@ -24,7 +24,7 @@ A modern, open-source statewide e-filing platform for Michigan courts. Designed 
 | **Serve documents only** | Varies; often separate workflow | One-click from case docket |
 | **Draft autosave** | Vendor-dependent | Browser draft recovery |
 | **Clerk review tools** | Queue tools vary by court | Batch accept, age badges, quick reject reasons |
-| **AI agent tools (WebMCP)** | Not available | 21 role-aware tools + `/agent` hub (ChatGPT / Chrome flag) |
+| **AI agent tools (WebMCP)** | Not available | 23 role-aware tools + `/agent` hub (ChatGPT / Chrome flag) |
 | **Cost / licensing** | Per-transaction vendor fees | AGPL-3.0 (no license fee) |
 
 > **Status:** Open source demo — core filing, clerk review, and public docket search work today. CMS integration is a **stub** until a court JIS/CMS adapter is wired in production.

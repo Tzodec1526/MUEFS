@@ -2,9 +2,9 @@
 # Usage: npx wrangler deploy -c wrangler.proxy.toml
 # ORIGIN in src/proxy.js must match the running quick-tunnel hostname.
 #
-# NOTE: Do not attach demo.tomcedoz.com/* as a Worker route while it CNAMEs to
-# Render (orange-to-orange) — traffic still hits Render. Use webmcp.tomcedoz.com
-# or Manual Deploy on Render for the canonical host.
+# NOTE: demo.tomcedoz.com cannot be a Workers custom domain while it CNAMEs to
+# Render (externally managed DNS / orange-to-orange). Use webmcp.tomcedoz.com,
+# muefs.tomcedoz.com, or Manual Deploy on Render for the canonical host.
 name = "muefs-webmcp-live"
 main = "src/proxy.js"
 compatibility_date = "2026-08-01"
@@ -14,3 +14,8 @@ workers_dev = true
 [[routes]]
 pattern = "webmcp.tomcedoz.com"
 custom_domain = true
+
+[[routes]]
+pattern = "muefs.tomcedoz.com"
+custom_domain = true
+

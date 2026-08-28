@@ -95,7 +95,10 @@ export async function registerSessionTools(mc: ModelContext, signal?: AbortSigna
           product: 'MUEFS — Michigan Unified E-Filing System',
           challenge: 'OpenAI WebMCP Challenge',
           live_agent_hub: 'https://webmcp.tomcedoz.com/agent',
-          also_live: 'https://muefs-webmcp-live.tom-72b.workers.dev/agent',
+          also_live: [
+            'https://muefs.tomcedoz.com/agent',
+            'https://muefs-webmcp-live.tom-72b.workers.dev/agent',
+          ],
           canonical_after_render_deploy: 'https://demo.tomcedoz.com/agent',
           repo: 'https://github.com/Tzodec1526/MUEFS',
           license: 'AGPL-3.0',

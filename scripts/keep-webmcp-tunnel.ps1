@@ -14,7 +14,7 @@ function Ensure-Container {
     docker rm -f muefs-webmcp-tunnel 2>$null | Out-Null
     docker run -d --name muefs-webmcp-tunnel -p 8010:8000 `
       -e ALLOW_DEMO_MODE=true -e DEMO_ISOLATED_SESSIONS=true -e DEMO_MODE_SECRET=local-verify `
-      -e ALLOWED_ORIGINS=https://webmcp.tomcedoz.com,https://muefs-webmcp-live.tom-72b.workers.dev,https://demo.tomcedoz.com `
+      -e ALLOWED_ORIGINS=https://webmcp.tomcedoz.com,https://muefs.tomcedoz.com,https://muefs-webmcp-live.tom-72b.workers.dev,https://demo.tomcedoz.com `
       muefs-demo:webmcp | Out-Null
   }
   $healthy = $false
