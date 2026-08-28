@@ -13,7 +13,16 @@ export async function registerMuefsTool(
       try {
         const result = await tool.execute(input);
         const ms = Math.round(performance.now() - started);
-        logAgentActivity(tool.name, input, true, ms);
+        let ok = true;
+        if (typeof result === 'string') {
+          try {
+            const parsed = JSON.parse(result) as { ok?: boolean };
+            if (parsed && parsed.ok === false) ok = false;
+          } catch {
+            /* non-JSON success string */
+          }
+        }
+        logAgentActivity(tool.name, input, ok, ms);
         return result;
       } catch (err) {
         const ms = Math.round(performance.now() - started);

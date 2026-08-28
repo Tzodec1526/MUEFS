@@ -53,19 +53,33 @@ https://github.com/Tzodec1526/MUEFS (AGPL-3.0)
 
 ## Demo video outline (< 3 min)
 
+**Required:** public YouTube with **audio** explaining what you built and how WebMCP is used. Silent slideshows fail the gate.
+
+### Voiceover script (read aloud)
+
+1. *(0:00)* "Michigan e-filing is fragmented. Motions under MCR 2.119 need briefs, proposed orders, and proof of service. Agents used to scrape HTML or invent requirements."
+2. *(0:20)* Open https://demo.tomcedoz.com/agent. "This is the MUEFS Agent Hub. WebMCP exposes twenty-one role-aware tools so ChatGPT works the same portal a human attorney uses."
+3. *(0:40)* In ChatGPT in-app browser, paste the attorney flagship prompt. Show activity feed filling. "One call runs search, docket, MCR checklist, and a pre-filled wizard URL. The human still clicks Submit."
+4. *(1:15)* Open the wizard from the result. "Human in the loop by design. Agents research and navigate. They never file."
+5. *(1:35)* Clerk prompt: triage workflow then queue. "Same site, different tool set when you sign in as clerk."
+6. *(1:55)* Case search form with toolname search_cases. "Declarative WebMCP. The agent fills the form humans already use."
+7. *(2:15)* Show GitHub AGPL repo and the Run attorney_motion_workflow button on /agent for backup B-roll without ChatGPT.
+8. *(2:40)* "MUEFS: agent-native Michigan court e-filing. Live at demo.tomcedoz.com."
+
+### Shot list
+
 | Time | Shot |
 |---|---|
 | 0:00 | Problem: fragmented MiFILE, complex MCR motions |
-| 0:15 | `/agent` — WebMCP active, 20 tools, live activity feed |
-| 0:35 | ChatGPT: `get_agent_session` → `attorney_motion_workflow` → wizard URL |
-| 1:05 | Human navigates pre-filled wizard; agent calls `validate_filing` |
-| 1:30 | Clerk: `clerk_triage_workflow` + queue UI |
-| 1:50 | SRL: `explain_mcr_for_filing` plain language |
-| 2:10 | Declarative forms: case search + login role picker |
-| 2:30 | Architecture + AGPL open source |
-| 2:45 | Call to action: unified Michigan e-filing |
+| 0:20 | `/agent` — WebMCP status, tool count, activity feed |
+| 0:40 | ChatGPT: flagship attorney prompt |
+| 1:15 | Pre-filled wizard (human submit only) |
+| 1:35 | Clerk triage |
+| 1:55 | Declarative case search |
+| 2:15 | Repo + Flagship demo button on `/agent` |
+| 2:40 | CTA |
 
-Record with `scripts/record-webmcp-demo.ps1` (browser-use) or screen capture; upload to YouTube unlisted/public.
+Record with screen capture + mic. `scripts/record-webmcp-demo.ps1` is B-roll only (no audio).
 
 ## Differentiators vs typical hackathon entries
 

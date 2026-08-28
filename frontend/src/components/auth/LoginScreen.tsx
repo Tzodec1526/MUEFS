@@ -54,7 +54,7 @@ export function notifyDemoRoleChanged(): void {
   window.dispatchEvent(new Event('muefs-demo-role-changed'));
 }
 
-function applyDemoRole(role: string): void {
+export function applyDemoRole(role: string): void {
   localStorage.setItem('demo_role', role);
   if (role === 'clerk') {
     localStorage.setItem('demo_court_id', '3');

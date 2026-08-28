@@ -10,6 +10,7 @@ import { getDemoRole } from '../auth/LoginScreen';
 import MichiganMark from '../common/MichiganMark';
 import { useToast } from '../common/Toast';
 import AgentActivityFeed from './AgentActivityFeed';
+import FlagshipDemoRunner from './FlagshipDemoRunner';
 
 const JUDGE_PROMPTS = [
   {
@@ -130,6 +131,8 @@ function WebMcpAgentPage() {
         <p className="agent-hub-note">Tool calls from this tab appear here as judges test WebMCP.</p>
         <AgentActivityFeed />
       </section>
+
+      <FlagshipDemoRunner />
 
       <section className="agent-hub-workflows">
         <h2>Workflow tools</h2>
