@@ -20,7 +20,7 @@ Sign in as clerk. Run the clerk triage workflow, then open the review queue.
 Same site. Different tool set. Court staff keep accept and reject authority.
 
 1:55
-On case search, the form itself is a WebMCP tool. The agent fills the fields humans already use.
+On the Agent Hub, the declarative case-search form is right on the page — toolname search_cases. Agents fill the same fields humans use. Activity feed logs it live.
 
 2:15
 The repo is AGPL on GitHub. If ChatGPT is unavailable, the Flagship demo buttons on /agent run the same paths for B-roll.

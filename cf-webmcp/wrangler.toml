@@ -1,0 +1,22 @@
+# Cloudflare Containers edge for the WebMCP Challenge live demo.
+# Deploy: cd cf-webmcp && npm i && npx wrangler deploy
+# Account: Tom@tomcedoz.com (set CLOUDFLARE_ACCOUNT_ID if needed)
+name = "muefs-webmcp"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+account_id = "72b88976acc5bc6d8cae287f05bde80a"
+workers_dev = true
+
+[[containers]]
+class_name = "MuefsDemoContainer"
+image = "../Dockerfile"
+max_instances = 2
+instance_type = "standard-2"
+
+[[durable_objects.bindings]]
+name = "MUEFS_DEMO"
+class_name = "MuefsDemoContainer"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MuefsDemoContainer"]

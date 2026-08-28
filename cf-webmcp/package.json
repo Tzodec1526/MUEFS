@@ -1,0 +1,15 @@
+{
+  "name": "muefs-webmcp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy --config wrangler.toml"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.0.30"
+  },
+  "devDependencies": {
+    "wrangler": "^4.127.1"
+  }
+}

@@ -20,6 +20,14 @@ While `demo.tomcedoz.com` awaits Manual Deploy, a Cloudflare quick tunnel can ex
 
 Dies when the tunnel process or PC sleeps. Prefer Render Manual Deploy for Devpost.
 
+After Manual Deploy, verify:
+
+```powershell
+powershell -File scripts/verify-live-webmcp.ps1
+```
+
+Optional durable backup (Cloudflare Containers): see `cf-webmcp/README.md` — needs Wrangler re-login with Containers scope, then `npm run deploy` for a `*.workers.dev` URL.
+
 ## Not done (blocks goal complete)
 
 1. **Manual Render deploy** of latest `main` so https://demo.tomcedoz.com/agent serves the hub
