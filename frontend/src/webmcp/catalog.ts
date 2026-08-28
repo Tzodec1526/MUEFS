@@ -124,9 +124,9 @@ export const TOOL_CATALOG: CatalogEntry[] = [
   {
     name: 'start_motion_filing',
     title: 'Start motion filing',
-    description: 'Build URL for wizard pre-filled from an existing case.',
-    readOnly: false,
-    tier: 'action',
+    description: 'Build URL for wizard pre-filled from an existing case (does not navigate or submit).',
+    readOnly: true,
+    tier: 'discovery',
   },
   {
     name: 'get_clerk_review_queue',

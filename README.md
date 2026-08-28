@@ -23,7 +23,7 @@ A modern, open-source statewide e-filing platform for Michigan courts. Designed 
 | **Serve documents only** | Varies; often separate workflow | One-click from case docket |
 | **Draft autosave** | Vendor-dependent | Browser draft recovery |
 | **Clerk review tools** | Queue tools vary by court | Batch accept, age badges, quick reject reasons |
-| **AI agent tools (WebMCP)** | Not available | Experimental (Chrome flag) |
+| **AI agent tools (WebMCP)** | Not available | 21 role-aware tools + `/agent` hub (ChatGPT / Chrome flag) |
 | **Cost / licensing** | Per-transaction vendor fees | AGPL-3.0 (no license fee) |
 
 > **Status:** Open source demo — core filing, clerk review, and public docket search work today. CMS integration is a **stub** until a court JIS/CMS adapter is wired in production.

@@ -1,0 +1,29 @@
+MUEFS WebMCP Challenge — voiceover (read aloud, under 3 minutes)
+
+0:00
+Michigan e-filing is fragmented. Motions under MCR 2.119 need briefs, proposed orders, and proof of service. Agents used to scrape HTML or invent requirements.
+
+0:20
+Open demo.tomcedoz.com/agent.
+This is the MUEFS Agent Hub. WebMCP exposes twenty-one role-aware tools so ChatGPT works the same portal a human attorney uses.
+
+0:40
+In ChatGPT's in-app browser, paste the attorney flagship prompt from the hub.
+Watch the live activity feed. One call runs search, docket, MCR checklist, and a pre-filled wizard URL. The human still clicks Submit.
+
+1:15
+Open the filing wizard from the result.
+Human in the loop by design. Agents research and navigate. They never file.
+
+1:35
+Sign in as clerk. Run the clerk triage workflow, then open the review queue.
+Same site. Different tool set. Court staff keep accept and reject authority.
+
+1:55
+On case search, the form itself is a WebMCP tool. The agent fills the fields humans already use.
+
+2:15
+The repo is AGPL on GitHub. If ChatGPT is unavailable, the Flagship demo buttons on /agent run the same paths for B-roll.
+
+2:40
+MUEFS: agent-native Michigan court e-filing. Live at demo.tomcedoz.com. Open source. Built for people and their agents together.
