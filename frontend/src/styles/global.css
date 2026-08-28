@@ -3548,8 +3548,31 @@ textarea:focus-visible {
 .agent-hub-status,
 .agent-hub-tools,
 .agent-hub-prompts,
-.agent-hub-why {
+.agent-hub-why,
+.agent-hub-declarative {
   margin-bottom: 2rem;
+}
+
+.agent-declarative-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: flex-end;
+  margin: 0.75rem 0;
+}
+
+.agent-declarative-form .form-group {
+  min-width: 10rem;
+  flex: 1;
+}
+
+.agent-declarative-hits {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.agent-declarative-hits li {
+  margin: 0.25rem 0;
 }
 
 .agent-status-pill {

@@ -46,7 +46,7 @@ Court filing is multi-step, rule-bound, and role-specific. Agents excel at resea
 
    > `sign_in_demo_role` clerk → `clerk_triage_workflow` → `navigate_to` /clerk/queue
 
-## Tool catalog (22+ tools, role-filtered)
+## Tool catalog (22 tools, role-filtered: 15 public · 19 filer · 18 clerk)
 
 | Tool | Tier | Role | Description |
 |---|---|---|---|
@@ -84,7 +84,7 @@ Every tool execution is logged client-side and shown on `/agent`. Agents can re-
 ```
 frontend/src/webmcp/
   registry.ts          # Role-aware register + refresh on role change
-  catalog.ts           # Tool metadata for /agent page (22+ tools, 3 tiers)
+  catalog.ts           # Tool metadata for /agent page (22 tools, 3 tiers)
   activity.ts          # Live execution log for /agent
   registerTool.ts      # Logging wrapper for every registerTool call
   annotations.ts       # readOnlyHint / untrustedContentHint

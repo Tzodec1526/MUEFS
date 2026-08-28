@@ -57,7 +57,7 @@ Reliable multi-step Michigan filing prep without scrapers or hallucinated MCR ch
 ## Testing instructions for judges
 
 1. Open the live URL in **ChatGPT in-app browser** (WebMCP on) or Chrome with `#enable-webmcp-testing`.
-2. Visit `/agent` — status **Active**, tool count ~14–22 by role; activity feed updates on tool calls.
+2. Visit `/agent` — status **Active**, tool count **15 / 19 / 18** by role (public / filer / clerk); activity feed updates on tool calls. Try the declarative search form on the hub.
 3. Prompt: `Call get_agent_session and get_agent_catalog.`
 4. Prompt: `Sign in as attorney, run attorney_motion_workflow for party Smith, then get_agent_activity.`
 5. Optional: clerk / SRL prompts on the hub, or click Flagship demo buttons without ChatGPT.

@@ -8,11 +8,11 @@ Use this for [Devpost](https://webmcp.devpost.com/) (deadline **Sep 3, 2026 @ 1:
 
 ## One-line pitch
 
-The first statewide e-filing portal where AI agents research dockets, load MCR motion checklists, and pre-fill filing wizards — while humans keep submit authority.
+The statewide Michigan e-filing portal where AI agents research dockets, load MCR motion checklists, and pre-fill filing wizards — while humans keep submit authority.
 
 ## Why WebMCP is the right fit
 
-Court filing combines public records research, role-based access (public / filer / clerk), and Michigan Court Rules companions (MCR 2.119 briefs, proposed orders). Before WebMCP, agents either scraped HTML or hallucinated requirements. MUEFS exposes **22+ role-aware tools** (discovery / workflow / action tiers), a **live activity feed** on `/agent` (also readable via `get_agent_activity`), SPA-safe navigation with human confirmation on mutating tools, plus **declarative** case-search and sign-in forms so agents and litigants share one interface.
+Court filing combines public records research, role-based access (public / filer / clerk), and Michigan Court Rules companions (MCR 2.119 briefs, proposed orders). Before WebMCP, agents either scraped HTML or hallucinated requirements. MUEFS exposes a **22-tool catalog**, role-filtered to **15 / 19 / 18** tools (public / filer / clerk), a **live activity feed** on `/agent` (also readable via `get_agent_activity`), SPA-safe navigation with human confirmation on mutating tools, plus **declarative** forms on the hub, case search, login, and clerk queue so agents and litigants share one interface.
 
 **Together, humans and agents can:**
 
@@ -70,7 +70,7 @@ https://github.com/Tzodec1526/MUEFS (AGPL-3.0 — GitHub license badge)
 ### Voiceover script (read aloud)
 
 1. *(0:00)* "Michigan e-filing is fragmented. Motions under MCR 2.119 need briefs, proposed orders, and proof of service. Agents used to scrape HTML or invent requirements."
-2. *(0:20)* Open https://demo.tomcedoz.com/agent. "This is the MUEFS Agent Hub. WebMCP exposes twenty-one role-aware tools so ChatGPT works the same portal a human attorney uses."
+2. *(0:20)* Open https://demo.tomcedoz.com/agent. "This is the MUEFS Agent Hub. WebMCP exposes a role-aware tool catalog — fifteen to nineteen tools depending on sign-in — so ChatGPT works the same portal a human attorney uses."
 3. *(0:40)* In ChatGPT in-app browser, paste the attorney flagship prompt. Show activity feed filling. "One call runs search, docket, MCR checklist, and a pre-filled wizard URL. The human still clicks Submit."
 4. *(1:15)* Open the wizard from the result. "Human in the loop by design. Agents research and navigate. They never file."
 5. *(1:35)* Clerk prompt: triage workflow then queue. "Same site, different tool set when you sign in as clerk."

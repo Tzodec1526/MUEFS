@@ -10,6 +10,7 @@ import { getDemoRole } from '../auth/LoginScreen';
 import MichiganMark from '../common/MichiganMark';
 import { useToast } from '../common/Toast';
 import AgentActivityFeed from './AgentActivityFeed';
+import AgentDeclarativeSearch from './AgentDeclarativeSearch';
 import FlagshipDemoRunner from './FlagshipDemoRunner';
 
 const JUDGE_PROMPTS = [
@@ -84,7 +85,8 @@ function WebMcpAgentPage() {
         <div>
           <h1>MUEFS Agent Hub</h1>
           <p>
-            WebMCP Challenge build — {tools.length} role-aware tools · declarative forms + imperative workflows
+            WebMCP Challenge build — {tools.length} tools for this role (15 public · 19 filer · 18 clerk) ·
+            declarative forms + imperative workflows
           </p>
           <nav className="agent-hub-nav" aria-label="Agent hub">
             <Link to="/login">Sign in</Link>
@@ -139,6 +141,8 @@ function WebMcpAgentPage() {
         <p className="agent-hub-note">Tool calls from this tab appear here as judges test WebMCP.</p>
         <AgentActivityFeed />
       </section>
+
+      <AgentDeclarativeSearch />
 
       <FlagshipDemoRunner />
 
@@ -223,7 +227,7 @@ function WebMcpAgentPage() {
             <strong>Human-in-the-loop</strong> — agents research and navigate; humans submit
           </li>
           <li>
-            <strong>Hybrid API</strong> — declarative case search form + role-aware imperative tools
+            <strong>Hybrid API</strong> — declarative search form on this hub + role-aware imperative tools
           </li>
           <li>
             <strong>Role-aware</strong> — tool set changes when you sign in as filer or clerk

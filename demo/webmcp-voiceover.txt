@@ -5,7 +5,7 @@ Michigan e-filing is fragmented. Motions under MCR 2.119 need briefs, proposed o
 
 0:20
 Open demo.tomcedoz.com/agent.
-This is the MUEFS Agent Hub. WebMCP exposes twenty-one role-aware tools so ChatGPT works the same portal a human attorney uses.
+This is the MUEFS Agent Hub. WebMCP exposes a role-aware tool catalog — fifteen to nineteen tools depending on sign-in — so ChatGPT works the same portal a human attorney uses.
 
 0:40
 In ChatGPT's in-app browser, paste the attorney flagship prompt from the hub.

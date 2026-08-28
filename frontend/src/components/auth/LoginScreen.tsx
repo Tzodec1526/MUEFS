@@ -111,7 +111,13 @@ function LoginScreen() {
             <label className="sr-only" htmlFor="demoRoleSelect">
               Demo role
             </label>
-            <select id="demoRoleSelect" name="role" defaultValue="attorney" className="login-webmcp-select">
+            <select
+              id="demoRoleSelect"
+              name="role"
+              defaultValue="attorney"
+              className="login-webmcp-select"
+              toolparamdescription="Demo role: attorney, clerk, srl, or public"
+            >
               <option value="attorney">Attorney</option>
               <option value="clerk">Court Clerk</option>
               <option value="srl">Self-Represented Litigant</option>
