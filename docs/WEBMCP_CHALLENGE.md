@@ -12,7 +12,7 @@ The statewide Michigan e-filing portal where AI agents research dockets, load MC
 
 ## Why WebMCP is the right fit
 
-Court filing combines public records research, role-based access (public / filer / clerk), and Michigan Court Rules companions (MCR 2.119 briefs, proposed orders). Before WebMCP, agents either scraped HTML or hallucinated requirements. MUEFS exposes a **22-tool catalog**, role-filtered to **15 / 19 / 18** tools (public / filer / clerk), a **live activity feed** on `/agent` (also readable via `get_agent_activity`), SPA-safe navigation with human confirmation on mutating tools, plus **declarative** forms on the hub, case search, login, and clerk queue so agents and litigants share one interface.
+Court filing combines public records research, role-based access (public / filer / clerk), and Michigan Court Rules companions (MCR 2.119 briefs, proposed orders). Before WebMCP, agents either scraped HTML or hallucinated requirements. MUEFS exposes a **23-tool catalog**, role-filtered to **16 / 20 / 19** tools (public / filer / clerk), a **live activity feed** on `/agent` (also readable via `get_agent_activity`), SPA-safe navigation with human confirmation on mutating tools, plus **declarative** forms on the hub, case search, login, and clerk queue so agents and litigants share one interface.
 
 **Together, humans and agents can:**
 

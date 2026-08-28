@@ -39,7 +39,7 @@ function Ensure-Tunnel {
   Start-Sleep -Seconds 8
 }
 
-Write-Host 'WebMCP keep-alive — Ctrl+C to stop. Front door: https://webmcp.tomcedoz.com/agent'
+Write-Host 'WebMCP keep-alive - Ctrl+C to stop. Front door: https://webmcp.tomcedoz.com/agent'
 while ($true) {
   try {
     Ensure-Container
@@ -50,9 +50,14 @@ while ($true) {
       if ($r.Content -match 'healthy') { $ok = $true }
     } catch {}
     $ts = Get-Date -Format 'HH:mm:ss'
-    if ($ok) { Write-Host "$ts front-door OK" } else { Write-Host "$ts front-door FAIL — check tunnel hostname vs proxy.js ORIGIN" }
+    if ($ok) {
+      Write-Host "$ts front-door OK"
+    } else {
+      Write-Host "$ts front-door FAIL - check tunnel hostname vs proxy.js ORIGIN"
+    }
   } catch {
-    Write-Host "$(Get-Date -Format HH:mm:ss) $($_.Exception.Message)"
+    $msg = $_.Exception.Message
+    Write-Host ("{0} {1}" -f (Get-Date -Format 'HH:mm:ss'), $msg)
   }
   Start-Sleep -Seconds 60
 }

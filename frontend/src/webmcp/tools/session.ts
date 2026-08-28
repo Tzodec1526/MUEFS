@@ -80,4 +80,41 @@ export async function registerSessionTools(mc: ModelContext, signal?: AbortSigna
     },
     { signal },
   );
+
+  await mc.registerTool(
+    {
+      name: 'get_challenge_briefing',
+      title: 'WebMCP Challenge briefing',
+      description:
+        'Judge-oriented overview: why MUEFS fits WebMCP, flagship prompts, live URLs, and ' +
+        'human-in-the-loop rules. Call this when evaluating or demoing the challenge entry.',
+      inputSchema: { type: 'object', properties: {} },
+      annotations: READ_ONLY,
+      async execute() {
+        return toolOk({
+          product: 'MUEFS — Michigan Unified E-Filing System',
+          challenge: 'OpenAI WebMCP Challenge',
+          live_agent_hub: 'https://webmcp.tomcedoz.com/agent',
+          canonical_demo: 'https://demo.tomcedoz.com',
+          repo: 'https://github.com/Tzodec1526/MUEFS',
+          license: 'AGPL-3.0',
+          why_webmcp:
+            'Court e-filing needs structured docket research, role-aware tools, and MCR checklists — without agents submitting filings.',
+          human_in_the_loop: 'Agents research and navigate; only humans click Submit in the filing wizard.',
+          apis: {
+            imperative: 'document.modelContext.registerTool in frontend/src/webmcp/',
+            declarative: ['search_cases', 'sign_in_demo_role', 'get_clerk_review_queue'],
+          },
+          flagship_prompts: [
+            'Call get_agent_session, then get_agent_catalog.',
+            'Sign in as attorney, run attorney_motion_workflow for party Smith, then get_agent_activity.',
+            'Sign in as clerk, run clerk_triage_workflow, open the review queue.',
+            'Sign in as srl, run explain_mcr_for_filing for court_id 3 case_type_id 35 filing_type motion.',
+          ],
+          suggested_next_tool: 'get_agent_session',
+        });
+      },
+    },
+    { signal },
+  );
 }

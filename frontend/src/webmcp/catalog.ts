@@ -31,6 +31,13 @@ export const TOOL_CATALOG: CatalogEntry[] = [
     tier: 'discovery',
   },
   {
+    name: 'get_challenge_briefing',
+    title: 'Challenge briefing',
+    description: 'Judge overview: live URLs, flagship prompts, HITL rules, how WebMCP is used.',
+    readOnly: true,
+    tier: 'discovery',
+  },
+  {
     name: 'search_cases',
     title: 'Search public docket',
     description: 'Search Michigan public court records by party or case number (declarative form too).',
@@ -169,6 +176,7 @@ const PUBLIC_TOOLS = new Set([
   'get_agent_catalog',
   'get_agent_session',
   'get_agent_activity',
+  'get_challenge_briefing',
   'search_cases',
   'get_case_docket',
   'list_courts',

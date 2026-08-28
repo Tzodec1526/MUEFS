@@ -17,8 +17,8 @@ const JUDGE_PROMPTS = [
   {
     title: 'Session bootstrap',
     prompt:
-      'Call get_agent_session, then get_agent_catalog. Summarize what we can do in this Michigan e-filing demo.',
-    tools: ['get_agent_session', 'get_agent_catalog'],
+      'Call get_challenge_briefing, then get_agent_session and get_agent_catalog. Summarize what we can do in this Michigan e-filing demo.',
+    tools: ['get_challenge_briefing', 'get_agent_session', 'get_agent_catalog'],
   },
   {
     title: 'Attorney motion workflow (flagship)',
@@ -85,7 +85,7 @@ function WebMcpAgentPage() {
         <div>
           <h1>MUEFS Agent Hub</h1>
           <p>
-            WebMCP Challenge build — {tools.length} tools for this role (15 public · 19 filer · 18 clerk) ·
+            WebMCP Challenge build — {tools.length} tools for this role (16 public · 20 filer · 19 clerk) ·
             declarative forms + imperative workflows
           </p>
           <nav className="agent-hub-nav" aria-label="Agent hub">

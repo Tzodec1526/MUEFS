@@ -34,7 +34,7 @@ export function buildAgentPageContext(): AgentPageContext {
     role: role || 'anonymous',
     path,
     tool_count: tools.length,
-    catalog_size: 22,
+    catalog_size: 23,
     suggested_next_tool: suggested,
     agent_hub: '/agent',
     human_in_the_loop:

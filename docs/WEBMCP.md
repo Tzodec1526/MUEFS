@@ -46,13 +46,14 @@ Court filing is multi-step, rule-bound, and role-specific. Agents excel at resea
 
    > `sign_in_demo_role` clerk → `clerk_triage_workflow` → `navigate_to` /clerk/queue
 
-## Tool catalog (22 tools, role-filtered: 15 public · 19 filer · 18 clerk)
+## Tool catalog (23 tools, role-filtered: 16 public · 20 filer · 19 clerk)
 
 | Tool | Tier | Role | Description |
 |---|---|---|---|
 | `get_agent_catalog` | discovery | all | Discover tools for current session |
 | `get_agent_session` | discovery | all | Role, path, drafts — **start here** |
 | `get_agent_activity` | discovery | all | Recent tool calls (same feed as `/agent`) |
+| `get_challenge_briefing` | discovery | all | Judge overview: URLs, prompts, HITL rules |
 | `search_cases` | discovery | all | Public docket search (+ declarative form) |
 | `get_case_docket` | discovery | all | Case detail by id |
 | `list_courts` | discovery | all | E-filing enabled courts by county |
