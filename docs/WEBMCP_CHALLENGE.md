@@ -91,7 +91,7 @@ https://github.com/Tzodec1526/MUEFS (AGPL-3.0 — GitHub license badge)
 | 2:15 | Repo + Flagship demo button on `/agent` |
 | 2:40 | CTA |
 
-Record with screen capture + mic. `scripts/record-webmcp-demo.ps1` is B-roll only (no audio).
+Record with screen capture + mic using `demo/webmcp-voiceover.txt`. Silent B-roll (no audio, not submission-ready alone): `demo/muefs-webmcp-challenge-broll.mp4` via `scripts/record-webmcp-demo.ps1`.
 
 ## Differentiators vs typical hackathon entries
 
