@@ -3,6 +3,8 @@
  * Demo builds use role-picker headers instead; this hook is for real IdP deployments.
  */
 
+import { notifyDemoRoleChanged } from '../components/auth/LoginScreen';
+
 const STORAGE_VERIFIER = 'muefs_pkce_verifier';
 const STORAGE_STATE = 'muefs_pkce_state';
 
@@ -107,5 +109,6 @@ export async function handleKeycloakCallback(
 
   localStorage.setItem('auth_token', tokens.access_token);
   localStorage.removeItem('demo_role');
+  notifyDemoRoleChanged();
   return 'ok';
 }
