@@ -165,21 +165,33 @@ function ReviewQueue() {
           <label>Court</label>
           <span className="clerk-court-label">{clerkCourtName}</span>
         </div>
-        <div className="form-group">
-          <label htmlFor="statusFilter">Filter</label>
-          <select
-            id="statusFilter"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="all">All Pending</option>
-            <option value="submitted">New Submissions</option>
-            <option value="under_review">Under Review</option>
-          </select>
-        </div>
-        <button className="btn btn-secondary" onClick={fetchQueue} disabled={loading}>
-          {loading ? 'Refreshing...' : 'Refresh'}
-        </button>
+        <form
+          className="queue-webmcp-filter"
+          toolname="get_clerk_review_queue"
+          tooldescription="List filings pending clerk review, optionally filtered by status"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void fetchQueue();
+          }}
+        >
+          <div className="form-group">
+            <label htmlFor="statusFilter">Filter</label>
+            <select
+              id="statusFilter"
+              name="status"
+              toolparamdescription="Queue status filter: all, submitted, or under_review"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="all">All Pending</option>
+              <option value="submitted">New Submissions</option>
+              <option value="under_review">Under Review</option>
+            </select>
+          </div>
+          <button type="submit" className="btn btn-secondary" disabled={loading}>
+            {loading ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </form>
         <span className="queue-meta">
           Last updated: {lastRefresh.toLocaleTimeString()}
         </span>

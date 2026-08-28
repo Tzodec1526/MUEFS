@@ -16,6 +16,11 @@ export async function registerClerkTools(mc: ModelContext, signal?: AbortSignal)
         type: 'object',
         properties: {
           page: { type: 'integer', minimum: 1, default: 1 },
+          status: {
+            type: 'string',
+            enum: ['all', 'submitted', 'under_review'],
+            description: 'Queue filter status',
+          },
         },
       },
       annotations: READ_ONLY,
@@ -24,9 +29,11 @@ export async function registerClerkTools(mc: ModelContext, signal?: AbortSignal)
           return toolError('Clerk role required. Use sign_in_demo_role with role clerk.');
         }
         const courtId = getDemoCourtId() || 3;
-        const data = await getClerkQueue(courtId, (input.page as number) || 1, 'all');
+        const status = (input.status as string) || 'all';
+        const data = await getClerkQueue(courtId, (input.page as number) || 1, status);
         return toolOk({
           court_id: courtId,
+          status,
           total: data.total,
           filings: data.filings.map((f) => ({
             id: f.id,

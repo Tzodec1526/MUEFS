@@ -47,9 +47,9 @@ No credentials required — demo uses role picker + optional `DEMO_MODE_SECRET` 
 
 ## Repository
 
-https://github.com/Tzodec1526/MUEFS (AGPL-3.0)
+https://github.com/Tzodec1526/MUEFS (AGPL-3.0 — GitHub license badge)
 
-**WebMCP work during challenge period:** commits on `main` adding `frontend/src/webmcp/`, `/agent` hub, orchestration tools, and `docs/WEBMCP.md`.
+**WebMCP work during challenge period:** commits on `main` after Aug 25 adding `frontend/src/webmcp/`, `/agent` hub, orchestration tools, and `docs/WEBMCP.md`. Topics: `webmcp`, `openai-challenge`, `court-filing`.
 
 ## Operator go-live (when you are ready)
 
@@ -58,9 +58,10 @@ https://github.com/Tzodec1526/MUEFS (AGPL-3.0)
 1. In Render → `muefs-demo` → **Manual Deploy** → deploy latest `main`.
 2. Confirm https://demo.tomcedoz.com/agent shows Agent Hub + Flagship demos.
 3. Confirm role switch works (demo secret via `/config.js`).
-4. Record the YouTube video with audio using the voiceover script above (ChatGPT path preferred; Flagship buttons as B-roll).
-5. Optional: set `autoDeploy: true` again after the challenge build is frozen.
-6. Submit on Devpost before Sep 3, 2026 @ 1:00 PM PT.
+4. Optional preflight (no Render): `docker build -t muefs-demo:webmcp .` then `powershell -File scripts/verify-webmcp-image.ps1`
+5. Record the YouTube video with audio using the voiceover script above (ChatGPT path preferred; Flagship buttons as B-roll).
+6. Optional: set `autoDeploy: true` again after the challenge build is frozen.
+7. Submit on Devpost before Sep 3, 2026 @ 1:00 PM PT.
 
 ## Demo video outline (< 3 min)
 

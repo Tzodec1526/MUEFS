@@ -1155,6 +1155,13 @@ tr.selected {
   margin-bottom: 0;
 }
 
+.queue-webmcp-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
 .queue-count {
   font-size: 0.85rem;
   color: var(--gray-500);
@@ -3500,6 +3507,13 @@ textarea:focus-visible {
   max-width: 52rem;
   margin: 0 auto;
   padding: 2rem 1.25rem 4rem;
+}
+
+.queue-webmcp-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
 }
 
 .agent-hub-header {
