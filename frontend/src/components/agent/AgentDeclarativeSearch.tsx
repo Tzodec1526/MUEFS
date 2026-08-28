@@ -26,7 +26,7 @@ function AgentDeclarativeSearch() {
         case_number: caseNumber || undefined,
         page: 1,
       });
-      const next = (data.cases ?? []).slice(0, 5).map((c) => ({
+      const next = (data.cases ?? []).slice(0, 5).map((c: { id: number; case_number: string; title: string }) => ({
         id: c.id,
         case_number: c.case_number,
         title: c.title,
