@@ -41,7 +41,7 @@ Agent hub: https://demo.tomcedoz.com/agent
 3. Prompt: *"Call get_agent_session and get_agent_catalog."*
 4. Prompt: *"Sign in as attorney, run attorney_motion_workflow for party Smith, navigate to the wizard."*
 5. Optional clerk: *"Sign in as clerk and run clerk_triage_workflow."*
-6. Optional SRL: *"Sign in as srl and run explain_mcr_for_filing for court 3 case type 1 motion."*
+6. Optional SRL: *"Sign in as srl and run explain_mcr_for_filing for court 3 case type 35 motion."*
 
 No credentials required — demo uses role picker + optional `DEMO_MODE_SECRET` on hosted deploy.
 

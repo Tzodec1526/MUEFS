@@ -1378,11 +1378,11 @@ def seed_database(reset: bool = False):
             # CIV-GEN is seeded for every circuit court above; assert for type narrowing.
             assert wayne_civil is not None
 
-            # --- Case 1: Active breach of contract case ---
+            # --- Case 1: Active civil case (CIV-GEN so MCR requirements/checklists attach) ---
             case1 = Case(
                 court_id=wayne_circuit.id,
                 case_number="25-000001-CZ",
-                case_type_id=wayne_contract.id if wayne_contract else wayne_civil.id,
+                case_type_id=wayne_civil.id,
                 title="Johnson v. Smith Industries LLC",
                 status=CaseStatus.OPEN,
                 filed_date=now,
@@ -1407,7 +1407,7 @@ def seed_database(reset: bool = False):
             # Initial complaint filing (accepted)
             filing1 = FilingEnvelope(
                 court_id=wayne_circuit.id, case_id=case1.id,
-                case_type_id=wayne_contract.id if wayne_contract else wayne_civil.id,
+                case_type_id=wayne_civil.id,
                 filer_id=attorney.id,
                 case_title="Johnson v. Smith Industries LLC",
                 filing_description=(
@@ -1431,7 +1431,7 @@ def seed_database(reset: bool = False):
             # Motion filing (submitted, pending review)
             filing1_motion = FilingEnvelope(
                 court_id=wayne_circuit.id, case_id=case1.id,
-                case_type_id=wayne_contract.id if wayne_contract else wayne_civil.id,
+                case_type_id=wayne_civil.id,
                 filer_id=attorney.id,
                 case_title="Johnson v. Smith Industries LLC",
                 filing_description=(

@@ -29,7 +29,7 @@ const JUDGE_PROMPTS = [
   {
     title: 'SRL MCR explainer',
     prompt:
-      'Sign in as srl. Run explain_mcr_for_filing for court_id 3 case_type_id 1 filing_type motion. Explain what papers I need in simple terms.',
+      'Sign in as srl. Run explain_mcr_for_filing for court_id 3 case_type_id 35 filing_type motion. Explain what papers I need in simple terms.',
     tools: ['sign_in_demo_role', 'explain_mcr_for_filing'],
   },
   {

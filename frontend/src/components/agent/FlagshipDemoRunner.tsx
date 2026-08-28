@@ -95,7 +95,7 @@ function FlagshipDemoRunner() {
     applyDemoRole('srl');
     record('sign_in_demo_role', true, 'Signed in as SRL', { role: 'srl', via: 'flagship_demo' });
     const courtId = 3;
-    const caseTypeId = 1;
+    const caseTypeId = 35; // CIV-GEN — seeded with MCR requirements + motion checklists
     const [requirements, checklists] = await Promise.all([
       getFilingRequirements(courtId, caseTypeId, 'motion'),
       getFilingChecklists(courtId, caseTypeId),
