@@ -30,7 +30,11 @@ powershell -File scripts/verify-live-webmcp.ps1
 
 Optional full Containers deploy (needs Wrangler re-login with Containers scope): see `cf-webmcp/README.md`.
 
-Deploy hook (no autoDeploy): add GitHub secret `RENDER_DEPLOY_HOOK_URL`, then Actions → **Deploy demo (Render hook)**.
+Optional keep-alive while the PC is the origin:
+
+```powershell
+powershell -File scripts/keep-webmcp-tunnel.ps1
+```
 
 ## Not done (blocks goal complete)
 
