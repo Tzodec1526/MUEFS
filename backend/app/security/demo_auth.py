@@ -13,6 +13,10 @@ def demo_headers_permitted(provided_secret: str | None) -> bool:
         return False
     if settings.debug:
         return True
-    if not settings.demo_mode_secret:
-        return False
-    return secrets.compare_digest(provided_secret or "", settings.demo_mode_secret)
+    expected = settings.demo_mode_secret
+    if not expected:
+        # Public hosted demo (isolated sandboxes) must keep working even when
+        # DEMO_MODE_SECRET was never set in the host env (empty config.js).
+        # Never enable ALLOW_DEMO_MODE without isolation on a real court deploy.
+        return bool(settings.demo_isolated_sessions)
+    return secrets.compare_digest(provided_secret or "", expected)

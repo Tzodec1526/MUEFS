@@ -28,11 +28,27 @@ def test_demo_secret_required_outside_debug(monkeypatch) -> None:
 
     monkeypatch.setattr(settings, "debug", False)
     monkeypatch.setattr(settings, "allow_demo_mode", True)
+    monkeypatch.setattr(settings, "demo_isolated_sessions", False)
     monkeypatch.setattr(settings, "demo_mode_secret", "court-demo-secret")
 
     assert demo_headers_permitted(None) is False
     assert demo_headers_permitted("wrong") is False
     assert demo_headers_permitted("court-demo-secret") is True
+
+
+def test_demo_headers_allowed_without_secret_when_isolated(monkeypatch) -> None:
+    """Hosted public demo must work when Render leaves DEMO_MODE_SECRET unset."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "debug", False)
+    monkeypatch.setattr(settings, "allow_demo_mode", True)
+    monkeypatch.setattr(settings, "demo_mode_secret", "")
+    monkeypatch.setattr(settings, "demo_isolated_sessions", True)
+    assert demo_headers_permitted(None) is True
+    assert demo_headers_permitted("") is True
+
+    monkeypatch.setattr(settings, "demo_isolated_sessions", False)
+    assert demo_headers_permitted(None) is False
 
 
 def test_strict_mime_defaults_follow_debug() -> None:

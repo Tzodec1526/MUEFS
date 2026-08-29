@@ -77,10 +77,14 @@ apiClient.interceptors.response.use(
       emitToast(message, 'error');
     }
     if (status === 401) {
+      const hadJwt = Boolean(localStorage.getItem('auth_token'));
       localStorage.removeItem('auth_token');
-      // Only send a genuinely authenticated session back to login. Never bounce an
-      // anonymous/public visitor browsing the public records path -- that would
-      // contradict the "no account needed" public-records access.
+      // Only bounce real JWT sessions. Demo-role sandboxes often get a transient
+      // 401 (secret misconfig, race); hard-redirecting to /login makes the demo
+      // unusable within seconds of signing in.
+      if (!hadJwt) {
+        return Promise.reject(error);
+      }
       const path = window.location.pathname;
       const onPublicPath = path.startsWith('/cases');
       const role = localStorage.getItem('demo_role');
