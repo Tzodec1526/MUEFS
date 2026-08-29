@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,7 +8,7 @@ from app.models.user import User, UserType
 from app.schemas.user import UserCreate, UserProfile, UserResponse
 from app.security.demo_auth import demo_headers_permitted
 from app.services.user_provision_service import provision_user_from_oidc
-from app.utils.keycloak_jwt import decode_keycloak_access_token
+from app.utils.keycloak_jwt import JWTError, decode_keycloak_access_token
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 

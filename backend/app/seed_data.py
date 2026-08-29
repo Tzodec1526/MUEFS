@@ -1366,9 +1366,6 @@ def seed_database(reset: bool = False):
             wayne_tort = session.query(CaseType).filter_by(
                 court_id=wayne_circuit.id, code="CIV-TORT"
             ).first()
-            wayne_contract = session.query(CaseType).filter_by(
-                court_id=wayne_circuit.id, code="CIV-CONT"
-            ).first()
             wayne_divorce = session.query(CaseType).filter_by(
                 court_id=wayne_circuit.id, code="FAM-DIV"
             ).first()

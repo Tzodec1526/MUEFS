@@ -6,16 +6,22 @@ every request; demo mode (ALLOW_DEMO_MODE) must never be enabled in production.
 
 from __future__ import annotations
 
+import json
 import time
 from typing import Any
 
 import httpx
-from jose import JWTError, jwk, jwt
+import jwt
+from jwt.algorithms import RSAAlgorithm
+from jwt.exceptions import InvalidTokenError as JWTError
 
 from app.config import settings
 
 _jwks_cache: tuple[float, dict[str, Any]] | None = None
 _JWKS_TTL_SEC = 300.0
+
+# Re-export so callers can catch JWTError without importing PyJWT.
+__all__ = ["JWTError", "decode_keycloak_access_token"]
 
 
 async def _fetch_jwks() -> dict[str, Any]:
@@ -50,25 +56,24 @@ async def decode_keycloak_access_token(token: str) -> dict[str, Any]:
     if not key_dict:
         raise JWTError(f"No JWKS key for kid={kid}")
 
-    rsa_key = jwk.construct(key_dict)
+    rsa_key = RSAAlgorithm.from_jwk(json.dumps(key_dict))
 
     issuer = f"{settings.keycloak_url.rstrip('/')}/realms/{settings.keycloak_realm}"
-    decode_kwargs: dict = {
+    decode_kwargs: dict[str, Any] = {
         "algorithms": ["RS256"],
         "issuer": issuer,
         "options": {
             "verify_aud": settings.jwt_audience_verify_enabled,
-            "require_exp": True,
+            "require": ["exp"],
         },
     }
     if settings.jwt_audience_verify_enabled:
         decode_kwargs["audience"] = settings.jwt_audiences_list
 
-    claims = jwt.decode(
-        token,
-        rsa_key,
-        **decode_kwargs,
-    )
+    try:
+        claims = jwt.decode(token, rsa_key, **decode_kwargs)
+    except JWTError as exc:
+        raise JWTError(str(exc)) from exc
 
     if not claims.get("sub"):
         raise JWTError("Token missing sub")

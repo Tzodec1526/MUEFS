@@ -15,7 +15,7 @@ import FlagshipDemoRunner from './FlagshipDemoRunner';
 
 const JUDGE_PROMPTS = [
   {
-    title: 'Session bootstrap',
+    title: 'Session start',
     prompt:
       'Call get_challenge_briefing, then get_agent_session and get_agent_catalog. Summarize what we can do in this Michigan e-filing demo.',
     tools: ['get_challenge_briefing', 'get_agent_session', 'get_agent_catalog'],

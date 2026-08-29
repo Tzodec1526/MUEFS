@@ -90,7 +90,7 @@ frontend/src/webmcp/
   annotations.ts       # readOnlyHint / untrustedContentHint
   output.ts            # Structured JSON + prompt-injection sanitization
   tools/
-    session.ts         # get_agent_session bootstrap
+    session.ts         # get_agent_session / challenge briefing
     workflows.ts         # attorney_motion_workflow, clerk_triage_workflow, explain_mcr
     courts.ts          # list_courts
     orchestration.ts   # research_case_for_motion
