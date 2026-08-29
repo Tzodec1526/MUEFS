@@ -55,6 +55,16 @@ Reliable multi-step Michigan filing prep without scrapers or hallucinated MCR ch
 - Optional `provideContext` republished on every SPA route
 - Output hardening: `untrustedContentHint` + sanitized docket text
 - Judge briefing tool: `get_challenge_briefing`
+
+### How this scores on Devpost criteria
+
+| Criterion | Where it shows up |
+|---|---|
+| **WebMCP Leverage** | Imperative + declarative tools; `provideContext` on every route; activity feed + `get_agent_activity` |
+| **Execution** | Live `/agent` hub, role-filtered catalog, HITL on mutating tools, seeded MCR data for Smith / CIV-GEN |
+| **Potential Impact** | Statewide e-filing pattern: agents research/navigate; humans alone Submit; clerk/SRL/attorney roles |
+| **Creativity** | Court-rules companions as tools; flagship workflows; judge `get_challenge_briefing`; same UI for humans and agents |
+
 ## Testing instructions for judges
 
 1. Open the live URL in a **WebMCP-capable agent browser**, or Chrome with `#enable-webmcp-testing`.
