@@ -71,7 +71,8 @@ async def decode_keycloak_access_token(token: str) -> dict[str, Any]:
         decode_kwargs["audience"] = settings.jwt_audiences_list
 
     try:
-        claims = jwt.decode(token, rsa_key, **decode_kwargs)
+        # from_jwk returns a cryptography key; PyJWT accepts it at runtime.
+        claims = jwt.decode(token, rsa_key, **decode_kwargs)  # type: ignore[arg-type]
     except JWTError as exc:
         raise JWTError(str(exc)) from exc
 
