@@ -24,7 +24,7 @@ A modern, open-source statewide e-filing platform for Michigan courts. Designed 
 | **Serve documents only** | Varies; often separate workflow | One-click from case docket |
 | **Draft autosave** | Vendor-dependent | Browser draft recovery |
 | **Clerk review tools** | Queue tools vary by court | Batch accept, age badges, quick reject reasons |
-| **AI agent tools (WebMCP)** | Not available | 23 role-aware tools + `/agent` hub (ChatGPT / Chrome flag) |
+| **AI agent tools (WebMCP)** | Not available | 23 role-aware tools + `/agent` hub (agent browser / Chrome flag) |
 | **Cost / licensing** | Per-transaction vendor fees | AGPL-3.0 (no license fee) |
 
 > **Status:** Open source demo — core filing, clerk review, and public docket search work today. CMS integration is a **stub** until a court JIS/CMS adapter is wired in production.
@@ -177,7 +177,7 @@ MUEFS is built for the [WebMCP Challenge](https://openai.com/webmcp-challenge/) 
 
 Full guide: **[docs/WEBMCP.md](docs/WEBMCP.md)** · Submission draft: **[docs/WEBMCP_CHALLENGE.md](docs/WEBMCP_CHALLENGE.md)**
 
-**Enable WebMCP:** ChatGPT in-app browser (default), or Chrome 149+ with `chrome://flags/#enable-webmcp-testing`.
+**Enable WebMCP:** a WebMCP-capable agent browser, or Chrome 149+ with `chrome://flags/#enable-webmcp-testing`.
 
 ## Security & Compliance
 

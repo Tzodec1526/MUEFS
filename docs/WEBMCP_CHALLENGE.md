@@ -38,7 +38,7 @@ Agent hub: https://webmcp.tomcedoz.com/agent
 
 ## Testing instructions for judges
 
-1. Open the URL in **ChatGPT in-app browser** (WebMCP on) or Chrome with `#enable-webmcp-testing`.
+1. Open the URL in a **WebMCP-capable agent browser**, or Chrome with `#enable-webmcp-testing`.
 2. Visit `/agent` — status should show **Active** with **16 / 20 / 19** tools by role; activity feed updates on each tool call.
 3. Prompt: *"Call get_challenge_briefing, then get_agent_session and get_agent_catalog."*
 4. Prompt: *"Sign in as attorney, run attorney_motion_workflow for party Smith, navigate to the wizard."*
@@ -61,7 +61,7 @@ https://github.com/Tzodec1526/MUEFS (AGPL-3.0 — GitHub license badge)
 2. Confirm https://demo.tomcedoz.com/agent shows Agent Hub + Flagship demos.
 3. Confirm role switch works (demo secret via `/config.js`).
 4. Optional preflight (no Render): `docker build -t muefs-demo:webmcp .` then `powershell -File scripts/verify-webmcp-image.ps1`
-5. Record the YouTube video with audio using the voiceover script above (ChatGPT path preferred; Flagship buttons as B-roll).
+5. Record the YouTube video with audio using the voiceover script above (live agent path preferred; Flagship buttons as B-roll).
 6. Optional: set `autoDeploy: true` again after the challenge build is frozen.
 7. Submit on Devpost before Sep 3, 2026 @ 1:00 PM PT.
 
@@ -72,12 +72,12 @@ https://github.com/Tzodec1526/MUEFS (AGPL-3.0 — GitHub license badge)
 ### Voiceover script (read aloud)
 
 1. *(0:00)* "Michigan e-filing is fragmented. Motions under MCR 2.119 need briefs, proposed orders, and proof of service. Agents used to scrape HTML or invent requirements."
-2. *(0:20)* Open https://webmcp.tomcedoz.com/agent. "This is the MUEFS Agent Hub. WebMCP exposes twenty-three role-aware tools — sixteen public, twenty filer, nineteen clerk — so ChatGPT works the same portal a human attorney uses."
-3. *(0:45)* In ChatGPT in-app browser, paste the attorney flagship prompt. Show activity feed filling. "One call runs search, docket, MCR checklist, and a pre-filled wizard URL. The human still clicks Submit."
+2. *(0:20)* Open https://webmcp.tomcedoz.com/agent. "This is the MUEFS Agent Hub. WebMCP exposes twenty-three role-aware tools — sixteen public, twenty filer, nineteen clerk — so agents work the same portal a human attorney uses."
+3. *(0:45)* In a WebMCP-capable agent browser, paste the attorney flagship prompt. Show activity feed filling. "One call runs search, docket, MCR checklist, and a pre-filled wizard URL. The human still clicks Submit."
 4. *(1:15)* Open the wizard from the result. "Human in the loop by design. Agents research and navigate. They never file."
 5. *(1:35)* Clerk prompt: triage workflow then queue. "Same site, different tool set when you sign in as clerk."
 6. *(1:55)* Case search form with toolname search_cases. "Declarative WebMCP. The agent fills the form humans already use."
-7. *(2:15)* Show GitHub AGPL repo and the Run attorney_motion_workflow button on /agent for backup B-roll without ChatGPT.
+7. *(2:15)* Show GitHub AGPL repo and the Run attorney_motion_workflow button on /agent for backup B-roll without a live agent.
 8. *(2:40)* "MUEFS: agent-native Michigan court e-filing. Live at webmcp.tomcedoz.com."
 
 ### Shot list
@@ -86,14 +86,14 @@ https://github.com/Tzodec1526/MUEFS (AGPL-3.0 — GitHub license badge)
 |---|---|
 | 0:00 | Problem: fragmented MiFILE, complex MCR motions |
 | 0:20 | `/agent` — WebMCP status, tool count, activity feed |
-| 0:40 | ChatGPT: flagship attorney prompt |
+| 0:40 | Agent browser: flagship attorney prompt |
 | 1:15 | Pre-filled wizard (human submit only) |
 | 1:35 | Clerk triage |
 | 1:55 | Declarative case search |
 | 2:15 | Repo + Flagship demo button on `/agent` |
 | 2:40 | CTA |
 
-Record with screen capture + mic using `demo/webmcp-voiceover.txt`. Draft with audio (TTS over B-roll, replace with live ChatGPT capture before submit): `demo/muefs-webmcp-challenge.mp4`. Silent B-roll only: `demo/muefs-webmcp-challenge-broll.mp4` via `scripts/record-webmcp-demo.ps1`.
+Record with screen capture + mic using `demo/webmcp-voiceover.txt`. Draft with audio (TTS over B-roll, replace with live agent capture before submit): `demo/muefs-webmcp-challenge.mp4`. Silent B-roll only: `demo/muefs-webmcp-challenge-broll.mp4` via `scripts/record-webmcp-demo.ps1`.
 
 ## Differentiators vs typical hackathon entries
 

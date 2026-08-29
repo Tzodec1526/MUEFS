@@ -175,7 +175,7 @@ function LoginScreen() {
             <span>
               <strong>WebMCP Challenge build:</strong> open{' '}
               <a href="/agent">/agent</a> for judge prompts, or ask your agent to call{' '}
-              <code>research_case_for_motion</code> after enabling WebMCP in Chrome or ChatGPT.
+              <code>research_case_for_motion</code> after enabling WebMCP (agent browser or Chrome flag).
             </span>
           </div>
         )}

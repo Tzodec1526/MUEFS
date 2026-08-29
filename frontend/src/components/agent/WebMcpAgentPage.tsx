@@ -115,7 +115,7 @@ function WebMcpAgentPage() {
         {!status.available && (
           <ol className="agent-setup-steps">
             <li>
-              <strong>ChatGPT desktop</strong> in-app browser (WebMCP on by default), or
+              Open this page in a <strong>WebMCP-capable agent browser</strong>, or
             </li>
             <li>
               Chrome 149+ → <code>chrome://flags/#enable-webmcp-testing</code> → reload

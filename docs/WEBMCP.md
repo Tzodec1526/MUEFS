@@ -18,13 +18,12 @@ Court filing is multi-step, rule-bound, and role-specific. Agents excel at resea
 
 ## Enable WebMCP
 
-### ChatGPT (recommended for judges)
+### WebMCP-capable agent browser
 
-1. Open the **ChatGPT desktop app**
-2. Use the **in-app browser** to navigate to the live demo URL
-3. WebMCP is enabled by default — no flags
+1. Open the live demo URL in an agent browser that supports WebMCP
+2. Confirm `/agent` shows **WebMCP status: Active**
 
-### Chrome (local dev)
+### Chrome (local / testing)
 
 1. Chrome **149+**
 2. `chrome://flags/#enable-webmcp-testing` → **Enabled**

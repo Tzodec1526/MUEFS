@@ -20,7 +20,7 @@
 ## Operator (post-objective / submission polish)
 
 1. Render → muefs-demo → **Manual Deploy** (or `gh secret set RENDER_DEPLOY_HOOK_URL` + Actions) so canonical https://demo.tomcedoz.com/agent matches `main` — DNS still points at Render; Workers custom domain cannot attach while that CNAME exists.
-2. Prefer live ChatGPT capture over TTS; upload YouTube; paste URL into Devpost.
+2. Prefer a live agent capture over TTS; upload YouTube; paste URL into Devpost.
 3. Submit on https://webmcp.devpost.com/ before Sep 3, 2026 @ 1:00 PM PT using `docs/WEBMCP_DEVPOST.md`.
 4. Keep PC awake / `scripts/keep-webmcp-tunnel.ps1` until Render is live.
 

@@ -135,9 +135,9 @@ function FlagshipDemoRunner() {
 
   return (
     <section className="agent-hub-demo">
-      <h2>Flagship demos (video / no ChatGPT)</h2>
+      <h2>Flagship demos (video / no agent)</h2>
       <p className="agent-hub-note">
-        Same paths agents call via WebMCP. Activity feed updates live. Record these when ChatGPT is unavailable.
+        Same paths agents call via WebMCP. Activity feed updates live. Use these when recording without a live agent.
       </p>
       <div className="agent-demo-actions">
         <button type="button" className="btn btn-primary" disabled={running} onClick={() => void run('attorney')}>

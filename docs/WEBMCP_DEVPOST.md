@@ -21,7 +21,7 @@ Statewide e-filing where agents research dockets and MCR checklists; humans keep
 
 ## Demo video URL
 
-*(Upload `demo/muefs-webmcp-challenge.mp4` or a live ChatGPT capture with audio; paste YouTube URL here.)*
+*(Upload `demo/muefs-webmcp-challenge.mp4` or a live agent capture with audio; paste YouTube URL here.)*
 
 ## Repository URL
 
@@ -41,7 +41,7 @@ Court e-filing mixes public docket research, role-based access (public / filer /
 
 ### Better UX for people + agents
 
-Attorneys ask ChatGPT to research a party and plan a motion; the agent runs `attorney_motion_workflow` (search → docket → requirements → draft count → pre-filled wizard URL) while the human stays on the Submit button. Clerks triage queues via `clerk_triage_workflow` without filer credentials. SRLs get plain-language MCR explanations via `explain_mcr_for_filing`. Judges see every tool call on the `/agent` activity feed; agents can re-read that feed with `get_agent_activity`.
+Attorneys ask an agent to research a party and plan a motion; the agent runs `attorney_motion_workflow` (search → docket → requirements → draft count → pre-filled wizard URL) while the human stays on the Submit button. Clerks triage queues via `clerk_triage_workflow` without filer credentials. SRLs get plain-language MCR explanations via `explain_mcr_for_filing`. Judges see every tool call on the `/agent` activity feed; agents can re-read that feed with `get_agent_activity`.
 
 ### What was difficult or impossible before
 
@@ -57,10 +57,10 @@ Reliable multi-step Michigan filing prep without scrapers or hallucinated MCR ch
 - Judge briefing tool: `get_challenge_briefing`
 ## Testing instructions for judges
 
-1. Open the live URL in **ChatGPT in-app browser** (WebMCP on) or Chrome with `#enable-webmcp-testing`.
+1. Open the live URL in a **WebMCP-capable agent browser**, or Chrome with `#enable-webmcp-testing`.
 2. Visit `/agent` — status **Active**, tool count **16 / 20 / 19** by role; try declarative search + Flagship buttons; activity feed updates on tool calls.
 3. Prompt: `Call get_challenge_briefing, then get_agent_session and get_agent_catalog.`
 4. Prompt: `Sign in as attorney, run attorney_motion_workflow for party Smith, then get_agent_activity.`
-5. Optional: clerk / SRL prompts on the hub, or click Flagship demo buttons without ChatGPT.
+5. Optional: clerk / SRL prompts on the hub, or click Flagship demo buttons without a live agent.
 
 No credentials required for demo roles. Optional hosted `DEMO_MODE_SECRET` is in `/config.js` when enabled.
