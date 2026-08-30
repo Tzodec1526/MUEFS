@@ -13,29 +13,29 @@ import AgentActivityFeed from './AgentActivityFeed';
 import AgentDeclarativeSearch from './AgentDeclarativeSearch';
 import FlagshipDemoRunner from './FlagshipDemoRunner';
 
-const JUDGE_PROMPTS = [
+const EXAMPLE_PROMPTS = [
   {
-    title: 'Session start',
+    title: 'Session',
     prompt:
-      'Call get_challenge_briefing, then get_agent_session and get_agent_catalog. Summarize what we can do in this Michigan e-filing demo.',
+      'Call get_challenge_briefing, then get_agent_session and get_agent_catalog.',
     tools: ['get_challenge_briefing', 'get_agent_session', 'get_agent_catalog'],
   },
   {
-    title: 'Attorney motion workflow (flagship)',
+    title: 'Attorney motion',
     prompt:
-      'Sign in as attorney, run attorney_motion_workflow for party Smith, explain the MCR plan in plain language, navigate_to the filing wizard, then call get_agent_activity.',
+      'Sign in as attorney, run attorney_motion_workflow for party Smith, navigate_to the filing wizard, then call get_agent_activity.',
     tools: ['sign_in_demo_role', 'attorney_motion_workflow', 'navigate_to', 'get_agent_activity'],
   },
   {
-    title: 'SRL MCR explainer',
+    title: 'SRL MCR',
     prompt:
-      'Sign in as srl. Run explain_mcr_for_filing for court_id 3 case_type_id 35 filing_type motion. Explain what papers I need in simple terms.',
+      'Sign in as srl. Run explain_mcr_for_filing for court_id 3 case_type_id 35 filing_type motion.',
     tools: ['sign_in_demo_role', 'explain_mcr_for_filing'],
   },
   {
-    title: 'Clerk triage workflow',
+    title: 'Clerk triage',
     prompt:
-      'Sign in as clerk, run clerk_triage_workflow, summarize priority filings, and open the review queue.',
+      'Sign in as clerk, run clerk_triage_workflow, then navigate_to /clerk/queue.',
     tools: ['sign_in_demo_role', 'clerk_triage_workflow', 'navigate_to'],
   },
 ];
@@ -68,7 +68,7 @@ function WebMcpAgentPage() {
   const handleCopy = async (text: string) => {
     try {
       await copyText(text);
-      pushToast('Copied to clipboard', 'success');
+      pushToast('Copied', 'success');
     } catch {
       pushToast('Could not copy', 'error');
     }
@@ -85,51 +85,48 @@ function WebMcpAgentPage() {
         <div>
           <h1>MUEFS Agent Hub</h1>
           <p>
-            WebMCP Challenge build — {tools.length} tools for this role (16 public · 20 filer · 19 clerk) ·
-            declarative forms + imperative workflows
+            {tools.length} tools · {role || 'anonymous'}
           </p>
           <nav className="agent-hub-nav" aria-label="Agent hub">
             <Link to="/login">Sign in</Link>
             <Link to="/cases/search">Case search</Link>
             <Link to="/">App home</Link>
             <a href="https://github.com/Tzodec1526/MUEFS" target="_blank" rel="noreferrer">
-              AGPL repo
+              Source
             </a>
           </nav>
         </div>
       </header>
 
       <section className="agent-hub-status" aria-live="polite">
-        <h2>WebMCP status</h2>
+        <h2>WebMCP</h2>
         <p className={`agent-status-pill ${status.available ? 'ok' : 'off'}`}>
           {status.available ? (
             <>
-              <CheckCircle2 size={18} aria-hidden /> Active — {status.toolCount} tools registered
+              <CheckCircle2 size={18} aria-hidden /> {status.toolCount} registered
             </>
           ) : (
             <>
-              <XCircle size={18} aria-hidden /> Not available in this browser
+              <XCircle size={18} aria-hidden /> Unavailable
             </>
           )}
         </p>
         {!status.available && (
           <ol className="agent-setup-steps">
             <li>
-              Open this page in a <strong>WebMCP-capable agent browser</strong>, or
+              WebMCP agent browser, or
             </li>
             <li>
-              Chrome 149+ → <code>chrome://flags/#enable-webmcp-testing</code> → reload
+              Chrome 149+ → <code>chrome://flags/#enable-webmcp-testing</code>
             </li>
           </ol>
         )}
         {browserTools.length > 0 && (
           <p className="agent-browser-tools">
-            Browser <code>getTools()</code>: {browserTools.length} tools visible
+            <code>getTools()</code>: {browserTools.length}
           </p>
         )}
         <p>
-          Role: <strong>{role || 'anonymous'}</strong>
-          {' · '}
           <Link to="/login">Switch role</Link>
           {' · '}
           <Link to="/cases/search">Case search</Link>
@@ -137,8 +134,7 @@ function WebMcpAgentPage() {
       </section>
 
       <section className="agent-hub-activity">
-        <h2>Live agent activity</h2>
-        <p className="agent-hub-note">Tool calls from this tab appear here as judges test WebMCP.</p>
+        <h2>Activity</h2>
         <AgentActivityFeed />
       </section>
 
@@ -147,13 +143,12 @@ function WebMcpAgentPage() {
       <FlagshipDemoRunner />
 
       <section className="agent-hub-workflows">
-        <h2>Workflow tools</h2>
+        <h2>Workflows</h2>
         <div className="agent-workflow-grid">
           {workflows.map((t) => (
             <article key={t.name} className="agent-workflow-card">
               <code>{t.name}</code>
               <h3>{t.title}</h3>
-              <p>{t.description}</p>
             </article>
           ))}
         </div>
@@ -161,14 +156,13 @@ function WebMcpAgentPage() {
 
       <section className="agent-hub-tools">
         <h2>
-          <Bot size={20} aria-hidden /> Discovery tools
+          <Bot size={20} aria-hidden /> Discovery
         </h2>
         <ul className="agent-tool-list">
           {discovery.map((t) => (
             <li key={t.name}>
               <code>{t.name}</code>
               <span>{t.title}</span>
-              <p>{t.description}</p>
               {t.readOnly && <span className="agent-tag">read-only</span>}
             </li>
           ))}
@@ -177,13 +171,12 @@ function WebMcpAgentPage() {
 
       {actions.length > 0 && (
         <section className="agent-hub-tools">
-          <h2>Action tools</h2>
+          <h2>Actions</h2>
           <ul className="agent-tool-list">
             {actions.map((t) => (
               <li key={t.name}>
                 <code>{t.name}</code>
                 <span>{t.title}</span>
-                <p>{t.description}</p>
               </li>
             ))}
           </ul>
@@ -191,8 +184,8 @@ function WebMcpAgentPage() {
       )}
 
       <section className="agent-hub-prompts">
-        <h2>Judge prompts — copy & paste</h2>
-        {JUDGE_PROMPTS.map((item) => (
+        <h2>Prompts</h2>
+        {EXAMPLE_PROMPTS.map((item) => (
           <article key={item.title} className="agent-prompt-card">
             <div className="agent-prompt-header">
               <h3>{item.title}</h3>
@@ -200,48 +193,15 @@ function WebMcpAgentPage() {
                 type="button"
                 className="btn btn-secondary btn-icon"
                 onClick={() => handleCopy(item.prompt)}
-                title="Copy prompt"
+                title="Copy"
               >
                 <Copy size={14} aria-hidden />
                 Copy
               </button>
             </div>
             <blockquote>{item.prompt}</blockquote>
-            <p className="agent-prompt-tools">
-              Tools:{' '}
-              {item.tools.map((n) => (
-                <code key={n}>{n}</code>
-              ))}
-            </p>
           </article>
         ))}
-      </section>
-
-      <section className="agent-hub-why">
-        <h2>Why this wins WebMCP</h2>
-        <ul>
-          <li>
-            <strong>Real domain</strong> — MCR 2.119 motion companions, clerk queues, sealed cases
-          </li>
-          <li>
-            <strong>Human-in-the-loop</strong> — agents research and navigate; humans submit
-          </li>
-          <li>
-            <strong>Hybrid API</strong> — declarative search form on this hub + role-aware imperative tools
-          </li>
-          <li>
-            <strong>Role-aware</strong> — tool set changes when you sign in as filer or clerk
-          </li>
-        </ul>
-        <p>
-          <a href="https://github.com/Tzodec1526/MUEFS/blob/main/docs/WEBMCP_CHALLENGE.md" target="_blank" rel="noreferrer">
-            Submission guide
-          </a>
-          {' · '}
-          <a href="https://webmcp.devpost.com/" target="_blank" rel="noreferrer">
-            Devpost
-          </a>
-        </p>
       </section>
     </div>
   );

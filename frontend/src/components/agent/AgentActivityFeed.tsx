@@ -11,11 +11,7 @@ function AgentActivityFeed() {
   }, []);
 
   if (entries.length === 0) {
-    return (
-      <p className="agent-activity-empty">
-        No agent tool calls yet. Ask your agent to run <code>get_agent_session</code> while this page is open.
-      </p>
-    );
+    return <p className="agent-activity-empty">—</p>;
   }
 
   return (

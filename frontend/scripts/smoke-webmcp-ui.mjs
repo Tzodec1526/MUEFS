@@ -22,14 +22,14 @@ page.setDefaultTimeout(20000);
 try {
   await page.goto(`${base}/agent`, { waitUntil: 'networkidle' });
   ok('hub title', await page.getByRole('heading', { name: 'MUEFS Agent Hub' }).isVisible());
-  ok('declarative section', await page.getByText(/Declarative WebMCP/i).isVisible());
-  ok('flagship section', await page.getByText(/Flagship demos/i).isVisible());
-  ok('judge prompts', await page.getByText(/Judge prompts/i).isVisible());
+  ok('declarative section', await page.getByRole('heading', { name: 'Case search' }).isVisible());
+  ok('flagship section', await page.getByRole('heading', { name: 'Run' }).isVisible());
+  ok('judge prompts', await page.getByRole('heading', { name: 'Prompts' }).isVisible());
 
   const form = page.locator('form[toolname="search_cases"]');
   ok('declarative form', await form.isVisible());
   await form.getByLabel(/Party name/i).fill('Smith');
-  await form.getByRole('button', { name: /Search \(declarative\)/i }).click();
+  await form.getByRole('button', { name: /^Search$/i }).click();
   await page.locator('.agent-declarative-hits li').first().waitFor({ state: 'visible', timeout: 15000 });
   ok('declarative hits', (await page.locator('.agent-declarative-hits li').count()) >= 1);
 
@@ -44,7 +44,7 @@ try {
     .innerText();
   ok('attorney workflow', /required docs/.test(attorneyDetail), attorneyDetail);
   ok('attorney has MCR data', !/0 required docs · 0 motion/.test(attorneyDetail), attorneyDetail);
-  ok('open result path', await page.getByRole('button', { name: /Open result path/i }).isVisible());
+  ok('open result path', await page.getByRole('button', { name: /Open result/i }).isVisible());
 
   await page.getByRole('button', { name: /Clerk · triage/i }).click();
   await page.locator('.agent-demo-steps code').filter({ hasText: 'clerk_triage_workflow' }).waitFor({

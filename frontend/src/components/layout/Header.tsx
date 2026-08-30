@@ -33,11 +33,7 @@ function Header() {
     <>
       {isDemoBuild() && (
         <div className="demo-stakeholder-banner" role="status" aria-live="polite">
-          <span>
-            <strong>Demonstration build</strong>
-            {' — '}
-            Not for filing real cases. Identity and payments are simulated.
-          </span>
+          <span>Demo — not for real filings.</span>
           <a href="/login" className="demo-banner-link">
             Roles
           </a>

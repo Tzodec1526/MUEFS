@@ -46,7 +46,7 @@ const ROWS: Row[] = [
   {
     feature: 'AI agent tools (WebMCP)',
     mifile: 'no',
-    muefs: { partial: 'Experimental (Chrome flag)' },
+    muefs: '23 tools + /agent',
     highlight: true,
   },
   {
@@ -111,20 +111,15 @@ function MifileComparison({ variant = 'dashboard' }: MifileComparisonProps) {
       aria-labelledby="mifile-compare-heading"
     >
       <div className="mifile-comparison-header">
-        <h2 id="mifile-compare-heading">Why one system beats the patchwork</h2>
-        <p>
-          Michigan e-filing still spans multiple court systems, vendor contracts, and uneven
-          public access. MUEFS is an open-source demo of what a unified portal could look like
-          — built for MCR compliance, not vendor rent.
-        </p>
+        <h2 id="mifile-compare-heading">MiFILE · MUEFS</h2>
       </div>
       <div className="mifile-comparison-table-wrap">
         <table className="mifile-comparison-table">
           <thead>
             <tr>
               <th scope="col">Capability</th>
-              <th scope="col">MiFILE / current landscape</th>
-              <th scope="col" className="muefs-col">MUEFS (this demo)</th>
+              <th scope="col">MiFILE</th>
+              <th scope="col" className="muefs-col">MUEFS</th>
             </tr>
           </thead>
           <tbody>
@@ -143,11 +138,9 @@ function MifileComparison({ variant = 'dashboard' }: MifileComparisonProps) {
         </table>
       </div>
       <p className="mifile-comparison-foot">
-        Comparison reflects this demo build and publicly documented MiFILE limits (e.g. 25 MB per
-        SCAO filing standards). Not an official court endorsement.
-        {' '}
+        Demo comparison · not an SCAO endorsement ·{' '}
         <a href="https://github.com/Tzodec1526/MUEFS" target="_blank" rel="noreferrer">
-          View source on GitHub
+          Source
         </a>
       </p>
     </section>

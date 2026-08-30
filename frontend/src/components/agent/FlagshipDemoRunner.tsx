@@ -135,10 +135,7 @@ function FlagshipDemoRunner() {
 
   return (
     <section className="agent-hub-demo">
-      <h2>Flagship demos (video / no agent)</h2>
-      <p className="agent-hub-note">
-        Same paths agents call via WebMCP. Activity feed updates live. Use these when recording without a live agent.
-      </p>
+      <h2>Run</h2>
       <div className="agent-demo-actions">
         <button type="button" className="btn btn-primary" disabled={running} onClick={() => void run('attorney')}>
           <Play size={16} aria-hidden />
@@ -161,7 +158,7 @@ function FlagshipDemoRunner() {
               navigate(nextPath);
             }}
           >
-            Open result path
+            Open result
           </button>
         )}
       </div>

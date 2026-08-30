@@ -37,16 +37,13 @@ function PlatformStats() {
   return (
     <section className="platform-stats" aria-labelledby="platform-stats-heading">
       <h2 id="platform-stats-heading" className="platform-stats-title">
-        Live demo platform
+        Platform
       </h2>
-      <p className="platform-stats-lead">
-        Real data in this sandbox — not a mockup. One index, one filing flow, one clerk queue.
-      </p>
       <div className="platform-stats-grid">
         <StatCard
           icon={<Building2 size={22} />}
-          label="Courts on e-filing"
-          value={stats.courts_efiling_enabled}
+          label="Courts"
+          value="All Michigan courts"
         />
         <StatCard
           icon={<FolderSearch size={22} />}

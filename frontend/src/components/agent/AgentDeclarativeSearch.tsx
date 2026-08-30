@@ -10,7 +10,7 @@ type Hit = {
   title: string;
 };
 
-/** Live declarative WebMCP form on the agent hub — judges see hybrid API without leaving /agent. */
+/** Declarative search_cases form on the agent hub. */
 function AgentDeclarativeSearch() {
   const { pushToast } = useToast();
   const [partyName, setPartyName] = useState('Smith');
@@ -43,7 +43,7 @@ function AgentDeclarativeSearch() {
         true,
         0,
       );
-      pushToast(next.length ? `Found ${data.total} case(s)` : 'No matches', next.length ? 'success' : 'error');
+      pushToast(next.length ? `Found ${data.total}` : 'No matches', next.length ? 'success' : 'error');
     } catch (err) {
       logAgentActivity(
         'search_cases',
@@ -59,10 +59,7 @@ function AgentDeclarativeSearch() {
 
   return (
     <section className="agent-hub-declarative">
-      <h2>Declarative WebMCP — live on this page</h2>
-      <p className="agent-hub-note">
-        Same <code>toolname=&quot;search_cases&quot;</code> form agents fill; humans click Search. Activity feed logs it.
-      </p>
+      <h2>Case search</h2>
       <form
         className="agent-declarative-form"
         toolname="search_cases"
@@ -80,7 +77,7 @@ function AgentDeclarativeSearch() {
             type="text"
             value={partyName}
             onChange={(e) => setPartyName(e.target.value)}
-            placeholder="e.g., Smith"
+            placeholder="Smith"
             toolparamdescription="Party or litigant name"
           />
         </div>
@@ -97,7 +94,7 @@ function AgentDeclarativeSearch() {
           />
         </div>
         <button className="btn btn-primary" type="submit" disabled={searching}>
-          {searching ? 'Searching…' : 'Search (declarative)'}
+          {searching ? 'Searching…' : 'Search'}
         </button>
       </form>
       {hits.length > 0 && (
@@ -110,9 +107,6 @@ function AgentDeclarativeSearch() {
           ))}
         </ul>
       )}
-      <p className="agent-hub-note">
-        Full search UI: <Link to="/cases/search">/cases/search</Link>
-      </p>
     </section>
   );
 }

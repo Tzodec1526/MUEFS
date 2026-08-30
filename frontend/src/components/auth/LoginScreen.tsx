@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Scale, ClipboardCheck, UserRound, BookOpen, Bot } from 'lucide-react';
+import { Scale, ClipboardCheck, UserRound, BookOpen } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { isDemoBuild } from '../../config/demoMode';
 import MichiganMark from '../common/MichiganMark';
@@ -168,22 +168,10 @@ function LoginScreen() {
         )}
 
         <MifileComparison variant="login" />
-
-        {isDemoBuild() && (
-          <div className="login-webmcp-hint">
-            <Bot size={18} aria-hidden="true" />
-            <span>
-              <strong>WebMCP Challenge build:</strong> open{' '}
-              <a href="/agent">/agent</a> for judge prompts, or ask your agent to call{' '}
-              <code>research_case_for_motion</code> after enabling WebMCP (agent browser or Chrome flag).
-            </span>
-          </div>
-        )}
       </div>
       {isDemoBuild() && (
         <div className="demo-stakeholder-banner demo-stakeholder-banner--login" role="status">
-          <strong>Interactive demo</strong>
-          {' — '}pick a role to explore the system. No accounts, no passwords.
+          Demo — not for real filings.
         </div>
       )}
     </div>
