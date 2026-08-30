@@ -111,16 +111,6 @@ function WebMcpAgentPage() {
             </>
           )}
         </p>
-        {!status.available && (
-          <ol className="agent-setup-steps">
-            <li>
-              WebMCP agent browser, or
-            </li>
-            <li>
-              Chrome 149+ → <code>chrome://flags/#enable-webmcp-testing</code>
-            </li>
-          </ol>
-        )}
         {browserTools.length > 0 && (
           <p className="agent-browser-tools">
             <code>getTools()</code>: {browserTools.length}

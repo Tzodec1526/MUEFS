@@ -35,39 +35,35 @@ WebMCP, React, FastAPI, Michigan Court Rules (MCR), Keycloak (optional), Render,
 
 ## Text description (paste)
 
-### Why WebMCP fits
+### Product
 
-Court e-filing mixes public docket research, role-based access (public / filer / clerk), and Michigan Court Rules companions (MCR 2.119 briefs, proposed orders, proof of service). Before WebMCP, agents scraped HTML or invented requirements. MUEFS exposes **role-aware WebMCP tools** (23 in catalog; **16 / 20 / 19** by role), a live **/agent** hub with activity feed + `get_agent_activity` / `get_challenge_briefing`, SPA-safe navigation, human confirmation on mutating tools, and **declarative** forms (`search_cases`, `sign_in_demo_role`, clerk queue filter) so agents and litigants share one interface.
+23 role-aware WebMCP tools (16 / 20 / 19), `/agent` hub + `get_agent_activity` / `get_challenge_briefing`, confirm on mutating tools, declarative forms (`search_cases`, `sign_in_demo_role`, clerk queue).
 
-### Better UX for people + agents
+### Flows
 
-Attorneys ask an agent to research a party and plan a motion; the agent runs `attorney_motion_workflow` (search → docket → requirements → draft count → pre-filled wizard URL) while the human stays on the Submit button. Clerks triage queues via `clerk_triage_workflow` without filer credentials. SRLs get plain-language MCR explanations via `explain_mcr_for_filing`. Judges see every tool call on the `/agent` activity feed; agents can re-read that feed with `get_agent_activity`.
+- Attorney: `attorney_motion_workflow` → search → docket → requirements → wizard URL; human Submit
+- Clerk: `clerk_triage_workflow`
+- SRL: `explain_mcr_for_filing`
 
-### What was difficult or impossible before
-
-Reliable multi-step Michigan filing prep without scrapers or hallucinated MCR checklists — in the same portal a human attorney already uses, with sealed-case and role boundaries enforced.
-
-### How we implemented WebMCP
+### Implementation
 
 - Imperative: `document.modelContext.registerTool()` in `frontend/src/webmcp/` (23 tools)
-- Declarative: `toolname` on case search, login, clerk queue filter, and hub search panel
-- Role-aware re-registration when demo role changes
-- Optional `provideContext` republished on every SPA route
-- Output hardening: `untrustedContentHint` + sanitized docket text
-- Judge briefing tool: `get_challenge_briefing`
+- Declarative: `toolname` on case search, login, clerk queue, hub search
+- Role-aware re-registration; optional `provideContext` on SPA routes
+- `untrustedContentHint` + sanitized docket text
 
-### How this scores on Devpost criteria
+### Devpost criteria map
 
-| Criterion | Where it shows up |
+| Criterion | Where |
 |---|---|
-| **WebMCP Leverage** | Imperative + declarative tools; `provideContext` on every route; activity feed + `get_agent_activity` |
-| **Execution** | Live `/agent` hub, role-filtered catalog, HITL on mutating tools, seeded MCR data for Smith / CIV-GEN |
-| **Potential Impact** | Statewide e-filing pattern: agents research/navigate; humans alone Submit; clerk/SRL/attorney roles |
-| **Creativity** | Court-rules companions as tools; flagship workflows; judge `get_challenge_briefing`; same UI for humans and agents |
+| **WebMCP Leverage** | Imperative + declarative; `provideContext`; activity feed |
+| **Execution** | Live `/agent`, role catalog, HITL, seeded Smith / CIV-GEN |
+| **Potential Impact** | Agents research/navigate; humans Submit; attorney/clerk/SRL |
+| **Creativity** | MCR companions as tools; workflows; same UI for humans and agents |
 
-## Testing instructions for judges
+## Testing instructions
 
-1. Open the live URL in a **WebMCP-capable agent browser**, or Chrome with `#enable-webmcp-testing`.
+1. Open the live URL with WebMCP enabled (or Chrome with `#enable-webmcp-testing`).
 2. Visit `/agent` — status **Active**, tool count **16 / 20 / 19** by role; try declarative search + Flagship buttons; activity feed updates on tool calls.
 3. Prompt: `Call get_challenge_briefing, then get_agent_session and get_agent_catalog.`
 4. Prompt: `Sign in as attorney, run attorney_motion_workflow for party Smith, then get_agent_activity.`

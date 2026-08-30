@@ -1,29 +1,29 @@
-MUEFS WebMCP Challenge — voiceover (read aloud, under 3 minutes)
+MUEFS WebMCP — voiceover (read aloud, under 3 minutes)
 
 0:00
-Michigan e-filing is fragmented. Motions under MCR 2.119 need briefs, proposed orders, and proof of service. Agents used to scrape HTML or invent requirements.
+Michigan e-filing is fragmented. Motions under MCR 2.119 need briefs, proposed orders, and proof of service.
 
 0:20
 Open webmcp.tomcedoz.com/agent.
-This is the MUEFS Agent Hub. WebMCP exposes twenty-three role-aware tools — sixteen public, twenty filer, nineteen clerk — so agents work the same portal a human attorney uses.
+Twenty-three role-aware tools — sixteen public, twenty filer, nineteen clerk.
 
 0:45
-In a WebMCP-capable agent browser, paste the attorney flagship prompt from the hub.
-Watch the live activity feed. One call runs search, docket, MCR checklist, and a pre-filled wizard URL. The human still clicks Submit.
+Paste the attorney motion prompt from the hub.
+Activity feed fills. One call: search, docket, MCR checklist, pre-filled wizard URL. Human clicks Submit.
 
 1:15
 Open the filing wizard from the result.
-Human in the loop by design. Agents research and navigate. They never file.
+Agents research and navigate. They never file.
 
 1:35
-Sign in as clerk. Run the clerk triage workflow, then open the review queue.
-Same site. Different tool set. Court staff keep accept and reject authority.
+Sign in as clerk. Run clerk triage, then open the review queue.
+Same site. Different tool set.
 
 1:55
-On the Agent Hub, the declarative case-search form is right on the page — toolname search_cases. Agents fill the same fields humans use. Activity feed logs it live.
+Declarative case search on the hub — toolname search_cases. Same fields humans use.
 
 2:15
-The repo is AGPL on GitHub. If a live agent is unavailable, the Flagship demo buttons on /agent run the same paths for B-roll.
+AGPL on GitHub. Run buttons on /agent cover the same paths without a live agent.
 
 2:40
-MUEFS: agent-native Michigan court e-filing. Live at webmcp.tomcedoz.com. Open source. Built for people and their agents together.
+MUEFS. Live at webmcp.tomcedoz.com.

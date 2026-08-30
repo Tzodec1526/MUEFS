@@ -12,9 +12,9 @@ export async function registerWorkflowTools(mc: ModelContext, signal?: AbortSign
       name: 'attorney_motion_workflow',
       title: 'Attorney motion workflow (full plan)',
       description:
-        'Challenge showcase workflow: verify filer role, search docket, load MCR requirements ' +
-        'and motion checklists, list draft filings, return wizard URL and plain-language plan. ' +
-        'Does not submit — human completes wizard.',
+        'Verify filer role, search docket, load MCR requirements and motion checklists, ' +
+        'list draft filings, return wizard URL and plain-language plan. Does not submit — ' +
+        'human completes wizard.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -89,8 +89,7 @@ export async function registerWorkflowTools(mc: ModelContext, signal?: AbortSign
       name: 'clerk_triage_workflow',
       title: 'Clerk triage workflow',
       description:
-        'Challenge showcase for court staff: queue counts, oldest pending filings, ' +
-        'and navigation to the review UI. Requires clerk role.',
+        'Queue counts, oldest pending filings, and navigation to the review UI. Requires clerk role.',
       inputSchema: { type: 'object', properties: {} },
       annotations: READ_ONLY,
       async execute() {

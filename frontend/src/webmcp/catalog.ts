@@ -32,8 +32,8 @@ export const TOOL_CATALOG: CatalogEntry[] = [
   },
   {
     name: 'get_challenge_briefing',
-    title: 'Challenge briefing',
-    description: 'Judge overview: live URLs, flagship prompts, HITL rules, how WebMCP is used.',
+    title: 'Agent briefing',
+    description: 'Live URLs, tool counts, example prompts, human-in-the-loop rules.',
     readOnly: true,
     tier: 'discovery',
   },
@@ -110,7 +110,7 @@ export const TOOL_CATALOG: CatalogEntry[] = [
   {
     name: 'sign_in_demo_role',
     title: 'Demo sign-in',
-    description: 'Switch demo role (attorney, clerk, srl, public) for judge testing.',
+    description: 'Switch demo role (attorney, clerk, srl, public).',
     readOnly: false,
     tier: 'action',
   },

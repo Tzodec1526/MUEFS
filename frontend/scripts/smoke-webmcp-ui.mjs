@@ -24,7 +24,7 @@ try {
   ok('hub title', await page.getByRole('heading', { name: 'MUEFS Agent Hub' }).isVisible());
   ok('declarative section', await page.getByRole('heading', { name: 'Case search' }).isVisible());
   ok('flagship section', await page.getByRole('heading', { name: 'Run' }).isVisible());
-  ok('judge prompts', await page.getByRole('heading', { name: 'Prompts' }).isVisible());
+  ok('prompts', await page.getByRole('heading', { name: 'Prompts' }).isVisible());
 
   const form = page.locator('form[toolname="search_cases"]');
   ok('declarative form', await form.isVisible());

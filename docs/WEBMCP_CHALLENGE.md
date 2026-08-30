@@ -10,24 +10,22 @@ Use this for [Devpost](https://webmcp.devpost.com/) (deadline **Sep 3, 2026 @ 1:
 
 The statewide Michigan e-filing portal where AI agents research dockets, load MCR motion checklists, and pre-fill filing wizards — while humans keep submit authority.
 
-## Why WebMCP is the right fit
+## What it does
 
-Court filing combines public records research, role-based access (public / filer / clerk), and Michigan Court Rules companions (MCR 2.119 briefs, proposed orders). Before WebMCP, agents either scraped HTML or hallucinated requirements. MUEFS exposes a **23-tool catalog**, role-filtered to **16 / 20 / 19** tools (public / filer / clerk), a **live activity feed** on `/agent` (also readable via `get_agent_activity`), SPA-safe navigation with human confirmation on mutating tools, plus **declarative** forms on the hub, case search, login, and clerk queue so agents and litigants share one interface.
+23 WebMCP tools (16 / 20 / 19 by role), `/agent` activity feed (`get_agent_activity`), SPA navigation with confirm on mutating tools, declarative forms on hub / search / login / clerk queue.
 
-**Together, humans and agents can:**
-
-1. Search `Smith` on the public docket, pull motion checklists, and open a pre-filled motion wizard in one `research_case_for_motion` call.
-2. Validate a draft filing against MCR required documents before the human clicks Submit.
-3. Let clerks triage queues via `clerk_queue_summary` without exposing filer credentials.
+1. `research_case_for_motion` — search → MCR checklist → pre-filled wizard
+2. `validate_filing` — MCR docs before human Submit
+3. `clerk_triage_workflow` / `clerk_queue_summary` — clerk queue without filer credentials
 
 ## How we implemented WebMCP
 
 - **Imperative tools** via `document.modelContext.registerTool()` in `frontend/src/webmcp/`
 - **Declarative tools** on case search and login forms (`toolname="search_cases"`, `sign_in_demo_role`)
-- **Role-aware registry** re-registers tools when demo role changes (attorney unlocks filer tools; clerk unlocks queue tools)
-- **Agent hub** at `/agent` with judge prompts, workflow cards, live activity feed, and browser `getTools()` count
-- **Workflow tier** — `attorney_motion_workflow`, `clerk_triage_workflow`, `explain_mcr_for_filing`
-- **Output hardening** — `untrustedContentHint` + sanitized docket text per WebMCP security guidance
+- **Role-aware registry** re-registers tools when demo role changes
+- **Agent hub** at `/agent` — catalog, workflows, activity feed, prompts, `getTools()` count
+- **Workflows** — `attorney_motion_workflow`, `clerk_triage_workflow`, `explain_mcr_for_filing`
+- **Output hardening** — `untrustedContentHint` + sanitized docket text
 
 ## Live URL
 
@@ -36,9 +34,9 @@ Agent hub: https://webmcp.tomcedoz.com/agent
 
 **After Manual Deploy:** https://demo.tomcedoz.com/agent
 
-## Testing instructions for judges
+## Testing instructions
 
-1. Open the URL in a **WebMCP-capable agent browser**, or Chrome with `#enable-webmcp-testing`.
+1. Open the URL with WebMCP enabled (or Chrome with `#enable-webmcp-testing`).
 2. Visit `/agent` — status should show **Active** with **16 / 20 / 19** tools by role; activity feed updates on each tool call.
 3. Prompt: *"Call get_challenge_briefing, then get_agent_session and get_agent_catalog."*
 4. Prompt: *"Sign in as attorney, run attorney_motion_workflow for party Smith, navigate to the wizard."*
@@ -51,7 +49,7 @@ No credentials required — demo uses role picker + optional `DEMO_MODE_SECRET` 
 
 https://github.com/Tzodec1526/MUEFS (AGPL-3.0 — GitHub license badge)
 
-**WebMCP work during challenge period:** commits on `main` after Aug 25 adding `frontend/src/webmcp/`, `/agent` hub, orchestration tools, and `docs/WEBMCP.md`. Topics: `webmcp`, `openai-challenge`, `court-filing`.
+**WebMCP work during challenge period:** commits on `main` after Aug 25 adding `frontend/src/webmcp/`, `/agent` hub, orchestration tools, and `docs/WEBMCP.md`. Topics: `webmcp`, `court-filing`.
 
 ## Operator go-live (when you are ready)
 
@@ -73,7 +71,7 @@ https://github.com/Tzodec1526/MUEFS (AGPL-3.0 — GitHub license badge)
 
 1. *(0:00)* "Michigan e-filing is fragmented. Motions under MCR 2.119 need briefs, proposed orders, and proof of service. Agents used to scrape HTML or invent requirements."
 2. *(0:20)* Open https://webmcp.tomcedoz.com/agent. "This is the MUEFS Agent Hub. WebMCP exposes twenty-three role-aware tools — sixteen public, twenty filer, nineteen clerk — so agents work the same portal a human attorney uses."
-3. *(0:45)* In a WebMCP-capable agent browser, paste the attorney flagship prompt. Show activity feed filling. "One call runs search, docket, MCR checklist, and a pre-filled wizard URL. The human still clicks Submit."
+3. *(0:45)* Paste the attorney motion prompt. Show activity feed filling. "One call runs search, docket, MCR checklist, and a pre-filled wizard URL. The human still clicks Submit."
 4. *(1:15)* Open the wizard from the result. "Human in the loop by design. Agents research and navigate. They never file."
 5. *(1:35)* Clerk prompt: triage workflow then queue. "Same site, different tool set when you sign in as clerk."
 6. *(1:55)* Case search form with toolname search_cases. "Declarative WebMCP. The agent fills the form humans already use."

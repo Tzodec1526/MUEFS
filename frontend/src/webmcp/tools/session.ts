@@ -74,7 +74,7 @@ export async function registerSessionTools(mc: ModelContext, signal?: AbortSigna
         return toolOk({
           count: activity.length,
           activity,
-          note: 'Also visible live on /agent for judges and demos.',
+          note: 'Same feed as /agent.',
         });
       },
     },
@@ -84,33 +84,29 @@ export async function registerSessionTools(mc: ModelContext, signal?: AbortSigna
   await mc.registerTool(
     {
       name: 'get_challenge_briefing',
-      title: 'WebMCP Challenge briefing',
+      title: 'Agent briefing',
       description:
-        'Judge-oriented overview: why MUEFS fits WebMCP, flagship prompts, live URLs, and ' +
-        'human-in-the-loop rules. Call this when evaluating or demoing the challenge entry.',
+        'Product overview: live URLs, tool counts, example prompts, and human-in-the-loop rules.',
       inputSchema: { type: 'object', properties: {} },
       annotations: READ_ONLY,
       async execute() {
         return toolOk({
           product: 'MUEFS — Michigan Unified E-Filing System',
-          challenge: 'OpenAI WebMCP Challenge',
           live_agent_hub: 'https://webmcp.tomcedoz.com/agent',
           also_live: [
             'https://muefs.tomcedoz.com/agent',
             'https://muefs-webmcp-live.tom-72b.workers.dev/agent',
           ],
-          canonical_after_render_deploy: 'https://demo.tomcedoz.com/agent',
+          canonical_demo: 'https://demo.tomcedoz.com/agent',
           repo: 'https://github.com/Tzodec1526/MUEFS',
           license: 'AGPL-3.0',
           tool_catalog: { total: 23, by_role: { public: 16, filer: 20, clerk: 19 } },
-          why_webmcp:
-            'Court e-filing needs structured docket research, role-aware tools, and MCR checklists — without agents submitting filings.',
           human_in_the_loop: 'Agents research and navigate; only humans click Submit in the filing wizard.',
           apis: {
             imperative: 'document.modelContext.registerTool in frontend/src/webmcp/',
             declarative: ['search_cases', 'sign_in_demo_role', 'get_clerk_review_queue'],
           },
-          flagship_prompts: [
+          example_prompts: [
             'Call get_challenge_briefing, then get_agent_session and get_agent_catalog.',
             'Sign in as attorney, run attorney_motion_workflow for party Smith, then get_agent_activity.',
             'Sign in as clerk, run clerk_triage_workflow, open the review queue.',

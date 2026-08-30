@@ -16,8 +16,8 @@ export async function registerAuthTools(mc: ModelContext, signal?: AbortSignal):
       name: 'sign_in_demo_role',
       title: 'Sign in (demo role)',
       description:
-        'Switch the demonstration role for judge testing. Navigates to login and sets ' +
-        'attorney, clerk, srl (self-represented), or public. Mutating: ask the human, or pass confirmed=true.',
+        'Switch the demonstration role. Navigates to login and sets attorney, clerk, srl ' +
+        '(self-represented), or public. Mutating: ask the human, or pass confirmed=true.',
       inputSchema: {
         type: 'object',
         required: ['role'],

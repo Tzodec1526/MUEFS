@@ -4,8 +4,7 @@ Copyright (c) 2026 Thomas Cedoz. Licensed under [AGPL-3.0-or-later](LICENSE).
 
 A modern, open-source statewide e-filing platform for Michigan courts. Designed to unify filing across all of Michigan's courts into a single, standards-compliant portal.
 
-**[WebMCP Challenge entry](https://openai.com/webmcp-challenge/).** Live: https://webmcp.tomcedoz.com/agent (also https://muefs.tomcedoz.com/agent) · Canonical demo: https://demo.tomcedoz.com · Guide: [docs/WEBMCP.md](docs/WEBMCP.md)
-
+Live demo: https://webmcp.tomcedoz.com/agent · https://demo.tomcedoz.com · Agent tools: [docs/WEBMCP.md](docs/WEBMCP.md)
 
 **Why this exists**: Michigan's current e-filing landscape is fragmented across multiple vendors and systems. Attorneys waste hours navigating incompatible platforms. Self-represented litigants face complex procedures with no guidance. MUEFS is a unified, modern alternative — one login and one interface for filing across Michigan's courts.
 
@@ -24,7 +23,7 @@ A modern, open-source statewide e-filing platform for Michigan courts. Designed 
 | **Serve documents only** | Varies; often separate workflow | One-click from case docket |
 | **Draft autosave** | Vendor-dependent | Browser draft recovery |
 | **Clerk review tools** | Queue tools vary by court | Batch accept, age badges, quick reject reasons |
-| **AI agent tools (WebMCP)** | Not available | 23 role-aware tools + `/agent` hub (agent browser / Chrome flag) |
+| **AI agent tools (WebMCP)** | Not available | 23 role-aware tools + `/agent` hub |
 | **Cost / licensing** | Per-transaction vendor fees | AGPL-3.0 (no license fee) |
 
 > **Status:** Open source demo — core filing, clerk review, and public docket search work today. CMS integration is a **stub** until a court JIS/CMS adapter is wired in production.
@@ -167,17 +166,13 @@ npm run build             # Production build
 
 From the repo root you can also run `npm run dev` (full demo stack), `npm test`, and `npm run lint`.
 
-#### WebMCP (OpenAI Challenge)
+#### WebMCP
 
-MUEFS is built for the [WebMCP Challenge](https://openai.com/webmcp-challenge/) — agent-native Michigan e-filing.
+- **`/agent`** — tool catalog, workflows, activity feed, example prompts
+- **Workflows:** `attorney_motion_workflow`, `research_case_for_motion`, `clerk_triage_workflow`
+- **23 tools**, role-filtered (public / filer / clerk)
 
-- **Agent hub:** `/agent` — tool catalog, workflow cards, live activity feed, judge prompts
-- **Flagship workflows:** `attorney_motion_workflow`, `research_case_for_motion` — search → MCR checklist → wizard URL
-- **21 role-aware tools** — discovery, workflow, and action tiers for public, filer, and clerk
-
-Full guide: **[docs/WEBMCP.md](docs/WEBMCP.md)** · Submission draft: **[docs/WEBMCP_CHALLENGE.md](docs/WEBMCP_CHALLENGE.md)**
-
-**Enable WebMCP:** a WebMCP-capable agent browser, or Chrome 149+ with `chrome://flags/#enable-webmcp-testing`.
+Guide: **[docs/WEBMCP.md](docs/WEBMCP.md)**
 
 ## Security & Compliance
 

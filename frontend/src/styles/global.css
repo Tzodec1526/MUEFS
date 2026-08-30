@@ -3593,11 +3593,6 @@ textarea:focus-visible {
   color: #b71c1c;
 }
 
-.agent-setup-steps {
-  margin: 0.75rem 0;
-  padding-left: 1.25rem;
-}
-
 .agent-tool-list {
   list-style: none;
   margin: 0;

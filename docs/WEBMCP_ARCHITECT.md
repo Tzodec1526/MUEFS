@@ -13,7 +13,7 @@ document.modelContext?.provideContext?.({ role, path, suggested_next_tool }); //
 
 ## Synthesis decision
 
-**Base: Design A (SPA bridge + sessionStorage).** Design B (reload + sessionStorage only) rejected because every flagship judge prompt calls `navigate_to` and would flash-wipe the hub UX.
+**Base: Design A (SPA bridge + sessionStorage).** Design B (reload + sessionStorage only) rejected because flagship prompts call `navigate_to` and would flash-wipe the hub UX.
 
 ## Types
 

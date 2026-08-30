@@ -1,4 +1,4 @@
-/** Agent tool execution log — visible on /agent for judges and demos. */
+/** Agent tool execution log — visible on /agent. */
 
 export interface AgentActivityEntry {
   id: number;
