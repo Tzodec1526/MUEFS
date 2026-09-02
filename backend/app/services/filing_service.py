@@ -5,14 +5,29 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.integrations.cms_adapter import get_cms_adapter  # CMS integration (stubs today)
-from app.models.case import Case, CaseStatus
+from app.integrations.cms_adapter import CMSFilingResult, get_cms_adapter
+from app.models.case import Case, CaseParticipant, CaseStatus, ParticipantRole
 from app.models.court import Court, FilingRequirement
 from app.models.filing import FilingEnvelope, FilingStatus
+from app.models.user import User, UserType
 from app.schemas.filing import (
     FilingEnvelopeCreate,
     FilingValidationResult,
 )
+from app.services import access_service
+
+
+class FilingCreateError(Exception):
+    def __init__(self, status_code: int, detail: str):
+        self.status_code = status_code
+        self.detail = detail
+        super().__init__(detail)
+
+
+class CmsSubmissionError(Exception):
+    def __init__(self, detail: str):
+        self.detail = detail
+        super().__init__(detail)
 
 # Document-code classifiers shared by the submission validator and the
 # requirements API, so the UI shows exactly the set the validator enforces.
@@ -87,6 +102,16 @@ async def create_filing(
     filer_id: int,
     data: FilingEnvelopeCreate,
 ) -> FilingEnvelope:
+    if data.case_id is not None:
+        case_row = await db.execute(select(Case).where(Case.id == data.case_id))
+        case = case_row.scalar_one_or_none()
+        if case is None:
+            raise FilingCreateError(404, "Case not found")
+        if case.court_id != data.court_id:
+            raise FilingCreateError(400, "Case does not belong to the selected court")
+        if not await access_service.user_may_read_case(db, filer_id, case.id):
+            raise FilingCreateError(403, "Not authorized to file on this case")
+
     envelope = FilingEnvelope(
         court_id=data.court_id,
         case_id=data.case_id,
@@ -104,6 +129,22 @@ async def create_filing(
     await db.refresh(envelope)
     await db.refresh(envelope, ["documents"])
     return envelope
+
+
+def fee_obligation_met(filing: FilingEnvelope) -> bool:
+    """True when submit may proceed: paid, waiver granted, or waiver application pending.
+
+    A requested waiver is an application that travels with the envelope. The clerk
+    grant or denial happens on review (accept writes granted). Service-only filings
+    have no fee.
+    """
+    if filing.filing_type == "service_only":
+        return True
+    if filing.payment_id is not None:
+        return True
+    if filing.fee_waiver_granted is True:
+        return True
+    return bool(filing.fee_waiver_requested)
 
 
 async def get_filing(db: AsyncSession, filing_id: int) -> FilingEnvelope | None:
@@ -273,6 +314,90 @@ async def submit_filing(
     return filing
 
 
+async def _case_for_accept(db: AsyncSession, filing: FilingEnvelope, now: datetime) -> Case:
+    if filing.case_id:
+        case_row = await db.execute(select(Case).where(Case.id == filing.case_id))
+        case = case_row.scalar_one_or_none()
+        if case is None:
+            raise CmsSubmissionError("Accepted filing references a missing case")
+        return case
+    case = Case(
+        court_id=filing.court_id,
+        case_number=f"MI-{filing.court_id}-{now.strftime('%Y')}-{filing.id:06d}",
+        case_type_id=filing.case_type_id,
+        title=filing.case_title or "Untitled Case",
+        status=CaseStatus.OPEN,
+        filed_date=now,
+    )
+    db.add(case)
+    await db.flush()
+    filing.case_id = case.id
+    return case
+
+
+async def _ensure_filer_participant(
+    db: AsyncSession, filing: FilingEnvelope, case: Case
+) -> None:
+    existing = await db.execute(
+        select(CaseParticipant.id).where(
+            CaseParticipant.case_id == case.id,
+            CaseParticipant.user_id == filing.filer_id,
+        ).limit(1)
+    )
+    if existing.scalar_one_or_none() is not None:
+        return
+    filer_row = await db.execute(select(User).where(User.id == filing.filer_id))
+    filer = filer_row.scalar_one_or_none()
+    role = (
+        ParticipantRole.ATTORNEY_PLAINTIFF
+        if filer is not None and filer.user_type == UserType.ATTORNEY
+        else ParticipantRole.PLAINTIFF
+    )
+    db.add(
+        CaseParticipant(
+            case_id=case.id,
+            user_id=filing.filer_id,
+            role=role,
+            party_name=filer.full_name if filer else "Filer",
+            attorney_bar_number=filer.bar_number if filer else None,
+        )
+    )
+    await db.flush()
+
+
+async def _submit_accepted_filing_to_cms(
+    db: AsyncSession, filing: FilingEnvelope, case: Case
+) -> CMSFilingResult:
+    cms_type_row = await db.execute(
+        select(Court.cms_type).where(Court.id == filing.court_id)
+    )
+    adapter = get_cms_adapter(cms_type_row.scalar_one_or_none())
+    party_rows = await db.execute(
+        select(CaseParticipant).where(CaseParticipant.case_id == case.id)
+    )
+    parties = [
+        {"name": p.party_name, "role": p.role.value if hasattr(p.role, "value") else str(p.role)}
+        for p in party_rows.scalars().all()
+    ]
+    try:
+        return await adapter.submit_filing(
+            case_number=case.case_number,
+            case_title=filing.case_title or case.title,
+            documents=[
+                {"title": d.title, "type": d.document_type_code}
+                for d in (filing.documents or [])
+            ],
+            parties=parties,
+            filing_metadata={
+                "filing_id": filing.id,
+                "court_id": filing.court_id,
+                "filing_type": filing.filing_type,
+            },
+        )
+    except Exception as exc:
+        return CMSFilingResult(success=False, error_message=str(exc))
+
+
 async def review_filing(
     db: AsyncSession,
     filing_id: int,
@@ -296,49 +421,29 @@ async def review_filing(
     filing.reviewed_at = now
 
     if action == "accept":
-        filing.status = FilingStatus.ACCEPTED
-        # Create case if this is a new filing (no existing case_id)
-        if not filing.case_id:
-            case = Case(
-                court_id=filing.court_id,
-                case_number=f"MI-{filing.court_id}-{now.strftime('%Y')}-{filing.id:06d}",
-                case_type_id=filing.case_type_id,
-                title=filing.case_title or "Untitled Case",
-                status=CaseStatus.OPEN,
-                filed_date=now,
-            )
-            db.add(case)
+        filing.status = FilingStatus.UNDER_REVIEW
+        case = await _case_for_accept(db, filing, now)
+        await _ensure_filer_participant(db, filing, case)
+        cms_result = await _submit_accepted_filing_to_cms(db, filing, case)
+        if not cms_result.success:
+            filing.cms_error = cms_result.error_message or "CMS submission failed"
+            filing.cms_filing_id = None
+            filing.cms_case_number = None
             await db.flush()
-            filing.case_id = case.id
-
-        # CMS adapter integration: push accepted filing to court's case management system.
-        # The adapter is selected by court.cms_type (JIS vs Tyler Odyssey); both are no-op
-        # stubs in this build. Production would persist external ids / errors.
-        try:
-            cms_type_row = await db.execute(
-                select(Court.cms_type).where(Court.id == filing.court_id)
-            )
-            adapter = get_cms_adapter(cms_type_row.scalar_one_or_none())
-            await adapter.submit_filing(
-                case_number=None,  # would resolve from created case or filing
-                case_title=filing.case_title or "Untitled Case",
-                documents=[
-                    {"title": d.title, "type": d.document_type_code}
-                    for d in (filing.documents or [])
-                ],
-                parties=[],
-                filing_metadata={
-                    "filing_id": filing.id,
-                    "court_id": filing.court_id,
-                    "filing_type": filing.filing_type,
-                },
-            )
-        except Exception:
-            # Never fail the review on CMS issues in this build; log/audit in prod.
-            pass
+            await db.refresh(filing)
+            await db.refresh(filing, ["documents"])
+            return filing
+        filing.status = FilingStatus.ACCEPTED
+        filing.cms_filing_id = cms_result.cms_filing_id
+        filing.cms_case_number = cms_result.cms_case_number
+        filing.cms_error = None
+        if filing.fee_waiver_requested:
+            filing.fee_waiver_granted = True
     elif action == "reject":
         filing.status = FilingStatus.REJECTED
         filing.rejection_reason = reason
+        if filing.fee_waiver_requested:
+            filing.fee_waiver_granted = False
     elif action == "return":
         filing.status = FilingStatus.RETURNED
         filing.rejection_reason = reason

@@ -6,10 +6,11 @@ and authenticated users alike may view non-sealed dockets and non-confidential d
 confidential, or draft check fails closed for it.
 
 Non-sealed matters: anyone (including anonymous) may view the case docket and non-confidential
-documents. Draft filings remain visible only to the filer and court staff.
+documents. Only accepted filings appear on the public docket. Draft, pending, rejected,
+returned, and service-only envelopes remain visible only to the filer and court staff.
 Sealed matters: litigants (party-linked accounts), counsel of record (attorney_* rows,
-matched by linked account or a verified bar number), filer-on-case, court staff, and
-system admin — never anonymous.
+matched by linked account or a verified bar number), filer-on-case (accepted envelopes
+only), court staff, and system admin — never anonymous.
 """
 
 from __future__ import annotations
@@ -22,13 +23,14 @@ from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.models.user import CourtRole, User, UserCourtRole, UserType
 
 # Filings that may appear on a public (non-sealed) docket to non-parties.
+# Pending, rejected, returned, and service-only envelopes stay off the public record.
 _PUBLIC_DOCKET_FILING_STATUSES = frozenset({
-    FilingStatus.SUBMITTED,
-    FilingStatus.UNDER_REVIEW,
     FilingStatus.ACCEPTED,
-    FilingStatus.REJECTED,
-    FilingStatus.RETURNED,
-    FilingStatus.SERVED,
+})
+
+# Standing as "filer on this case" requires an accepted envelope, not a draft.
+_FILER_ON_CASE_STATUSES = frozenset({
+    FilingStatus.ACCEPTED,
 })
 
 # Sealed matters: bar-number match only for rows of counsel of record, not incidental bar fields.
@@ -114,6 +116,7 @@ async def user_may_read_sealed_case(db: AsyncSession, user_id: int | None, case_
         select(FilingEnvelope.id).where(
             FilingEnvelope.case_id == case_id,
             FilingEnvelope.filer_id == user_id,
+            FilingEnvelope.status.in_(_FILER_ON_CASE_STATUSES),
         )
     )
     if fil_q.scalar_one_or_none() is not None:

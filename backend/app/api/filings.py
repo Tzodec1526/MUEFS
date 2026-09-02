@@ -42,7 +42,10 @@ async def create_filing(
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
-    envelope = await filing_service.create_filing(db, user_id, data)
+    try:
+        envelope = await filing_service.create_filing(db, user_id, data)
+    except filing_service.FilingCreateError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     await audit_service.log_action(
         db,
         user_id=user_id,
@@ -156,12 +159,7 @@ async def submit_filing(
             detail="Not authorized to access this filing",
         )
 
-    # Verify payment for non-service-only, non-fee-waiver filings
-    if (
-        filing_check.filing_type != "service_only"
-        and not filing_check.fee_waiver_requested
-        and filing_check.payment_id is None
-    ):
+    if not filing_service.fee_obligation_met(filing_check):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Payment required before submission",

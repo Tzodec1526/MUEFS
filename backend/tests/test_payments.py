@@ -56,3 +56,20 @@ async def test_process_payment(db_session):
     assert payment.transaction_ref is not None
     assert payment.processed_at is not None
     assert "[SIMULATED" in (payment.description or "")
+
+
+@pytest.mark.asyncio
+async def test_process_payment_refuses_when_not_simulated(db_session, monkeypatch):
+    from app.config import settings
+    from app.services import payment_service
+
+    monkeypatch.setattr(settings, "payments_are_simulated", False)
+    with pytest.raises(payment_service.PaymentsNotConfiguredError):
+        await payment_service.process_payment(
+            db_session,
+            amount_cents=15000,
+            payment_method=PaymentMethod.CREDIT_CARD,
+            payer_id=1,
+            description="Should not complete",
+        )
+

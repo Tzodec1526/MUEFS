@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user_id
 from app.database import get_db
 from app.models.court import Court
+from app.models.filing import FilingStatus
 from app.models.user import CourtRole, UserCourtRole
 from app.schemas.filing import (
     BatchReviewRequest,
@@ -79,13 +81,30 @@ async def review_filing(
         )
     await _require_clerk_role(db, user_id, filing_check.court_id)
 
-    filing = await filing_service.review_filing(
-        db, filing_id, reviewer_id=user_id, action=data.action, reason=data.reason
-    )
+    try:
+        filing = await filing_service.review_filing(
+            db, filing_id, reviewer_id=user_id, action=data.action, reason=data.reason
+        )
+    except filing_service.CmsSubmissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Court CMS rejected the filing: {exc.detail}",
+        ) from exc
     if not filing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Filing cannot be reviewed (not in submitted/under_review status)",
+        )
+    if data.action == "accept" and filing.status != FilingStatus.ACCEPTED:
+        # Return 502 without raising so get_db commits cms_error on the envelope.
+        return JSONResponse(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            content={
+                "detail": (
+                    f"Court CMS rejected the filing: "
+                    f"{filing.cms_error or 'CMS submission failed'}"
+                )
+            },
         )
     await db.refresh(filing)
     await db.refresh(filing, ["documents"])
@@ -150,7 +169,7 @@ async def batch_review_filings(
             f = await filing_service.review_filing(
                 db, fid, reviewer_id=user_id, action=data.action
             )
-            if f:
+            if f is not None and f.status == FilingStatus.ACCEPTED:
                 results["succeeded"].append(fid)
             else:
                 results["failed"].append(fid)

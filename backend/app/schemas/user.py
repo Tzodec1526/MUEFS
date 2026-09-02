@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
-from app.models.user import UserType
+from app.models.user import CourtRole, UserType
 
 
 class UserBase(BaseModel):
@@ -33,5 +33,12 @@ class UserResponse(UserBase):
     model_config = {"from_attributes": True}
 
 
+class CourtAssignment(BaseModel):
+    court_id: int
+    role: CourtRole
+    court_name: str | None = None
+
+
 class UserProfile(UserResponse):
     full_name: str
+    court_assignments: list[CourtAssignment] = []

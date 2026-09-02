@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handleKeycloakCallback } from '../../auth/keycloakPkce';
+import { applySessionFromProfile, notifyDemoRoleChanged } from './LoginScreen';
+import { apiClient } from '../../api/client';
 
 function AuthCallback() {
   const navigate = useNavigate();
@@ -8,9 +10,18 @@ function AuthCallback() {
 
   useEffect(() => {
     handleKeycloakCallback(window.location.search)
-      .then((result) => {
-        if (result === 'ok') navigate('/', { replace: true });
-        else setError(true);
+      .then(async (result) => {
+        if (result !== 'ok') {
+          setError(true);
+          return;
+        }
+        try {
+          const { data } = await apiClient.get('/auth/me');
+          applySessionFromProfile(data);
+        } catch {
+          notifyDemoRoleChanged();
+        }
+        navigate('/', { replace: true });
       })
       .catch(() => setError(true));
   }, [navigate]);

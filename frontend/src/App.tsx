@@ -10,7 +10,7 @@ import ReviewQueue from './components/clerk/ReviewQueue';
 import CaseSearch from './components/search/CaseSearch';
 import Favorites from './components/search/Favorites';
 import CaseDetailPage from './components/search/CaseDetailPage';
-import LoginScreen, { getDemoRole, getDemoCourtName } from './components/auth/LoginScreen';
+import LoginScreen, { getDemoRole, getDemoCourtName, hasSession } from './components/auth/LoginScreen';
 import AuthCallback from './components/auth/AuthCallback';
 import WebMcpAgentPage from './components/agent/WebMcpAgentPage';
 import PlatformStats from './components/marketing/PlatformStats';
@@ -23,7 +23,7 @@ function RequireRole({ children }: { children: React.ReactNode }) {
   // requires a (demo) role and bounces unauthenticated visitors to the login screen.
   const isPublicPath =
     location.pathname.startsWith('/cases') || location.pathname.startsWith('/agent');
-  if (!getDemoRole() && !isPublicPath && location.pathname !== '/login') {
+  if (!hasSession() && !isPublicPath && location.pathname !== '/login') {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;

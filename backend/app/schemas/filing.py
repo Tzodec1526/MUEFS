@@ -56,6 +56,9 @@ class FilingEnvelopeResponse(BaseModel):
     fee_waiver_requested: bool
     fee_waiver_granted: bool | None
     fee_waiver_reason: str | None
+    cms_case_number: str | None = None
+    cms_filing_id: str | None = None
+    cms_error: str | None = None
     documents: list[FilingDocumentResponse] = []
     created_at: datetime
     updated_at: datetime

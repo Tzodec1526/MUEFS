@@ -68,3 +68,10 @@ demo/webmcp-vo-plain.txt
 demo/webmcp-vo.mp3
 demo/webmcp-vo.wav
 
+# Verification skill runtime (SKILL.md + features stay committed)
+.cursor/skills/verify-muefs/.run/
+.cursor/skills/verify-muefs/artifacts/
+
+# Local agent decision trails (not for the public repo)
+.audit/
+

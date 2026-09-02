@@ -78,13 +78,19 @@ async def process_payment(
             ),
         )
 
-    payment = await payment_service.process_payment(
-        db,
-        amount_cents=data.amount_cents,
-        payment_method=data.payment_method,
-        payer_id=user_id,
-        description=f"Filing envelope #{data.envelope_id}",
-    )
+    try:
+        payment = await payment_service.process_payment(
+            db,
+            amount_cents=data.amount_cents,
+            payment_method=data.payment_method,
+            payer_id=user_id,
+            description=f"Filing envelope #{data.envelope_id}",
+        )
+    except payment_service.PaymentsNotConfiguredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
 
     # Link payment to filing
     filing.payment_id = payment.id

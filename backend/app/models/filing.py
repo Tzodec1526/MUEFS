@@ -45,6 +45,9 @@ class FilingEnvelope(Base):
     fee_waiver_requested: Mapped[bool] = mapped_column(default=False)
     fee_waiver_granted: Mapped[bool | None] = mapped_column(default=None)
     fee_waiver_reason: Mapped[str | None] = mapped_column(String(2000))
+    cms_case_number: Mapped[str | None] = mapped_column(String(100))
+    cms_filing_id: Mapped[str | None] = mapped_column(String(100))
+    cms_error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

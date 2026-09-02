@@ -9,6 +9,10 @@ from app.models.payment import Payment, PaymentMethod, PaymentStatus
 from app.schemas.payment import PaymentCalculateResponse
 
 
+class PaymentsNotConfiguredError(Exception):
+    """PAYMENTS_ARE_SIMULATED is off and no processor is wired."""
+
+
 async def calculate_fees(
     db: AsyncSession,
     court_id: int,
@@ -116,10 +120,12 @@ async def process_payment(
     payer_id: int,
     description: str | None = None,
 ) -> Payment:
-    # Court compliance: PSP integration must replace this; keep audit text explicit.
-    desc = description or ""
-    if settings.payments_are_simulated:
-        desc = f"[SIMULATED — no funds moved] {desc}".strip()
+    if not settings.payments_are_simulated:
+        raise PaymentsNotConfiguredError(
+            "Payment processing is not configured. Set PAYMENTS_ARE_SIMULATED=true "
+            "only for demonstration, or wire a payment processor."
+        )
+    desc = f"[SIMULATED — no funds moved] {(description or '').strip()}".strip()
 
     payment = Payment(
         amount_cents=amount_cents,

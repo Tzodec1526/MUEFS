@@ -12,6 +12,10 @@ export function getDemoRole(): string | null {
   return localStorage.getItem('demo_role');
 }
 
+export function hasSession(): boolean {
+  return Boolean(getDemoRole() || localStorage.getItem('auth_token'));
+}
+
 export function getDemoCourtId(): number | null {
   const id = localStorage.getItem('demo_court_id');
   return id ? parseInt(id, 10) : null;
@@ -64,6 +68,35 @@ export function applyDemoRole(role: string): void {
     localStorage.removeItem('demo_court_name');
   }
   notifyDemoRoleChanged();
+}
+
+export type SessionProfile = {
+  user_type: string;
+  court_assignments?: { court_id: number; role: string; court_name?: string | null }[];
+};
+
+const SHELL_ROLE_BY_USER_TYPE: Record<string, string> = {
+  attorney: 'attorney',
+  clerk: 'clerk',
+  judge: 'clerk',
+  admin: 'clerk',
+  self_represented: 'srl',
+  public: 'public',
+};
+
+export function applySessionFromProfile(profile: SessionProfile): void {
+  const role = SHELL_ROLE_BY_USER_TYPE[profile.user_type] ?? 'srl';
+  applyDemoRole(role);
+  if (role !== 'clerk') return;
+  const assignments = profile.court_assignments ?? [];
+  const staff =
+    assignments.find((a) => a.role === 'clerk' || a.role === 'judge' || a.role === 'admin')
+    ?? assignments[0];
+  if (!staff) return;
+  localStorage.setItem('demo_court_id', String(staff.court_id));
+  if (staff.court_name) {
+    localStorage.setItem('demo_court_name', staff.court_name);
+  }
 }
 
 function LoginScreen() {

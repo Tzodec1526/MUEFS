@@ -4,8 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
-from app.models.user import User, UserType
-from app.schemas.user import UserCreate, UserProfile, UserResponse
+from app.models.court import Court
+from app.models.user import User, UserCourtRole, UserType
+from app.schemas.user import CourtAssignment, UserCreate, UserProfile, UserResponse
 from app.security.demo_auth import demo_headers_permitted
 from app.services.user_provision_service import provision_user_from_oidc
 from app.utils.keycloak_jwt import JWTError, decode_keycloak_access_token
@@ -161,8 +162,21 @@ async def require_user_may_manage_efilings(current_user: User = Depends(get_curr
 
 
 @router.get("/me", response_model=UserProfile)
-async def get_profile(current_user: User = Depends(get_current_user)):
-    return current_user
+async def get_profile(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(UserCourtRole, Court.name)
+        .join(Court, Court.id == UserCourtRole.court_id)
+        .where(UserCourtRole.user_id == current_user.id)
+    )
+    assignments = [
+        CourtAssignment(court_id=ucr.court_id, role=ucr.role, court_name=name)
+        for ucr, name in result.all()
+    ]
+    profile = UserProfile.model_validate(current_user)
+    return profile.model_copy(update={"court_assignments": assignments})
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)

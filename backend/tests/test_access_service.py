@@ -185,7 +185,7 @@ async def test_public_user_reads_non_sealed_case(db_session):
 
 
 @pytest.mark.asyncio
-async def test_non_party_sees_submitted_not_draft_on_public_case(db_session):
+async def test_non_party_sees_accepted_not_pending_on_public_case(db_session):
     filer = User(
         email="draft_filer@test.com", first_name="F", last_name="iler",
         user_type=UserType.ATTORNEY, bar_number="P999",
@@ -229,7 +229,18 @@ async def test_non_party_sees_submitted_not_draft_on_public_case(db_session):
         db_session, stranger.id, env_sub
     )
     assert may_draft is False
-    assert may_sub is True
+    assert may_sub is False
+
+    env_acc = FilingEnvelope(
+        court_id=court.id, case_id=case.id, case_type_id=ct.id,
+        filer_id=filer.id, status=FilingStatus.ACCEPTED,
+    )
+    db_session.add(env_acc)
+    await db_session.flush()
+    may_acc = await access_service.user_may_read_filing_envelope(
+        db_session, stranger.id, env_acc
+    )
+    assert may_acc is True
 
 
 @pytest.mark.asyncio
@@ -482,8 +493,8 @@ async def test_anonymous_document_access_public_yes_confidential_no(db_session):
 
 
 @pytest.mark.asyncio
-async def test_anonymous_sees_submitted_envelope_not_draft(db_session):
-    """Anonymous docket shows filings that have left draft, never drafts."""
+async def test_anonymous_sees_accepted_envelope_not_draft(db_session):
+    """Anonymous docket shows accepted filings, never drafts."""
     court, ct = await _court_and_case_type(db_session)
     filer = User(
         email="anon_env_filer@test.com", first_name="F", last_name="iler",
@@ -512,3 +523,62 @@ async def test_anonymous_sees_submitted_envelope_not_draft(db_session):
     may_acc = await access_service.user_may_read_filing_envelope(db_session, None, env_accepted)
     assert may_draft is False
     assert may_acc is True
+
+
+@pytest.mark.asyncio
+async def test_anonymous_does_not_see_rejected_returned_or_served(db_session):
+    court, ct = await _court_and_case_type(db_session)
+    filer = User(
+        email="anon_hidden_filer@test.com", first_name="F", last_name="iler",
+        user_type=UserType.ATTORNEY, bar_number="P457",
+    )
+    db_session.add(filer)
+    case = Case(
+        court_id=court.id, case_number="ANON-HIDE", case_type_id=ct.id,
+        title="Open", status=CaseStatus.OPEN, filed_date=datetime.now(UTC),
+        is_sealed=False,
+    )
+    db_session.add(case)
+    await db_session.flush()
+    hidden = []
+    for st in (FilingStatus.REJECTED, FilingStatus.RETURNED, FilingStatus.SERVED,
+               FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW):
+        env = FilingEnvelope(
+            court_id=court.id, case_id=case.id, case_type_id=ct.id,
+            filer_id=filer.id, status=st,
+        )
+        db_session.add(env)
+        hidden.append(env)
+    await db_session.flush()
+    for env in hidden:
+        assert await access_service.user_may_read_filing_envelope(
+            db_session, None, env
+        ) is False
+
+
+@pytest.mark.asyncio
+async def test_sealed_draft_does_not_grant_stranger_case_access(db_session):
+    filer = User(
+        email="seal_draft_filer@test.com", first_name="F", last_name="iler",
+        user_type=UserType.ATTORNEY, bar_number="P321",
+    )
+    stranger = User(
+        email="seal_draft_stranger@test.com", first_name="S", last_name="tr",
+        user_type=UserType.ATTORNEY, bar_number="P322",
+    )
+    db_session.add_all([filer, stranger])
+    court, ct = await _court_and_case_type(db_session)
+    case = Case(
+        court_id=court.id, case_number="SEAL-DRAFT", case_type_id=ct.id,
+        title="Sealed", status=CaseStatus.OPEN, filed_date=datetime.now(UTC),
+        is_sealed=True,
+    )
+    db_session.add(case)
+    await db_session.flush()
+    db_session.add(FilingEnvelope(
+        court_id=court.id, case_id=case.id, case_type_id=ct.id,
+        filer_id=stranger.id, status=FilingStatus.DRAFT,
+    ))
+    await db_session.flush()
+    assert await access_service.user_may_read_case(db_session, stranger.id, case.id) is False
+
