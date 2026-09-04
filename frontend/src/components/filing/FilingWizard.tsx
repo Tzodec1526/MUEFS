@@ -1,14 +1,14 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import CourtSelector from './CourtSelector';
 import CaseSelector, { CaseResult } from './CaseSelector';
 import CaseTypeSelector from './CaseTypeSelector';
 import DocumentUpload from './DocumentUpload';
-import ServiceList from './ServiceList';
 import FilingReview from './FilingReview';
 import { formatFee } from '../../utils/format';
 import { getErrorDetail } from '../../utils/errors';
-import { createFiling } from '../../api/filings';
+import { createFiling, getFiling, updateFiling, type FilingEnvelope } from '../../api/filings';
+import LoadError from '../common/LoadError';
 import { getCourt, getCaseTypes, getFilingChecklists, FilingChecklist } from '../../api/courts';
 import { getDemoRole } from '../auth/LoginScreen';
 import {
@@ -17,7 +17,7 @@ import {
   stepLabel,
 } from '../../utils/srlMode';
 
-type WizardStep = 'court' | 'case' | 'case-type' | 'details' | 'documents' | 'service' | 'payment' | 'review';
+type WizardStep = 'court' | 'case' | 'case-type' | 'details' | 'documents' | 'review';
 
 interface FilingData {
   courtId: number | null;
@@ -37,11 +37,6 @@ interface FilingData {
     size: number;
     isSearchable: boolean;
   }>;
-  serviceContacts: Array<{
-    name: string;
-    email: string;
-    method: string;
-  }>;
   paymentComplete: boolean;
   caseChoiceMade: boolean;  // user picked existing-case or new-case on the 'case' step
   feeWaiverRequested: boolean;
@@ -51,18 +46,17 @@ interface FilingData {
 
 // Steps adapt to the filing: a new case adds Case Type + Case Details; filing into an
 // existing case skips Case Type (it's known from the case).
-function buildSteps(filingType: string): { key: WizardStep; label: string; required: boolean }[] {
+function buildSteps(filingType: string): { key: WizardStep; label: string }[] {
   const isNewCase = filingType === 'initial';
   return [
-    { key: 'court', label: 'Select Court', required: true },
-    { key: 'case', label: 'Case', required: true },
+    { key: 'court', label: 'Select Court' },
+    { key: 'case', label: 'Case' },
     ...(isNewCase
-      ? [{ key: 'case-type' as WizardStep, label: 'Case Type & Rules', required: true }]
+      ? [{ key: 'case-type' as WizardStep, label: 'Case Type & Rules' }]
       : []),
-    { key: 'details', label: isNewCase ? 'Case Details' : 'Filing Details', required: true },
-    { key: 'documents', label: 'Documents', required: true },
-    { key: 'service', label: 'Service', required: false },
-    { key: 'review', label: 'Review & Submit', required: true },
+    { key: 'details', label: isNewCase ? 'Case Details' : 'Filing Details' },
+    { key: 'documents', label: 'Documents' },
+    { key: 'review', label: 'Review & Submit' },
   ];
 }
 
@@ -98,7 +92,6 @@ const defaultFilingData: FilingData = {
   filingDescription: '',
   filingId: null,
   documents: [],
-  serviceContacts: [],
   paymentComplete: false,
   caseChoiceMade: false,
   feeWaiverRequested: false,
@@ -108,16 +101,41 @@ const defaultFilingData: FilingData = {
 
 function FilingWizard() {
   const [searchParams] = useSearchParams();
-  const draft = loadDraft();
-  const initialData: FilingData = draft ? { ...defaultFilingData, ...draft, motionSubtype: draft.motionSubtype || null } : defaultFilingData;
-  const [currentStep, setCurrentStep] = useState<WizardStep>(draft ? 'court' : 'court');
-  const [filingData, setFilingData] = useState<FilingData>(initialData);
+  const [draft] = useState(() => searchParams.size ? null : loadDraft());
+  const requestedFilingId = searchParams.get('filing_id') || (draft?.filingId ? String(draft.filingId) : null);
+  const [filingData, setFilingData] = useState<FilingData>(() => {
+    if (draft || requestedFilingId) return { ...defaultFilingData, ...draft };
+    const courtId = searchParams.get('court_id');
+    if (!courtId) return defaultFilingData;
+    const caseId = searchParams.get('case_id');
+    const caseTypeId = searchParams.get('case_type_id');
+    if (!caseId || !caseTypeId) return { ...defaultFilingData, courtId: Number(courtId) };
+    const serviceOnly = searchParams.get('service_only') === 'true';
+    return {
+      ...defaultFilingData,
+      courtId: Number(courtId),
+      caseId: Number(caseId),
+      caseTypeId: Number(caseTypeId),
+      caseTitle: searchParams.get('case_title') || '',
+      filingType: serviceOnly ? 'service_only' : 'subsequent',
+      caseChoiceMade: true,
+      filingFeeCents: serviceOnly ? 0 : 2000,
+    };
+  });
+  const [currentStep, setCurrentStep] = useState<WizardStep>(() =>
+    draft ? 'court' : filingData.caseId ? 'details' : filingData.courtId ? 'case' : 'court'
+  );
   const [showDraftBanner, setShowDraftBanner] = useState(!!draft);
   const [saving, setSaving] = useState(false);
+  const [loadedFiling, setLoadedFiling] = useState<FilingEnvelope | null>(null);
+  const readOnly = loadedFiling !== null && !['draft', 'returned'].includes(loadedFiling.status);
+  const [loadingExisting, setLoadingExisting] = useState(Boolean(requestedFilingId));
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [submission, setSubmission] = useState<FilingEnvelope>();
   const [errors, setErrors] = useState<string[]>([]);
-  const [isMotionMode, setIsMotionMode] = useState(false);
+  const isMotionMode = filingData.filingType !== 'initial';
   const [motionChecklists, setMotionChecklists] = useState<FilingChecklist[]>([]);
-  const [loadingChecklists, setLoadingChecklists] = useState(false);
   const [plainLanguage, setPlainLanguage] = useState(() => {
     if (getDemoRole() === 'srl') {
       if (!isPlainLanguageMode()) setPlainLanguageMode(true);
@@ -126,73 +144,91 @@ function FilingWizard() {
     return isPlainLanguageMode();
   });
 
-  // Pre-fill from URL params (e.g., "File a Motion" from case detail page)
+  // Load the saved envelope, or resolve display labels for a new filing's URL prefill.
   useEffect(() => {
-    const caseId = searchParams.get('case_id');
-    const courtId = searchParams.get('court_id');
-    const caseTypeId = searchParams.get('case_type_id');
-    const caseTitle = searchParams.get('case_title');
-
-    const serviceOnly = searchParams.get('service_only') === 'true';
-
-    if (caseId && courtId && caseTypeId) {
-      clearDraft();
-      setIsMotionMode(true); // eslint-disable-line react-hooks/set-state-in-effect -- one-time prefill from URL on mount
-      const numCourtId = Number(courtId);
-      setFilingData({
-        ...defaultFilingData,
-        caseId: Number(caseId),
-        courtId: numCourtId,
-        courtName: '',
-        filingType: serviceOnly ? 'service_only' : 'subsequent',
-        caseTypeId: Number(caseTypeId),
-        caseTypeName: '',
-        caseTitle: caseTitle || '',
-        filingDescription: '',
-        caseChoiceMade: true,
-        paymentComplete: serviceOnly,
-        // For motions/subsequent, use lower natural motion fee ($20) instead of case init fee
-        filingFeeCents: serviceOnly ? 0 : 2000,
-      });
-      setCurrentStep('details');
-      setShowDraftBanner(false);
-      // Fetch actual court name
-      getCourt(numCourtId).then(court => {
-        setFilingData(prev => ({ ...prev, courtName: court.name }));
-      }).catch(() => {
-        setFilingData(prev => ({ ...prev, courtName: `Court #${courtId}` }));
-      });
-      // Resolve the case type name (deep links carry only the id).
-      getCaseTypes(numCourtId).then(types => {
-        const match = types.find(t => t.id === Number(caseTypeId));
-        if (match) setFilingData(prev => ({ ...prev, caseTypeName: match.name }));
-      }).catch(() => { /* name is a display nicety; ignore */ });
-    } else if (courtId) {
-      // Court-only prefill (e.g., "Use for Filing" from a favorite court): start a new
-      // filing pre-set to that court and jump to the case step (the court is chosen).
-      clearDraft();
-      const numCourtId = Number(courtId);
-      setFilingData({ ...defaultFilingData, courtId: numCourtId, filingType: 'initial' });
-      setCurrentStep('case');
-      setShowDraftBanner(false);
-      getCourt(numCourtId).then(court => {
-        setFilingData(prev => ({ ...prev, courtName: court.name }));
-      }).catch(() => {
-        setFilingData(prev => ({ ...prev, courtName: `Court #${courtId}` }));
-      });
+    const filingId = requestedFilingId;
+    if (filingId) {
+      const controller = new AbortController();
+      const loadExisting = async () => {
+        setLoadingExisting(true);
+        setLoadError(null);
+        try {
+          const envelope = await getFiling(Number(filingId), controller.signal);
+          const [court, types] = await Promise.all([
+            getCourt(envelope.court_id),
+            getCaseTypes(envelope.court_id),
+          ]);
+          if (controller.signal.aborted) return;
+          const caseType = types.find((type) => type.id === envelope.case_type_id);
+          const filingType = envelope.filing_type === 'initial' || envelope.filing_type === 'service_only'
+            ? envelope.filing_type : 'subsequent';
+          const recoveredDraft = draft?.filingId === envelope.id
+            && ['draft', 'returned'].includes(envelope.status) ? draft : null;
+          if (draft?.filingId === envelope.id && !recoveredDraft) clearDraft();
+          setLoadedFiling(envelope);
+          setFilingData({
+            ...defaultFilingData,
+            filingId: envelope.id,
+            courtId: envelope.court_id,
+            courtName: court.name,
+            caseId: envelope.case_id,
+            caseTypeId: envelope.case_type_id,
+            caseTypeName: caseType?.name || '',
+            filingType,
+            caseTitle: recoveredDraft?.caseTitle ?? envelope.case_title ?? '',
+            filingDescription: recoveredDraft?.filingDescription ?? envelope.filing_description ?? '',
+            motionSubtype: recoveredDraft?.motionSubtype ?? null,
+            filingFeeCents: filingType === 'service_only' ? 0
+              : filingType === 'initial' ? caseType?.filing_fee_cents || 0 : 2000,
+            caseChoiceMade: true,
+            paymentComplete: envelope.payment_id != null || envelope.fee_waiver_requested
+              || envelope.fee_waiver_granted === true,
+            feeWaiverRequested: envelope.fee_waiver_requested,
+            feeWaiverReason: envelope.fee_waiver_reason || '',
+            documents: envelope.documents.map((doc) => ({
+              id: doc.id, title: doc.title, type: doc.document_type_code,
+              size: doc.file_size_bytes, isSearchable: doc.is_text_searchable,
+            })),
+          });
+          setCurrentStep('documents');
+          setShowDraftBanner(recoveredDraft !== null);
+        } catch (err) {
+          if (!controller.signal.aborted) {
+            setLoadError(getErrorDetail(err) || 'Could not load this filing. Please retry.');
+          }
+        } finally {
+          if (!controller.signal.aborted) setLoadingExisting(false);
+        }
+      };
+      loadExisting();
+      return () => controller.abort();
     }
-  }, [searchParams]);
+    const courtId = searchParams.get('court_id');
+    if (!courtId) return;
+    const caseTypeId = searchParams.get('case_type_id');
+    let active = true;
+    Promise.all([
+      getCourt(Number(courtId)).catch(() => ({ name: `Court #${courtId}` })),
+      caseTypeId ? getCaseTypes(Number(courtId)).catch(() => []) : Promise.resolve([]),
+    ]).then(([court, types]) => {
+      if (active) setFilingData(prev => prev.courtId !== Number(courtId) ? prev : {
+        ...prev,
+        courtName: court.name,
+        caseTypeName: types.find(t => t.id === prev.caseTypeId)?.name || prev.caseTypeName,
+      });
+    });
+    return () => { active = false; };
+  }, [searchParams, requestedFilingId, draft, reloadKey]);
 
   // Fetch motion checklists dynamically when in motion mode (for subtype dropdown + pre-fill).
   // Focused on civil cases per requirements (civil case types will surface relevant motion checklists like Summary Disposition, General Motion, etc.)
   useEffect(() => {
-    if (!isMotionMode || !filingData.courtId || !filingData.caseTypeId) {
+    if (!isMotionMode || readOnly || !filingData.courtId || !filingData.caseTypeId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset when leaving motion mode
       setMotionChecklists([]);
       return;
     }
     async function fetchChecklists() {
-      setLoadingChecklists(true);
       try {
         const lists = await getFilingChecklists(filingData.courtId!, filingData.caseTypeId!);
         // Prioritize civil-focused motion types for this feature
@@ -202,26 +238,27 @@ function FilingWizard() {
         setMotionChecklists(civilLists.length > 0 ? civilLists : lists);
       } catch {
         setMotionChecklists([]);
-      } finally {
-        setLoadingChecklists(false);
       }
     }
     fetchChecklists();
-  }, [isMotionMode, filingData.courtId, filingData.caseTypeId]);
+  }, [isMotionMode, readOnly, filingData.courtId, filingData.caseTypeId]);
 
   const steps = buildSteps(filingData.filingType).map((s) => ({
     ...s,
     label: plainLanguage ? stepLabel(s.key, s.label) : s.label,
   }));
   const currentStepIndex = steps.findIndex((s) => s.key === currentStep);
+  const detailsStepIndex = steps.findIndex((s) => s.key === 'details');
 
-  const updateData = useCallback((updates: Partial<FilingData>) => {
-    setFilingData((prev) => {
-      const next = { ...prev, ...updates };
-      saveDraft(next);
-      return next;
-    });
-  }, []);
+  const updateData = (updates: Partial<FilingData>) => {
+    setFilingData((prev) => ({ ...prev, ...updates }));
+  };
+
+  useEffect(() => {
+    if (filingData.courtId && !loadingExisting && !loadError && !readOnly && !submission) {
+      saveDraft(filingData);
+    }
+  }, [filingData, loadingExisting, loadError, readOnly, submission]);
 
   const canProceed = (): boolean => {
     switch (currentStep) {
@@ -232,15 +269,9 @@ function FilingWizard() {
       case 'case-type':
         return filingData.caseTypeId !== null;
       case 'details':
-        // For motion mode with available subtypes (civil focus), require subtype selection for dynamic pre-fill
-        if (isMotionMode && motionChecklists.length > 0 && !filingData.motionSubtype) {
-          return false;
-        }
         return filingData.caseTitle.trim().length > 0;
       case 'documents':
         return filingData.documents.length > 0;
-      case 'service':
-        return true; // optional
       default:
         return true;
     }
@@ -253,25 +284,32 @@ function FilingWizard() {
       return;
     }
 
-    // Create the filing envelope on the server when moving past details
-    if (currentStep === 'details' && !filingData.filingId) {
+    // Persist edits as well as new envelopes before moving to documents.
+    if (currentStep === 'details') {
       setSaving(true);
       try {
-        const envelope = await createFiling({
-          court_id: filingData.courtId!,
-          case_id: filingData.caseId || undefined,
-          case_type_id: filingData.caseTypeId!,
-          filing_type: filingData.filingType,
-          case_title: filingData.caseTitle,
-          filing_description: filingData.filingDescription,
-          fee_waiver_requested: filingData.feeWaiverRequested,
-          fee_waiver_reason: filingData.feeWaiverReason || undefined,
-        });
-        updateData({ filingId: envelope.id });
+        if (filingData.filingId) {
+          await updateFiling(filingData.filingId, {
+            case_title: filingData.caseTitle,
+            filing_description: filingData.filingDescription,
+          });
+        } else {
+          const envelope = await createFiling({
+            court_id: filingData.courtId!,
+            case_id: filingData.caseId || undefined,
+            case_type_id: filingData.caseTypeId!,
+            filing_type: filingData.filingType,
+            case_title: filingData.caseTitle,
+            filing_description: filingData.filingDescription,
+            fee_waiver_requested: filingData.feeWaiverRequested,
+            fee_waiver_reason: filingData.feeWaiverReason || undefined,
+          });
+          updateData({ filingId: envelope.id });
+        }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
         const detail = getErrorDetail(err);
-        setErrors([`Failed to create filing: ${detail || msg}`]);
+        setErrors([`Failed to save filing: ${detail || msg}`]);
         setSaving(false);
         return;
       }
@@ -296,6 +334,7 @@ function FilingWizard() {
 
   const goToStep = (step: WizardStep) => {
     const targetIndex = steps.findIndex((s) => s.key === step);
+    if (filingData.filingId && targetIndex < detailsStepIndex) return;
     // Only allow going back to completed steps
     if (targetIndex <= currentStepIndex) {
       setCurrentStep(step);
@@ -318,9 +357,7 @@ function FilingWizard() {
       case 'court': return 'Please select a court to continue.';
       case 'case': return 'Please choose an existing case or start a new case.';
       case 'case-type': return 'Please select a case type to continue.';
-      case 'details': return isMotionMode && motionChecklists.length > 0 && !filingData.motionSubtype 
-        ? 'Please select a motion subtype to continue (enables companion pre-fill).' 
-        : 'Please enter a case title to continue.';
+      case 'details': return 'Please enter a case title to continue.';
       case 'documents': return 'Please upload at least one document to continue.';
       default: return 'Please complete this step to continue.';
     }
@@ -328,21 +365,34 @@ function FilingWizard() {
 
   const handleDiscardDraft = () => {
     clearDraft();
+    setLoadedFiling(null);
     setFilingData(defaultFilingData);
     setShowDraftBanner(false);
     setCurrentStep('court');
     setErrors([]);
     setSaving(false);
-    setIsMotionMode(false);
     setMotionChecklists([]);
-    setLoadingChecklists(false);
   };
+
+  if (loadingExisting) return <p className="loading" role="status">Loading filing...</p>;
+  if (loadError) return <LoadError message={loadError} onRetry={() => setReloadKey((key) => key + 1)} />;
+  if (readOnly) {
+    return (
+      <div className="filing-wizard">
+        <Link to="/filings">Back to My Filings</Link>
+        <h2>Filing #{loadedFiling.id}</h2>
+        <p>Status: <span className={`status-badge ${loadedFiling.status}`}>{loadedFiling.status.replace('_', ' ')}</span></p>
+        {loadedFiling.rejection_reason && <p role="note">Clerk note: {loadedFiling.rejection_reason}</p>}
+        <FilingReview filingData={filingData} readOnly />
+      </div>
+    );
+  }
 
   return (
     <div className="filing-wizard">
       <div className="wizard-header">
         <h2>
-          {isMotionMode
+          {loadedFiling ? `Continue Filing #${loadedFiling.id}` : isMotionMode
             ? plainLanguage
               ? 'File papers in an existing case'
               : 'File a Motion'
@@ -400,7 +450,7 @@ function FilingWizard() {
                 : 'upcoming'
             }`}
             onClick={() => goToStep(step.key)}
-            disabled={index > currentStepIndex}
+            disabled={Boolean(submission) || index > currentStepIndex || Boolean(filingData.filingId && index < detailsStepIndex)}
             aria-current={index === currentStepIndex ? 'step' : undefined}
           >
             <span className="step-number">
@@ -450,7 +500,6 @@ function FilingWizard() {
                 caseTypeId: null, caseTypeName: '',
                 caseId: null, caseTitle: '', caseChoiceMade: false, filingType: 'initial',
               });
-              setIsMotionMode(false);
             }}
           />
         )}
@@ -472,7 +521,6 @@ function FilingWizard() {
                 caseChoiceMade: true,
                 motionSubtype: null,
               });
-              setIsMotionMode(true);
             }}
             onSelectNew={() => {
               updateData({
@@ -484,7 +532,6 @@ function FilingWizard() {
                 filingFeeCents: 0,
                 caseChoiceMade: true,
               });
-              setIsMotionMode(false);
             }}
           />
         )}
@@ -494,8 +541,7 @@ function FilingWizard() {
             courtId={filingData.courtId}
             selectedCaseTypeId={filingData.caseTypeId}
             onSelect={(id, name, feeCents) => {
-              const effectiveFee = filingData.filingType === 'subsequent' ? 2000 : (filingData.filingType === 'service_only' ? 0 : feeCents);
-              updateData({ caseTypeId: id, caseTypeName: name, filingFeeCents: effectiveFee, motionSubtype: null });
+              updateData({ caseTypeId: id, caseTypeName: name, filingFeeCents: feeCents, motionSubtype: null });
             }}
           />
         )}
@@ -521,7 +567,8 @@ function FilingWizard() {
                       name="filingType"
                       value="subsequent"
                       checked={filingData.filingType === 'subsequent'}
-                      onChange={() => updateData({ filingType: 'subsequent', filingFeeCents: 2000 })}
+                      disabled={filingData.filingId !== null}
+                      onChange={() => updateData({ filingType: 'subsequent', filingFeeCents: 2000, paymentComplete: false })}
                     />
                     <div>
                       <strong>File with Court</strong>
@@ -534,11 +581,12 @@ function FilingWizard() {
                       name="filingType"
                       value="service_only"
                       checked={filingData.filingType === 'service_only'}
-                      onChange={() => updateData({ filingType: 'service_only', paymentComplete: true, filingFeeCents: 0 })}
+                      disabled={filingData.filingId !== null}
+                      onChange={() => updateData({ filingType: 'service_only', filingFeeCents: 0 })}
                     />
                     <div>
                       <strong>Service Only (No Court Filing)</strong>
-                      <span>Document is served on other parties only. Not filed with the court, no clerk review, no filing fee. Common for discovery requests, interrogatories, and other party-to-party documents.</span>
+                      <span>Record documents for service outside this app. No court filing, clerk review, or filing fee. This app does not deliver documents to other parties.</span>
                     </div>
                   </label>
                 </div>
@@ -549,13 +597,12 @@ function FilingWizard() {
             {isMotionMode && motionChecklists.length > 0 && (
               <div className="form-group">
                 <label htmlFor="motionSubtype">
-                  Motion Subtype (Civil) <span className="required-marker">*</span>
+                  Motion Subtype (Civil, optional)
                 </label>
                 <select
                   id="motionSubtype"
                   value={filingData.motionSubtype || ''}
                   onChange={(e) => updateData({ motionSubtype: e.target.value || null })}
-                  disabled={loadingChecklists}
                 >
                   <option value="">-- Select specific motion type --</option>
                   {motionChecklists.map((cl) => (
@@ -564,7 +611,6 @@ function FilingWizard() {
                     </option>
                   ))}
                 </select>
-                {loadingChecklists && <span className="info-text">Loading subtypes...</span>}
                 {filingData.motionSubtype && (
                   <span className="field-hint">
                     {motionChecklists.find((c) => c.motion_type === filingData.motionSubtype)?.help_text || 'Select to pre-fill required companion documents below.'}
@@ -575,7 +621,7 @@ function FilingWizard() {
 
             <p className="info-text">
               {filingData.filingType === 'service_only'
-                ? 'Describe the documents you are serving. These will be delivered to the service contacts but not filed with the court.'
+                ? 'Describe the documents you are recording. You must arrange delivery to the other parties outside this app.'
                 : isMotionMode
                 ? 'Describe your motion. The case title is pre-filled from the existing case.'
                 : <>Enter the case information. Fields marked with <span className="required-marker">*</span> are required.</>
@@ -633,53 +679,39 @@ function FilingWizard() {
           />
         )}
 
-        {currentStep === 'documents' && !filingData.filingId && (
-          <div className="form-section">
-            <h3>Upload Documents</h3>
-            <div className="alert alert-info">
-              Your filing will be created when you proceed. You can then upload documents.
-            </div>
-          </div>
-        )}
-
-        {currentStep === 'service' && (
-          <ServiceList
-            contacts={filingData.serviceContacts}
-            onChange={(contacts) => updateData({ serviceContacts: contacts })}
-          />
-        )}
-
         {currentStep === 'review' && (
           <FilingReview
             filingData={filingData}
-            filingId={filingData.filingId}
+            submission={submission}
             onPaymentComplete={() => updateData({ paymentComplete: true })}
-            onSubmitSuccess={clearDraft}
+            onSubmitSuccess={(filing) => { clearDraft(); setSubmission(filing); }}
           />
         )}
       </div>
 
       {/* Navigation */}
-      <div className="wizard-nav">
-        <button
-          className="btn btn-secondary"
-          onClick={goBack}
-          disabled={currentStepIndex === 0}
-        >
-          Back
-        </button>
-        <div className="wizard-nav-right">
-          {currentStep !== 'review' && (
-            <button
-              className="btn btn-primary"
-              onClick={goNext}
-              disabled={saving}
-            >
-              {saving ? 'Saving...' : currentStepIndex === steps.length - 2 ? 'Review Filing' : 'Continue'}
-            </button>
-          )}
+      {!submission && (
+        <div className="wizard-nav">
+          <button
+            className="btn btn-secondary"
+            onClick={goBack}
+            disabled={currentStepIndex === 0 || saving || Boolean(filingData.filingId && currentStep === 'details')}
+          >
+            Back
+          </button>
+          <div className="wizard-nav-right">
+            {currentStep !== 'review' && (
+              <button
+                className="btn btn-primary"
+                onClick={goNext}
+                disabled={saving}
+              >
+                {saving ? 'Saving...' : currentStepIndex === steps.length - 2 ? 'Review Filing' : 'Continue'}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

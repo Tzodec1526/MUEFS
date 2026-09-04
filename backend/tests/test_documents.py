@@ -1,34 +1,13 @@
 """Tests for document-related functionality."""
 
 
-from app.services.document_service import (
-    compute_sha256,
-    validate_file_size,
-    validate_mime_type,
-)
-from app.utils.pdf import check_pii_patterns, validate_electronic_signature
+import io
 
+from pypdf import PdfReader, PdfWriter
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
-def test_compute_sha256():
-    data = b"Hello, Michigan courts!"
-    hash1 = compute_sha256(data)
-    hash2 = compute_sha256(data)
-    assert hash1 == hash2
-    assert len(hash1) == 64  # SHA-256 hex digest length
-
-
-def test_compute_sha256_different_data():
-    hash1 = compute_sha256(b"data1")
-    hash2 = compute_sha256(b"data2")
-    assert hash1 != hash2
-
-
-def test_validate_file_size():
-    # Default max is 100MB
-    assert validate_file_size(1024) is True  # 1 KB
-    assert validate_file_size(50 * 1024 * 1024) is True  # 50 MB
-    assert validate_file_size(100 * 1024 * 1024) is True  # 100 MB exactly
-    assert validate_file_size(101 * 1024 * 1024) is False  # 101 MB
+from app.services.document_service import inspect_pdf, validate_mime_type
+from app.utils.pdf import check_pii_patterns
 
 
 def test_validate_mime_type():
@@ -64,7 +43,53 @@ def test_check_pii_financial():
     assert any("financial" in w.lower() for w in warnings)
 
 
-def test_validate_electronic_signature():
-    assert validate_electronic_signature("/s/ John Smith") is True
-    assert validate_electronic_signature("Signed by John Smith") is False
-    assert validate_electronic_signature("No signature here") is False
+def test_pdf_inspection_samples_text_once_and_deduplicates_pii(monkeypatch):
+    writer = PdfWriter()
+    writer.add_blank_page(width=300, height=300)  # A scanned cover must not hide later text.
+    for _ in range(2):
+        page = writer.add_blank_page(width=300, height=300)
+        page[NameObject("/Resources")] = DictionaryObject({
+            NameObject("/Font"): DictionaryObject({
+                NameObject("/F1"): DictionaryObject({
+                    NameObject("/Type"): NameObject("/Font"),
+                    NameObject("/Subtype"): NameObject("/Type1"),
+                    NameObject("/BaseFont"): NameObject("/Helvetica"),
+                }),
+            }),
+        })
+        content = DecodedStreamObject()
+        content.set_data(b"BT /F1 12 Tf 10 100 Td (SSN: 123-45-6789) Tj ET")
+        page[NameObject("/Contents")] = content
+    buffer = io.BytesIO()
+    writer.write(buffer)
+
+    readers = []
+
+    def counted_reader(*args, **kwargs):
+        reader = PdfReader(*args, **kwargs)
+        readers.append(reader)
+        return reader
+
+    monkeypatch.setattr("pypdf.PdfReader", counted_reader)
+    inspection = inspect_pdf(buffer.getvalue())
+    assert len(readers) == 1
+    assert inspection.page_count == 3
+    assert inspection.is_text_searchable
+    assert len(inspection.pii_warnings) == 1
+    assert "Social Security" in inspection.pii_warnings[0]
+
+
+def test_pdf_inspection_handles_malformed_files_and_limits_sampling():
+    broken = inspect_pdf(b"not a PDF")
+    assert broken.page_count is None
+    assert not broken.is_text_searchable
+    assert broken.pii_warnings == []
+
+    writer = PdfWriter()
+    writer.add_blank_page(width=100, height=100)
+    buffer = io.BytesIO()
+    writer.write(buffer)
+    blank = inspect_pdf(buffer.getvalue(), max_pages=0)
+    assert blank.page_count == 1
+    assert not blank.is_text_searchable
+    assert blank.pii_warnings == []

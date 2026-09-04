@@ -1,9 +1,9 @@
-import io
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from starlette.concurrency import run_in_threadpool
 
 from app.integrations.cms_adapter import CMSFilingResult, get_cms_adapter
 from app.models.case import Case, CaseParticipant, CaseStatus, ParticipantRole
@@ -61,10 +61,6 @@ def _is_response_code(code: str) -> bool:
     )
 
 
-def _is_service_proof_code(code: str) -> bool:
-    return code.upper() in _SERVICE_PROOF_CODES
-
-
 def requirements_for_filing_type(
     requirements: list[FilingRequirement],
     filing_type: str,
@@ -89,7 +85,7 @@ def requirements_for_filing_type(
             if not (
                 _is_motion_code(r.document_type_code)
                 or _is_response_code(r.document_type_code)
-                or _is_service_proof_code(r.document_type_code)
+                or r.document_type_code.upper() in _SERVICE_PROOF_CODES
             )
         ]
     if filing_type in ("subsequent", "motion"):
@@ -162,25 +158,33 @@ async def list_filings(
     status: FilingStatus | None = None,
     page: int = 1,
     page_size: int = 25,
-) -> tuple[list[FilingEnvelope], int]:
+) -> tuple[list[FilingEnvelope], int, dict[FilingStatus, int]]:
     query = (
         select(FilingEnvelope)
         .options(selectinload(FilingEnvelope.documents))
         .where(FilingEnvelope.filer_id == filer_id)
-        .order_by(FilingEnvelope.updated_at.desc())
+        .order_by(FilingEnvelope.updated_at.desc(), FilingEnvelope.id.desc())
     )
-    count_query = select(func.count()).select_from(FilingEnvelope).where(
-        FilingEnvelope.filer_id == filer_id
-    )
+    status_counts = await get_filing_status_counts(db, filer_id)
 
     if status:
         query = query.where(FilingEnvelope.status == status)
-        count_query = count_query.where(FilingEnvelope.status == status)
 
-    total = (await db.execute(count_query)).scalar() or 0
+    total = status_counts[status] if status else sum(status_counts.values())
+    if not total:
+        return [], 0, status_counts
     query = query.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
-    return list(result.scalars().all()), total
+    return list(result.scalars().all()), total, status_counts
+
+
+async def get_filing_status_counts(db: AsyncSession, filer_id: int) -> dict[FilingStatus, int]:
+    result = await db.execute(
+        select(FilingEnvelope.status, func.count())
+        .where(FilingEnvelope.filer_id == filer_id)
+        .group_by(FilingEnvelope.status)
+    )
+    return dict.fromkeys(FilingStatus, 0) | dict(result.tuples().all())
 
 
 async def validate_filing(
@@ -255,22 +259,14 @@ async def validate_filing(
 
     # PII detection on PDF documents (MCR 1.109 redaction requirements)
     from app.services import document_service
-    from app.utils.pdf import check_pii_patterns
 
     for doc in filing.documents:
         if doc.mime_type == "application/pdf":
             try:
-                file_stream = await document_service.download_document(doc.file_key)
-                file_data = file_stream.read()
-                from pypdf import PdfReader
-                reader = PdfReader(io.BytesIO(file_data))
-                for page in reader.pages[:5]:  # Check first 5 pages
-                    text = page.extract_text() or ""
-                    pii_warnings = check_pii_patterns(text)
-                    for w in pii_warnings:
-                        warnings.append(f"Document '{doc.title}': {w}")
-                    if pii_warnings:
-                        break  # One warning per doc is enough
+                inspection = await run_in_threadpool(
+                    document_service.inspect_stored_pdf, doc.file_key
+                )
+                warnings.extend(f"Document '{doc.title}': {w}" for w in inspection.pii_warnings)
             except Exception:
                 pass  # Skip PII check if file can't be read
 
@@ -295,11 +291,14 @@ async def submit_filing(
         .with_for_update()
     )
     filing = result.scalar_one_or_none()
-    if not filing or filing.status != FilingStatus.DRAFT:
+    if not filing or filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
         return None
 
     now = datetime.now(UTC)
     filing.submitted_at = now
+    filing.reviewed_at = None
+    filing.reviewer_id = None
+    filing.rejection_reason = None
 
     # Service-only filings skip clerk review entirely
     if filing.filing_type == "service_only":
@@ -461,23 +460,24 @@ async def get_clerk_queue(
     court_id: int,
     page: int = 1,
     page_size: int = 25,
+    status: FilingStatus | None = None,
 ) -> tuple[list[FilingEnvelope], int]:
+    filters = [
+        FilingEnvelope.court_id == court_id,
+        FilingEnvelope.status.in_([FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW]),
+    ]
+    if status is not None:
+        filters.append(FilingEnvelope.status == status)
     query = (
         select(FilingEnvelope)
         .options(selectinload(FilingEnvelope.documents))
-        .where(
-            FilingEnvelope.court_id == court_id,
-            FilingEnvelope.status.in_([FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW]),
-        )
-        .order_by(FilingEnvelope.submitted_at.asc())
+        .where(*filters)
+        .order_by(FilingEnvelope.submitted_at.asc(), FilingEnvelope.id.asc())
     )
     count_query = (
         select(func.count())
         .select_from(FilingEnvelope)
-        .where(
-            FilingEnvelope.court_id == court_id,
-            FilingEnvelope.status.in_([FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW]),
-        )
+        .where(*filters)
     )
 
     total = (await db.execute(count_query)).scalar() or 0

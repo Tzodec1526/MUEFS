@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { submitFiling, validateFiling, FilingValidation } from '../../api/filings';
-import { formatFee, getDocumentLabel } from '../../utils/format';
+import { submitFiling, validateFiling, FilingValidation, FilingEnvelope } from '../../api/filings';
+import { formatBytes, formatFee, getDocumentLabel } from '../../utils/format';
 import { getErrorDetail } from '../../utils/errors';
 import PaymentForm from './PaymentForm';
 
@@ -14,25 +14,26 @@ interface FilingData {
   filingDescription: string;
   filingId: number | null;
   documents: Array<{ id: number; title: string; type: string; size: number; isSearchable: boolean }>;
-  serviceContacts: Array<{ name: string; email: string; method: string }>;
   paymentComplete: boolean;
   filingType: 'initial' | 'subsequent' | 'service_only';
 }
 
 interface Props {
   filingData: FilingData;
-  filingId: number | null;
+  submission?: FilingEnvelope;
   onPaymentComplete?: () => void;
-  onSubmitSuccess?: () => void;
+  onSubmitSuccess?: (filing: FilingEnvelope) => void;
+  readOnly?: boolean;
 }
 
-function FilingReview({ filingData, filingId, onPaymentComplete, onSubmitSuccess }: Props) {
+function FilingReview({ filingData, submission, onPaymentComplete, onSubmitSuccess, readOnly = false }: Props) {
+  const { filingId } = filingData;
   const [validation, setValidation] = useState<FilingValidation | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const needsPayment =
+    !readOnly &&
     filingData.filingFeeCents > 0 &&
     !filingData.paymentComplete &&
     filingData.filingType !== 'service_only';
@@ -52,18 +53,17 @@ function FilingReview({ filingData, filingId, onPaymentComplete, onSubmitSuccess
   // validating. Submit stays disabled until validation passes.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (filingId) handleValidate();
+    if (filingId && !readOnly) handleValidate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filingId]);
+  }, [filingId, readOnly]);
 
   const handleSubmit = async () => {
     if (!filingId) return;
     setSubmitting(true);
     setError(null);
     try {
-      await submitFiling(filingId);
-      setSubmitted(true);
-      onSubmitSuccess?.();
+      const result = await submitFiling(filingId);
+      onSubmitSuccess?.(result);
     } catch (err: unknown) {
       const detail = getErrorDetail(err);
       const message = detail || (err instanceof Error ? err.message : 'Submission failed. Please try again.');
@@ -73,19 +73,15 @@ function FilingReview({ filingData, filingId, onPaymentComplete, onSubmitSuccess
     }
   };
 
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1048576).toFixed(1)} MB`;
-  };
-
-  if (submitted) {
+  if (submission) {
     return (
       <div className="form-section success-section">
         <div className="success-icon">&#10003;</div>
         <h3>Filing Submitted Successfully</h3>
         <p>
-          Your filing has been submitted to <strong>{filingData.courtName}</strong> for clerk review.
+          {submission.status === 'served'
+            ? 'This service-only filing has been recorded. It does not enter clerk review or deliver documents to other parties.'
+            : <>Your filing has been submitted to <strong>{filingData.courtName}</strong> for clerk review.</>}
         </p>
         <div className="success-details">
           <div className="success-detail-row">
@@ -102,7 +98,7 @@ function FilingReview({ filingData, filingId, onPaymentComplete, onSubmitSuccess
           </div>
           <div className="success-detail-row">
             <span>Status</span>
-            <span className="status-badge submitted">Submitted</span>
+            <span className={`status-badge ${submission.status}`}>{submission.status.replace('_', ' ')}</span>
           </div>
         </div>
         <p className="success-note">
@@ -118,11 +114,13 @@ function FilingReview({ filingData, filingId, onPaymentComplete, onSubmitSuccess
 
   return (
     <div className="form-section">
-      <h3>Review Your Filing</h3>
-      <p className="info-text">
-        Please review all information carefully before submitting. Once submitted,
-        the filing will be sent to the court clerk for review.
-      </p>
+      <h3>{readOnly ? 'Filing Details' : 'Review Your Filing'}</h3>
+      {!readOnly && (
+        <p className="info-text">
+          Review all information carefully before submitting. Submitted filings
+          cannot be edited unless returned for correction.
+        </p>
+      )}
 
       {/* Filing Summary */}
       <div className="review-card">
@@ -171,7 +169,7 @@ function FilingReview({ filingData, filingId, onPaymentComplete, onSubmitSuccess
                 <tr key={doc.id}>
                   <td>{doc.title}</td>
                   <td>{getDocumentLabel(doc.type)}</td>
-                  <td>{formatSize(doc.size)}</td>
+                  <td>{formatBytes(doc.size)}</td>
                   <td>{doc.isSearchable ? 'Yes' : <span className="warning-text">No</span>}</td>
                 </tr>
               ))}
@@ -182,28 +180,9 @@ function FilingReview({ filingData, filingId, onPaymentComplete, onSubmitSuccess
         )}
       </div>
 
-      {/* Service Contacts */}
-      <div className="review-card">
-        <h4>Service of Process ({filingData.serviceContacts.length})</h4>
-        {filingData.serviceContacts.length > 0 ? (
-          <table className="review-table">
-            <thead>
-              <tr><th>Name</th><th>Email</th><th>Method</th></tr>
-            </thead>
-            <tbody>
-              {filingData.serviceContacts.map((c, i) => (
-                <tr key={i}>
-                  <td>{c.name}</td>
-                  <td>{c.email}</td>
-                  <td>{c.method}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p className="info-text">No service contacts added. You may need to serve parties through traditional methods.</p>
-        )}
-      </div>
+      {filingData.filingType === 'service_only' && (
+        <p className="info-text">Recording this filing does not deliver documents to other parties. Arrange service outside this app.</p>
+      )}
 
       {/* Payment — shown here so you can review the filing first, then pay before submitting */}
       {needsPayment && filingData.courtId && filingData.caseTypeId && (
@@ -252,31 +231,35 @@ function FilingReview({ filingData, filingId, onPaymentComplete, onSubmitSuccess
 
       {error && <div className="alert alert-error" role="alert">{error}</div>}
 
-      <div className="review-actions">
-        <button className="btn btn-secondary" onClick={handleValidate}>
-          Validate Before Submitting
-        </button>
-        <button
-          className="btn btn-primary btn-large"
-          onClick={handleSubmit}
-          disabled={submitting || needsPayment || !validation || !validation.is_valid}
-          title={
-            needsPayment
-              ? 'Complete payment above before submitting'
-              : !validation || !validation.is_valid
-                ? 'Resolve the issues above before submitting'
-                : undefined
-          }
-        >
-          {submitting ? 'Submitting to Court...' : 'Submit Filing'}
-        </button>
-      </div>
+      {!readOnly && (
+        <>
+          <div className="review-actions">
+            <button className="btn btn-secondary" onClick={handleValidate}>
+              Validate Before Submitting
+            </button>
+            <button
+              className="btn btn-primary btn-large"
+              onClick={handleSubmit}
+              disabled={submitting || needsPayment || !validation || !validation.is_valid}
+              title={
+                needsPayment
+                  ? 'Complete payment above before submitting'
+                  : !validation || !validation.is_valid
+                    ? 'Resolve the issues above before submitting'
+                    : undefined
+              }
+            >
+              {submitting ? 'Submitting...' : 'Submit Filing'}
+            </button>
+          </div>
 
-      <p className="submit-disclaimer">
-        By submitting, you certify under MCR 1.109 that this filing complies with
-        Michigan Court Rules, that all documents are text-searchable, and that
-        personal identifying information has been properly redacted.
-      </p>
+          <p className="submit-disclaimer">
+            By submitting, you certify under MCR 1.109 that this filing complies with
+            Michigan Court Rules, that all documents are text-searchable, and that
+            personal identifying information has been properly redacted.
+          </p>
+        </>
+      )}
     </div>
   );
 }

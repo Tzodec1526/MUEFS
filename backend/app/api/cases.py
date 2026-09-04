@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -7,6 +7,7 @@ from app.api.auth import get_optional_user_id
 from app.database import get_db
 from app.models.case import Case, CaseStatus
 from app.models.filing import FilingEnvelope
+from app.models.user import CourtRole, UserCourtRole
 from app.schemas.case import (
     CaseDocketResponse,
     CaseSearchItemResponse,
@@ -110,17 +111,31 @@ async def get_case_filings(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access filings for this case",
         )
-    result = await db.execute(
+    case = await db.get(Case, case_id)
+    query = (
         select(FilingEnvelope)
         .options(selectinload(FilingEnvelope.documents))
         .where(FilingEnvelope.case_id == case_id)
-        .order_by(FilingEnvelope.created_at.desc())
+        .order_by(FilingEnvelope.created_at.desc(), FilingEnvelope.id.desc())
     )
-    ordered = list(result.scalars().all())
-    visible = [
-        env
-        for env in ordered
-        if await access_service.user_may_read_filing_envelope(db, user_id, env)
-    ]
-    start = (page - 1) * page_size
-    return visible[start : start + page_size]
+    # Case access above already establishes standing on a sealed docket. For an
+    # open docket, filter before paging so hidden filings never displace visible ones.
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    if not case.is_sealed:
+        staff_courts = select(UserCourtRole.court_id).where(
+            UserCourtRole.user_id == user_id,
+            UserCourtRole.role.in_([CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]),
+        )
+        visible: ColumnElement[bool] = FilingEnvelope.status.in_(
+            access_service.PUBLIC_DOCKET_FILING_STATUSES
+        )
+        if user_id is not None:
+            visible = or_(
+                visible,
+                FilingEnvelope.filer_id == user_id,
+                FilingEnvelope.court_id.in_(staff_courts),
+            )
+        query = query.where(visible)
+    result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
+    return list(result.scalars().all())

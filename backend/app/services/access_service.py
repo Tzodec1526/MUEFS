@@ -24,7 +24,7 @@ from app.models.user import CourtRole, User, UserCourtRole, UserType
 
 # Filings that may appear on a public (non-sealed) docket to non-parties.
 # Pending, rejected, returned, and service-only envelopes stay off the public record.
-_PUBLIC_DOCKET_FILING_STATUSES = frozenset({
+PUBLIC_DOCKET_FILING_STATUSES = frozenset({
     FilingStatus.ACCEPTED,
 })
 
@@ -45,16 +45,12 @@ async def user_is_court_staff_for_court(
 ) -> bool:
     if user_id is None:
         return False
-    q = await db.execute(
-        select(UserCourtRole.id).where(
-            UserCourtRole.user_id == user_id,
-            UserCourtRole.court_id == court_id,
-            UserCourtRole.role.in_(
-                [CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]
-            ),
-        )
-    )
-    return q.scalar_one_or_none() is not None
+    staff_role = select(UserCourtRole.id).where(
+        UserCourtRole.user_id == user_id,
+        UserCourtRole.court_id == court_id,
+        UserCourtRole.role.in_([CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]),
+    ).exists()
+    return bool(await db.scalar(select(staff_role)))
 
 
 async def user_may_read_sealed_case(db: AsyncSession, user_id: int | None, case_id: int) -> bool:
@@ -77,17 +73,6 @@ async def user_may_read_sealed_case(db: AsyncSession, user_id: int | None, case_
     if await user_is_court_staff_for_court(db, user_id, case.court_id):
         return True
 
-    # Litigant: user_id on a row that is not attorney-of-record (plaintiff, defendant, …).
-    litigant_q = await db.execute(
-        select(CaseParticipant.id).where(
-            CaseParticipant.case_id == case_id,
-            CaseParticipant.user_id == user_id,
-            CaseParticipant.role.notin_(_ATTORNEY_OF_RECORD_ROLES),
-        )
-    )
-    if litigant_q.scalar_one_or_none() is not None:
-        return True
-
     # Counsel of record only: attorney_* rows, matched by linked account or a *verified*
     # bar number on that row. A self-asserted (unverified) bar number never grants sealed
     # access — public self-registration leaves bar_number_verified False, so it cannot be
@@ -100,29 +85,22 @@ async def user_may_read_sealed_case(db: AsyncSession, user_id: int | None, case_
         if user.bar_number is not None and user.bar_number_verified
         else false()
     )
-    counsel_cond = [
+    participant_conditions = [
         CaseParticipant.case_id == case_id,
-        CaseParticipant.role.in_(_ATTORNEY_OF_RECORD_ROLES),
         or_(
             CaseParticipant.user_id == user_id,
-            bar_match,
+            and_(CaseParticipant.role.in_(_ATTORNEY_OF_RECORD_ROLES), bar_match),
         ),
     ]
-    counsel_q = await db.execute(select(CaseParticipant.id).where(*counsel_cond))
-    if counsel_q.scalar_one_or_none() is not None:
-        return True
-
-    fil_q = await db.execute(
+    participant_grant = select(CaseParticipant.id).where(*participant_conditions).exists()
+    filer_grant = (
         select(FilingEnvelope.id).where(
             FilingEnvelope.case_id == case_id,
             FilingEnvelope.filer_id == user_id,
             FilingEnvelope.status.in_(_FILER_ON_CASE_STATUSES),
-        )
+        ).exists()
     )
-    if fil_q.scalar_one_or_none() is not None:
-        return True
-
-    return False
+    return bool(await db.scalar(select(or_(participant_grant, filer_grant))))
 
 
 async def user_may_read_case(db: AsyncSession, user_id: int | None, case_id: int) -> bool:
@@ -167,7 +145,7 @@ async def user_may_read_filing_envelope(
     if envelope.status == FilingStatus.DRAFT:
         return False
 
-    return envelope.status in _PUBLIC_DOCKET_FILING_STATUSES
+    return envelope.status in PUBLIC_DOCKET_FILING_STATUSES
 
 
 async def user_may_read_document(

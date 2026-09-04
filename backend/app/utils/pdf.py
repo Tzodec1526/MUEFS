@@ -36,8 +36,3 @@ def check_pii_patterns(text: str) -> list[str]:
         )
 
     return warnings
-
-
-def validate_electronic_signature(text: str) -> bool:
-    """Check if document contains valid electronic signature format per MCR 1.109."""
-    return bool(re.search(r"/s/\s+\w", text))

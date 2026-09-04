@@ -210,7 +210,7 @@ async def test_file_multiple_motions_to_same_case(db_session):
         await db_session.flush()
 
     # Verify all filings are linked to the same case
-    filings, total = await filing_service.list_filings(db_session, user.id)
+    filings, total, _ = await filing_service.list_filings(db_session, user.id)
     case_filings = [f for f in filings if f.case_id == case.id]
     # Initial complaint + 3 motions = 4 filings linked to this case
     assert len(case_filings) == 4

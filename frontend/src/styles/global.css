@@ -1417,6 +1417,7 @@ tr.selected {
 
   .form-row {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .filter-row {

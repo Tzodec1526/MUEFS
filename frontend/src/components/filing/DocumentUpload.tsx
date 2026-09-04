@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { uploadDocument, removeDocument } from '../../api/filings';
 import { getFilingChecklists, FilingChecklist } from '../../api/courts';
 import { getErrorDetail } from '../../utils/errors';
+import { formatBytes } from '../../utils/format';
 
 interface DocumentInfo {
   id: number;
@@ -419,12 +420,6 @@ function DocumentUpload({
     }
   };
 
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1048576).toFixed(1)} MB`;
-  };
-
   const getTypeLabel = (code: string) => {
     return ALL_TYPES.find(t => t.code === code)?.label || code;
   };
@@ -637,7 +632,7 @@ function DocumentUpload({
                   <td>{doc.title}</td>
                   <td>{getTypeLabel(doc.type)}</td>
                   <td><span className="mcr-ref">{getTypeMcr(doc.type)}</span></td>
-                  <td>{formatSize(doc.size)}</td>
+                  <td>{formatBytes(doc.size)}</td>
                   <td>
                     <button
                       className="btn btn-small btn-danger"

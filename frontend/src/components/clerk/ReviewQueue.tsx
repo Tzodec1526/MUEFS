@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { batchReview, getClerkQueue, reviewFiling, FilingEnvelope } from '../../api/filings';
 import { getDemoCourtName } from '../auth/LoginScreen';
 import LoadError from '../common/LoadError';
-import { getDocumentLabel, parseServerDate } from '../../utils/format';
+import { formatBytes, getDocumentLabel, parseServerDate } from '../../utils/format';
 
 function ReviewQueue() {
   const clerkCourtId = parseInt(localStorage.getItem('demo_court_id') || '3', 10);
@@ -18,28 +18,41 @@ function ReviewQueue() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [page, setPage] = useState(1);
+  const requestRef = useRef<AbortController | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [queueError, setQueueError] = useState<string | null>(null);
 
   const fetchQueue = useCallback(async () => {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setLoading(true);
     setQueueError(null);
     try {
-      const result = await getClerkQueue(courtId, 1, statusFilter);
+      const result = await getClerkQueue(courtId, page, statusFilter, controller.signal);
+      if (controller.signal.aborted) return;
+      if (page > 1 && result.filings.length === 0) {
+        setPage(Math.max(1, Math.ceil(result.total / 25)));
+        return;
+      }
       setFilings(result.filings);
       setTotal(result.total);
+      setSelectedIds((previous) => new Set(result.filings.filter((f) => previous.has(f.id)).map((f) => f.id)));
       setLastRefresh(new Date());
     } catch {
+      if (controller.signal.aborted) return;
       setQueueError("We couldn't load the review queue. Please retry.");
       setFilings([]);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
-  }, [courtId, statusFilter]);
+  }, [courtId, page, statusFilter]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- existing pattern; fetchQueue performs the setState for loading/data
     fetchQueue();
+    return () => requestRef.current?.abort();
   }, [fetchQueue]);
 
   // Auto-refresh every 30 seconds, but never while a filing is open for review or an
@@ -125,11 +138,6 @@ function ReviewQueue() {
     return { text: `${Math.floor(hours / 24)}d`, level: 'overdue' };
   };
 
-  const formatSize = (bytes: number) => {
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)} KB`;
-    return `${(bytes / 1048576).toFixed(1)} MB`;
-  };
-
   // Common rejection reasons for quick selection
   const COMMON_REASONS = [
     'Missing required documents',
@@ -155,7 +163,7 @@ function ReviewQueue() {
               const age = getAge(f.submitted_at);
               return age.level === 'overdue';
             }).length}</span>
-            <span className="stat-label">Overdue</span>
+            <span className="stat-label">Overdue on this page</span>
           </div>
         </div>
       </div>
@@ -181,7 +189,8 @@ function ReviewQueue() {
               name="status"
               toolparamdescription="Queue status filter: all, submitted, or under_review"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); setSelectedIds(new Set()); setSelectedFiling(null); }}
+              disabled={actionInProgress}
             >
               <option value="all">All Pending</option>
               <option value="submitted">New Submissions</option>
@@ -291,6 +300,19 @@ function ReviewQueue() {
               )}
             </tbody>
           </table>
+          {total > 25 && (
+            <div className="pagination">
+              <button className="btn btn-secondary btn-small" disabled={page <= 1 || loading || actionInProgress}
+                onClick={() => { setPage((p) => p - 1); setSelectedIds(new Set()); setSelectedFiling(null); }}>
+                Previous
+              </button>
+              <span>Page {page} of {Math.ceil(total / 25)}</span>
+              <button className="btn btn-secondary btn-small" disabled={page >= Math.ceil(total / 25) || loading || actionInProgress}
+                onClick={() => { setPage((p) => p + 1); setSelectedIds(new Set()); setSelectedFiling(null); }}>
+                Next
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Filing Detail Panel */}
@@ -326,7 +348,7 @@ function ReviewQueue() {
                     <div className="doc-info">
                       <strong>{doc.title}</strong>
                       <span className="doc-meta">
-                        {getDocumentLabel(doc.document_type_code)} &middot; {formatSize(doc.file_size_bytes)}
+                        {getDocumentLabel(doc.document_type_code)} &middot; {formatBytes(doc.file_size_bytes)}
                         {doc.page_count && ` \u00b7 ${doc.page_count} pages`}
                       </span>
                     </div>

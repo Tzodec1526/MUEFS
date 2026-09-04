@@ -1,21 +1,22 @@
-import { useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { FilePlus2, FolderOpen, Search, ClipboardCheck } from 'lucide-react';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Footer from './components/layout/Footer';
-import FilingWizard from './components/filing/FilingWizard';
-import MyFilings from './components/filing/MyFilings';
-import ReviewQueue from './components/clerk/ReviewQueue';
-import CaseSearch from './components/search/CaseSearch';
-import Favorites from './components/search/Favorites';
-import CaseDetailPage from './components/search/CaseDetailPage';
 import LoginScreen, { getDemoRole, getDemoCourtName, hasSession } from './components/auth/LoginScreen';
-import AuthCallback from './components/auth/AuthCallback';
-import WebMcpAgentPage from './components/agent/WebMcpAgentPage';
 import PlatformStats from './components/marketing/PlatformStats';
 import MifileComparison from './components/marketing/MifileComparison';
-import { listFilings, getClerkQueue } from './api/filings';
+import { getFilingStatusCounts, getClerkQueue } from './api/filings';
+
+const FilingWizard = lazy(() => import('./components/filing/FilingWizard'));
+const MyFilings = lazy(() => import('./components/filing/MyFilings'));
+const ReviewQueue = lazy(() => import('./components/clerk/ReviewQueue'));
+const CaseSearch = lazy(() => import('./components/search/CaseSearch'));
+const Favorites = lazy(() => import('./components/search/Favorites'));
+const CaseDetailPage = lazy(() => import('./components/search/CaseDetailPage'));
+const AuthCallback = lazy(() => import('./components/auth/AuthCallback'));
+const WebMcpAgentPage = lazy(() => import('./components/agent/WebMcpAgentPage'));
 
 function RequireRole({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -48,8 +49,10 @@ function FilerDashboard() {
   const [draftCount, setDraftCount] = useState<number | null>(null);
   const [returnedCount, setReturnedCount] = useState<number | null>(null);
   useEffect(() => {
-    listFilings({ status: 'draft' }).then((r) => setDraftCount(r.total)).catch(() => {});
-    listFilings({ status: 'returned' }).then((r) => setReturnedCount(r.total)).catch(() => {});
+    getFilingStatusCounts().then((counts) => {
+      setDraftCount(counts.draft);
+      setReturnedCount(counts.returned);
+    }).catch(() => {});
   }, []);
 
   return (
@@ -183,40 +186,45 @@ function NotFound() {
 }
 
 function App() {
+  const location = useLocation();
   return (
-    <Routes>
-      <Route path="/login" element={<LoginScreen />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route path="/agent" element={<WebMcpAgentPage />} />
-      {/* Authenticated routes */}
-      <Route
-        path="*"
-        element={
-          <RequireRole>
-            <div className="app-layout">
-              <a className="skip-link" href="#main-content">Skip to main content</a>
-              <Header />
-              <div className="app-body">
-                <Sidebar />
-                <main className="main-content" id="main-content" tabIndex={-1}>
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/filing/new" element={<RequireFiler><FilingWizard /></RequireFiler>} />
-                    <Route path="/filings" element={<RequireFiler><MyFilings /></RequireFiler>} />
-                    <Route path="/cases/search" element={<CaseSearch />} />
-                    <Route path="/cases/:caseId" element={<CaseDetailPage />} />
-                    <Route path="/favorites" element={<RequireFiler><Favorites /></RequireFiler>} />
-                    <Route path="/clerk/queue" element={<RequireClerk><ReviewQueue /></RequireClerk>} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </main>
+    <Suspense fallback={<p className="loading" role="status">Loading page...</p>}>
+      <Routes>
+        <Route path="/login" element={<LoginScreen />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/agent" element={<WebMcpAgentPage />} />
+        {/* Authenticated routes */}
+        <Route
+          path="*"
+          element={
+            <RequireRole>
+              <div className="app-layout">
+                <a className="skip-link" href="#main-content">Skip to main content</a>
+                <Header />
+                <div className="app-body">
+                  <Sidebar />
+                  <main className="main-content" id="main-content" tabIndex={-1}>
+                    <Suspense fallback={<p className="loading" role="status">Loading page...</p>}>
+                      <Routes>
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/filing/new" element={<RequireFiler><FilingWizard key={location.key} /></RequireFiler>} />
+                        <Route path="/filings" element={<RequireFiler><MyFilings /></RequireFiler>} />
+                        <Route path="/cases/search" element={<CaseSearch />} />
+                        <Route path="/cases/:caseId" element={<CaseDetailPage />} />
+                        <Route path="/favorites" element={<RequireFiler><Favorites /></RequireFiler>} />
+                        <Route path="/clerk/queue" element={<RequireClerk><ReviewQueue /></RequireClerk>} />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </Suspense>
+                  </main>
+                </div>
+                <Footer />
               </div>
-              <Footer />
-            </div>
-          </RequireRole>
-        }
-      />
-    </Routes>
+            </RequireRole>
+          }
+        />
+      </Routes>
+    </Suspense>
   );
 }
 

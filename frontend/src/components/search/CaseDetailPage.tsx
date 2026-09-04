@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Link2 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { addFavorite, removeFavorite, listFavorites } from '../../api/favorites';
 import { getCaseTypes } from '../../api/courts';
-import { getDocumentLabel, parseServerDate } from '../../utils/format';
+import { formatBytes, formatShortDate, getDocumentLabel } from '../../utils/format';
 import { getDemoRole } from '../auth/LoginScreen';
 import { useToast } from '../common/Toast';
 
@@ -59,31 +59,51 @@ function CaseDetailPage() {
   const [togglingFav, setTogglingFav] = useState(false);
   const [courtName, setCourtName] = useState('');
   const [caseTypeName, setCaseTypeName] = useState('');
+  const [docketPage, setDocketPage] = useState(1);
+  const [hasMoreFilings, setHasMoreFilings] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [docketError, setDocketError] = useState<string | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
+    requestRef.current = controller;
     async function load() {
+      setLoading(true);
+      setError(null);
+      setDocketError(null);
+      setLoadingMore(false);
+      setDocketPage(1);
+      setCaseTypeName('');
       try {
         const [caseRes, filingsRes, favsRes] = await Promise.all([
-          apiClient.get(`/cases/${caseId}`),
-          apiClient.get(`/cases/${caseId}/filings`),
+          apiClient.get(`/cases/${caseId}`, { signal: controller.signal }),
+          apiClient.get(`/cases/${caseId}/filings`, { signal: controller.signal }),
           isPublicViewer
             ? Promise.resolve({ favorites: [] as { case_id: number }[] })
             : listFavorites().catch(() => ({ favorites: [] })),
         ]);
+        if (controller.signal.aborted) return;
         setCaseData(caseRes.data);
         setFilings(filingsRes.data);
+        setHasMoreFilings(filingsRes.data.length === 25);
         // Fetch court name + case type label for a credible docket header
         try {
-          const courtRes = await apiClient.get(`/courts/${caseRes.data.court_id}`);
+          const [courtRes, types] = await Promise.all([
+            apiClient.get(`/courts/${caseRes.data.court_id}`, { signal: controller.signal }),
+            getCaseTypes(caseRes.data.court_id),
+          ]);
+          if (controller.signal.aborted) return;
           setCourtName(courtRes.data.name);
-          const types = await getCaseTypes(caseRes.data.court_id);
           const ct = types.find((t) => t.id === caseRes.data.case_type_id);
           if (ct) setCaseTypeName(ct.name);
         } catch {
+          if (controller.signal.aborted) return;
           setCourtName(`Court #${caseRes.data.court_id}`);
         }
         setIsFavorited(favsRes.favorites.some((f: { case_id: number }) => f.case_id === Number(caseId)));
       } catch (err: unknown) {
+        if (controller.signal.aborted) return;
         const status = (err as { response?: { status?: number } })?.response?.status;
         if (status === 403) {
           setError('This case is sealed or confidential and is not available for public viewing.');
@@ -93,11 +113,31 @@ function CaseDetailPage() {
           setError('Failed to load case details.');
         }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
     load();
+    return () => controller.abort();
   }, [caseId, isPublicViewer]);
+
+  const loadMoreFilings = async () => {
+    const signal = requestRef.current?.signal;
+    setLoadingMore(true);
+    setDocketError(null);
+    try {
+      const { data } = await apiClient.get<CaseFiling[]>(`/cases/${caseId}/filings`, {
+        params: { page: docketPage + 1 }, signal,
+      });
+      if (signal?.aborted) return;
+      setFilings((previous) => [...previous, ...data]);
+      setDocketPage((previous) => previous + 1);
+      setHasMoreFilings(data.length === 25);
+    } catch {
+      if (!signal?.aborted) setDocketError('Could not load more filings. Please try again.');
+    } finally {
+      if (!signal?.aborted) setLoadingMore(false);
+    }
+  };
 
   const copyShareLink = async () => {
     const url = `${window.location.origin}/cases/${caseId}`;
@@ -122,18 +162,6 @@ function CaseDetailPage() {
       }
     } catch { /* ignore */ }
     finally { setTogglingFav(false); }
-  };
-
-  const formatDate = (d: string | null) => {
-    if (!d) return '--';
-    return parseServerDate(d).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric',
-    });
-  };
-
-  const formatSize = (bytes: number) => {
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)} KB`;
-    return `${(bytes / 1048576).toFixed(1)} MB`;
   };
 
   const roleLabel = (role: string) => {
@@ -222,7 +250,7 @@ function CaseDetailPage() {
             <div><label>Case Type</label><span>{caseTypeName || '--'}</span></div>
             <div><label>Status</label><span className={`status-badge ${caseData.status}`}>{caseData.status}</span></div>
             <div><label>Court</label><span>{courtName}</span></div>
-            <div><label>Filed Date</label><span>{formatDate(caseData.filed_date)}</span></div>
+            <div><label>Filed Date</label><span>{formatShortDate(caseData.filed_date)}</span></div>
           </div>
         </div>
 
@@ -267,7 +295,7 @@ function CaseDetailPage() {
                 <div className="docket-entry-header">
                   <span className="docket-entry-id">#{f.id}</span>
                   <span className={`status-badge ${docketStatus(f.status).cls}`}>{docketStatus(f.status).label}</span>
-                  <span className="docket-entry-date">{formatDate(f.submitted_at || f.created_at)}</span>
+                  <span className="docket-entry-date">{formatShortDate(f.submitted_at || f.created_at)}</span>
                 </div>
                 <div className="docket-entry-desc">
                   {f.filing_description || 'No description'}
@@ -287,7 +315,7 @@ function CaseDetailPage() {
                       rel="noopener noreferrer"
                       title="Download document"
                     >
-                      {doc.title} ({getDocumentLabel(doc.document_type_code)}, {formatSize(doc.file_size_bytes)}
+                      {doc.title} ({getDocumentLabel(doc.document_type_code)}, {formatBytes(doc.file_size_bytes)}
                       {doc.page_count ? `, ${doc.page_count}p` : ''})
                     </a>
                   ))}
@@ -297,6 +325,12 @@ function CaseDetailPage() {
           </div>
         ) : (
           <p className="info-text">No filings on record.</p>
+        )}
+        {docketError && <p className="alert alert-error" role="alert">{docketError}</p>}
+        {hasMoreFilings && (
+          <button className="btn btn-secondary" onClick={loadMoreFilings} disabled={loadingMore}>
+            {loadingMore ? 'Loading filings...' : 'Load more filings'}
+          </button>
         )}
       </div>
     </div>

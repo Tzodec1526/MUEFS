@@ -1,3 +1,4 @@
+import hashlib
 import re
 import uuid
 
@@ -12,11 +13,14 @@ from fastapi import (
     UploadFile,
     status,
 )
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.api.auth import get_current_user_id, require_user_may_manage_efilings
 from app.config import settings
 from app.database import get_db
+from app.models.court import Court
 from app.models.filing import FilingDocument, FilingStatus
 from app.models.user import User
 from app.schemas.document import DocumentUploadResponse
@@ -24,8 +28,8 @@ from app.schemas.filing import (
     FilingEnvelopeCreate,
     FilingEnvelopeResponse,
     FilingEnvelopeUpdate,
-    FilingListResponse,
     FilingValidationResult,
+    MyFilingsResponse,
 )
 from app.services import access_service, audit_service, document_service, filing_service
 from app.utils import malware_scan
@@ -58,7 +62,7 @@ async def create_filing(
     return envelope
 
 
-@router.get("", response_model=FilingListResponse)
+@router.get("", response_model=MyFilingsResponse)
 async def list_filings(
     status_filter: FilingStatus | None = Query(None, alias="status"),
     page: int = Query(1, ge=1),
@@ -66,10 +70,28 @@ async def list_filings(
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    filings, total = await filing_service.list_filings(
+    filings, total, status_counts = await filing_service.list_filings(
         db, user_id, status=status_filter, page=page, page_size=page_size
     )
-    return FilingListResponse(filings=filings, total=total, page=page, page_size=page_size)  # type: ignore[arg-type]
+    court_names = {}
+    if filings:
+        courts = await db.execute(
+            select(Court.id, Court.name).where(Court.id.in_({f.court_id for f in filings}))
+        )
+        court_names = dict(courts.tuples().all())
+    return MyFilingsResponse(
+        filings=filings,  # type: ignore[arg-type]
+        total=total, page=page, page_size=page_size,
+        status_counts=status_counts, court_names=court_names,
+    )
+
+
+@router.get("/summary", response_model=dict[FilingStatus, int])
+async def filing_summary(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    return await filing_service.get_filing_status_counts(db, user_id)
 
 
 @router.get("/{filing_id}", response_model=FilingEnvelopeResponse)
@@ -102,10 +124,10 @@ async def update_filing(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
     if filing.filer_id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your filing")
-    if filing.status != FilingStatus.DRAFT:
+    if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Can only update draft filings",
+            detail="Can only update draft or returned filings",
         )
 
     if data.case_title is not None:
@@ -184,7 +206,7 @@ async def submit_filing(
     if not filing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Filing cannot be submitted (not in draft status)",
+            detail="Only draft or returned filings can be submitted",
         )
     # Full refresh to get updated_at, then load documents relationship
     await db.refresh(filing)
@@ -225,27 +247,19 @@ async def upload_document(
             detail="Cannot upload documents to this filing",
         )
 
-    # Read file in chunks to prevent memory exhaustion from spoofed Content-Length
+    # Bound the read without retaining both a chunk list and a joined copy.
     max_bytes = settings.max_file_size_mb * 1024 * 1024
-    chunks: list[bytes] = []
-    total_read = 0
-    while True:
-        chunk = await file.read(65536)  # 64KB chunks
-        if not chunk:
-            break
-        total_read += len(chunk)
-        if total_read > max_bytes:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"File exceeds maximum size of {settings.max_file_size_mb}MB",
-            )
-        chunks.append(chunk)
-    file_data = b"".join(chunks)
+    file_data = await file.read(max_bytes + 1)
+    if len(file_data) > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"File exceeds maximum size of {settings.max_file_size_mb}MB",
+        )
 
     # Validate MIME type from file content (never trust client Content-Type alone).
     try:
-        content_type = document_service.resolve_upload_mime_type(
-            file_data, file.content_type
+        content_type = await run_in_threadpool(
+            document_service.resolve_upload_mime_type, file_data, file.content_type
         )
     except ValueError as exc:
         raise HTTPException(
@@ -260,27 +274,27 @@ async def upload_document(
 
     # Malware screening (defense in depth): reject executables / known-bad signatures
     # regardless of the declared MIME type.
-    scan = malware_scan.scan_upload(file_data, content_type)
+    scan = await run_in_threadpool(malware_scan.scan_upload, file_data, content_type)
     if not scan.is_clean:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=scan.reason or "File rejected by malware screening",
         )
 
-    sha256 = document_service.compute_sha256(file_data)
+    sha256 = (await run_in_threadpool(hashlib.sha256, file_data)).hexdigest()
     safe_name = re.sub(r'[^\w\s\-.]', '', file.filename or 'document') or 'document'
     file_key = f"filings/{filing_id}/{uuid.uuid4()}/{safe_name}"
 
-    await document_service.upload_document(file_data, file_key, content_type)
+    await run_in_threadpool(document_service.upload_document, file_data, file_key, content_type)
 
     page_count = None
     is_searchable = False
     pii_warnings: list[str] = []
     if content_type == "application/pdf":
-        page_count = document_service.get_pdf_page_count(file_data)
-        is_searchable = document_service.is_pdf_text_searchable(file_data)
-        # MCR 1.109 PII screening at upload (advisory; re-run at filing validation).
-        pii_warnings = document_service.scan_pdf_pii(file_data)
+        inspection = await run_in_threadpool(document_service.inspect_pdf, file_data)
+        page_count = inspection.page_count
+        is_searchable = inspection.is_text_searchable
+        pii_warnings = inspection.pii_warnings
 
     try:
         doc = FilingDocument(
@@ -311,7 +325,7 @@ async def upload_document(
         )
     except Exception:
         # Clean up orphaned S3 object if DB operations fail
-        await document_service.delete_document(file_key)
+        await run_in_threadpool(document_service.delete_document, file_key)
         raise
 
     return DocumentUploadResponse(
@@ -356,7 +370,7 @@ async def remove_document(
     file_key = doc.file_key
     await db.delete(doc)
     await db.flush()
-    await document_service.delete_document(file_key)
+    await run_in_threadpool(document_service.delete_document, file_key)
 
     await audit_service.log_action(
         db,

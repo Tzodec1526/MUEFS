@@ -19,7 +19,9 @@ export interface FilingEnvelope {
   case_id: number | null;
   case_type_id: number;
   filer_id: number;
+  filing_type: 'initial' | 'subsequent' | 'service_only';
   status: string;
+  payment_id: number | null;
   case_title: string | null;
   filing_description: string | null;
   submitted_at: string | null;
@@ -57,13 +59,23 @@ export async function createFiling(data: {
 export async function listFilings(params?: {
   status?: string;
   page?: number;
-}): Promise<{ filings: FilingEnvelope[]; total: number }> {
-  const { data } = await apiClient.get('/filings', { params });
+}, signal?: AbortSignal): Promise<{
+  filings: FilingEnvelope[];
+  total: number;
+  status_counts: Record<string, number>;
+  court_names: Record<number, string>;
+}> {
+  const { data } = await apiClient.get('/filings', { params, signal });
   return data;
 }
 
-export async function getFiling(filingId: number): Promise<FilingEnvelope> {
-  const { data } = await apiClient.get(`/filings/${filingId}`);
+export async function getFilingStatusCounts(): Promise<Record<string, number>> {
+  const { data } = await apiClient.get('/filings/summary');
+  return data;
+}
+
+export async function getFiling(filingId: number, signal?: AbortSignal): Promise<FilingEnvelope> {
+  const { data } = await apiClient.get(`/filings/${filingId}`, { signal });
   return data;
 }
 
@@ -143,12 +155,13 @@ export async function getClerkQueue(
   courtId: number,
   page: number = 1,
   statusFilter?: string,
+  signal?: AbortSignal,
 ): Promise<{ filings: FilingEnvelope[]; total: number }> {
   const params: Record<string, unknown> = { court_id: courtId, page };
   if (statusFilter && statusFilter !== 'all') {
     params.status = statusFilter;
   }
-  const { data } = await apiClient.get('/clerk/queue', { params });
+  const { data } = await apiClient.get('/clerk/queue', { params, signal });
   return data;
 }
 

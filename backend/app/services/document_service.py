@@ -1,6 +1,7 @@
-import hashlib
 import io
 import logging
+from contextlib import closing
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import BinaryIO
 
@@ -55,15 +56,6 @@ def resolve_upload_mime_type(file_data: bytes, http_type: str | None) -> str:
     return http_type or "application/octet-stream"
 
 
-def compute_sha256(file_data: bytes) -> str:
-    return hashlib.sha256(file_data).hexdigest()
-
-
-def validate_file_size(file_size: int) -> bool:
-    max_bytes = settings.max_file_size_mb * 1024 * 1024
-    return file_size <= max_bytes
-
-
 def validate_mime_type(mime_type: str) -> bool:
     allowed = {
         "application/pdf",
@@ -87,7 +79,7 @@ def _safe_local_path(file_key: str) -> Path:
     return local_path
 
 
-async def upload_document(
+def upload_document(
     file_data: bytes,
     file_key: str,
     content_type: str,
@@ -108,17 +100,17 @@ async def upload_document(
     return file_key
 
 
-async def download_document(file_key: str) -> BinaryIO:
+def download_document(file_key: str) -> BinaryIO:
     if _is_demo_mode():
         local_path = _safe_local_path(file_key)
-        return io.BytesIO(local_path.read_bytes())
+        return local_path.open("rb")
 
     client = get_s3_client()
     response = client.get_object(Bucket=settings.s3_bucket_name, Key=file_key)
     return response["Body"]
 
 
-async def delete_document(file_key: str) -> None:
+def delete_document(file_key: str) -> None:
     if _is_demo_mode():
         local_path = _safe_local_path(file_key)
         if local_path.exists():
@@ -129,50 +121,38 @@ async def delete_document(file_key: str) -> None:
     client.delete_object(Bucket=settings.s3_bucket_name, Key=file_key)
 
 
-def get_pdf_page_count(file_data: bytes) -> int | None:
-    try:
-        from pypdf import PdfReader
-        reader = PdfReader(io.BytesIO(file_data))
-        return len(reader.pages)
-    except Exception as e:
-        logger.warning("Failed to extract PDF page count: %s", e)
-        return None
+@dataclass
+class PdfInspection:
+    page_count: int | None = None
+    is_text_searchable: bool = False
+    pii_warnings: list[str] = field(default_factory=list)
 
 
-def is_pdf_text_searchable(file_data: bytes, max_pages: int = 5) -> bool:
-    """True if any of the first ``max_pages`` pages yields extractable text.
-
-    Sampling several pages (not just page 1) avoids mislabeling documents whose first
-    page is a scanned cover sheet.
-    """
-    try:
-        from pypdf import PdfReader
-        reader = PdfReader(io.BytesIO(file_data))
-        if len(reader.pages) == 0:
-            return False
-        for page in reader.pages[:max_pages]:
-            text = page.extract_text()
-            if text and text.strip():
-                return True
-        return False
-    except Exception as e:
-        logger.warning("Failed to check PDF text searchability: %s", e)
-        return False
-
-
-def scan_pdf_pii(file_data: bytes, max_pages: int = 5) -> list[str]:
-    """Return MCR 1.109 PII warnings for the first ``max_pages`` pages of a PDF (advisory)."""
+def inspect_pdf(file_data: bytes, max_pages: int = 5) -> PdfInspection:
+    """Parse once and reuse sampled text for searchability and advisory PII checks."""
     from app.utils.pdf import check_pii_patterns
 
-    warnings: list[str] = []
+    inspection = PdfInspection()
     try:
         from pypdf import PdfReader
         reader = PdfReader(io.BytesIO(file_data))
+        inspection.page_count = len(reader.pages)
         for page in reader.pages[:max_pages]:
-            text = page.extract_text() or ""
+            try:
+                text = page.extract_text() or ""
+            except Exception as exc:
+                logger.warning("Failed to extract PDF page text: %s", exc)
+                continue
+            if text.strip():
+                inspection.is_text_searchable = True
             for w in check_pii_patterns(text):
-                if w not in warnings:
-                    warnings.append(w)
+                if w not in inspection.pii_warnings:
+                    inspection.pii_warnings.append(w)
     except Exception as e:
-        logger.warning("Failed to scan PDF for PII: %s", e)
-    return warnings
+        logger.warning("Failed to inspect PDF: %s", e)
+    return inspection
+
+
+def inspect_stored_pdf(file_key: str) -> PdfInspection:
+    with closing(download_document(file_key)) as stream:
+        return inspect_pdf(stream.read())

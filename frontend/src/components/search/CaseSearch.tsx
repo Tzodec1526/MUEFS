@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Link2 } from 'lucide-react';
 import { searchCases } from '../../api/cases';
@@ -29,21 +29,20 @@ function CaseSearch() {
   const demoRole = getDemoRole();
   const showFavorites = demoRole === 'attorney' || demoRole === 'srl';
 
-  const initialParty = searchParams.get('party') || '';
-  const initialCase = searchParams.get('case') || '';
-  const initialPage = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
-  const urlDrivenSearch = Boolean(initialParty || initialCase);
+  const submittedPartyName = searchParams.get('party') || '';
+  const submittedCaseNumber = searchParams.get('case') || '';
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+  const hasSearched = Boolean(submittedPartyName || submittedCaseNumber);
 
-  const [caseNumber, setCaseNumber] = useState(initialCase);
-  const [partyName, setPartyName] = useState(initialParty);
+  const [caseNumber, setCaseNumber] = useState(submittedCaseNumber);
+  const [partyName, setPartyName] = useState(submittedPartyName);
   const [results, setResults] = useState<CaseResult[]>([]);
   const [total, setTotal] = useState(0);
   const [searching, setSearching] = useState(false);
-  const [hasSearched, setHasSearched] = useState(urlDrivenSearch);
   const [favoritedIds, setFavoritedIds] = useState<Set<number>>(new Set());
   const [togglingFav, setTogglingFav] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(initialPage);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!showFavorites) return;
@@ -58,69 +57,52 @@ function CaseSearch() {
     loadFavorites();
   }, [showFavorites]);
 
-  const syncUrl = useCallback(
-    (opts: { num: string; party: string; page: number }) => {
-      const next = new URLSearchParams();
-      if (opts.party) next.set('party', opts.party);
-      if (opts.num) next.set('case', opts.num);
-      if (opts.page > 1) next.set('page', String(opts.page));
-      setSearchParams(next, { replace: true });
-    },
-    [setSearchParams],
-  );
-
-  const runSearch = useCallback(
-    async (opts: { num: string; party: string; page: number; searched: boolean }) => {
+  useEffect(() => {
+    const controller = new AbortController();
+    async function load() {
       setSearching(true);
       setError(null);
+      setCaseNumber(submittedCaseNumber);
+      setPartyName(submittedPartyName);
       try {
         const data = await searchCases({
-          case_number: opts.num || undefined,
-          party_name: opts.party || undefined,
-          page: opts.page,
-        });
+          case_number: submittedCaseNumber || undefined,
+          party_name: submittedPartyName || undefined,
+          page: page,
+        }, controller.signal);
+        if (controller.signal.aborted) return;
         setResults(data.cases);
         setTotal(data.total);
-        setHasSearched(opts.searched);
-        syncUrl(opts);
       } catch {
+        if (controller.signal.aborted) return;
         setError("We couldn't reach the records system. Please try again.");
         setResults([]);
         setTotal(0);
       } finally {
-        setSearching(false);
+        if (!controller.signal.aborted) setSearching(false);
       }
-    },
-    [syncUrl],
-  );
-
-  useEffect(() => {
-    // Initial load from URL params or recent filings list
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    runSearch({
-      num: initialCase,
-      party: initialParty,
-      page: initialPage,
-      searched: urlDrivenSearch,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    }
+    load();
+    return () => controller.abort();
+  }, [submittedCaseNumber, submittedPartyName, page, reloadKey]);
 
   const handleSearch = () => {
-    setPage(1);
-    runSearch({ num: caseNumber, party: partyName, page: 1, searched: true });
+    const next = new URLSearchParams();
+    if (caseNumber.trim()) next.set('case', caseNumber.trim());
+    if (partyName.trim()) next.set('party', partyName.trim());
+    if (next.toString() === searchParams.toString()) setReloadKey((key) => key + 1);
+    else setSearchParams(next);
   };
 
   const goToPage = (p: number) => {
-    setPage(p);
-    runSearch({ num: caseNumber, party: partyName, page: p, searched: hasSearched });
+    const next = new URLSearchParams(searchParams);
+    if (p > 1) next.set('page', String(p));
+    else next.delete('page');
+    setSearchParams(next);
   };
 
   const copyShareLink = async () => {
-    const params = new URLSearchParams();
-    if (partyName) params.set('party', partyName);
-    if (caseNumber) params.set('case', caseNumber);
-    if (page > 1) params.set('page', String(page));
+    const params = searchParams;
     const url = `${window.location.origin}/cases/search${params.toString() ? `?${params}` : ''}`;
     try {
       await navigator.clipboard.writeText(url);
@@ -151,10 +133,6 @@ function CaseSearch() {
     } finally {
       setTogglingFav(null);
     }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSearch();
   };
 
   return (
@@ -192,7 +170,6 @@ function CaseSearch() {
               type="text"
               value={caseNumber}
               onChange={(e) => setCaseNumber(e.target.value)}
-              onKeyDown={handleKeyDown}
               placeholder="e.g., 25-000001-CZ"
               toolparamdescription="Case number (partial match)"
             />
@@ -205,7 +182,6 @@ function CaseSearch() {
               type="text"
               value={partyName}
               onChange={(e) => setPartyName(e.target.value)}
-              onKeyDown={handleKeyDown}
               placeholder="e.g., Smith"
               toolparamdescription="Party or litigant name"
             />
@@ -228,7 +204,7 @@ function CaseSearch() {
       </form>
 
       {error ? (
-        <LoadError message={error} onRetry={() => goToPage(page)} />
+        <LoadError message={error} onRetry={() => setReloadKey((key) => key + 1)} />
       ) : (
         <div className="search-results">
           <h3>{hasSearched ? `Results (${total})` : 'Recent public filings'}</h3>

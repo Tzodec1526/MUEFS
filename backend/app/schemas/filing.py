@@ -73,6 +73,11 @@ class FilingListResponse(BaseModel):
     page_size: int
 
 
+class MyFilingsResponse(FilingListResponse):
+    status_counts: dict[FilingStatus, int]
+    court_names: dict[int, str]
+
+
 class ClerkReviewRequest(BaseModel):
     action: str  # "accept", "reject", "return"
     reason: str | None = Field(None, max_length=5000)

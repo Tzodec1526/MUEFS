@@ -5,8 +5,8 @@ export async function searchCases(params: {
   party_name?: string;
   court_id?: number;
   page?: number;
-}) {
-  const { data } = await apiClient.get('/cases/search', { params });
+}, signal?: AbortSignal) {
+  const { data } = await apiClient.get('/cases/search', { params, signal });
   return data;
 }
 

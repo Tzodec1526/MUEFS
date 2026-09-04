@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { listFilings, FilingEnvelope } from '../../api/filings';
-import { getCourt } from '../../api/courts';
 import LoadError from '../common/LoadError';
 import { parseServerDate } from '../../utils/format';
 
@@ -13,7 +12,13 @@ const STATUS_OPTIONS = [
   { value: 'accepted', label: 'Accepted' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'returned', label: 'Returned' },
+  { value: 'served', label: 'Served' },
 ];
+
+const STATUS_LABELS: Record<string, string> = {
+  draft: 'Draft', submitted: 'Submitted', under_review: 'Under Review',
+  accepted: 'Accepted', rejected: 'Rejected', returned: 'Returned', served: 'Served',
+};
 
 function MyFilings() {
   const navigate = useNavigate();
@@ -23,10 +28,12 @@ function MyFilings() {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [courtNames, setCourtNames] = useState<Record<number, string>>({});
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    const controller = new AbortController();
     async function fetchFilings() {
       setLoading(true);
       setError(null);
@@ -34,27 +41,23 @@ function MyFilings() {
         const result = await listFilings({
           status: statusFilter || undefined,
           page,
-        });
+        }, controller.signal);
+        if (controller.signal.aborted) return;
         setFilings(result.filings);
         setTotal(result.total);
-        // Fetch court names for display
-        const courtIds = [...new Set(result.filings.map(f => f.court_id))];
-        const names: Record<number, string> = {};
-        await Promise.all(courtIds.map(async (id) => {
-          try {
-            const court = await getCourt(id);
-            names[id] = court.name;
-          } catch { /* ignore */ }
-        }));
-        setCourtNames(prev => ({ ...prev, ...names }));
+        setCourtNames(result.court_names);
+        setStatusCounts(result.status_counts);
       } catch {
+        if (controller.signal.aborted) return;
         setError("We couldn't load your filings. Please retry.");
         setFilings([]);
+        setTotal(0);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
     fetchFilings();
+    return () => controller.abort();
   }, [statusFilter, page, reloadKey]);
 
   const formatDate = (dateStr: string | null) => {
@@ -68,25 +71,6 @@ function MyFilings() {
     });
   };
 
-  const getStatusInfo = (status: string) => {
-    switch (status) {
-      case 'draft': return { label: 'Draft', className: 'draft', action: 'Continue editing' };
-      case 'submitted': return { label: 'Submitted', className: 'submitted', action: 'Awaiting review' };
-      case 'under_review': return { label: 'Under Review', className: 'under_review', action: 'Being reviewed' };
-      case 'accepted': return { label: 'Accepted', className: 'accepted', action: 'Filed with court' };
-      case 'rejected': return { label: 'Rejected', className: 'rejected', action: 'See reason' };
-      case 'returned': return { label: 'Returned', className: 'returned', action: 'Needs correction' };
-      default: return { label: status, className: '', action: '' };
-    }
-  };
-
-  const statusCounts = useMemo(() =>
-    filings.reduce((acc, f) => {
-      acc[f.status] = (acc[f.status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>),
-  [filings]);
-
   return (
     <div className="my-filings">
       <div className="page-header">
@@ -96,16 +80,15 @@ function MyFilings() {
 
       {/* Status summary cards */}
       <div className="status-summary">
-        {['draft', 'submitted', 'under_review', 'accepted', 'rejected', 'returned'].map(s => {
-          const info = getStatusInfo(s);
+        {Object.entries(STATUS_LABELS).map(([s, label]) => {
           return (
             <button
               key={s}
               className={`status-card ${statusFilter === s ? 'active' : ''}`}
-              onClick={() => setStatusFilter(statusFilter === s ? '' : s)}
+              onClick={() => { setStatusFilter(statusFilter === s ? '' : s); setPage(1); }}
             >
               <span className="status-card-count">{statusCounts[s] || 0}</span>
-              <span className={`status-badge ${info.className}`}>{info.label}</span>
+              <span className={`status-badge ${s}`}>{label}</span>
             </button>
           );
         })}
@@ -145,12 +128,11 @@ function MyFilings() {
       {!loading && filings.length > 0 && (
         <div className="filings-list">
           {filings.map((filing) => {
-            const info = getStatusInfo(filing.status);
             return (
               <div key={filing.id} className="filing-card">
                 <div className="filing-card-header">
                   <span className="filing-card-id">#{filing.id}</span>
-                  <span className={`status-badge ${info.className}`}>{info.label}</span>
+                  <span className={`status-badge ${filing.status}`}>{STATUS_LABELS[filing.status] || filing.status}</span>
                 </div>
                 <h4 className="filing-card-title">{filing.case_title || 'Untitled Filing'}</h4>
                 <div className="filing-card-meta">
@@ -187,7 +169,7 @@ function MyFilings() {
         <div className="pagination">
           <button
             className="btn btn-secondary btn-small"
-            disabled={page <= 1}
+            disabled={page <= 1 || loading}
             onClick={() => setPage(p => p - 1)}
           >
             Previous
@@ -195,7 +177,7 @@ function MyFilings() {
           <span>Page {page} of {Math.ceil(total / 25)}</span>
           <button
             className="btn btn-secondary btn-small"
-            disabled={page >= Math.ceil(total / 25)}
+            disabled={page >= Math.ceil(total / 25) || loading}
             onClick={() => setPage(p => p + 1)}
           >
             Next

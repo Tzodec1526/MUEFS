@@ -183,7 +183,8 @@ async def test_list_filings(db_session):
         )
         await filing_service.create_filing(db_session, user.id, data)
 
-    filings, total = await filing_service.list_filings(db_session, user.id)
+    filings, total, counts = await filing_service.list_filings(db_session, user.id)
+    assert counts[FilingStatus.DRAFT] == total
     assert total == 3
     assert len(filings) == 3
 

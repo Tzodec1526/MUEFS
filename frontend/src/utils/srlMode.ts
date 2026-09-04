@@ -15,7 +15,6 @@ export const PLAIN_STEP_LABELS: Record<string, string> = {
   'case-type': 'What kind of case',
   details: 'Tell us about your filing',
   documents: 'Upload your papers',
-  service: 'Who to notify',
   review: 'Check and send',
 };
 

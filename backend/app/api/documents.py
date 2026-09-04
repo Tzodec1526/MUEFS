@@ -1,9 +1,13 @@
+import hashlib
 import re
+from contextlib import closing
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.background import BackgroundTask
+from starlette.concurrency import run_in_threadpool
 
 from app.api.auth import get_optional_user_id
 from app.database import get_db
@@ -56,7 +60,7 @@ async def download_document(
     )
 
     try:
-        file_stream = await document_service.download_document(doc.file_key)
+        file_stream = await run_in_threadpool(document_service.download_document, doc.file_key)
     except (FileNotFoundError, OSError):
         # Seeded demo filings have a document record but no stored file behind it.
         # Show a clear message instead of a generic 500.
@@ -70,10 +74,17 @@ async def download_document(
             status_code=status.HTTP_404_NOT_FOUND,
         )
     safe_filename = sanitize_filename(doc.title)
+
+    def chunks():
+        with closing(file_stream):
+            while chunk := file_stream.read(64 * 1024):
+                yield chunk
+
     return StreamingResponse(
-        file_stream,
+        chunks(),
         media_type=doc.mime_type,
         headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'},
+        background=BackgroundTask(file_stream.close),
     )
 
 
@@ -96,10 +107,15 @@ async def verify_document(
             detail="Not authorized to access this document",
         )
 
+    def stored_hash():
+        with closing(document_service.download_document(doc.file_key)) as file_stream:
+            digest = hashlib.sha256()
+            while chunk := file_stream.read(64 * 1024):
+                digest.update(chunk)
+            return digest.hexdigest()
+
     try:
-        file_stream = await document_service.download_document(doc.file_key)
-        file_data = file_stream.read()
-        current_hash = document_service.compute_sha256(file_data)
+        current_hash = await run_in_threadpool(stored_hash)
         is_valid = current_hash == doc.sha256_hash
     except OSError:
         return DocumentVerifyResponse(

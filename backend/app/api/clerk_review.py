@@ -7,14 +7,13 @@ from app.api.auth import get_current_user_id
 from app.database import get_db
 from app.models.court import Court
 from app.models.filing import FilingStatus
-from app.models.user import CourtRole, UserCourtRole
 from app.schemas.filing import (
     BatchReviewRequest,
     ClerkReviewRequest,
     FilingEnvelopeResponse,
     FilingListResponse,
 )
-from app.services import audit_service, filing_service, notification_service
+from app.services import access_service, audit_service, filing_service, notification_service
 from app.utils.http_context import client_ip, client_user_agent
 
 router = APIRouter(prefix="/clerk", tags=["Clerk Review"])
@@ -24,14 +23,7 @@ async def _require_clerk_role(
     db: AsyncSession, user_id: int, court_id: int,
 ) -> None:
     """Verify user has clerk/judge/admin role for the given court."""
-    result = await db.execute(
-        select(UserCourtRole).where(
-            UserCourtRole.user_id == user_id,
-            UserCourtRole.court_id == court_id,
-            UserCourtRole.role.in_([CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]),
-        )
-    )
-    if not result.scalar_one_or_none():
+    if not await access_service.user_is_court_staff_for_court(db, user_id, court_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized as clerk for this court",
@@ -43,12 +35,17 @@ async def get_review_queue(
     court_id: int = Query(...),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
+    status_filter: FilingStatus | None = Query(None, alias="status"),
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
     await _require_clerk_role(db, user_id, court_id)
+    if status_filter not in (None, FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW):
+        raise HTTPException(
+            status_code=400, detail="Queue status must be submitted or under_review"
+        )
     filings, total = await filing_service.get_clerk_queue(
-        db, court_id, page=page, page_size=page_size
+        db, court_id, page=page, page_size=page_size, status=status_filter
     )
     return FilingListResponse(filings=filings, total=total, page=page, page_size=page_size)  # type: ignore[arg-type]
 
