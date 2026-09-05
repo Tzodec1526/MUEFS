@@ -16,10 +16,10 @@ Browser tools for Michigan e-filing: agents research and navigate; humans submit
 
 1. Open `/agent` — confirm WebMCP registered and activity feed
 2. Call `get_agent_session`, then `get_agent_catalog`
-3. Attorney: `sign_in_demo_role` attorney → `attorney_motion_workflow` party Smith → `navigate_to` wizard path
+3. Attorney: `sign_in_demo_role` attorney → `attorney_motion_workflow` party Smith → choose a case if prompted → call again with its case_id → `navigate_to` wizard path
 4. Clerk: `sign_in_demo_role` clerk → `clerk_triage_workflow` → `navigate_to` /clerk/queue
 
-## Tool catalog (23 · role-filtered 16 / 20 / 19)
+## Tool catalog (20 · role-filtered 15 / 19 / 16)
 
 | Tool | Tier | Role | Description |
 |---|---|---|---|
@@ -30,7 +30,6 @@ Browser tools for Michigan e-filing: agents research and navigate; humans submit
 | `search_cases` | discovery | all | Public docket search (+ declarative form) |
 | `get_case_docket` | discovery | all | Case detail by id |
 | `list_courts` | discovery | all | E-filing enabled courts by county |
-| `research_case_for_motion` | workflow | all | Search → docket → MCR checklist → wizard URL |
 | `attorney_motion_workflow` | workflow | all* | Full filer plan with drafts + wizard URL |
 | `clerk_triage_workflow` | workflow | all* | Queue counts + review plan |
 | `explain_mcr_for_filing` | workflow | all | Plain-language MCR for SRLs |
@@ -38,14 +37,12 @@ Browser tools for Michigan e-filing: agents research and navigate; humans submit
 | `get_motion_checklists` | discovery | all | MCR 2.119 motion companions |
 | `navigate_to` | action | all | Same-origin navigation |
 | `sign_in_demo_role` | action | demo | Switch attorney / clerk / srl / public |
-| `open_filing_for_review` | discovery | clerk | Deep link into queue for one filing |
 | `get_current_demo_role` | discovery | demo | Current session role |
 | `list_my_filings` | discovery | filer | Attorney/SRL filings |
 | `get_filing_details` | discovery | filer | Single filing status |
 | `validate_filing` | workflow | filer | Pre-submit MCR validation |
 | `start_motion_filing` | action | filer | Build wizard URL from case ids |
 | `get_clerk_review_queue` | discovery | clerk | Pending review list |
-| `clerk_queue_summary` | discovery | clerk | Queue aggregates |
 
 \*Workflow tools are callable when anonymous but return `needs_sign_in` until the correct role is active.
 
@@ -67,7 +64,6 @@ frontend/src/webmcp/
     session.ts         # get_agent_session / briefing
     workflows.ts       # attorney / clerk / explain_mcr
     courts.ts
-    orchestration.ts   # research_case_for_motion
     search.ts
     rules.ts
     auth.ts

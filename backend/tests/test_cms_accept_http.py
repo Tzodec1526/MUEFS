@@ -9,6 +9,7 @@ from sqlalchemy.pool import StaticPool
 from app.database import Base, get_db
 from app.integrations.cms_adapter import CMSFilingResult
 from app.main import app
+from app.models.case import Case
 from app.models.court import CaseCategory, CaseType, Court, CourtType
 from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.models.user import CourtRole, User, UserCourtRole, UserType
@@ -26,14 +27,10 @@ async def cms_fail_app(monkeypatch):
         await conn.run_sync(Base.metadata.create_all)
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-    class FailingAdapter:
-        async def submit_filing(self, **_kwargs):
-            return CMSFilingResult(success=False, error_message="JIS unavailable")
+    async def fail_submission(_case_number, _filing_id):
+        return CMSFilingResult(success=False, error_message="JIS unavailable")
 
-    monkeypatch.setattr(
-        "app.services.filing_service.get_cms_adapter",
-        lambda _cms_type: FailingAdapter(),
-    )
+    monkeypatch.setattr("app.services.filing_service.submit_filing_to_cms", fail_submission)
 
     ids: dict[str, int] = {}
     async with factory() as s:
@@ -106,3 +103,7 @@ async def test_cms_failure_persists_after_http_502(cms_fail_app):
         assert env is not None
         assert env.status != FilingStatus.ACCEPTED
         assert env.cms_error == "JIS unavailable"
+        assert env.case_id is None
+        from sqlalchemy import func, select
+
+        assert await s.scalar(select(func.count()).select_from(Case)) == 0

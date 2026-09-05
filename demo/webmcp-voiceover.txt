@@ -23,7 +23,7 @@ Same site. Different tool set.
 Declarative case search on the hub — toolname search_cases. Same fields humans use.
 
 2:15
-AGPL on GitHub. Run buttons on /agent cover the same paths without a live agent.
+AGPL on GitHub. The /agent page lists the available tools and lets you search cases directly.
 
 2:40
 MUEFS. Live at webmcp.tomcedoz.com.

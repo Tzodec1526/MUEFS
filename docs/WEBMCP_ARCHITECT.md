@@ -41,7 +41,6 @@ export function publishAgentPageContext(): void; // role, path, drafts hint, sug
 - `confirm.ts` — window.confirm wrapper (HITL for MUTATING)
 - `annotations.ts` — MUTATING used on navigate_to, sign_in_demo_role
 - `registry.ts` — provideContext + addEventListener toolchange (don't clobber); late modelContext poll
-- `tools/clerk.ts` — `open_filing_for_review` deep link
 - `catalog.ts` + test — role matrix
 - Header / WebMcpHeaderLink — always show Agent; notify on role clear
 

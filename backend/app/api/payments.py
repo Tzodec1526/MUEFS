@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user_id, require_user_may_manage_efilings
 from app.config import settings
 from app.database import get_db
+from app.models.filing import FilingEnvelope, FilingStatus
 from app.models.user import User
 from app.schemas.payment import (
     PaymentCalculateRequest,
@@ -11,7 +13,7 @@ from app.schemas.payment import (
     PaymentProcessRequest,
     PaymentResponse,
 )
-from app.services import audit_service, filing_service, payment_service
+from app.services import audit_service, payment_service
 from app.utils.http_context import client_ip, client_user_agent
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
@@ -23,9 +25,12 @@ async def calculate_fees(
     db: AsyncSession = Depends(get_db),
     _user_id: int = Depends(get_current_user_id),
 ):
-    return await payment_service.calculate_fees(
-        db, data.court_id, data.case_type_id, data.document_count, data.filing_type
-    )
+    try:
+        return await payment_service.calculate_fees(
+            db, data.court_id, data.case_type_id, data.filing_type
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/process", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
@@ -43,7 +48,9 @@ async def process_payment(
         )
 
     # Look up the filing envelope to validate payment against actual fees
-    filing = await filing_service.get_filing(db, data.envelope_id)
+    filing = await db.scalar(
+        select(FilingEnvelope).where(FilingEnvelope.id == data.envelope_id).with_for_update()
+    )
     if not filing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -61,6 +68,8 @@ async def process_payment(
             status_code=status.HTTP_409_CONFLICT,
             detail="Payment already processed for this filing",
         )
+    if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
+        raise HTTPException(status_code=409, detail="Only draft or returned filings can be paid")
 
     # Validate amount matches calculated fees
     calculated = await payment_service.calculate_fees(

@@ -1,11 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user_id
 from app.database import get_db
-from app.models.court import Court
 from app.models.filing import FilingStatus
 from app.schemas.filing import (
     BatchReviewRequest,
@@ -13,7 +11,7 @@ from app.schemas.filing import (
     FilingEnvelopeResponse,
     FilingListResponse,
 )
-from app.services import access_service, audit_service, filing_service, notification_service
+from app.services import access_service, audit_service, filing_service
 from app.utils.http_context import client_ip, client_user_agent
 
 router = APIRouter(prefix="/clerk", tags=["Clerk Review"])
@@ -115,22 +113,6 @@ async def review_filing(
         details={"action": data.action, "reason": data.reason},
         ip_address=client_ip(request),
         user_agent=client_user_agent(request),
-    )
-
-    # Look up actual court name for notification
-    court_result = await db.execute(select(Court).where(Court.id == filing.court_id))
-    court = court_result.scalar_one_or_none()
-    court_name = court.name if court else f"Court #{filing.court_id}"
-
-    status_text = "returned" if data.action == "return" else data.action + "ed"
-    await notification_service.notify_filing_status_change(
-        db,
-        filer_id=filing.filer_id,
-        filing_id=filing_id,
-        status=status_text,
-        court_name=court_name,
-        case_title=filing.case_title,
-        reason=data.reason,
     )
 
     return filing

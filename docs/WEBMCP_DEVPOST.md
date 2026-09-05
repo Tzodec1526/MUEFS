@@ -37,7 +37,7 @@ WebMCP, React, FastAPI, Michigan Court Rules (MCR), Keycloak (optional), Render,
 
 ### Product
 
-23 role-aware WebMCP tools (16 / 20 / 19), `/agent` hub + `get_agent_activity` / `get_challenge_briefing`, confirm on mutating tools, declarative forms (`search_cases`, `sign_in_demo_role`, clerk queue).
+20 role-aware WebMCP tools (15 / 19 / 16), `/agent` hub + `get_agent_activity` / `get_challenge_briefing`, confirm on mutating tools, declarative forms (`search_cases`, `sign_in_demo_role`, clerk queue).
 
 ### Flows
 
@@ -47,7 +47,7 @@ WebMCP, React, FastAPI, Michigan Court Rules (MCR), Keycloak (optional), Render,
 
 ### Implementation
 
-- Imperative: `document.modelContext.registerTool()` in `frontend/src/webmcp/` (23 tools)
+- Imperative: `document.modelContext.registerTool()` in `frontend/src/webmcp/` (20 tools)
 - Declarative: `toolname` on case search, login, clerk queue, hub search
 - Role-aware re-registration; optional `provideContext` on SPA routes
 - `untrustedContentHint` + sanitized docket text
@@ -64,7 +64,7 @@ WebMCP, React, FastAPI, Michigan Court Rules (MCR), Keycloak (optional), Render,
 ## Testing instructions
 
 1. Open the live URL with WebMCP enabled (or Chrome with `#enable-webmcp-testing`).
-2. Visit `/agent` — status **Active**, tool count **16 / 20 / 19** by role; try declarative search + Flagship buttons; activity feed updates on tool calls.
+2. Visit `/agent` — status **Active**, tool count **15 / 19 / 16** by role; try declarative search + Flagship buttons; activity feed updates on tool calls.
 3. Prompt: `Call get_challenge_briefing, then get_agent_session and get_agent_catalog.`
 4. Prompt: `Sign in as attorney, run attorney_motion_workflow for party Smith, then get_agent_activity.`
 5. Optional: clerk / SRL prompts on the hub, or click Flagship demo buttons without a live agent.

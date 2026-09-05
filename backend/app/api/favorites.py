@@ -2,13 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import contains_eager, selectinload
 
-from app.api.auth import get_current_user_id, require_user_may_manage_efilings
+from app.api.auth import get_current_user, get_current_user_id, require_user_may_manage_efilings
 from app.database import get_db
 from app.models.case import Case
 from app.models.court import Court
 from app.models.user import FavoriteCase, FavoriteCourt, User
+from app.services.access_service import case_visibility_filter
 
 router = APIRouter(prefix="/favorites", tags=["Favorites"])
 
@@ -55,13 +56,14 @@ class FavoriteCourtListResponse(BaseModel):
 @router.get("", response_model=FavoriteCaseListResponse)
 async def list_favorites(
     db: AsyncSession = Depends(get_db),
-    user_id: int = Depends(get_current_user_id),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
         select(FavoriteCase)
-        .options(selectinload(FavoriteCase.case))
-        .where(FavoriteCase.user_id == user_id)
-        .order_by(FavoriteCase.created_at.desc())
+        .join(FavoriteCase.case)
+        .options(contains_eager(FavoriteCase.case))
+        .where(FavoriteCase.user_id == current_user.id, case_visibility_filter(current_user))
+        .order_by(FavoriteCase.created_at.desc(), FavoriteCase.id.desc())
     )
     favorites = list(result.scalars().all())
 
@@ -87,8 +89,9 @@ async def add_favorite(
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
-    # Check case exists
-    case_result = await db.execute(select(Case).where(Case.id == data.case_id))
+    case_result = await db.execute(select(Case).where(
+        Case.id == data.case_id, case_visibility_filter(current_user),
+    ))
     case = case_result.scalar_one_or_none()
     if not case:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")

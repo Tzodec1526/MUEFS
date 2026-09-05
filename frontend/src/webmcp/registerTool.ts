@@ -34,15 +34,9 @@ export async function registerMuefsTool(
   await mc.registerTool(wrapped, options);
 }
 
-/** Proxy that logs every tool registration and execution. */
+/** Decorate tool registration with execution logging. */
 export function createLoggingModelContext(mc: ModelContext): ModelContext {
   return {
     registerTool: (tool, options) => registerMuefsTool(mc, tool, options),
-    getTools: mc.getTools?.bind(mc),
-    executeTool: mc.executeTool?.bind(mc),
-    provideContext: mc.provideContext?.bind(mc),
-    ontoolchange: mc.ontoolchange,
-    addEventListener: mc.addEventListener?.bind(mc),
-    removeEventListener: mc.removeEventListener?.bind(mc),
   };
 }

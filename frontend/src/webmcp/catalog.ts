@@ -59,13 +59,6 @@ export const TOOL_CATALOG: CatalogEntry[] = [
     tier: 'discovery',
   },
   {
-    name: 'research_case_for_motion',
-    title: 'Research case & motion plan',
-    description: 'Search → docket → MCR motion checklist → pre-filled filing URL.',
-    readOnly: true,
-    tier: 'workflow',
-  },
-  {
     name: 'attorney_motion_workflow',
     title: 'Attorney motion workflow',
     description: 'Full filer plan: case research, requirements, drafts, wizard URL.',
@@ -150,20 +143,6 @@ export const TOOL_CATALOG: CatalogEntry[] = [
     tier: 'discovery',
   },
   {
-    name: 'clerk_queue_summary',
-    title: 'Clerk queue summary',
-    description: 'Aggregate counts and oldest pending items for clerks.',
-    readOnly: true,
-    tier: 'discovery',
-  },
-  {
-    name: 'open_filing_for_review',
-    title: 'Open filing for review',
-    description: 'Deep link into the clerk queue for one filing (human decides accept/reject).',
-    readOnly: true,
-    tier: 'discovery',
-  },
-  {
     name: 'get_current_demo_role',
     title: 'Current demo role',
     description: 'Active demonstration role in this browser session.',
@@ -180,7 +159,6 @@ const PUBLIC_TOOLS = new Set([
   'search_cases',
   'get_case_docket',
   'list_courts',
-  'research_case_for_motion',
   'attorney_motion_workflow',
   'clerk_triage_workflow',
   'explain_mcr_for_filing',
@@ -202,8 +180,6 @@ const FILER_TOOLS = new Set([
 const CLERK_TOOLS = new Set([
   ...PUBLIC_TOOLS,
   'get_clerk_review_queue',
-  'clerk_queue_summary',
-  'open_filing_for_review',
 ]);
 
 export function toolsForRole(role: string | null): Set<string> {
@@ -238,7 +214,7 @@ export async function registerCatalogTool(
           role: role || 'anonymous',
           tool_count: entries.length,
           tools: entries,
-          workflows: ['attorney_motion_workflow', 'clerk_triage_workflow', 'research_case_for_motion'],
+          workflows: entries.filter(t => t.tier === 'workflow').map(t => t.name),
           hint: 'Start with get_agent_session, then attorney_motion_workflow for filers.',
         });
       },

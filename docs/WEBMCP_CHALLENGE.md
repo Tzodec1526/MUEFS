@@ -12,11 +12,11 @@ The statewide Michigan e-filing portal where AI agents research dockets, load MC
 
 ## What it does
 
-23 WebMCP tools (16 / 20 / 19 by role), `/agent` activity feed (`get_agent_activity`), SPA navigation with confirm on mutating tools, declarative forms on hub / search / login / clerk queue.
+20 WebMCP tools (15 / 19 / 16 by role), `/agent` activity feed (`get_agent_activity`), SPA navigation with confirm on mutating tools, declarative forms on hub / search / login / clerk queue.
 
-1. `research_case_for_motion` — search → MCR checklist → pre-filled wizard
+1. `attorney_motion_workflow` — search → MCR checklist → pre-filled wizard
 2. `validate_filing` — MCR docs before human Submit
-3. `clerk_triage_workflow` / `clerk_queue_summary` — clerk queue without filer credentials
+3. `clerk_triage_workflow` — clerk queue without filer credentials
 
 ## How we implemented WebMCP
 
@@ -37,7 +37,7 @@ Agent hub: https://webmcp.tomcedoz.com/agent
 ## Testing instructions
 
 1. Open the URL with WebMCP enabled (or Chrome with `#enable-webmcp-testing`).
-2. Visit `/agent` — status should show **Active** with **16 / 20 / 19** tools by role; activity feed updates on each tool call.
+2. Visit `/agent` — status should show **Active** with **15 / 19 / 16** tools by role; activity feed updates on each tool call.
 3. Prompt: *"Call get_challenge_briefing, then get_agent_session and get_agent_catalog."*
 4. Prompt: *"Sign in as attorney, run attorney_motion_workflow for party Smith, navigate to the wizard."*
 5. Optional clerk: *"Sign in as clerk and run clerk_triage_workflow."*
@@ -75,7 +75,7 @@ https://github.com/Tzodec1526/MUEFS (AGPL-3.0 — GitHub license badge)
 4. *(1:15)* Open the wizard from the result. "Human in the loop by design. Agents research and navigate. They never file."
 5. *(1:35)* Clerk prompt: triage workflow then queue. "Same site, different tool set when you sign in as clerk."
 6. *(1:55)* Case search form with toolname search_cases. "Declarative WebMCP. The agent fills the form humans already use."
-7. *(2:15)* Show GitHub AGPL repo and the Run attorney_motion_workflow button on /agent for backup B-roll without a live agent.
+7. *(2:15)* Show the GitHub AGPL repo and the workflow catalog on /agent.
 8. *(2:40)* "MUEFS: agent-native Michigan court e-filing. Live at webmcp.tomcedoz.com."
 
 ### Shot list
@@ -91,7 +91,7 @@ https://github.com/Tzodec1526/MUEFS (AGPL-3.0 — GitHub license badge)
 | 2:15 | Repo + Flagship demo button on `/agent` |
 | 2:40 | CTA |
 
-Record with screen capture + mic using `demo/webmcp-voiceover.txt`. Draft with audio (TTS over B-roll, replace with live agent capture before submit): `demo/muefs-webmcp-challenge.mp4`. Silent B-roll only: `demo/muefs-webmcp-challenge-broll.mp4` via `scripts/record-webmcp-demo.ps1`.
+Record with screen capture + mic using `demo/webmcp-voiceover.txt`. Draft with audio (TTS over B-roll, replace with live agent capture before submit): `demo/muefs-webmcp-challenge.mp4`. Silent B-roll only: `demo/muefs-webmcp-challenge-broll.mp4` (archived recording of the earlier UI).
 
 ## Differentiators vs typical hackathon entries
 

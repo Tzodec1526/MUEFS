@@ -1,7 +1,7 @@
 import { listFilings } from '../../api/filings';
 import { getDemoRole } from '../../components/auth/LoginScreen';
 import { getAgentActivity } from '../activity';
-import { catalogForRole } from '../catalog';
+import { catalogForRole, TOOL_CATALOG } from '../catalog';
 import { READ_ONLY } from '../annotations';
 import { toolOk } from '../output';
 import type { ModelContext } from '../types';
@@ -100,7 +100,14 @@ export async function registerSessionTools(mc: ModelContext, signal?: AbortSigna
           canonical_demo: 'https://demo.tomcedoz.com/agent',
           repo: 'https://github.com/Tzodec1526/MUEFS',
           license: 'AGPL-3.0',
-          tool_catalog: { total: 23, by_role: { public: 16, filer: 20, clerk: 19 } },
+          tool_catalog: {
+            total: TOOL_CATALOG.length,
+            by_role: {
+              public: catalogForRole(null).length,
+              filer: catalogForRole('attorney').length,
+              clerk: catalogForRole('clerk').length,
+            },
+          },
           human_in_the_loop: 'Agents research and navigate; only humans click Submit in the filing wizard.',
           apis: {
             imperative: 'document.modelContext.registerTool in frontend/src/webmcp/',

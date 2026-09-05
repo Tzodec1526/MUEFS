@@ -36,3 +36,21 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
             yield session
     finally:
         await engine.dispose()  # Disposing the in-memory DB also drops its tables.
+
+
+@pytest_asyncio.fixture
+async def api_client(db_session):
+    from httpx import ASGITransport, AsyncClient
+
+    from app.database import get_db
+    from app.main import app
+
+    async def override_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            yield client
+    finally:
+        app.dependency_overrides.pop(get_db, None)

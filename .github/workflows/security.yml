@@ -61,7 +61,7 @@ jobs:
       - name: Audit frontend dependencies (production only)
         run: |
           cd frontend
-          npm install
+          npm ci
           npm audit --omit=dev --audit-level=high
 
   bandit:

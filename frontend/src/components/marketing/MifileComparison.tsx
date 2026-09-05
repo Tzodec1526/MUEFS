@@ -1,4 +1,5 @@
 import { Check, X, Minus } from 'lucide-react';
+import { TOOL_CATALOG } from '../../webmcp/catalog';
 
 type Cell = 'yes' | 'no' | { partial: string } | string;
 
@@ -46,7 +47,7 @@ const ROWS: Row[] = [
   {
     feature: 'AI agent tools (WebMCP)',
     mifile: 'no',
-    muefs: '23 tools + /agent',
+    muefs: `${TOOL_CATALOG.length} tools + /agent`,
     highlight: true,
   },
   {
@@ -55,9 +56,9 @@ const ROWS: Row[] = [
     muefs: 'yes',
   },
   {
-    feature: 'Serve documents only',
+    feature: 'Service-only records',
     mifile: { partial: 'Varies; often separate workflow' },
-    muefs: 'One-click from case docket',
+    muefs: 'Record documents; arrange delivery outside the app',
   },
   {
     feature: 'Draft autosave',

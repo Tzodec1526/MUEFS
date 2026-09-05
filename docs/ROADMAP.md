@@ -7,10 +7,9 @@ finished court system.
 
 ## Known limitations (demo-grade today)
 
-- **CMS integration is stubbed.** The adapter layer (JIS, Tyler Odyssey) is real and
-  pluggable, and dispatches by `court.cms_type`, but the adapters return canned responses —
-  there is no live connection to a court case-management system yet. See
-  `backend/app/integrations/`.
+- **CMS integration is not connected.** Demo acceptance records a simulated identifier.
+  Outside demo mode, an unconfigured CMS blocks acceptance. No JIS or Tyler request is
+  made; see the submission boundary in `backend/app/integrations/cms_adapter.py`.
 - **Payments are simulated.** The fee/waiver flow is fully demonstrated, but no payment
   processor is integrated (`PAYMENTS_ARE_SIMULATED=true`); no card data is handled.
 - **Demo auth is open by configuration.** The hosted demo enables `ALLOW_DEMO_MODE` and
@@ -23,8 +22,8 @@ finished court system.
   processing (server-side OCR / PDF-A conversion) is not implemented.
 - **Demo persistence is lightweight.** `run_demo.py` and the hosted demo use SQLite + local
   file storage; production uses PostgreSQL + MinIO/S3.
-- **No production e-service or notice delivery.** The demo captures email via MailHog rather
-  than sending real notices.
+- **No e-service or email delivery.** Clerk decisions create in-app notifications.
+  Service-only filings record documents; delivery must be arranged outside the app.
 
 ## Roadmap (illustrative)
 

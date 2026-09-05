@@ -36,13 +36,6 @@ class Settings(BaseSettings):
     # Comma-separated trusted proxy IPs for X-Forwarded-For (Render, nginx, etc.).
     trusted_proxy_ips: str = ""
 
-    # Email
-    smtp_host: str = "localhost"
-    smtp_port: int = 1025
-    smtp_user: str = ""
-    smtp_password: str = ""
-    smtp_from: str = "noreply@michigan-efiling.gov"
-
     # Document processing
     max_file_size_mb: int = 100
 

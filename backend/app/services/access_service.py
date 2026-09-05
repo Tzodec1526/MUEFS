@@ -15,7 +15,7 @@ only), court staff, and system admin — never anonymous.
 
 from __future__ import annotations
 
-from sqlalchemy import and_, false, or_, select
+from sqlalchemy import ColumnElement, and_, false, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.case import Case, CaseParticipant, ParticipantRole
@@ -53,26 +53,15 @@ async def user_is_court_staff_for_court(
     return bool(await db.scalar(select(staff_role)))
 
 
-async def user_may_read_sealed_case(db: AsyncSession, user_id: int | None, case_id: int) -> bool:
-    """Sealed docket: litigants, counsel of record, filer-on-case, court staff, admin."""
-    if user_id is None:
-        return False  # anonymous public visitors never reach sealed matters
-    case_row = await db.execute(select(Case).where(Case.id == case_id))
-    case = case_row.scalar_one_or_none()
-    if not case or not case.is_sealed:
-        return False
-
-    user_row = await db.execute(select(User).where(User.id == user_id))
-    user = user_row.scalar_one_or_none()
-    if not user or not user.is_active:
-        return False
-
+def case_visibility_filter(user: User | None) -> ColumnElement[bool]:
+    """Shared SQL predicate for both single-case reads and saved-case listings."""
+    public = Case.is_sealed.is_(False)
+    if user is None:
+        return public
+    if not user.is_active:
+        return false()
     if user.user_type == UserType.ADMIN:
-        return True
-
-    if await user_is_court_staff_for_court(db, user_id, case.court_id):
-        return True
-
+        return true()
     # Counsel of record only: attorney_* rows, matched by linked account or a *verified*
     # bar number on that row. A self-asserted (unverified) bar number never grants sealed
     # access — public self-registration leaves bar_number_verified False, so it cannot be
@@ -85,42 +74,46 @@ async def user_may_read_sealed_case(db: AsyncSession, user_id: int | None, case_
         if user.bar_number is not None and user.bar_number_verified
         else false()
     )
-    participant_conditions = [
-        CaseParticipant.case_id == case_id,
+    participant_grant = select(CaseParticipant.id).where(
+        CaseParticipant.case_id == Case.id,
         or_(
-            CaseParticipant.user_id == user_id,
+            CaseParticipant.user_id == user.id,
             and_(CaseParticipant.role.in_(_ATTORNEY_OF_RECORD_ROLES), bar_match),
         ),
-    ]
-    participant_grant = select(CaseParticipant.id).where(*participant_conditions).exists()
+    ).correlate(Case).exists()
     filer_grant = (
         select(FilingEnvelope.id).where(
-            FilingEnvelope.case_id == case_id,
-            FilingEnvelope.filer_id == user_id,
+            FilingEnvelope.case_id == Case.id,
+            FilingEnvelope.filer_id == user.id,
             FilingEnvelope.status.in_(_FILER_ON_CASE_STATUSES),
-        ).exists()
+        ).correlate(Case).exists()
     )
-    return bool(await db.scalar(select(or_(participant_grant, filer_grant))))
+    staff_grant = select(UserCourtRole.id).where(
+        UserCourtRole.court_id == Case.court_id,
+        UserCourtRole.user_id == user.id,
+        UserCourtRole.role.in_([CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]),
+    ).correlate(Case).exists()
+    return or_(public, participant_grant, filer_grant, staff_grant)
+
+
+async def user_may_read_sealed_case(db: AsyncSession, user_id: int | None, case_id: int) -> bool:
+    """Sealed docket: litigants, counsel of record, filer-on-case, court staff, admin."""
+    if user_id is None:
+        return False
+    user = await db.get(User, user_id)
+    return bool(user and await db.scalar(select(Case.id).where(
+        Case.id == case_id, Case.is_sealed.is_(True), case_visibility_filter(user),
+    )))
 
 
 async def user_may_read_case(db: AsyncSession, user_id: int | None, case_id: int) -> bool:
     """Non-sealed: anyone, including anonymous public visitors. Sealed: restricted list."""
-    case_row = await db.execute(select(Case).where(Case.id == case_id))
-    case = case_row.scalar_one_or_none()
-    if not case:
+    user = await db.get(User, user_id) if user_id is not None else None
+    if user_id is not None and user is None:
         return False
-
-    # A signed-in account must still be active; anonymous (user_id None) skips this.
-    if user_id is not None:
-        user_row = await db.execute(select(User).where(User.id == user_id))
-        user = user_row.scalar_one_or_none()
-        if not user or not user.is_active:
-            return False
-
-    if not case.is_sealed:
-        return True
-
-    return await user_may_read_sealed_case(db, user_id, case_id)
+    return bool(await db.scalar(select(Case.id).where(
+        Case.id == case_id, case_visibility_filter(user),
+    )))
 
 
 async def user_may_read_filing_envelope(

@@ -11,38 +11,29 @@ import MichiganMark from '../common/MichiganMark';
 import { useToast } from '../common/Toast';
 import AgentActivityFeed from './AgentActivityFeed';
 import AgentDeclarativeSearch from './AgentDeclarativeSearch';
-import FlagshipDemoRunner from './FlagshipDemoRunner';
 
 const EXAMPLE_PROMPTS = [
   {
     title: 'Session',
     prompt:
       'Call get_challenge_briefing, then get_agent_session and get_agent_catalog.',
-    tools: ['get_challenge_briefing', 'get_agent_session', 'get_agent_catalog'],
   },
   {
     title: 'Attorney motion',
     prompt:
-      'Sign in as attorney, run attorney_motion_workflow for party Smith, navigate_to the filing wizard, then call get_agent_activity.',
-    tools: ['sign_in_demo_role', 'attorney_motion_workflow', 'navigate_to', 'get_agent_activity'],
+      'Sign in as attorney, run attorney_motion_workflow for party Smith, let me choose a case if there are several matches, navigate_to the filing wizard, then call get_agent_activity.',
   },
   {
     title: 'SRL MCR',
     prompt:
       'Sign in as srl. Run explain_mcr_for_filing for court_id 3 case_type_id 35 filing_type motion.',
-    tools: ['sign_in_demo_role', 'explain_mcr_for_filing'],
   },
   {
     title: 'Clerk triage',
     prompt:
       'Sign in as clerk, run clerk_triage_workflow, then navigate_to /clerk/queue.',
-    tools: ['sign_in_demo_role', 'clerk_triage_workflow', 'navigate_to'],
   },
 ];
-
-function copyText(text: string): Promise<void> {
-  return navigator.clipboard.writeText(text);
-}
 
 function WebMcpAgentPage() {
   const status = webMcpStatus();
@@ -67,7 +58,7 @@ function WebMcpAgentPage() {
 
   const handleCopy = async (text: string) => {
     try {
-      await copyText(text);
+      await navigator.clipboard.writeText(text);
       pushToast('Copied', 'success');
     } catch {
       pushToast('Could not copy', 'error');
@@ -103,7 +94,7 @@ function WebMcpAgentPage() {
         <p className={`agent-status-pill ${status.available ? 'ok' : 'off'}`}>
           {status.available ? (
             <>
-              <CheckCircle2 size={18} aria-hidden /> {status.toolCount} registered
+              <CheckCircle2 size={18} aria-hidden /> Browser supports WebMCP
             </>
           ) : (
             <>
@@ -129,8 +120,6 @@ function WebMcpAgentPage() {
       </section>
 
       <AgentDeclarativeSearch />
-
-      <FlagshipDemoRunner />
 
       <section className="agent-hub-workflows">
         <h2>Workflows</h2>

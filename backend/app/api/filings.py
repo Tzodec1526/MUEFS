@@ -181,7 +181,7 @@ async def submit_filing(
             detail="Not authorized to access this filing",
         )
 
-    if not filing_service.fee_obligation_met(filing_check):
+    if not await filing_service.fee_obligation_met(db, filing_check):
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Payment required before submission",

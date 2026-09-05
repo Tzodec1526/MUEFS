@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
 
-from app.integrations.cms_adapter import CMSFilingResult, get_cms_adapter
+from app.integrations.cms_adapter import submit_filing_to_cms
 from app.models.case import Case, CaseParticipant, CaseStatus, ParticipantRole
 from app.models.court import Court, FilingRequirement
 from app.models.filing import FilingEnvelope, FilingStatus
@@ -15,6 +15,7 @@ from app.schemas.filing import (
     FilingValidationResult,
 )
 from app.services import access_service
+from app.services.notification_service import notify_filing_status_change
 
 
 class FilingCreateError(Exception):
@@ -127,7 +128,7 @@ async def create_filing(
     return envelope
 
 
-def fee_obligation_met(filing: FilingEnvelope) -> bool:
+async def fee_obligation_met(db: AsyncSession, filing: FilingEnvelope) -> bool:
     """True when submit may proceed: paid, waiver granted, or waiver application pending.
 
     A requested waiver is an application that travels with the envelope. The clerk
@@ -140,7 +141,12 @@ def fee_obligation_met(filing: FilingEnvelope) -> bool:
         return True
     if filing.fee_waiver_granted is True:
         return True
-    return bool(filing.fee_waiver_requested)
+    if filing.fee_waiver_requested:
+        return True
+    from app.services.payment_service import calculate_fees
+
+    fees = await calculate_fees(db, filing.court_id, filing.case_type_id, filing.filing_type)
+    return fees.total_cents == 0
 
 
 async def get_filing(db: AsyncSession, filing_id: int) -> FilingEnvelope | None:
@@ -328,9 +334,6 @@ async def _case_for_accept(db: AsyncSession, filing: FilingEnvelope, now: dateti
         status=CaseStatus.OPEN,
         filed_date=now,
     )
-    db.add(case)
-    await db.flush()
-    filing.case_id = case.id
     return case
 
 
@@ -364,39 +367,6 @@ async def _ensure_filer_participant(
     await db.flush()
 
 
-async def _submit_accepted_filing_to_cms(
-    db: AsyncSession, filing: FilingEnvelope, case: Case
-) -> CMSFilingResult:
-    cms_type_row = await db.execute(
-        select(Court.cms_type).where(Court.id == filing.court_id)
-    )
-    adapter = get_cms_adapter(cms_type_row.scalar_one_or_none())
-    party_rows = await db.execute(
-        select(CaseParticipant).where(CaseParticipant.case_id == case.id)
-    )
-    parties = [
-        {"name": p.party_name, "role": p.role.value if hasattr(p.role, "value") else str(p.role)}
-        for p in party_rows.scalars().all()
-    ]
-    try:
-        return await adapter.submit_filing(
-            case_number=case.case_number,
-            case_title=filing.case_title or case.title,
-            documents=[
-                {"title": d.title, "type": d.document_type_code}
-                for d in (filing.documents or [])
-            ],
-            parties=parties,
-            filing_metadata={
-                "filing_id": filing.id,
-                "court_id": filing.court_id,
-                "filing_type": filing.filing_type,
-            },
-        )
-    except Exception as exc:
-        return CMSFilingResult(success=False, error_message=str(exc))
-
-
 async def review_filing(
     db: AsyncSession,
     filing_id: int,
@@ -422,8 +392,7 @@ async def review_filing(
     if action == "accept":
         filing.status = FilingStatus.UNDER_REVIEW
         case = await _case_for_accept(db, filing, now)
-        await _ensure_filer_participant(db, filing, case)
-        cms_result = await _submit_accepted_filing_to_cms(db, filing, case)
+        cms_result = await submit_filing_to_cms(case.case_number, filing.id)
         if not cms_result.success:
             filing.cms_error = cms_result.error_message or "CMS submission failed"
             filing.cms_filing_id = None
@@ -432,6 +401,11 @@ async def review_filing(
             await db.refresh(filing)
             await db.refresh(filing, ["documents"])
             return filing
+        if filing.case_id is None:
+            db.add(case)
+            await db.flush()
+            filing.case_id = case.id
+        await _ensure_filer_participant(db, filing, case)
         filing.status = FilingStatus.ACCEPTED
         filing.cms_filing_id = cms_result.cms_filing_id
         filing.cms_case_number = cms_result.cms_case_number
@@ -449,6 +423,12 @@ async def review_filing(
     else:
         return None
 
+    court = await db.get(Court, filing.court_id)
+    await notify_filing_status_change(
+        db, filer_id=filing.filer_id, filing_id=filing.id, status=filing.status.value,
+        court_name=court.name if court else f"Court #{filing.court_id}",
+        case_title=filing.case_title, reason=reason,
+    )
     await db.flush()
     await db.refresh(filing)
     await db.refresh(filing, ["documents"])

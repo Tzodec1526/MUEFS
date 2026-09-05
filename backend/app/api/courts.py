@@ -25,43 +25,35 @@ async def list_courts(
     page_size: int = Query(25, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(Court)
-    count_query = select(func.count()).select_from(Court)
-
-    def _ilike(col, value: str):
-        escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        return col.ilike(f"%{escaped}%")
-
+    filters = []
     if county:
-        query = query.where(_ilike(Court.county, county))
-        count_query = count_query.where(_ilike(Court.county, county))
+        filters.append(Court.county.icontains(county, autoescape=True))
     if court_type:
-        query = query.where(Court.court_type == court_type)
-        count_query = count_query.where(Court.court_type == court_type)
+        filters.append(Court.court_type == court_type)
     # Tier lets the picker separate statewide/appellate forums (no county) from the
     # county-based trial courts -- the appellate courts are otherwise buried.
     if tier == "appellate":
         appellate = (
             CourtType.COURT_OF_CLAIMS, CourtType.COURT_OF_APPEALS, CourtType.SUPREME_COURT,
         )
-        query = query.where(Court.court_type.in_(appellate))
-        count_query = count_query.where(Court.court_type.in_(appellate))
+        filters.append(Court.court_type.in_(appellate))
     elif tier == "trial":
         trial = (
             CourtType.CIRCUIT, CourtType.DISTRICT, CourtType.PROBATE, CourtType.MUNICIPAL,
         )
-        query = query.where(Court.court_type.in_(trial))
-        count_query = count_query.where(Court.court_type.in_(trial))
+        filters.append(Court.court_type.in_(trial))
     if q:
-        cond = _ilike(Court.name, q) | _ilike(Court.city, q)
-        query = query.where(cond)
-        count_query = count_query.where(cond)
+        filters.append(
+            Court.name.icontains(q, autoescape=True) | Court.city.icontains(q, autoescape=True)
+        )
     if efiling_only:
-        query = query.where(Court.is_efiling_enabled == True)  # noqa: E712
-        count_query = count_query.where(Court.is_efiling_enabled == True)  # noqa: E712
+        filters.append(Court.is_efiling_enabled.is_(True))
 
-    total = (await db.execute(count_query)).scalar() or 0
-    query = query.order_by(Court.county, Court.name).offset((page - 1) * page_size).limit(page_size)
+    total = await db.scalar(select(func.count()).select_from(Court).where(*filters)) or 0
+    query = (
+        select(Court).where(*filters).order_by(Court.county, Court.name, Court.id)
+        .offset((page - 1) * page_size).limit(page_size)
+    )
     result = await db.execute(query)
 
     return CourtListResponse(courts=list(result.scalars().all()), total=total)  # type: ignore[arg-type]

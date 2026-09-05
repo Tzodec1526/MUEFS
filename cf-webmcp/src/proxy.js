@@ -8,9 +8,11 @@ const ORIGIN = 'https://specifies-dna-bird-obligation.trycloudflare.com';
 export default {
   async fetch(request) {
     const incoming = new URL(request.url);
-    const target = new URL(incoming.pathname + incoming.search, ORIGIN);
+    const target = new URL(ORIGIN);
+    target.pathname = incoming.pathname;
+    target.search = incoming.search;
     const headers = new Headers(request.headers);
-    headers.set('Host', new URL(ORIGIN).host);
+    headers.set('Host', target.host);
     return fetch(target, {
       method: request.method,
       headers,

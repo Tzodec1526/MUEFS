@@ -13,13 +13,18 @@ _SIM_PAYMENT_NOTICE = (
 class PaymentCalculateRequest(BaseModel):
     court_id: int
     case_type_id: int
-    document_count: int = 1
     filing_type: str = Field(default="initial", max_length=20)
+
+
+class FeeItem(BaseModel):
+    fee_type: str
+    amount_cents: int
+    description: str
 
 
 class PaymentCalculateResponse(BaseModel):
     filing_fee_cents: int
-    additional_fees: list[dict] = []
+    additional_fees: list[FeeItem] = []
     total_cents: int
     fee_description: str
     is_simulated: bool = True

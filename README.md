@@ -20,10 +20,10 @@ Live demo: https://webmcp.tomcedoz.com/agent · https://demo.tomcedoz.com · Age
 | **Motion companions** | Filers must know MCR rules | Validates & prompts (MCR 2.119) |
 | **File from case docket** | Existing-case filing supported | Pre-filled from case detail |
 | **Case favorites** | Not available | Star cases, quick access |
-| **Serve documents only** | Varies; often separate workflow | One-click from case docket |
+| **Service-only records** | Varies; often separate workflow | Record documents; arrange delivery outside the app |
 | **Draft autosave** | Vendor-dependent | Browser draft recovery |
 | **Clerk review tools** | Queue tools vary by court | Batch accept, age badges, quick reject reasons |
-| **AI agent tools (WebMCP)** | Not available | 23 role-aware tools + `/agent` hub |
+| **AI agent tools (WebMCP)** | Not available | 20 role-aware tools + `/agent` hub |
 | **Cost / licensing** | Per-transaction vendor fees | AGPL-3.0 (no license fee) |
 
 > **Status:** Open source demo — core filing, clerk review, and public docket search work today. CMS integration is a **stub** until a court JIS/CMS adapter is wired in production.
@@ -56,7 +56,7 @@ A **60-second attorney walkthrough** is in [`demo/muefs-walkthrough-60s.mp4`](de
 - **Backend**: Python 3.11+ / FastAPI (async)
 - **Frontend**: React 18 + TypeScript + Vite
 - **Database**: PostgreSQL 16 (production) / SQLite (demo)
-- **Cache/Queue**: Redis 7 + Celery
+- **Rate limiting**: Redis 7 (shared) / memory (demo)
 - **Object Storage**: MinIO S3-compatible (production) / local filesystem (demo)
 - **Auth**: Keycloak OAuth2/OIDC (production) / role-based demo login (demo)
 - **Containerization**: Docker + Docker Compose
@@ -169,8 +169,8 @@ From the repo root you can also run `npm run dev` (full demo stack), `npm test`,
 #### WebMCP
 
 - **`/agent`** — tool catalog, workflows, activity feed, example prompts
-- **Workflows:** `attorney_motion_workflow`, `research_case_for_motion`, `clerk_triage_workflow`
-- **23 tools**, role-filtered (public / filer / clerk)
+- **Workflows:** `attorney_motion_workflow`, `clerk_triage_workflow`
+- **20 tools**, role-filtered (public / filer / clerk)
 
 Guide: **[docs/WEBMCP.md](docs/WEBMCP.md)**
 

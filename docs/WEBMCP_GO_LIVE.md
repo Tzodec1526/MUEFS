@@ -5,7 +5,7 @@
 | Requirement | Status | Evidence |
 |---|---|---|
 | Judge-ready live `/agent` | Met | https://webmcp.tomcedoz.com/agent · https://muefs.tomcedoz.com/agent — Playwright smoke **11/11**; bundle `index-CYZ4kc8V.js` |
-| Maximize Devpost criteria | Met | 23 tools (16/20/19), imperative+declarative, HITL, flagship workflows, `get_challenge_briefing`; criteria map in `docs/WEBMCP_DEVPOST.md` |
+| Maximize Devpost criteria | Met | 20 tools (15/19/16), imperative+declarative, HITL, flagship workflows, `get_challenge_briefing`; criteria map in `docs/WEBMCP_DEVPOST.md` |
 | Public AGPL + post-Aug-25 WebMCP | Met | GitHub `AGPL-3.0`, topics `webmcp`, homepage → live hub; `frontend/src/webmcp/` + `docs/WEBMCP*` on `main` after Aug 25 |
 | `<3min` demo-video-ready | Met | `demo/muefs-webmcp-challenge.mp4` (~92.5s, h264+aac) + `demo/webmcp-voiceover.txt` |
 | Verified on localhost | Met | `scripts/verify-webmcp-image.ps1` PASS (`muefs-demo:webmcp`, Smith req=5) |

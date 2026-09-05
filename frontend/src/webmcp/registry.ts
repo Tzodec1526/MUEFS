@@ -1,50 +1,12 @@
 import { getDemoRole } from '../components/auth/LoginScreen';
-import { catalogForRole, registerCatalogTool, toolsForRole } from './catalog';
+import { catalogForRole } from './catalog';
 import { publishAgentPageContext } from './context';
-import { createLoggingModelContext } from './registerTool';
 import type { ModelContext } from './types';
-import { registerAuthTools } from './tools/auth';
-import { registerClerkTools } from './tools/clerk';
-import { registerCourtTools } from './tools/courts';
-import { registerExtendedFilingTools } from './tools/filings-ext';
-import { registerFilingNavTools } from './tools/filings-nav';
-import { registerNavigationTools } from './tools/navigation';
-import { registerOrchestrationTools } from './tools/orchestration';
-import { registerRulesTools } from './tools/rules';
-import { registerSearchTools } from './tools/search';
-import { registerSessionTools } from './tools/session';
-import { registerWorkflowTools } from './tools/workflows';
 
 let controller: AbortController | null = null;
 let lastRole: string | null | undefined;
 let initialized = false;
 let lateBindTimer: ReturnType<typeof setInterval> | null = null;
-
-async function registerRoleTools(mc: ModelContext, role: string | null, signal: AbortSignal) {
-  const logMc = createLoggingModelContext(mc);
-
-  await registerCatalogTool(logMc, role, signal);
-  await registerSessionTools(logMc, signal);
-  await registerSearchTools(logMc, signal);
-  await registerCourtTools(logMc, signal);
-  await registerRulesTools(logMc, signal);
-  await registerOrchestrationTools(logMc, signal);
-  await registerWorkflowTools(logMc, signal);
-  await registerNavigationTools(logMc, signal);
-  await registerAuthTools(logMc, signal);
-
-  const allowed = toolsForRole(role);
-
-  if (allowed.has('list_my_filings')) {
-    await registerExtendedFilingTools(logMc, signal);
-    await registerFilingNavTools(logMc, signal);
-  }
-  if (allowed.has('get_clerk_review_queue')) {
-    await registerClerkTools(logMc, signal);
-  }
-
-  publishAgentPageContext(mc);
-}
 
 export async function refreshMuefsWebMcpTools(): Promise<void> {
   if (!document.modelContext) return;
@@ -53,10 +15,19 @@ export async function refreshMuefsWebMcpTools(): Promise<void> {
   if (controller && lastRole === role) return;
 
   controller?.abort();
-  controller = new AbortController();
+  const activeController = new AbortController();
+  controller = activeController;
   lastRole = role;
 
-  await registerRoleTools(document.modelContext, role, controller.signal);
+  try {
+    const { registerRoleTools } = await import('./registerTools');
+    if (activeController.signal.aborted) return;
+    await registerRoleTools(document.modelContext, role, activeController.signal);
+  } catch (err) {
+    activeController.abort();
+    if (controller === activeController) controller = null;
+    throw err;
+  }
 
   if (import.meta.env.DEV) {
     const names = catalogForRole(role).map((t) => t.name);
@@ -131,7 +102,7 @@ export function webMcpStatus(): { available: boolean; role: string | null; toolC
 }
 
 export async function listRegisteredToolsFromBrowser(): Promise<string[]> {
-  if (!document.modelContext?.getTools) return catalogForRole(getDemoRole()).map((t) => t.name);
+  if (!document.modelContext?.getTools) return [];
   try {
     const tools = await document.modelContext.getTools();
     return tools.map((t) => t.name);

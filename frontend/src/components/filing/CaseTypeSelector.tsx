@@ -43,7 +43,7 @@ function getRuleUrl(ref: string): string | null {
 interface Props {
   courtId: number;
   selectedCaseTypeId: number | null;
-  onSelect: (caseTypeId: number, caseTypeName: string, filingFeeCents: number) => void;
+  onSelect: (caseTypeId: number, caseTypeName: string) => void;
 }
 
 function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
@@ -145,10 +145,10 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
           <div
             key={ct.id}
             className={`case-type-card ${selectedCaseTypeId === ct.id ? 'selected' : ''}`}
-            onClick={() => onSelect(ct.id, ct.name, ct.filing_fee_cents)}
+            onClick={() => onSelect(ct.id, ct.name)}
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(ct.id, ct.name, ct.filing_fee_cents); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(ct.id, ct.name); }}
             aria-selected={selectedCaseTypeId === ct.id}
           >
             <div className="case-type-header">

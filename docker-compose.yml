@@ -20,7 +20,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis Cache & Message Broker
+  # Redis rate limiting
   redis:
     image: redis:7-alpine
     ports:
@@ -109,9 +109,6 @@ services:
       PROVISION_USER_ON_FIRST_OIDC_LOGIN: ${PROVISION_USER_ON_FIRST_OIDC_LOGIN:-true}
       RATE_LIMIT_BACKEND: ${RATE_LIMIT_BACKEND:-redis}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
-      SMTP_HOST: ${SMTP_HOST:-mailhog}
-      SMTP_PORT: ${SMTP_PORT:-1025}
-      SMTP_FROM: ${SMTP_FROM:-noreply@michigan-efiling.gov}
       # Optional ClamAV scanning. Off by default; enable with the `security` profile and
       # MALWARE_SCAN_CLAMAV_ENABLED=true (see the clamav service below). Built-in heuristic
       # screening runs regardless.
@@ -136,33 +133,6 @@ services:
       minio:
         condition: service_healthy
 
-  # Celery Worker (async document processing)
-  celery-worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    command: celery -A app.tasks worker --loglevel=info
-    healthcheck:
-      test: ["CMD", "celery", "-A", "app.tasks", "inspect", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://muefs:muefs_dev@postgres:5432/muefs}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-http://minio:9000}
-      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-muefs_minio}
-      S3_SECRET_KEY: ${S3_SECRET_KEY:-muefs_minio_secret}
-      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-muefs-documents}
-    volumes:
-      - ./backend:/app
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
   # Frontend
   frontend:
     build:
@@ -179,13 +149,6 @@ services:
       VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-http://localhost:8080}
       VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-muefs}
       VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-muefs-frontend}
-
-  # MailHog (dev email testing)
-  mailhog:
-    image: mailhog/mailhog:latest
-    ports:
-      - "1025:1025"
-      - "8025:8025"
 
   # Optional malware scanner — opt-in so the default stack stays fast.
   #   docker compose --profile security up   (and set MALWARE_SCAN_CLAMAV_ENABLED=true)

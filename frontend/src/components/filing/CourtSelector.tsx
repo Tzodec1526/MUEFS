@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { listCourts, Court } from '../../api/courts';
 import { listFavoriteCourts, addFavoriteCourt, removeFavoriteCourt } from '../../api/favorites';
 import LoadError from '../common/LoadError';
@@ -39,12 +39,13 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
   const [search, setSearch] = useState('');
   const [countyFilter, setCountyFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [favoritedCourtIds, setFavoritedCourtIds] = useState<Set<number>>(new Set());
   const [togglingFav, setTogglingFav] = useState<number | null>(null);
-  const showFavorites = true;
 
   // Statewide/appellate forums (Court of Appeals, Supreme Court, Court of Claims) apply
   // regardless of county -- load them once and always surface them in their own group so
@@ -55,10 +56,9 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
       .catch(() => setStatewideCourts([]));
   }, []);
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
       setLoading(true);
       setError(null);
       try {
@@ -68,20 +68,22 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
           court_type: typeFilter || undefined,
           q: search.trim() || undefined,
           page_size: 100,
-        });
+          page,
+        }, controller.signal);
         setTrialCourts(result.courts);
+        setTotal(result.total);
       } catch {
+        if (controller.signal.aborted) return;
         setError("We couldn't load the court list. Please try again.");
         setTrialCourts([]);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }, 300);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [countyFilter, typeFilter, search, reloadKey]);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [countyFilter, typeFilter, search, reloadKey, page]);
 
   useEffect(() => {
-    if (!showFavorites) return;
     async function loadFavorites() {
       try {
         const data = await listFavoriteCourts();
@@ -91,7 +93,7 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
       }
     }
     loadFavorites();
-  }, [showFavorites]);
+  }, []);
 
   const toggleFavoriteCourt = async (courtId: number) => {
     setTogglingFav(courtId);
@@ -146,8 +148,7 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
       >
         <div className="court-card-head">
           <h4>{court.name}</h4>
-          {showFavorites && (
-            <button
+          <button
               className={`fav-star ${isFav ? 'active' : ''}`}
               onClick={(e) => { e.stopPropagation(); toggleFavoriteCourt(court.id); }}
               disabled={togglingFav === court.id}
@@ -155,8 +156,7 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
               aria-label={isFav ? 'Remove court from favorites' : 'Add court to favorites'}
             >
               {isFav ? '★' : '☆'}
-            </button>
-          )}
+          </button>
         </div>
         <p>
           {isAppellate ? 'Statewide jurisdiction' : `${court.county} County`} &middot; {typeLabel}
@@ -180,7 +180,7 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
           id="courtSearch"
           type="text"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           placeholder="e.g., Court of Appeals, Oakland, 3rd Circuit"
         />
       </div>
@@ -188,7 +188,7 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
       <div className="filter-row">
         <div className="form-group">
           <label htmlFor="county">County</label>
-          <select id="county" value={countyFilter} onChange={(e) => setCountyFilter(e.target.value)}>
+          <select id="county" value={countyFilter} onChange={(e) => { setCountyFilter(e.target.value); setPage(1); }}>
             <option value="">All Counties</option>
             {MICHIGAN_COUNTIES.map((county) => (
               <option key={county} value={county}>{county}</option>
@@ -197,7 +197,7 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
         </div>
         <div className="form-group">
           <label htmlFor="courtType">Court Type</label>
-          <select id="courtType" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+          <select id="courtType" value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}>
             <option value="">All Types</option>
             <option value="circuit">Circuit Court</option>
             <option value="district">District Court</option>
@@ -230,6 +230,13 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
                 </p>
               )}
             </div>
+            {total > 100 && (
+              <nav className="pagination" aria-label="Trial court pages">
+                <button className="btn btn-secondary" disabled={loading || page === 1} onClick={() => setPage(p => p - 1)}>Previous</button>
+                <span>Page {page} of {Math.ceil(total / 100)}</span>
+                <button className="btn btn-secondary" disabled={loading || page * 100 >= total} onClick={() => setPage(p => p + 1)}>Next</button>
+              </nav>
+            )}
           </div>
         </>
       )}

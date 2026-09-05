@@ -21,11 +21,8 @@ dependencies = [
     "httpx>=0.27.0",
     "boto3>=1.34.0",
     "redis>=5.0.0",
-    "celery[redis]>=5.4.0",
-    "aiosmtplib>=3.0.0",
     "python-magic>=0.4.27",
     "pypdf>=4.0.0",
-    "Pillow>=10.0.0",
     "clamd>=1.0.2",
 ]
 
@@ -37,7 +34,6 @@ test = [
     "httpx>=0.27.0",
     "ruff>=0.4.0",
     "mypy>=1.10.0",
-    "factory-boy>=3.3.0",
     "aiosqlite>=0.20.0",  # async SQLite driver used by the demo and the test suite
 ]
 # `dev` is an alias for `test` so both `pip install -e ".[test]"` (README) and

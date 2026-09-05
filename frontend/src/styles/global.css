@@ -271,22 +271,6 @@ h1, h2 {
   background: var(--gray-50);
 }
 
-.notification-badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 1rem;
-  height: 1rem;
-  padding: 0 0.25rem;
-  border-radius: 999px;
-  background: var(--red-600, #dc2626);
-  color: white;
-  font-size: 0.65rem;
-  font-weight: 700;
-  line-height: 1rem;
-  text-align: center;
-}
-
 .notification-panel {
   position: absolute;
   right: 0;
@@ -1760,24 +1744,6 @@ tr.selected {
 }
 
 /* Payment Improvements */
-.payment-confirmed {
-  text-align: center;
-  padding: 2rem;
-}
-
-.payment-check {
-  display: inline-block;
-  width: 52px;
-  height: 52px;
-  line-height: 50px;
-  border-radius: 50%;
-  background: var(--success-tint);
-  border: 2px solid var(--success-border);
-  color: var(--success);
-  font-size: 1.5rem;
-  margin-bottom: 0.5rem;
-}
-
 .payment-option-list {
   display: grid;
   gap: 0.5rem;
@@ -3643,44 +3609,6 @@ textarea:focus-visible {
   font-style: italic;
   border-left: 3px solid var(--gold-500, #c9a227);
   padding-left: 0.75rem;
-}
-
-.agent-prompt-tools code {
-  margin-right: 0.35rem;
-}
-
-.agent-hub-demo {
-  margin-bottom: 2rem;
-}
-
-.agent-demo-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
-.agent-demo-steps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--gray-200);
-  border-radius: 0.5rem;
-}
-
-.agent-demo-steps li {
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--gray-100);
-  font-size: 0.85rem;
-}
-
-.agent-demo-steps li.fail {
-  background: #fff5f5;
-}
-
-.agent-demo-steps code {
-  font-weight: 600;
-  margin-right: 0.5rem;
 }
 
 .agent-hub-note {

@@ -1,93 +1,74 @@
 import { useState, useEffect } from 'react';
-import { calculateFees, processPayment } from '../../api/documents';
+import { calculateFees, processPayment, type FilingFees } from '../../api/documents';
 import { updateFiling } from '../../api/filings';
 import { formatCents as formatCurrency } from '../../utils/format';
 import { getErrorDetail } from '../../utils/errors';
+import LoadError from '../common/LoadError';
 
 interface Props {
   courtId: number;
   caseTypeId: number;
-  filingId: number | null;
+  filingId: number;
   onPaymentComplete: () => void;
   filingType?: string;
 }
 
 function PaymentForm({ courtId, caseTypeId, filingId, onPaymentComplete, filingType = 'initial' }: Props) {
-  const [fees, setFees] = useState<{
-    filing_fee_cents: number;
-    total_cents: number;
-    fee_description: string;
-    additional_fees: Array<{ fee_type: string; amount_cents: number; description: string }>;
-    is_simulated?: boolean;
-    simulation_notice?: string;
-  } | null>(null);
+  const [fees, setFees] = useState<FilingFees | null>(null);
   const [loading, setLoading] = useState(true);
+  const [feeError, setFeeError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('credit_card');
-  const [completed, setCompleted] = useState(false);
   const [waiverReason, setWaiverReason] = useState('');
 
   useEffect(() => {
+    let active = true;
     async function fetchFees() {
+      setLoading(true);
+      setFeeError(null);
       try {
-        const result = await calculateFees(courtId, caseTypeId, 1, filingType);
+        const result = await calculateFees(courtId, caseTypeId, filingType);
+        if (!active) return;
         setFees(result);
-        // If no fee, auto-complete
         if (result.total_cents === 0) {
-          setCompleted(true);
           onPaymentComplete();
         }
-      } catch {
-        setFees(null);
+      } catch (err) {
+        if (active) setFeeError(getErrorDetail(err) || 'Could not calculate filing fees.');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
     fetchFees();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- onPaymentComplete is stable from parent
-  }, [courtId, caseTypeId, filingType]);
+    return () => { active = false; };
+  }, [courtId, caseTypeId, filingType, onPaymentComplete, attempt]);
 
   const [processing, setProcessing] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
 
   const handlePay = async () => {
-    if (!fees || !filingId) {
-      setCompleted(true);
-      onPaymentComplete();
-      return;
-    }
+    if (!fees) return;
 
     // Fee waiver — persist the request + reason to the envelope, then advance. The
     // submit endpoint allows fee-waiver filings without payment.
-    if (paymentMethod === 'waiver') {
-      if (!waiverReason.trim()) {
-        setPayError('Please describe why you are unable to pay the filing fee.');
-        return;
-      }
-      setProcessing(true);
-      setPayError(null);
-      try {
+    if (paymentMethod === 'waiver' && !waiverReason.trim()) {
+      setPayError('Please describe why you are unable to pay the filing fee.');
+      return;
+    }
+    setProcessing(true);
+    setPayError(null);
+    try {
+      if (paymentMethod === 'waiver') {
         await updateFiling(filingId, {
           fee_waiver_requested: true,
           fee_waiver_reason: waiverReason.trim(),
         });
-        setCompleted(true);
-        onPaymentComplete();
-      } catch (err: unknown) {
-        setPayError(getErrorDetail(err) || 'Could not submit the fee waiver request.');
-      } finally {
-        setProcessing(false);
+      } else {
+        await processPayment(filingId, fees.total_cents, paymentMethod);
       }
-      return;
-    }
-
-    setProcessing(true);
-    setPayError(null);
-    try {
-      await processPayment(filingId, fees.total_cents, paymentMethod);
-      setCompleted(true);
       onPaymentComplete();
     } catch (err: unknown) {
-      setPayError(getErrorDetail(err) || 'Payment processing failed');
+      setPayError(getErrorDetail(err) || 'Could not record payment or fee waiver.');
     } finally {
       setProcessing(false);
     }
@@ -95,39 +76,20 @@ function PaymentForm({ courtId, caseTypeId, filingId, onPaymentComplete, filingT
 
   if (loading) {
     return (
-      <div className="form-section">
-        <h3>Filing Fees</h3>
+      <div className="review-card">
+        <h4>Filing Fees</h4>
         <p>Calculating fees...</p>
       </div>
     );
   }
 
-  if (completed) {
-    const wasSimulated = fees?.is_simulated !== false;
-    return (
-      <div className="form-section">
-        <h3>Filing Fees</h3>
-        <div className="payment-confirmed">
-          <span className="payment-check">&#10003;</span>
-          <p>
-            {fees && fees.total_cents > 0
-              ? wasSimulated
-                ? `Simulated payment of ${formatCurrency(fees.total_cents)} recorded (no charge).`
-                : `Payment of ${formatCurrency(fees.total_cents)} confirmed.`
-              : 'No filing fee required for this case type.'}
-          </p>
-        </div>
-      </div>
-    );
-  }
+  if (feeError) return <LoadError message={feeError} onRetry={() => setAttempt(n => n + 1)} />;
 
-  const showSimulated =
-    fees?.is_simulated !== false &&
-    (fees?.simulation_notice || fees?.is_simulated === true);
+  const showSimulated = fees?.is_simulated;
 
   return (
-    <div className="form-section">
-      <h3>Filing Fees</h3>
+    <div className="review-card">
+      <h4>Filing Fees</h4>
       {showSimulated && (
         <div className="alert alert-info" role="status">
           <strong>Simulated payment</strong>
@@ -178,6 +140,7 @@ function PaymentForm({ courtId, caseTypeId, filingId, onPaymentComplete, filingT
                     name="paymentMethod"
                     value={method.value}
                     checked={paymentMethod === method.value}
+                    disabled={method.value !== 'waiver' && !showSimulated}
                     onChange={(e) => setPaymentMethod(e.target.value)}
                   />
                   <div>
@@ -217,8 +180,8 @@ function PaymentForm({ courtId, caseTypeId, filingId, onPaymentComplete, filingT
               {paymentMethod === 'waiver'
                 ? 'Your fee waiver request will be reviewed by the court. If denied, you will be notified and may pay the fee at that time.'
                 : showSimulated
-                  ? 'Confirming below only advances the filing wizard in this demo. Connect a payment service provider for production.'
-                  : 'Your payment will be securely processed. Filing fees are set by the Michigan Supreme Court and are the same regardless of how you file.'}
+                  ? 'Confirming below records a simulated payment. No money is charged.'
+                  : 'Online payment is currently unavailable. Contact the court about payment options.'}
             </p>
           </div>
 
@@ -226,7 +189,7 @@ function PaymentForm({ courtId, caseTypeId, filingId, onPaymentComplete, filingT
             <div className="alert alert-error" role="alert">{payError}</div>
           )}
 
-          <button className="btn btn-primary btn-large" onClick={handlePay} disabled={processing}>
+          <button className="btn btn-primary btn-large" onClick={handlePay} disabled={processing || (paymentMethod !== 'waiver' && !showSimulated)}>
             {processing
               ? 'Processing...'
               : paymentMethod === 'waiver'

@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
-import { getNotificationSummary, listNotifications, type NotificationItem } from '../../api/notifications';
+import { listNotifications, type NotificationItem } from '../../api/notifications';
 import { getDemoRole } from '../auth/LoginScreen';
+import LoadError from '../common/LoadError';
 
 function NotificationBell() {
   const role = getDemoRole();
-  const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -22,25 +25,23 @@ function NotificationBell() {
   }, [open]);
 
   useEffect(() => {
-    if (!role || role === 'public') return;
-    getNotificationSummary()
-      .then((s) => setUnread(s.unread))
-      .catch(() => setUnread(0));
-  }, [role]);
-
-  const toggle = async () => {
-    const next = !open;
-    setOpen(next);
-    if (next) {
+    if (!open || !role || role === 'public') return;
+    let active = true;
+    const load = async () => {
+      setLoading(true);
+      setError(false);
       try {
         const data = await listNotifications(1);
-        setItems(data.notifications);
-        setUnread(data.unread);
+        if (active) setItems(data.notifications);
       } catch {
-        setItems([]);
+        if (active) setError(true);
+      } finally {
+        if (active) setLoading(false);
       }
-    }
-  };
+    };
+    load();
+    return () => { active = false; };
+  }, [open, role, attempt]);
 
   if (!role || role === 'public') return null;
 
@@ -49,17 +50,18 @@ function NotificationBell() {
       <button
         type="button"
         className="notification-bell-btn"
-        onClick={toggle}
+        onClick={() => setOpen(!open)}
         aria-expanded={open}
-        aria-label={unread ? `${unread} unread notifications` : 'Notifications'}
+        aria-label="Notifications"
       >
         <Bell size={18} aria-hidden="true" />
-        {unread > 0 && <span className="notification-badge">{unread}</span>}
       </button>
       {open && (
         <div className="notification-panel" role="dialog" aria-label="Notifications">
-          <h3>Notifications</h3>
-          {items.length === 0 ? (
+          <h3>Recent notifications</h3>
+          {loading ? <p>Loading notifications...</p> : error ? (
+            <LoadError message="Could not load notifications." onRetry={() => setAttempt(n => n + 1)} />
+          ) : items.length === 0 ? (
             <p className="notification-empty">No notifications yet.</p>
           ) : (
             <ul>

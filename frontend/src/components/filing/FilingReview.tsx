@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { submitFiling, validateFiling, FilingValidation, FilingEnvelope } from '../../api/filings';
-import { formatBytes, formatFee, getDocumentLabel } from '../../utils/format';
+import { formatBytes, getDocumentLabel } from '../../utils/format';
 import { getErrorDetail } from '../../utils/errors';
 import PaymentForm from './PaymentForm';
 
@@ -9,7 +9,6 @@ interface FilingData {
   courtName: string;
   caseTypeId: number | null;
   caseTypeName: string;
-  filingFeeCents: number;
   caseTitle: string;
   filingDescription: string;
   filingId: number | null;
@@ -34,7 +33,6 @@ function FilingReview({ filingData, submission, onPaymentComplete, onSubmitSucce
 
   const needsPayment =
     !readOnly &&
-    filingData.filingFeeCents > 0 &&
     !filingData.paymentComplete &&
     filingData.filingType !== 'service_only';
 
@@ -138,10 +136,6 @@ function FilingReview({ filingData, submission, onPaymentComplete, onSubmitSucce
             <label>Case Title</label>
             <span>{filingData.caseTitle || 'Not provided'}</span>
           </div>
-          <div className="review-item">
-            <label>Filing Fee</label>
-            <span>{formatFee(filingData.filingFeeCents)}</span>
-          </div>
         </div>
         {filingData.filingDescription && (
           <div className="review-item full-width">
@@ -185,17 +179,14 @@ function FilingReview({ filingData, submission, onPaymentComplete, onSubmitSucce
       )}
 
       {/* Payment — shown here so you can review the filing first, then pay before submitting */}
-      {needsPayment && filingData.courtId && filingData.caseTypeId && (
-        <div className="review-card">
-          <h4>Payment</h4>
-          <PaymentForm
-            courtId={filingData.courtId}
-            caseTypeId={filingData.caseTypeId}
-            filingId={filingId}
-            filingType={filingData.filingType}
-            onPaymentComplete={() => onPaymentComplete?.()}
-          />
-        </div>
+      {needsPayment && onPaymentComplete && filingId && filingData.courtId && filingData.caseTypeId && (
+        <PaymentForm
+          courtId={filingData.courtId}
+          caseTypeId={filingData.caseTypeId}
+          filingId={filingId}
+          filingType={filingData.filingType}
+          onPaymentComplete={onPaymentComplete}
+        />
       )}
 
       {/* Validation Results */}

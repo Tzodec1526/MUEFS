@@ -1,5 +1,5 @@
 import { getDemoRole } from '../components/auth/LoginScreen';
-import { catalogForRole } from './catalog';
+import { catalogForRole, TOOL_CATALOG } from './catalog';
 import type { ModelContext } from './types';
 
 export interface AgentPageContext {
@@ -26,26 +26,18 @@ export function buildAgentPageContext(): AgentPageContext {
 
   const declarative: string[] = ['search_cases', 'sign_in_demo_role'];
   if (path.startsWith('/clerk')) declarative.push('get_clerk_review_queue');
-  if (path.startsWith('/agent')) {
-    /* hub also hosts search_cases declarative panel */
-  }
 
   return {
     role: role || 'anonymous',
     path,
     tool_count: tools.length,
-    catalog_size: 23,
+    catalog_size: TOOL_CATALOG.length,
     suggested_next_tool: suggested,
     agent_hub: '/agent',
     human_in_the_loop:
       'Agents may research and navigate; only humans submit filings in the wizard.',
     declarative_tools_on_site: declarative,
-    workflows: [
-      'attorney_motion_workflow',
-      'clerk_triage_workflow',
-      'explain_mcr_for_filing',
-      'research_case_for_motion',
-    ],
+    workflows: tools.filter(t => t.tier === 'workflow').map(t => t.name),
   };
 }
 

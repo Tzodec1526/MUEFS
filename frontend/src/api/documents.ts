@@ -1,15 +1,22 @@
 import { apiClient } from './client';
 
+export interface FilingFees {
+  filing_fee_cents: number;
+  total_cents: number;
+  fee_description: string;
+  additional_fees: Array<{ fee_type: string; amount_cents: number; description: string }>;
+  is_simulated: boolean;
+  simulation_notice: string;
+}
+
 export async function calculateFees(
   courtId: number,
   caseTypeId: number,
-  documentCount: number = 1,
   filingType: string = 'initial',
-) {
+): Promise<FilingFees> {
   const { data } = await apiClient.post('/payments/calculate', {
     court_id: courtId,
     case_type_id: caseTypeId,
-    document_count: documentCount,
     filing_type: filingType,
   });
   return data;

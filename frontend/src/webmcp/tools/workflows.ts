@@ -20,6 +20,7 @@ export async function registerWorkflowTools(mc: ModelContext, signal?: AbortSign
         properties: {
           party_name: { type: 'string' },
           case_number: { type: 'string' },
+          case_id: { type: 'integer', minimum: 1, description: 'Explicitly selected case; skips search' },
         },
       },
       annotations: UNTRUSTED_RECORDS,
@@ -33,19 +34,34 @@ export async function registerWorkflowTools(mc: ModelContext, signal?: AbortSign
           });
         }
 
-        const party = (input.party_name as string) || undefined;
-        const caseNum = (input.case_number as string) || undefined;
-        if (!party && !caseNum) {
-          return toolError('Provide party_name or case_number for the motion target case.');
+        let caseId = input.case_id as number | undefined;
+        if (caseId !== undefined && (!Number.isInteger(caseId) || caseId <= 0)) {
+          return toolError('Provide a positive integer case_id.');
+        }
+        if (caseId === undefined) {
+          const party = (input.party_name as string) || undefined;
+          const caseNum = (input.case_number as string) || undefined;
+          if (!party && !caseNum) {
+            return toolError('Provide party_name, case_number, or case_id for the motion target case.');
+          }
+          const search = await searchCases({ party_name: party, case_number: caseNum, page: 1 });
+          if (!search.cases.length) {
+            return toolOk({ found: false, message: 'No public case match.' });
+          }
+          if (search.total > 1) {
+            return toolOk({
+              needs_case_selection: true,
+              total: search.total,
+              candidates: search.cases.map((c: { id: number; title: string; case_number: string; court_id: number }) => ({
+                id: c.id, case_number: c.case_number, title: sanitizeAgentText(c.title), court_id: c.court_id,
+              })),
+              message: 'Ask the filer to choose a case, then call this tool with its case_id.',
+            });
+          }
+          caseId = Number(search.cases[0].id);
         }
 
-        const search = await searchCases({ party_name: party, case_number: caseNum, page: 1 });
-        if (!search.cases?.length) {
-          return toolOk({ found: false, message: 'No public case match.' });
-        }
-
-        const hit = search.cases[0];
-        const docket = await getCase(hit.id);
+        const docket = await getCase(caseId);
         const [requirements, checklists, drafts] = await Promise.all([
           getFilingRequirements(docket.court_id, docket.case_type_id, 'subsequent'),
           getFilingChecklists(docket.court_id, docket.case_type_id),
@@ -104,7 +120,9 @@ export async function registerWorkflowTools(mc: ModelContext, signal?: AbortSign
           getClerkQueue(courtId, 1, 'submitted'),
           getClerkQueue(courtId, 1, 'under_review'),
         ]);
-        const combined = [...submitted.filings, ...review.filings].slice(0, 5);
+        const combined = [...submitted.filings, ...review.filings]
+          .sort((a, b) => (a.submitted_at || '').localeCompare(b.submitted_at || '') || a.id - b.id)
+          .slice(0, 5);
 
         return toolOk({
           workflow: 'clerk_triage',

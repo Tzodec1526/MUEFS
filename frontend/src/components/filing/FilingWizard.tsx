@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import CourtSelector from './CourtSelector';
 import CaseSelector, { CaseResult } from './CaseSelector';
 import CaseTypeSelector from './CaseTypeSelector';
 import DocumentUpload from './DocumentUpload';
 import FilingReview from './FilingReview';
-import { formatFee } from '../../utils/format';
 import { getErrorDetail } from '../../utils/errors';
 import { createFiling, getFiling, updateFiling, type FilingEnvelope } from '../../api/filings';
 import LoadError from '../common/LoadError';
@@ -26,7 +25,6 @@ interface FilingData {
   filingType: 'initial' | 'subsequent' | 'service_only';
   caseTypeId: number | null;
   caseTypeName: string;
-  filingFeeCents: number;
   caseTitle: string;
   filingDescription: string;
   filingId: number | null;
@@ -87,7 +85,6 @@ const defaultFilingData: FilingData = {
   filingType: 'initial',
   caseTypeId: null,
   caseTypeName: '',
-  filingFeeCents: 0,
   caseTitle: '',
   filingDescription: '',
   filingId: null,
@@ -119,7 +116,6 @@ function FilingWizard() {
       caseTitle: searchParams.get('case_title') || '',
       filingType: serviceOnly ? 'service_only' : 'subsequent',
       caseChoiceMade: true,
-      filingFeeCents: serviceOnly ? 0 : 2000,
     };
   });
   const [currentStep, setCurrentStep] = useState<WizardStep>(() =>
@@ -134,6 +130,9 @@ function FilingWizard() {
   const [reloadKey, setReloadKey] = useState(0);
   const [submission, setSubmission] = useState<FilingEnvelope>();
   const [errors, setErrors] = useState<string[]>([]);
+  const handlePaymentComplete = useCallback(() => {
+    setFilingData(prev => ({ ...prev, paymentComplete: true }));
+  }, []);
   const isMotionMode = filingData.filingType !== 'initial';
   const [motionChecklists, setMotionChecklists] = useState<FilingChecklist[]>([]);
   const [plainLanguage, setPlainLanguage] = useState(() => {
@@ -178,8 +177,6 @@ function FilingWizard() {
             caseTitle: recoveredDraft?.caseTitle ?? envelope.case_title ?? '',
             filingDescription: recoveredDraft?.filingDescription ?? envelope.filing_description ?? '',
             motionSubtype: recoveredDraft?.motionSubtype ?? null,
-            filingFeeCents: filingType === 'service_only' ? 0
-              : filingType === 'initial' ? caseType?.filing_fee_cents || 0 : 2000,
             caseChoiceMade: true,
             paymentComplete: envelope.payment_id != null || envelope.fee_waiver_requested
               || envelope.fee_waiver_granted === true,
@@ -474,9 +471,6 @@ function FilingWizard() {
           {filingData.caseTitle && (
             <span><strong>Case:</strong> {filingData.caseTitle}</span>
           )}
-          {filingData.filingFeeCents > 0 && (
-            <span><strong>Fee:</strong> {formatFee(filingData.filingFeeCents)}</span>
-          )}
           <span><strong>Docs:</strong> {filingData.documents.length}</span>
         </div>
       )}
@@ -517,7 +511,6 @@ function FilingWizard() {
                 caseTypeName,
                 caseTitle: c.title,
                 filingType: 'subsequent',
-                filingFeeCents: 2000,
                 caseChoiceMade: true,
                 motionSubtype: null,
               });
@@ -529,7 +522,6 @@ function FilingWizard() {
                 caseTypeId: null,
                 caseTypeName: '',
                 filingType: 'initial',
-                filingFeeCents: 0,
                 caseChoiceMade: true,
               });
             }}
@@ -540,8 +532,8 @@ function FilingWizard() {
           <CaseTypeSelector
             courtId={filingData.courtId}
             selectedCaseTypeId={filingData.caseTypeId}
-            onSelect={(id, name, feeCents) => {
-              updateData({ caseTypeId: id, caseTypeName: name, filingFeeCents: feeCents, motionSubtype: null });
+            onSelect={(id, name) => {
+              updateData({ caseTypeId: id, caseTypeName: name, motionSubtype: null });
             }}
           />
         )}
@@ -568,7 +560,7 @@ function FilingWizard() {
                       value="subsequent"
                       checked={filingData.filingType === 'subsequent'}
                       disabled={filingData.filingId !== null}
-                      onChange={() => updateData({ filingType: 'subsequent', filingFeeCents: 2000, paymentComplete: false })}
+                      onChange={() => updateData({ filingType: 'subsequent', paymentComplete: false })}
                     />
                     <div>
                       <strong>File with Court</strong>
@@ -582,7 +574,7 @@ function FilingWizard() {
                       value="service_only"
                       checked={filingData.filingType === 'service_only'}
                       disabled={filingData.filingId !== null}
-                      onChange={() => updateData({ filingType: 'service_only', filingFeeCents: 0 })}
+                      onChange={() => updateData({ filingType: 'service_only' })}
                     />
                     <div>
                       <strong>Service Only (No Court Filing)</strong>
@@ -683,7 +675,7 @@ function FilingWizard() {
           <FilingReview
             filingData={filingData}
             submission={submission}
-            onPaymentComplete={() => updateData({ paymentComplete: true })}
+            onPaymentComplete={handlePaymentComplete}
             onSubmitSuccess={(filing) => { clearDraft(); setSubmission(filing); }}
           />
         )}

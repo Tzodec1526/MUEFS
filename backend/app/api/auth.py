@@ -22,13 +22,15 @@ def _bearer_token(authorization: str | None) -> str | None:
 
 
 async def _resolve_demo_user_id(db: AsyncSession, x_demo_user_id: int) -> int:
-    """Validate demo header user exists (court systems: no implicit default user)."""
-    result = await db.execute(select(User.id).where(User.id == x_demo_user_id))
+    """Validate demo header belongs to an active user; there is no default account."""
+    result = await db.execute(select(User.id).where(
+        User.id == x_demo_user_id, User.is_active.is_(True),
+    ))
     uid = result.scalar_one_or_none()
     if uid is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unknown demo user id",
+            detail="Unknown or disabled demo user id",
         )
     return uid
 
@@ -134,7 +136,9 @@ async def get_optional_user_id(
         and x_demo_user_id is not None
         and demo_headers_permitted(x_demo_auth_secret)
     ):
-        demo_result = await db.execute(select(User.id).where(User.id == x_demo_user_id))
+        demo_result = await db.execute(select(User.id).where(
+            User.id == x_demo_user_id, User.is_active.is_(True),
+        ))
         return demo_result.scalar_one_or_none()
 
     return None

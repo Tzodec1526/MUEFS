@@ -1,16 +1,8 @@
-"""Abstract CMS (Case Management System) integration interface.
+"""CMS submission boundary. Only the demo has a simulated implementation."""
 
-Michigan courts use multiple CMS platforms:
-- JIS (Judicial Information Services) - 80% of trial courts
-- Tyler Odyssey - select courts
-- Various legacy systems - ~60 courts
-
-This adapter pattern allows the e-filing system to push accepted filings
-to any court's CMS regardless of the underlying technology.
-"""
-
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
+
+from app.config import settings
 
 
 @dataclass
@@ -21,53 +13,13 @@ class CMSFilingResult:
     error_message: str | None = None
 
 
-@dataclass
-class CMSCaseInfo:
-    case_number: str
-    title: str
-    status: str
-    court_name: str
-    filed_date: str
-    parties: list[dict]
-
-
-class CMSAdapter(ABC):
-    """Base class for CMS integrations."""
-
-    @abstractmethod
-    async def submit_filing(
-        self,
-        case_number: str | None,
-        case_title: str,
-        documents: list[dict],
-        parties: list[dict],
-        filing_metadata: dict,
-    ) -> CMSFilingResult:
-        """Submit an accepted filing to the court's CMS."""
-        ...
-
-    @abstractmethod
-    async def get_case(self, case_number: str) -> CMSCaseInfo | None:
-        """Retrieve case information from the CMS."""
-        ...
-
-    @abstractmethod
-    async def health_check(self) -> bool:
-        """Check if the CMS integration is operational."""
-        ...
-
-
-def get_cms_adapter(cms_type: str | None) -> CMSAdapter:
-    """Return the CMS adapter for a court's case-management system.
-
-    Selection is by ``Court.cms_type``: Tyler Odyssey / TrueFiling courts use the Odyssey
-    adapter; everything else defaults to JIS (the CMS used by ~80% of Michigan trial
-    courts). Imports are deferred to avoid a circular import with the concrete adapters.
-    """
-    from app.integrations.jis_adapter import JISAdapter
-    from app.integrations.tyler_adapter import TylerOdysseyAdapter
-
-    key = (cms_type or "").strip().lower()
-    if key in {"tyler", "odyssey", "tyler odyssey", "truefiling"}:
-        return TylerOdysseyAdapter()
-    return JISAdapter()
+async def submit_filing_to_cms(case_number: str, filing_id: int) -> CMSFilingResult:
+    if not settings.allow_demo_mode:
+        return CMSFilingResult(
+            success=False, error_message="Court CMS integration is not configured",
+        )
+    return CMSFilingResult(
+        success=True,
+        cms_case_number=case_number,
+        cms_filing_id=f"DEMO-{filing_id}",
+    )

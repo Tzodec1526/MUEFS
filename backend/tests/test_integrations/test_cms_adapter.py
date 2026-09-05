@@ -1,12 +1,20 @@
-"""Tests for CMS adapter interface."""
+"""An unconfigured CMS can only simulate acceptance in demo mode."""
 
-from app.integrations.cms_adapter import get_cms_adapter
-from app.integrations.jis_adapter import JISAdapter
-from app.integrations.tyler_adapter import TylerOdysseyAdapter
+from app.config import settings
+from app.integrations.cms_adapter import submit_filing_to_cms
 
 
-def test_get_cms_adapter_selects_by_cms_type():
-    assert isinstance(get_cms_adapter("JIS"), JISAdapter)
-    assert isinstance(get_cms_adapter("TrueFiling"), TylerOdysseyAdapter)
-    assert isinstance(get_cms_adapter("Tyler Odyssey"), TylerOdysseyAdapter)
-    assert isinstance(get_cms_adapter(None), JISAdapter)
+async def test_cms_simulation_is_gated_by_demo_mode(monkeypatch):
+    monkeypatch.setattr(settings, "allow_demo_mode", False)
+    result = await submit_filing_to_cms("CASE-1", 12)
+    assert result.success is False
+    assert result.cms_filing_id is None
+    assert "not configured" in result.error_message
+
+    monkeypatch.setattr(settings, "allow_demo_mode", True)
+    first = await submit_filing_to_cms("CASE-1", 12)
+    second = await submit_filing_to_cms("CASE-1", 13)
+    assert first.success and second.success
+    assert first.cms_case_number == "CASE-1"
+    assert first.cms_filing_id == "DEMO-12"
+    assert second.cms_filing_id == "DEMO-13"

@@ -308,14 +308,10 @@ async def test_accept_does_not_mark_accepted_when_cms_fails(db_session, monkeypa
     await db_session.flush()
     await filing_service.submit_filing(db_session, filing.id)
 
-    class FailingAdapter:
-        async def submit_filing(self, **_kwargs):
-            return CMSFilingResult(success=False, error_message="JIS unavailable")
+    async def fail_submission(_case_number, _filing_id):
+        return CMSFilingResult(success=False, error_message="JIS unavailable")
 
-    monkeypatch.setattr(
-        "app.services.filing_service.get_cms_adapter",
-        lambda _cms_type: FailingAdapter(),
-    )
+    monkeypatch.setattr("app.services.filing_service.submit_filing_to_cms", fail_submission)
     clerk = User(
         email="clerk-cms@example.com",
         first_name="C",

@@ -44,8 +44,8 @@ export async function listCourts(params?: {
   q?: string;
   page?: number;
   page_size?: number;
-}): Promise<{ courts: Court[]; total: number }> {
-  const { data } = await apiClient.get('/courts', { params });
+}, signal?: AbortSignal): Promise<{ courts: Court[]; total: number }> {
+  const { data } = await apiClient.get('/courts', { params, signal });
   return data;
 }
 

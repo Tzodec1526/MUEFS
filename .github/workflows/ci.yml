@@ -42,7 +42,6 @@ jobs:
         run: |
           cd backend
           pip install -e ".[dev]"
-          pip install aiosqlite
       - name: Run tests
         run: |
           cd backend
@@ -58,7 +57,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd frontend
-          npm install
+          npm ci
       - name: Lint
         run: |
           cd frontend
