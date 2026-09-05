@@ -131,9 +131,8 @@ async def create_filing(
 async def fee_obligation_met(db: AsyncSession, filing: FilingEnvelope) -> bool:
     """True when submit may proceed: paid, waiver granted, or waiver application pending.
 
-    A requested waiver is an application that travels with the envelope. The clerk
-    grant or denial happens on review (accept writes granted). Service-only filings
-    have no fee.
+    An undecided application travels with the envelope. Filing review never decides
+    the waiver. A denial cannot be bypassed by leaving the request flag selected.
     """
     if filing.filing_type == "service_only":
         return True
@@ -141,7 +140,9 @@ async def fee_obligation_met(db: AsyncSession, filing: FilingEnvelope) -> bool:
         return True
     if filing.fee_waiver_granted is True:
         return True
-    if filing.fee_waiver_requested:
+    if filing.fee_waiver_granted is False and filing.fee_waiver_amount_due_cents is not None:
+        return filing.fee_waiver_amount_due_cents == 0
+    if filing.fee_waiver_requested and filing.fee_waiver_granted is None:
         return True
     from app.services.payment_service import calculate_fees
 
@@ -216,6 +217,10 @@ async def validate_filing(
 
     if not filing.documents:
         errors.append("At least one document must be uploaded")
+    if filing.fee_waiver_requested and filing.fee_waiver_granted is None and not any(
+        doc.document_type_code == "FEE_WAIVER" for doc in filing.documents
+    ):
+        missing_docs.append("Completed, signed Fee Waiver Request (MC 20) — nonpublic")
 
     # Service-only filings have relaxed validation - just need docs and a case
     is_service_only = filing.filing_type == "service_only"
@@ -411,13 +416,9 @@ async def review_filing(
         filing.cms_filing_id = cms_result.cms_filing_id
         filing.cms_case_number = cms_result.cms_case_number
         filing.cms_error = None
-        if filing.fee_waiver_requested:
-            filing.fee_waiver_granted = True
     elif action == "reject":
         filing.status = FilingStatus.REJECTED
         filing.rejection_reason = reason
-        if filing.fee_waiver_requested:
-            filing.fee_waiver_granted = False
     elif action == "return":
         filing.status = FilingStatus.RETURNED
         filing.rejection_reason = reason
@@ -437,11 +438,20 @@ async def get_clerk_queue(
     page: int = 1,
     page_size: int = 25,
     status: FilingStatus | None = None,
+    fee_waivers: bool = False,
 ) -> tuple[list[FilingEnvelope], int]:
     filters = [
         FilingEnvelope.court_id == court_id,
         FilingEnvelope.status.in_([FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW]),
     ]
+    if fee_waivers:
+        filters = [
+            FilingEnvelope.court_id == court_id,
+            FilingEnvelope.fee_waiver_requested.is_(True),
+            FilingEnvelope.fee_waiver_granted.is_(None),
+            FilingEnvelope.submitted_at.is_not(None),
+            FilingEnvelope.status.not_in([FilingStatus.REJECTED, FilingStatus.SERVED]),
+        ]
     if status is not None:
         filters.append(FilingEnvelope.status == status)
     query = (

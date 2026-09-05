@@ -44,9 +44,15 @@ async def notify_filing_status_change(
     }
     notification_type = type_map.get(status, NotificationType.CASE_UPDATE)
 
-    subject = f"Filing #{filing_id} - {status.title()} - {court_name}"
+    label = {
+        "waiver_referred": "Fee waiver referred for judicial review",
+        "waiver_granted": "Fee waiver granted",
+        "waiver_denied": "Fee waiver denied",
+        "payment_recorded": "Payment recorded",
+    }.get(status, status.replace("_", " ").title())
+    subject = f"Filing #{filing_id} - {label} - {court_name}"
     body_parts = [
-        f"Your filing #{filing_id} has been {status}.",
+        f"Filing #{filing_id}: {label}.",
         f"Court: {court_name}",
     ]
     if case_title:

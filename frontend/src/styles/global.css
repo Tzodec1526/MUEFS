@@ -3796,7 +3796,8 @@ textarea:focus-visible {
 @media print {
   body:has(.filing-history) header, body:has(.filing-history) footer,
   body:has(.filing-history) .sidebar, .filing-history button,
-  .filing-history .page-header > a, .filing-history .pagination { display: none !important; }
+  .filing-history .page-header > a, .filing-history .pagination,
+  .fee-waiver-panel form, .waiver-payment { display: none !important; }
   body:has(.filing-history) .main-content { margin: 0; padding: 0; }
   .filing-history { max-width: none; color: #000; }
   .receipt-card { break-inside: avoid; box-shadow: none; }

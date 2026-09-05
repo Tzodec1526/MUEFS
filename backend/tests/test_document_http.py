@@ -21,9 +21,10 @@ from tests.test_filings import create_test_fixtures
 @pytest.fixture
 async def filing_client(db_session, monkeypatch, tmp_path):
     user, court, case_type = await create_test_fixtures(db_session)
+    case_type.filing_fee_cents = 0
     envelope = FilingEnvelope(
         court_id=court.id, case_type_id=case_type.id, filer_id=user.id,
-        case_title="A v B", filing_type="initial", fee_waiver_requested=True,
+        case_title="A v B", filing_type="initial",
     )
     db_session.add(envelope)
     await db_session.flush()

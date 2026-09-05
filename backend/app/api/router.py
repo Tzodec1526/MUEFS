@@ -8,6 +8,7 @@ from app.api.court_rules import router as court_rules_router
 from app.api.courts import router as courts_router
 from app.api.documents import router as documents_router
 from app.api.favorites import router as favorites_router
+from app.api.fee_waivers import router as fee_waivers_router
 from app.api.filings import router as filings_router
 from app.api.notifications import router as notifications_router
 from app.api.payments import router as payments_router
@@ -21,6 +22,7 @@ api_router.include_router(court_rules_router)
 api_router.include_router(cases_router)
 api_router.include_router(filings_router)
 api_router.include_router(clerk_router)
+api_router.include_router(fee_waivers_router)
 api_router.include_router(documents_router)
 api_router.include_router(favorites_router)
 api_router.include_router(notifications_router)

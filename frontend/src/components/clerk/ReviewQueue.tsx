@@ -197,6 +197,7 @@ function ReviewQueue() {
               <option value="all">All Pending</option>
               <option value="submitted">New Submissions</option>
               <option value="under_review">Under Review</option>
+              <option value="waivers">Pending Fee Waivers</option>
             </select>
           </div>
           <button type="submit" className="btn btn-secondary" disabled={loading}>
@@ -218,7 +219,7 @@ function ReviewQueue() {
       {queueError && <LoadError message={queueError} onRetry={fetchQueue} />}
 
       {/* Batch actions */}
-      {selectedIds.size > 0 && (
+      {selectedIds.size > 0 && statusFilter !== 'waivers' && (
         <div className="batch-actions">
           <span>{selectedIds.size} filing(s) selected</span>
           <button
@@ -249,6 +250,7 @@ function ReviewQueue() {
                     checked={selectedIds.size === filings.length && filings.length > 0}
                     onChange={toggleSelectAll}
                     aria-label="Select all filings"
+                    disabled={statusFilter === 'waivers'}
                   />
                 </th>
                 <th>Filing #</th>
@@ -276,6 +278,7 @@ function ReviewQueue() {
                         checked={selectedIds.has(filing.id)}
                         onChange={() => toggleSelect(filing.id)}
                         aria-label={`Select filing ${filing.id}`}
+                        disabled={statusFilter === 'waivers'}
                       />
                     </td>
                     <td className="filing-num">#{filing.id}</td>
@@ -330,6 +333,12 @@ function ReviewQueue() {
             <div className="detail-section">
               <h4>Case Information</h4>
               <Link to={`/filings/${selectedFiling.id}/history`} className="btn btn-secondary btn-small">Receipts &amp; history</Link>
+              {selectedFiling.fee_waiver_requested && <p>
+                Fee waiver: {selectedFiling.fee_waiver_granted === true ? 'granted'
+                  : selectedFiling.fee_waiver_granted === false ? 'denied'
+                  : selectedFiling.fee_waiver_referred_at ? 'awaiting judicial review' : 'awaiting court review'}.
+                {' '}<Link to={`/filings/${selectedFiling.id}/history`}>Open fee waiver review</Link>
+              </p>}
               <div className="detail-grid">
                 <div><label>Title</label><span>{selectedFiling.case_title || 'N/A'}</span></div>
                 <div><label>Submitted</label><span>{formatDate(selectedFiling.submitted_at)}</span></div>
@@ -400,14 +409,14 @@ function ReviewQueue() {
                 <button
                   className="btn btn-success"
                   onClick={() => handleReview(selectedFiling.id, 'accept')}
-                  disabled={actionInProgress}
+                  disabled={actionInProgress || statusFilter === 'waivers'}
                 >
                   {actionInProgress ? 'Processing...' : 'Accept'}
                 </button>
                 <button
                   className="btn btn-warning"
                   onClick={() => handleReview(selectedFiling.id, 'return')}
-                  disabled={actionInProgress || !reviewReason.trim()}
+                  disabled={actionInProgress || !reviewReason.trim() || statusFilter === 'waivers'}
                   title={!reviewReason.trim() ? 'Reason required' : ''}
                 >
                   Return for Correction
@@ -415,7 +424,7 @@ function ReviewQueue() {
                 <button
                   className="btn btn-danger"
                   onClick={() => handleReview(selectedFiling.id, 'reject')}
-                  disabled={actionInProgress || !reviewReason.trim()}
+                  disabled={actionInProgress || !reviewReason.trim() || statusFilter === 'waivers'}
                   title={!reviewReason.trim() ? 'Reason required' : ''}
                 >
                   Reject

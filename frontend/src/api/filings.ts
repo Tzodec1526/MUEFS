@@ -30,6 +30,9 @@ export interface FilingEnvelope {
   fee_waiver_requested: boolean;
   fee_waiver_granted: boolean | null;
   fee_waiver_reason: string | null;
+  fee_waiver_referred_at: string | null;
+  fee_waiver_decided_at: string | null;
+  fee_waiver_amount_due_cents: number | null;
   documents: FilingDocument[];
   created_at: string;
   updated_at: string;
@@ -119,6 +122,8 @@ export interface FilingTransaction {
     filing_description?: string | null;
     fee_waiver_requested?: boolean;
     payment?: { amount_cents: number; transaction_ref: string; is_simulated: boolean } | null;
+    basis?: string;
+    amount_due_cents?: number;
     documents?: FilingDocument[];
     cms_case_number?: string | null;
     cms_filing_id?: string | null;
@@ -133,6 +138,24 @@ export interface FilingHistory {
   total: number;
   page: number;
   page_size: number;
+  fee_waiver: FeeWaiverState | null;
+}
+
+export interface FeeWaiverState {
+  granted: boolean | null;
+  referred_at: string | null;
+  decided_at: string | null;
+  amount_due_cents: number | null;
+  payment_id: number | null;
+  can_pay: boolean;
+  payments_simulated: boolean;
+  allowed_actions: string[];
+}
+
+export async function decideFeeWaiver(filingId: number, decision: FormData): Promise<void> {
+  await apiClient.post(`/clerk/filings/${filingId}/fee-waiver`, decision, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
 }
 
 export async function getFilingHistory(filingId: number, page: number, signal?: AbortSignal): Promise<FilingHistory> {
@@ -196,7 +219,9 @@ export async function getClerkQueue(
   signal?: AbortSignal,
 ): Promise<{ filings: FilingEnvelope[]; total: number }> {
   const params: Record<string, unknown> = { court_id: courtId, page };
-  if (statusFilter && statusFilter !== 'all') {
+  if (statusFilter === 'waivers') {
+    params.fee_waivers = true;
+  } else if (statusFilter && statusFilter !== 'all') {
     params.status = statusFilter;
   }
   const { data } = await apiClient.get('/clerk/queue', { params, signal });

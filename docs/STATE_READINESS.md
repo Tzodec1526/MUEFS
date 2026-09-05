@@ -14,7 +14,7 @@ establish state approval or production readiness.
 | Survive retries and simultaneous actions | Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Batch review uses a savepoint per filing. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
 | Protect private material | Private envelopes and receipts require filer or court-staff access. Dockets exclude waiver application data, confidential document metadata, superseded documents and other filers' drafts. Fee-waiver documents are nonpublic even if the filer omits the checkbox. | Full classification/retention policy for every case and document type; independent security assessment. |
 | Record the correct legal filing date | Each submission's actual receipt time is preserved independently of later clerk decisions. | Court timezones, approved holiday/closure calendars, business-day rules and authorized date adjustments. The UI does not promise that correcting a document preserves its legal filing date. |
-| Resolve fee waivers correctly | A request can accompany a filing; private hardship text stays off the docket and receipts. | Separate authorized waiver decisions, nonpublic approved forms, reasons/orders, reconsideration and post-denial payment. Acceptance must not remain a substitute for adjudicating a waiver. |
+| Resolve fee waivers correctly | A completed application accompanies the filing. Clerk waivers, referral and judicial decisions are separate court-scoped actions. Signed decision PDFs and denial amounts remain in private history; a filer can pay after denial without resubmitting. | Actual notice delivery, de novo review and judicial assignment, court calendars/deadlines, case-wide continuation and reinstatement, court verification of signed forms and prisoner-specific procedures. |
 | Collect and reconcile funds | Demo fee quoting, simulated payments and linked payment references work. | Audited court fee schedules, a real hosted payment processor, signed webhooks, reconciliation, refunds and accounting exports. |
 | Deliver electronic service | Service-only documents can be recorded. | Verified service contacts, consent/eligibility, real transmission, failures/retries, non-electronic alternatives and retained proof. A recorded document or in-app notice is not proof of service. |
 | Connect to the court's system of record | Acceptance is explicitly blocked outside demo mode when CMS integration is absent. | A documented court/vendor contract, credentialed sandbox, document/code mapping, idempotent delivery, status callbacks, error recovery and reconciliation. |
@@ -69,6 +69,53 @@ Database triggers block transaction UPDATE and DELETE in SQLite and PostgreSQL. 
 owners can remove these controls; they are not a substitute for restricted production
 roles, protected backups or an external archive. Document retention needs a court-approved
 policy before production use. In-app notices are available; email transmission is not.
+
+## Independent fee waiver review
+
+The payment screen links to SCAO's approved MC 20 and accepts an uploaded application.
+The required free-text hardship question has been removed. A pending request must have
+an application attachment before submission; the system does not verify the form's
+contents or signature. The application and signed decision PDFs are nonpublic.
+
+Court staff can select **Pending Fee Waivers** in the review queue, including waivers on
+filings that were already accepted. The private history page exposes only actions allowed
+by the viewer's assignment to that court:
+
+- Clerks can record a signed waiver for qualifying public assistance or qualifying legal
+  services representation, or refer the request for judicial review.
+- Judges can record a signed grant or denial. Denial requires the reason in the order and
+  the amount due. Administrative access alone does not authorize these decisions, and a
+  judge cannot decide their own application.
+- Filing acceptance, return and rejection do not change waiver decisions. A decided or
+  referred request cannot be reset by editing the returned filing.
+
+`POST /api/v1/clerk/filings/{id}/fee-waiver` commits the filing state, PDF metadata and private
+history event in the same database transaction. The stored PDF stays outside the filer's editable
+attachment list. Competing decisions use the envelope row lock; only one decision wins.
+The existing private history response includes the waiver state and allowed actions.
+
+After denial, the filer can record a simulated payment of the amount in the decision from
+history. The server uses that amount, including on a corrected filing, instead of applying
+a subsequently changed fee schedule. Payment creates its own receipt and does not change
+the submission time, number of submissions, filing status or denial. It does not establish
+the legal filing date. Real payment processing remains unconfigured.
+
+Court staff must still send the signed decision and required notice through an authorized
+channel. The in-app notice does not establish delivery, start a calculated deadline, issue
+a stay, or arrange de novo review. The application does not automatically reject a filing
+for missed payment. These procedures, case-wide waiver continuation/reinstatement, refunds
+and prisoner-specific requirements remain implementation work.
+
+Migration `f38d104ac927` adds referral/decision times, the amount due and an index for the
+pending-waiver queue. Existing waiver booleans are preserved and shown as legacy state
+when no independent decision time exists. No signed order is fabricated from an earlier
+acceptance. The migration refuses a downgrade that would discard decision state.
+
+`backend/tests/test_fee_waivers.py` covers application requirements, court-role boundaries,
+private signed orders, retained downloads, denial/payment and draft-edit bypass attempts.
+The PostgreSQL suite also races waiver decisions and post-denial payments. The upload
+pipeline is shared with filer documents so size limits, MIME inspection, malware screening
+and off-thread PDF processing apply to both.
 
 ## Sources guiding the evaluation
 

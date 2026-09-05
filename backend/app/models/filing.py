@@ -45,6 +45,9 @@ class FilingEnvelope(Base):
     fee_waiver_requested: Mapped[bool] = mapped_column(default=False)
     fee_waiver_granted: Mapped[bool | None] = mapped_column(default=None)
     fee_waiver_reason: Mapped[str | None] = mapped_column(String(2000))
+    fee_waiver_referred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fee_waiver_decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fee_waiver_amount_due_cents: Mapped[int | None] = mapped_column(Integer)
     cms_case_number: Mapped[str | None] = mapped_column(String(100))
     cms_filing_id: Mapped[str | None] = mapped_column(String(100))
     cms_error: Mapped[str | None] = mapped_column(Text)
@@ -59,13 +62,16 @@ class FilingEnvelope(Base):
     documents: Mapped[list["FilingDocument"]] = relationship(
         back_populates="envelope",
         primaryjoin="and_(FilingEnvelope.id == FilingDocument.envelope_id, "
-        "FilingDocument.removed_at.is_(None))",
+        "FilingDocument.removed_at.is_(None), "
+        "FilingDocument.document_type_code != 'FEE_WAIVER_ORDER')",
         order_by="FilingDocument.id",
     )
 
     __table_args__ = (
         Index('ix_filing_court_status', 'court_id', 'status'),
         Index('ix_filing_court_status_submitted', 'court_id', 'status', 'submitted_at'),
+        Index('ix_filing_court_waiver', 'court_id', 'fee_waiver_requested',
+              'fee_waiver_granted', 'submitted_at'),
     )
 
 

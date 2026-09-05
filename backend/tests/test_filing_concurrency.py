@@ -19,11 +19,67 @@ from app.models.case import Case
 from app.models.filing import FilingDocument, FilingStatus
 from app.models.filing_transaction import FilingTransaction
 from app.models.notification import Notification
+from app.models.payment import Payment
 from app.services import filing_service
+from tests.test_fee_waivers import decision_pdf
 from tests.test_filing_history import filing_fixture
 
 POSTGRES_URL = os.getenv("MUEFS_TEST_POSTGRES_URL")
 pytestmark = pytest.mark.skipif(not POSTGRES_URL, reason="MUEFS_TEST_POSTGRES_URL not configured")
+
+
+@pytest.mark.parametrize("operation", ["waiver", "payment"])
+async def test_concurrent_waiver_and_post_denial_payment_commit_once(
+    postgres_sessions, tmp_path, monkeypatch, operation,
+):
+    from datetime import UTC, datetime
+
+    from httpx import ASGITransport, AsyncClient
+
+    from app.services import document_service
+
+    monkeypatch.setattr(document_service, "_local_storage_path", lambda: tmp_path)
+    fid, filer, clerk = await prepare_filing(postgres_sessions)
+    async with postgres_sessions.begin() as db:
+        filing = await filing_service.submit_filing(db, fid)
+        filing.fee_waiver_requested = True
+        if operation == "payment":
+            filing.fee_waiver_granted = False
+            filing.fee_waiver_decided_at = datetime.now(UTC)
+            filing.fee_waiver_amount_due_cents = 750
+
+    async def database():
+        async with postgres_sessions.begin() as db:
+            yield db
+
+    app.dependency_overrides[get_db] = database
+    try:
+        async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
+            if operation == "waiver":
+                async def act():
+                    return await client.post(f"/api/v1/clerk/filings/{fid}/fee-waiver",
+                        headers={"X-Demo-User-Id": str(clerk)},
+                        data={"action": "grant_public_assistance"},
+                        files={"file": ("signed.pdf", decision_pdf(), "application/pdf")})
+            else:
+                async def act():
+                    return await client.post("/api/v1/payments/process",
+                        headers={"X-Demo-User-Id": str(filer)},
+                        json={"envelope_id": fid, "payment_method": "credit_card",
+                              "amount_cents": 750})
+            results = await asyncio.wait_for(asyncio.gather(act(), act()), 15)
+        expected = [200 if operation == "waiver" else 201, 409]
+        assert sorted(r.status_code for r in results) == expected
+        async with postgres_sessions() as db:
+            assert await db.scalar(select(func.count()).select_from(FilingTransaction)) == 2
+            if operation == "waiver":
+                assert await db.scalar(select(func.count()).select_from(FilingDocument).where(
+                    FilingDocument.document_type_code == "FEE_WAIVER_ORDER",
+                )) == 1
+            else:
+                assert await db.scalar(select(func.count()).select_from(Payment)) == 1
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 
 @pytest_asyncio.fixture

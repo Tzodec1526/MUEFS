@@ -17,11 +17,14 @@ from app.services.notification_service import notify_filing_status_change
 async def record_transaction(
     db: AsyncSession, filing: FilingEnvelope, event_type: str, actor_id: int,
     *, reason: str | None = None, idempotency_key: str | None = None,
+    details: dict | None = None,
 ) -> FilingTransaction:
     actor = await db.get(User, actor_id)
     court = await db.get(Court, filing.court_id)
     now = datetime.now(UTC)
-    details: dict = {"reason": reason} if reason else {}
+    details = dict(details or {})
+    if reason:
+        details["reason"] = reason
     if event_type in ("submitted", "service_recorded"):
         case = await db.get(Case, filing.case_id) if filing.case_id else None
         payment = await db.get(Payment, filing.payment_id) if filing.payment_id else None
@@ -64,7 +67,9 @@ async def record_transaction(
         notice = await notify_filing_status_change(
             db, filer_id=filing.filer_id, filing_id=filing.id, status=event_type,
             court_name=court.name if court else f"Court #{filing.court_id}",
-            case_title=filing.case_title, reason=reason,
+            case_title=filing.case_title,
+            reason=("Open the private filing history to read the decision."
+                    if event_type.startswith("waiver_") else reason),
         )
         notice.body += (
             f"\nTransaction: {transaction.id}\nRecorded (UTC): {now.isoformat()}"

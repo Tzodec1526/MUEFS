@@ -46,6 +46,7 @@ const DOCUMENT_LABELS: Record<string, string> = {
   PROPOSED_ORDER: 'Proposed Order', NOTICE_HEARING: 'Notice of Hearing',
   NOT_HEARING: 'Notice of Hearing', AFFIDAVIT: 'Affidavit', EXHIBIT: 'Exhibit',
   ANSWER: 'Answer', REPLY: 'Reply', JURY_DEMAND: 'Jury Demand',
+  FEE_WAIVER: 'Fee Waiver Request', FEE_WAIVER_ORDER: 'Signed Fee Waiver Decision',
   MOT_SD: 'Motion for Summary Disposition', MOT_DISMISS: 'Motion to Dismiss',
   MOT_COMPEL: 'Motion to Compel', MOT_PROTECTIVE: 'Motion for Protective Order',
   MOT_SANCTIONS: 'Motion for Sanctions', MOT_DEFAULT: 'Motion for Default',

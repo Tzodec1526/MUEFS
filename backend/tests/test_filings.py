@@ -329,7 +329,7 @@ async def test_accept_does_not_mark_accepted_when_cms_fails(db_session, monkeypa
 
 
 @pytest.mark.asyncio
-async def test_accept_grants_requested_fee_waiver(db_session):
+async def test_accept_does_not_decide_requested_fee_waiver(db_session):
     user, court, case_type = await create_test_fixtures(db_session)
     data = FilingEnvelopeCreate(
         court_id=court.id,
@@ -363,6 +363,6 @@ async def test_accept_grants_requested_fee_waiver(db_session):
         db_session, filing.id, reviewer_id=clerk.id, action="accept"
     )
     assert accepted is not None
-    assert accepted.fee_waiver_granted is True
+    assert accepted.fee_waiver_granted is None
     assert accepted.status == FilingStatus.ACCEPTED
 

@@ -40,6 +40,8 @@ def test_unversioned_demo_upgrade_preserves_filings(tmp_path):
                 filer_id=user.id,
                 status=FilingStatus.RETURNED,
                 submitted_at=datetime.now(UTC),
+                fee_waiver_requested=True,
+                fee_waiver_granted=True,
             )
             db.add(filing)
             db.flush()
@@ -59,6 +61,12 @@ def test_unversioned_demo_upgrade_preserves_filings(tmp_path):
         with engine.begin() as conn:
             conn.execute(text("DROP TABLE filing_transactions"))
             conn.execute(text("DROP TABLE alembic_version"))
+            conn.execute(text("DROP INDEX ix_filing_court_waiver"))
+            conn.execute(text("ALTER TABLE filing_envelopes DROP COLUMN fee_waiver_referred_at"))
+            conn.execute(text("ALTER TABLE filing_envelopes DROP COLUMN fee_waiver_decided_at"))
+            conn.execute(text(
+                "ALTER TABLE filing_envelopes DROP COLUMN fee_waiver_amount_due_cents"
+            ))
             conn.execute(text("ALTER TABLE filing_envelopes DROP COLUMN submission_count"))
             conn.execute(text("ALTER TABLE filing_documents DROP COLUMN retained_at"))
             conn.execute(text("ALTER TABLE filing_documents DROP COLUMN removed_at"))
@@ -70,7 +78,9 @@ def test_unversioned_demo_upgrade_preserves_filings(tmp_path):
             assert conn.scalar(text("SELECT is_confidential FROM filing_documents")) == 1
             assert conn.scalar(text("SELECT count(*) FROM filing_transactions")) == 0
             assert conn.scalar(text("SELECT status FROM filing_envelopes")) == "RETURNED"
-            assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "e91c62d7a104"
+            assert conn.scalar(text("SELECT fee_waiver_granted FROM filing_envelopes")) == 1
+            assert conn.scalar(text("SELECT fee_waiver_decided_at FROM filing_envelopes")) is None
+            assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "f38d104ac927"
     finally:
         engine.dispose()
 

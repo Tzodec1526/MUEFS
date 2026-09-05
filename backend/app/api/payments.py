@@ -14,6 +14,7 @@ from app.schemas.payment import (
     PaymentResponse,
 )
 from app.services import audit_service, payment_service
+from app.services.filing_record_service import record_transaction
 from app.utils.http_context import client_ip, client_user_agent
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
@@ -50,6 +51,7 @@ async def process_payment(
     # Look up the filing envelope to validate payment against actual fees
     filing = await db.scalar(
         select(FilingEnvelope).where(FilingEnvelope.id == data.envelope_id).with_for_update()
+        .execution_options(populate_existing=True)
     )
     if not filing:
         raise HTTPException(
@@ -68,22 +70,30 @@ async def process_payment(
             status_code=status.HTTP_409_CONFLICT,
             detail="Payment already processed for this filing",
         )
-    if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
-        raise HTTPException(status_code=409, detail="Only draft or returned filings can be paid")
+    after_denial = filing.fee_waiver_granted is False and filing.fee_waiver_decided_at is not None
+    if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED) and not (
+        after_denial and filing.status in (
+            FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW, FilingStatus.ACCEPTED,
+        )
+    ):
+        raise HTTPException(status_code=409, detail="This filing is not awaiting payment")
+    if filing.fee_waiver_granted is True:
+        raise HTTPException(status_code=409, detail="Fees have been waived for this filing")
 
     # Validate amount matches calculated fees
-    calculated = await payment_service.calculate_fees(
-        db,
-        court_id=filing.court_id,
-        case_type_id=filing.case_type_id,
-        filing_type=filing.filing_type,
-    )
-    if data.amount_cents != calculated.total_cents:
+    expected_cents = filing.fee_waiver_amount_due_cents if after_denial else None
+    if expected_cents is None:
+        calculated = await payment_service.calculate_fees(
+            db, court_id=filing.court_id, case_type_id=filing.case_type_id,
+            filing_type=filing.filing_type,
+        )
+        expected_cents = calculated.total_cents
+    if data.amount_cents != expected_cents:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
                 f"Payment amount ({data.amount_cents}) does not match "
-                f"calculated fee ({calculated.total_cents})"
+                f"amount due ({expected_cents})"
             ),
         )
 
@@ -104,6 +114,11 @@ async def process_payment(
     # Link payment to filing
     filing.payment_id = payment.id
     await db.flush()
+    await record_transaction(db, filing, "payment_recorded", user_id, details={
+        "payment": {"id": payment.id, "amount_cents": payment.amount_cents,
+                    "transaction_ref": payment.transaction_ref,
+                    "is_simulated": settings.payments_are_simulated},
+    })
 
     await audit_service.log_action(
         db,

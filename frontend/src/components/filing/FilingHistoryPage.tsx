@@ -4,12 +4,15 @@ import { getFilingHistory, type FilingHistory, type FilingTransaction } from '..
 import { getDemoRole } from '../auth/LoginScreen';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
+import FeeWaiverPanel, { waiverActionLabels } from './FeeWaiverPanel';
 import { formatBytes, formatCents, getDocumentLabel, parseServerDate } from '../../utils/format';
 
 const eventLabels: Record<string, string> = {
   submitted: 'Submission received', accepted: 'Accepted by the court',
   returned: 'Returned for correction', rejected: 'Rejected',
   cms_failed: 'Court system submission failed', service_recorded: 'Service-only documents recorded',
+  waiver_referred: 'Fee waiver referred for judicial review', waiver_granted: 'Fee waiver granted',
+  waiver_denied: 'Fee waiver denied', payment_recorded: 'Payment recorded',
 };
 
 function saveReceipt(filingId: number, transaction: FilingTransaction) {
@@ -68,6 +71,8 @@ export default function FilingHistoryPage() {
       </div>
       <p className="info-text">A receipt records what this system received. Court acceptance is a separate decision.
         Times below are recorded in UTC. Service-only records do not prove delivery to another party.</p>
+      {history.fee_waiver && <FeeWaiverPanel key={`${filingId}-${attempt}`} filingId={history.filing_id}
+        waiver={history.fee_waiver} onChange={() => { setPage(1); setAttempt(n => n + 1); }} />}
       {history.transactions.length === 0 && <div className="empty-state">
         <h3>No recorded transactions</h3>
         <p>Receipts are created when a filing is submitted. Filings that predate receipt tracking do not have reconstructed receipts.</p>
@@ -76,13 +81,20 @@ export default function FilingHistoryPage() {
         {history.transactions.map(transaction => <li key={transaction.id} className="receipt-card">
           <div className="receipt-heading">
             <h3>{eventLabels[transaction.event_type] || transaction.event_type}</h3>
-            <span>{transaction.submission_number ? `Submission ${transaction.submission_number}` : 'Legacy filing'}</span>
+            <span>{transaction.submission_number ? `Submission ${transaction.submission_number}`
+              : transaction.event_type === 'payment_recorded' ? 'Before submission' : 'Legacy filing'}</span>
           </div>
           <p><time dateTime={parseServerDate(transaction.occurred_at).toISOString()}>
             {parseServerDate(transaction.occurred_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}
           </time> · {transaction.actor_name}</p>
           <p className="receipt-reference">Transaction <code>{transaction.id}</code></p>
           {transaction.details.reason && <div className="alert alert-warning">{transaction.details.reason}</div>}
+          {transaction.details.basis && <p>{waiverActionLabels[transaction.details.basis] || transaction.details.basis}</p>}
+          {transaction.details.amount_due_cents != null && <p>Amount due under the decision: <strong>{formatCents(transaction.details.amount_due_cents)}</strong></p>}
+          {transaction.event_type === 'payment_recorded' && transaction.details.payment && <p>
+            {formatCents(transaction.details.payment.amount_cents)} · {transaction.details.payment.transaction_ref}
+            {transaction.details.payment.is_simulated && ' (simulated)'}
+          </p>}
           {transaction.details.court_name && <dl className="receipt-details">
             <div><dt>Court</dt><dd>{transaction.details.court_name}</dd></div>
             <div><dt>Case at submission</dt><dd>{transaction.details.case_title || 'Not specified'}

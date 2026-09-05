@@ -37,8 +37,6 @@ interface FilingData {
   }>;
   paymentComplete: boolean;
   caseChoiceMade: boolean;  // user picked existing-case or new-case on the 'case' step
-  feeWaiverRequested: boolean;
-  feeWaiverReason: string;
   motionSubtype: string | null;  // selected motion type for subsequent civil filings
 }
 
@@ -63,7 +61,12 @@ const AUTOSAVE_KEY = 'muefs_filing_draft';
 function loadDraft(): FilingData | null {
   try {
     const saved = localStorage.getItem(AUTOSAVE_KEY);
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const draft = JSON.parse(saved);
+      delete draft.feeWaiverRequested;
+      delete draft.feeWaiverReason;
+      return draft;
+    }
   } catch { /* ignore */ }
   return null;
 }
@@ -91,8 +94,6 @@ const defaultFilingData: FilingData = {
   documents: [],
   paymentComplete: false,
   caseChoiceMade: false,
-  feeWaiverRequested: false,
-  feeWaiverReason: '',
   motionSubtype: null,
 };
 
@@ -130,8 +131,11 @@ function FilingWizard() {
   const [reloadKey, setReloadKey] = useState(0);
   const [submission, setSubmission] = useState<FilingEnvelope>();
   const [errors, setErrors] = useState<string[]>([]);
-  const handlePaymentComplete = useCallback(() => {
-    setFilingData(prev => ({ ...prev, paymentComplete: true }));
+  const handlePaymentComplete = useCallback((filing: FilingEnvelope) => {
+    setFilingData(prev => ({ ...prev, paymentComplete: true,
+      documents: filing.documents.map(doc => ({ id: doc.id, title: doc.title,
+        type: doc.document_type_code, size: doc.file_size_bytes, isSearchable: doc.is_text_searchable })),
+    }));
   }, []);
   const isMotionMode = filingData.filingType !== 'initial';
   const [motionChecklists, setMotionChecklists] = useState<FilingChecklist[]>([]);
@@ -178,10 +182,10 @@ function FilingWizard() {
             filingDescription: recoveredDraft?.filingDescription ?? envelope.filing_description ?? '',
             motionSubtype: recoveredDraft?.motionSubtype ?? null,
             caseChoiceMade: true,
-            paymentComplete: envelope.payment_id != null || envelope.fee_waiver_requested
+            paymentComplete: envelope.payment_id != null
+              || (envelope.fee_waiver_requested && envelope.fee_waiver_granted === null)
+              || envelope.fee_waiver_amount_due_cents === 0
               || envelope.fee_waiver_granted === true,
-            feeWaiverRequested: envelope.fee_waiver_requested,
-            feeWaiverReason: envelope.fee_waiver_reason || '',
             documents: envelope.documents.map((doc) => ({
               id: doc.id, title: doc.title, type: doc.document_type_code,
               size: doc.file_size_bytes, isSearchable: doc.is_text_searchable,
@@ -298,8 +302,6 @@ function FilingWizard() {
             filing_type: filingData.filingType,
             case_title: filingData.caseTitle,
             filing_description: filingData.filingDescription,
-            fee_waiver_requested: filingData.feeWaiverRequested,
-            fee_waiver_reason: filingData.feeWaiverReason || undefined,
           });
           updateData({ filingId: envelope.id });
         }

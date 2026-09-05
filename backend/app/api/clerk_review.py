@@ -34,6 +34,7 @@ async def get_review_queue(
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
     status_filter: FilingStatus | None = Query(None, alias="status"),
+    fee_waivers: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -43,7 +44,7 @@ async def get_review_queue(
             status_code=400, detail="Queue status must be submitted or under_review"
         )
     filings, total = await filing_service.get_clerk_queue(
-        db, court_id, page=page, page_size=page_size, status=status_filter
+        db, court_id, page=page, page_size=page_size, status=status_filter, fee_waivers=fee_waivers,
     )
     return FilingListResponse(filings=filings, total=total, page=page, page_size=page_size)  # type: ignore[arg-type]
 

@@ -60,6 +60,9 @@ class FilingEnvelopeResponse(BaseModel):
     fee_waiver_requested: bool
     fee_waiver_granted: bool | None
     fee_waiver_reason: str | None
+    fee_waiver_referred_at: datetime | None = None
+    fee_waiver_decided_at: datetime | None = None
+    fee_waiver_amount_due_cents: int | None = None
     cms_case_number: str | None = None
     cms_filing_id: str | None = None
     cms_error: str | None = None
@@ -131,6 +134,17 @@ class FilingTransactionResponse(BaseModel):
         return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
 
 
+class FeeWaiverState(BaseModel):
+    granted: bool | None
+    referred_at: datetime | None
+    decided_at: datetime | None
+    amount_due_cents: int | None
+    payment_id: int | None
+    can_pay: bool
+    allowed_actions: list[str]
+    payments_simulated: bool
+
+
 class FilingHistoryResponse(BaseModel):
     filing_id: int
     status: FilingStatus
@@ -139,3 +153,4 @@ class FilingHistoryResponse(BaseModel):
     total: int
     page: int
     page_size: int
+    fee_waiver: FeeWaiverState | None = None

@@ -21,7 +21,7 @@ interface FilingData {
 interface Props {
   filingData: FilingData;
   submission?: FilingEnvelope;
-  onPaymentComplete?: () => void;
+  onPaymentComplete?: (filing: FilingEnvelope) => void;
   onSubmitSuccess?: (filing: FilingEnvelope) => void;
   readOnly?: boolean;
 }
@@ -55,7 +55,7 @@ function FilingReview({ filingData, submission, onPaymentComplete, onSubmitSucce
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (filingId && !readOnly) handleValidate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filingId, readOnly]);
+  }, [filingId, readOnly, filingData.documents.length, filingData.paymentComplete]);
 
   const handleSubmit = async () => {
     if (!filingId) return;

@@ -1,5 +1,3 @@
-import hashlib
-import re
 import uuid
 from datetime import UTC, datetime
 
@@ -20,10 +18,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from app.api.auth import get_current_user_id, require_user_may_manage_efilings
-from app.config import settings
+from app.api.document_upload import store_document_upload
 from app.database import get_db
 from app.models.court import Court
-from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
+from app.models.filing import FilingEnvelope, FilingStatus
 from app.models.filing_transaction import FilingTransaction
 from app.models.user import User
 from app.schemas.document import DocumentUploadResponse
@@ -36,7 +34,7 @@ from app.schemas.filing import (
     MyFilingsResponse,
 )
 from app.services import access_service, audit_service, document_service, filing_service
-from app.utils import malware_scan
+from app.services.fee_waiver_service import waiver_state
 from app.utils.http_context import client_ip, client_user_agent
 
 router = APIRouter(prefix="/filings", tags=["Filings"])
@@ -136,6 +134,17 @@ async def update_filing(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Can only update draft or returned filings",
+        )
+
+    if filing.submitted_at is not None and (
+        (data.fee_waiver_requested is not None
+         and data.fee_waiver_requested != filing.fee_waiver_requested)
+        or (data.fee_waiver_reason is not None
+            and data.fee_waiver_reason != filing.fee_waiver_reason)
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="A submitted fee waiver request cannot be changed through draft editing",
         )
 
     if data.case_title is not None:
@@ -268,97 +277,26 @@ async def upload_document(
             detail="Cannot upload documents to this filing",
         )
 
-    # Bound the read without retaining both a chunk list and a joined copy.
-    max_bytes = settings.max_file_size_mb * 1024 * 1024
-    file_data = await file.read(max_bytes + 1)
-    if len(file_data) > max_bytes:
+    if document_type_code == "FEE_WAIVER_ORDER":
         raise HTTPException(
-            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail=f"File exceeds maximum size of {settings.max_file_size_mb}MB",
+            status_code=403, detail="Court decisions must be recorded by authorized court staff",
         )
-
-    # Validate MIME type from file content (never trust client Content-Type alone).
+    doc, pii_warnings = await store_document_upload(
+        db, filing_id, file, document_type_code, title, is_confidential,
+    )
     try:
-        content_type = await run_in_threadpool(
-            document_service.resolve_upload_mime_type, file_data, file.content_type
-        )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=str(exc),
-        ) from exc
-    if not document_service.validate_mime_type(content_type):
-        raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Unsupported file type. Accepted: PDF, Word, TXT, RTF, TIFF, JPG, PNG",
-        )
-
-    # Malware screening (defense in depth): reject executables / known-bad signatures
-    # regardless of the declared MIME type.
-    scan = await run_in_threadpool(malware_scan.scan_upload, file_data, content_type)
-    if not scan.is_clean:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=scan.reason or "File rejected by malware screening",
-        )
-
-    sha256 = (await run_in_threadpool(hashlib.sha256, file_data)).hexdigest()
-    safe_name = re.sub(r'[^\w\s\-.]', '', file.filename or 'document') or 'document'
-    file_key = f"filings/{filing_id}/{uuid.uuid4()}/{safe_name}"
-
-    await run_in_threadpool(document_service.upload_document, file_data, file_key, content_type)
-
-    page_count = None
-    is_searchable = False
-    pii_warnings: list[str] = []
-    if content_type == "application/pdf":
-        inspection = await run_in_threadpool(document_service.inspect_pdf, file_data)
-        page_count = inspection.page_count
-        is_searchable = inspection.is_text_searchable
-        pii_warnings = inspection.pii_warnings
-
-    try:
-        doc = FilingDocument(
-            envelope_id=filing_id,
-            document_type_code=document_type_code,
-            title=title,
-            file_key=file_key,
-            file_size_bytes=len(file_data),
-            mime_type=content_type,
-            page_count=page_count,
-            sha256_hash=sha256,
-            # The fee-waiver application is nonpublic under MCR 2.002(B),
-            # regardless of whether the filer selected the confidentiality checkbox.
-            is_confidential=is_confidential or document_type_code == "FEE_WAIVER",
-            is_text_searchable=is_searchable,
-        )
-        db.add(doc)
-        await db.flush()
-        await db.refresh(doc)
-
         await audit_service.log_action(
-            db,
-            user_id=user_id,
-            action="upload_document",
-            entity_type="filing_document",
-            entity_id=doc.id,
-            details={"filing_id": filing_id, "filename": file.filename},
-            ip_address=client_ip(request),
-            user_agent=client_user_agent(request),
+            db, user_id=user_id, action="upload_document", entity_type="filing_document",
+            entity_id=doc.id, details={"filing_id": filing_id, "filename": file.filename},
+            ip_address=client_ip(request), user_agent=client_user_agent(request),
         )
     except Exception:
-        # Clean up orphaned S3 object if DB operations fail
-        await run_in_threadpool(document_service.delete_document, file_key)
+        await run_in_threadpool(document_service.delete_document, doc.file_key)
         raise
-
     return DocumentUploadResponse(
-        id=doc.id,
-        title=doc.title,
-        file_size_bytes=doc.file_size_bytes,
-        mime_type=doc.mime_type,
-        sha256_hash=doc.sha256_hash,
-        is_text_searchable=doc.is_text_searchable,
-        page_count=doc.page_count,
+        id=doc.id, title=doc.title, file_size_bytes=doc.file_size_bytes,
+        mime_type=doc.mime_type, sha256_hash=doc.sha256_hash,
+        is_text_searchable=doc.is_text_searchable, page_count=doc.page_count,
         warnings=pii_warnings,
     )
 
@@ -441,4 +379,5 @@ async def filing_history(
         filing_id=filing.id, status=filing.status, submission_count=filing.submission_count,
         transactions=list(transactions),  # type: ignore[arg-type]
         total=total, page=page, page_size=page_size,
+        fee_waiver=await waiver_state(db, filing, user_id) if filing.fee_waiver_requested else None,
     )

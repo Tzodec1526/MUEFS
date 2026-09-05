@@ -115,7 +115,8 @@ MUEFS/
 
 ### For Self-Represented Litigants
 - **Guided filing wizard** with plain-language instructions
-- **Fee waiver support** (MCR 2.002) built into the payment flow
+- **Fee waiver review**: private application uploads, separate clerk/judicial decisions,
+  retained signed orders and payment after denial (simulated payments)
 - **Step-by-step process** — no legal knowledge of e-filing procedures required
 
 ### For Court Clerks
