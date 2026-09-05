@@ -35,6 +35,8 @@ export default function FilingHistoryPage() {
   const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const role = getDemoRole();
+  const backTo = role === 'admin' ? '/admin' : role === 'clerk' ? '/clerk/queue' : '/filings';
 
   useEffect(() => {
     const controller = new AbortController();
@@ -58,8 +60,8 @@ export default function FilingHistoryPage() {
     <div className="page-header">
       <div><h2>Filing #{filingId}: receipts &amp; history</h2>
         <p>Submission records and clerk decisions, newest first.</p></div>
-      <Link className="btn btn-secondary" to={getDemoRole() === 'clerk' ? '/clerk/queue' : '/filings'}>
-        {getDemoRole() === 'clerk' ? 'Back to queue' : 'My Filings'}
+      <Link className="btn btn-secondary" to={backTo}>
+        {role === 'admin' ? 'People & access' : role === 'clerk' ? 'Back to queue' : 'My Filings'}
       </Link>
     </div>
     {loading && <p role="status">Loading filing history…</p>}

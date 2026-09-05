@@ -18,6 +18,38 @@ async def test_security_headers_on_health() -> None:
     assert "content-security-policy" in response.headers
 
 
+@pytest.mark.parametrize(
+    "provider, origin",
+    [
+        ("https://identity.example.gov/auth/", "https://identity.example.gov:443"),
+        ("http://127.0.0.1:54254", "http://127.0.0.1:54254"),
+    ],
+)
+async def test_browser_policy_allows_configured_identity_exchange_only(
+    monkeypatch, provider, origin
+):
+    from fastapi import FastAPI
+
+    from app.config import settings
+    from app.middleware.security_headers import SecurityHeadersMiddleware
+
+    monkeypatch.setattr(settings, "keycloak_url", provider)
+    application = FastAPI()
+    application.add_middleware(SecurityHeadersMiddleware)
+    async with AsyncClient(
+        transport=ASGITransport(app=application), base_url="http://test"
+    ) as client:
+        callback = await client.get("/auth/callback")
+        api = await client.get("/api/v1/auth/me")
+    directives = callback.headers["content-security-policy"].split("; ")
+    assert f"connect-src 'self' {origin}" in directives
+    assert "script-src 'self'" in directives
+    assert (
+        api.headers["content-security-policy"]
+        == "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+    )
+
+
 def test_api_docs_disabled_outside_debug() -> None:
     settings = Settings(debug=False, enable_api_docs=None)
     assert settings.api_docs_enabled is False

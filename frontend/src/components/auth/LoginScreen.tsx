@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Scale, ClipboardCheck, UserRound, BookOpen } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Scale, ClipboardCheck, UserRound, BookOpen, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { isDemoBuild } from '../../config/demoMode';
 import MichiganMark from '../common/MichiganMark';
@@ -13,7 +13,7 @@ export function getDemoRole(): string | null {
 }
 
 export function hasSession(): boolean {
-  return Boolean(getDemoRole() || localStorage.getItem('auth_token'));
+  return Boolean(localStorage.getItem('auth_token') || (isDemoBuild() && getDemoRole()));
 }
 
 export function getDemoCourtId(): number | null {
@@ -27,6 +27,7 @@ export function getDemoCourtName(): string | null {
 
 interface RoleOption {
   role: string;
+  label: string;
   description: string;
   icon: LucideIcon;
 }
@@ -34,23 +35,31 @@ interface RoleOption {
 const roles: RoleOption[] = [
   {
     role: 'attorney',
+    label: 'Attorney',
     description: 'File on behalf of clients across all Michigan courts',
     icon: Scale,
   },
   {
     role: 'clerk',
+    label: 'Court Clerk',
     description: 'Review filings, manage the court queue, process orders',
     icon: ClipboardCheck,
   },
   {
     role: 'srl',
+    label: 'Self-Represented Litigant',
     description: 'File your own case with step-by-step, plain-language guidance',
     icon: UserRound,
   },
   {
     role: 'public',
+    label: 'Public docket',
     description: 'Search non-sealed cases and read public filings — no sign-in or account needed',
     icon: BookOpen,
+  },
+  {
+    role: 'admin', label: 'System Administrator', icon: ShieldCheck,
+    description: 'Provision accounts, manage court access, and inspect retained changes in this demo',
   },
 ];
 
@@ -60,6 +69,7 @@ export function notifyDemoRoleChanged(): void {
 
 export function applyDemoRole(role: string): void {
   localStorage.setItem('demo_role', role);
+  localStorage.setItem('administration_access', String(role === 'admin'));
   if (role === 'clerk') {
     localStorage.setItem('demo_court_id', '3');
     localStorage.setItem('demo_court_name', '3rd Circuit Court - Wayne County');
@@ -79,37 +89,41 @@ const SHELL_ROLE_BY_USER_TYPE: Record<string, string> = {
   attorney: 'attorney',
   clerk: 'clerk',
   judge: 'clerk',
-  admin: 'clerk',
+  admin: 'admin',
   self_represented: 'srl',
   public: 'public',
 };
 
 export function applySessionFromProfile(profile: SessionProfile): void {
   const role = SHELL_ROLE_BY_USER_TYPE[profile.user_type] ?? 'srl';
-  applyDemoRole(role);
-  if (role !== 'clerk') return;
+  localStorage.setItem('demo_role', role);
+  localStorage.removeItem('demo_court_id');
+  localStorage.removeItem('demo_court_name');
   const assignments = profile.court_assignments ?? [];
+  localStorage.setItem('administration_access', String(
+    role === 'admin' || assignments.some(assignment => assignment.role === 'admin'),
+  ));
   const staff =
-    assignments.find((a) => a.role === 'clerk' || a.role === 'judge' || a.role === 'admin')
-    ?? assignments[0];
-  if (!staff) return;
-  localStorage.setItem('demo_court_id', String(staff.court_id));
-  if (staff.court_name) {
-    localStorage.setItem('demo_court_name', staff.court_name);
+    assignments.find((a) => a.role === 'clerk' || a.role === 'judge' || a.role === 'admin');
+  if (staff) {
+    localStorage.setItem('demo_court_id', String(staff.court_id));
+    if (staff.court_name) localStorage.setItem('demo_court_name', staff.court_name);
   }
+  notifyDemoRoleChanged();
 }
 
 function LoginScreen() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const returnPath = safeLoginReturnPath(searchParams.get('next'));
+  const demo = isDemoBuild();
 
   useEffect(() => {
     const role = searchParams.get('role');
-    if (!role || !roles.some((r) => r.role === role)) return;
+    if (!demo || !role || !roles.some((r) => r.role === role)) return;
     applyDemoRole(role);
     navigate(role === 'public' ? '/cases/search' : returnPath, { replace: true });
-  }, [searchParams, navigate, returnPath]);
+  }, [searchParams, navigate, returnPath, demo]);
 
   const handleSignIn = (option: RoleOption) => {
     applyDemoRole(option.role);
@@ -125,10 +139,10 @@ function LoginScreen() {
             STATE OF MICHIGAN
           </div>
           <h1>Michigan Unified E-Filing System</h1>
-          <p className="login-subtitle">Demo &middot; Statewide Electronic Filing Portal</p>
+          <p className="login-subtitle">{demo ? 'Demo · ' : ''}Statewide Electronic Filing Portal</p>
         </div>
 
-        <div className="login-cards">
+        {demo && <div className="login-cards">
           <form
             className="login-webmcp-form"
             toolname="sign_in_demo_role"
@@ -152,10 +166,7 @@ function LoginScreen() {
               className="login-webmcp-select"
               toolparamdescription="Demo role: attorney, clerk, srl, or public"
             >
-              <option value="attorney">Attorney</option>
-              <option value="clerk">Court Clerk</option>
-              <option value="srl">Self-Represented Litigant</option>
-              <option value="public">Public</option>
+              {roles.map(option => <option key={option.role} value={option.role}>{option.label}</option>)}
             </select>
             <button type="submit" className="btn btn-secondary login-webmcp-submit">
               Agent: sign in selected role
@@ -170,10 +181,7 @@ function LoginScreen() {
                 <option.icon size={26} strokeWidth={1.75} aria-hidden="true" />
               </div>
               <div className="login-card-role">
-                {option.role === 'attorney' && 'Attorney'}
-                {option.role === 'clerk' && 'Court Clerk'}
-                {option.role === 'srl' && 'Self-Represented Litigant'}
-                {option.role === 'public' && 'Public docket'}
+                {option.label}
               </div>
               <div className="login-card-desc">{option.description}</div>
               <button
@@ -184,7 +192,7 @@ function LoginScreen() {
               </button>
             </div>
           ))}
-        </div>
+        </div>}
 
         {keycloakConfigured() && (
           <div className="login-keycloak">
@@ -193,15 +201,19 @@ function LoginScreen() {
               className="btn btn-secondary"
               onClick={() => startKeycloakLogin(returnPath)}
             >
-              Sign in with Keycloak (PKCE)
+              Sign in with your court account
             </button>
             <p className="login-keycloak-note">
-              Production identity provider — uses authorization code + PKCE when configured.
+              Use the identity account approved by your court or state.
             </p>
           </div>
         )}
 
-        <MifileComparison variant="login" />
+        {!demo && <div className="login-keycloak">
+          {!keycloakConfigured() && <p role="alert">Sign-in is not configured for this deployment. Contact the court&apos;s support team.</p>}
+          <Link className="btn btn-secondary" to="/cases/search">Browse public records</Link>
+        </div>}
+        {demo && <MifileComparison variant="login" />}
       </div>
       {isDemoBuild() && (
         <div className="demo-stakeholder-banner demo-stakeholder-banner--login" role="status">

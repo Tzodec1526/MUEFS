@@ -3,10 +3,11 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import DDL, JSON, DateTime, ForeignKey, Index, String, UniqueConstraint, event
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.models.retention import append_only
 
 
 class FilingTransaction(Base):
@@ -28,24 +29,4 @@ class FilingTransaction(Base):
     )
 
 
-# Protect retained transactions from UPDATE/DELETE, including SQL outside the ORM.
-# Database owners can remove these guards; production retention still needs restricted
-# database roles, backups, and the court's approved retention policy.
-for operation in ("UPDATE", "DELETE"):
-    event.listen(FilingTransaction.__table__, "after_create", DDL(f"""
-        CREATE TRIGGER filing_transactions_no_{operation.lower()}
-        BEFORE {operation} ON filing_transactions
-        BEGIN SELECT RAISE(ABORT, 'filing_transactions is append-only'); END
-    """).execute_if(dialect="sqlite"))
-
-event.listen(FilingTransaction.__table__, "after_create", DDL("""
-    CREATE FUNCTION protect_filing_transactions() RETURNS trigger LANGUAGE plpgsql AS $$
-    BEGIN RAISE EXCEPTION 'filing_transactions is append-only'; END; $$
-""").execute_if(dialect="postgresql"))
-event.listen(FilingTransaction.__table__, "after_create", DDL("""
-    CREATE TRIGGER filing_transactions_append_only BEFORE UPDATE OR DELETE
-    ON filing_transactions FOR EACH ROW EXECUTE FUNCTION protect_filing_transactions()
-""").execute_if(dialect="postgresql"))
-event.listen(FilingTransaction.__table__, "after_drop", DDL(
-    "DROP FUNCTION IF EXISTS protect_filing_transactions()"
-).execute_if(dialect="postgresql"))
+append_only(FilingTransaction.__table__)

@@ -49,6 +49,16 @@ regardless of demo mode:
   pre-existing privileged account (admin/clerk/judge or any bar-holding account).
 - **Ownership / IDOR.** Filings, payments, favorites, notifications, and clerk review all
   enforce per-user ownership or court-role checks before returning or mutating data.
+- **Administration.** System administrators explicitly bind identities and delegate court
+  administration. Court delegates cannot change identity bindings or administrator grants.
+  Stale edits are rejected and changes retain their operator, reason and before/after values.
+  Deactivation and grant revocation affect subsequent protected requests even with an
+  unexpired token. Bootstrap requires database operator access; see
+  [the identity deployment procedure](docs/DEPLOYMENT.md#2-identity-keycloak).
+- **Retained evidence.** Database triggers reject UPDATE and DELETE on audit logs, filing
+  transactions, calendar revisions and email delivery events, including bulk SQL. Database
+  owners can remove these controls; restrict runtime ownership, DDL and TRUNCATE privileges
+  and maintain protected backups and the court's approved retention policy.
 - **Upload safety.** Uploads are size-limited (streamed, 100 MB), restricted to an
   allowlisted set of document/image MIME types, stored under server-generated keys
   (path-traversal-guarded), and **malware-screened** (see below).
@@ -65,7 +75,7 @@ which is what keeps adoption low-risk and avoids vendor lock-in.
 | --- | --- | --- |
 | User identity & credentials | The court's IdP (Keycloak / state SSO) | Validates IdP-issued RS256 JWTs; stores no passwords. |
 | Payment / card data | The payment processor (PCI scope) | Records fee/waiver status only; no card data touches MUEFS (simulated in the demo). |
-| System of record (official docket) | The court's existing CMS (JIS, Tyler Odyssey) | Pushes accepted filings via the adapter layer; the CMS stays authoritative. |
+| System of record (official docket) | The court's existing CMS (JIS, Tyler Odyssey) | Acceptance is blocked outside demo mode until an actual CMS adapter is integrated; the CMS stays authoritative. |
 | Application authorization (who may read/file what) | **MUEFS** | Sealed/confidential access control, ownership/IDOR checks, audit logging. |
 | Upload safety (type, size, malware, PII) | **MUEFS** | MIME allowlist, size cap, malware screening, MCR 1.109 PII warnings. |
 

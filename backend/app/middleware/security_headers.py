@@ -3,31 +3,33 @@
 from __future__ import annotations
 
 from fastapi import Request, Response
+from pydantic import HttpUrl
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.types import ASGIApp
 
 from app.config import settings
 
 _API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
-_SPA_CSP = (
-    "default-src 'self'; "
-    "script-src 'self'; "
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-    "font-src 'self' https://fonts.gstatic.com; "
-    "img-src 'self' data:; "
-    "connect-src 'self'; "
-    "frame-ancestors 'none'; "
-    "base-uri 'self'; "
-    "form-action 'self'"
-)
-
-
-def _csp_for_path(path: str) -> str:
-    if path.startswith("/api/"):
-        return _API_CSP
-    return _SPA_CSP
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app: ASGIApp) -> None:
+        super().__init__(app)
+        identity = HttpUrl(settings.keycloak_url)
+        # PKCE exchanges the authorization code from the browser. Permit the configured
+        # provider origin without opening script loading or unrelated connections.
+        self.spa_csp = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data:; "
+            f"connect-src 'self' {identity.scheme}://{identity.host}:{identity.port}; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
+        )
+
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
@@ -44,7 +46,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             response.headers["Strict-Transport-Security"] = (
                 "max-age=31536000; includeSubDomains; preload"
             )
-        response.headers["Content-Security-Policy"] = _csp_for_path(request.url.path)
+        response.headers["Content-Security-Policy"] = (
+            _API_CSP if request.url.path.startswith("/api/") else self.spa_csp
+        )
         if not request.url.path.startswith("/api/"):
             response.headers["Cross-Origin-Embedder-Policy"] = "credentialless"
         return response

@@ -1,3 +1,4 @@
+import { isDemoBuild } from '../config/demoMode';
 import type { ModelContext } from './types';
 
 export interface CatalogEntry {
@@ -183,9 +184,10 @@ const CLERK_TOOLS = new Set([
 ]);
 
 export function toolsForRole(role: string | null): Set<string> {
-  if (role === 'clerk') return CLERK_TOOLS;
-  if (role === 'attorney' || role === 'srl') return FILER_TOOLS;
-  return PUBLIC_TOOLS;
+  const allowed = role === 'clerk' ? CLERK_TOOLS
+    : role === 'attorney' || role === 'srl' ? FILER_TOOLS : PUBLIC_TOOLS;
+  if (isDemoBuild()) return allowed;
+  return new Set([...allowed].filter(name => name !== 'sign_in_demo_role' && name !== 'get_current_demo_role'));
 }
 
 export function catalogForRole(role: string | null): CatalogEntry[] {

@@ -201,12 +201,14 @@ async def test_postgres_retained_records_reject_sql_mutation(postgres_sessions):
 
     from sqlalchemy.exc import DBAPIError
 
+    from app.models.audit import AuditLog
     from app.models.court_calendar import CourtCalendar
     from app.models.notification import NotificationDeliveryEvent
 
     fid, _filer, clerk = await prepare_filing(postgres_sessions)
     async with postgres_sessions.begin() as db:
         filing = await filing_service.submit_filing(db, fid)
+        db.add(AuditLog(user_id=clerk, action="retention_fixture", entity_type="user"))
         notice_id = await db.scalar(select(Notification.id))
         db.add(NotificationDeliveryEvent(
             notification_id=notice_id, attempt_number=0, outcome="queued",
@@ -225,6 +227,8 @@ async def test_postgres_retained_records_reject_sql_mutation(postgres_sessions):
         "DELETE FROM court_calendars",
         "UPDATE notification_delivery_events SET outcome = 'changed'",
         "DELETE FROM notification_delivery_events",
+        "UPDATE audit_log SET action = 'changed'",
+        "DELETE FROM audit_log",
     ):
         with pytest.raises(DBAPIError, match="append-only"):
             async with postgres_sessions.begin() as db:
@@ -233,6 +237,7 @@ async def test_postgres_retained_records_reject_sql_mutation(postgres_sessions):
         assert await db.scalar(select(func.count()).select_from(FilingTransaction)) == 1
         assert await db.scalar(select(func.count()).select_from(CourtCalendar)) == 1
         assert await db.scalar(select(func.count()).select_from(NotificationDeliveryEvent)) == 1
+        assert await db.scalar(select(func.count()).select_from(AuditLog)) == 1
 
 
 @pytest.mark.parametrize("postgres_sessions", [False, True], indirect=True)

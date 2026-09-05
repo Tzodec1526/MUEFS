@@ -1,11 +1,10 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Index, Integer, String, Text, event, func
-from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy import JSON, DateTime, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.orm import Session as SyncSession
 
 from app.database import Base
+from app.models.retention import append_only
 
 
 class AuditLog(Base):
@@ -24,23 +23,10 @@ class AuditLog(Base):
     )
 
     __table_args__ = (
-        Index('ix_audit_user_time', 'user_id', 'timestamp'),
-        Index('ix_audit_action_time', 'action', 'timestamp'),
+        Index("ix_audit_user_time", "user_id", "timestamp"),
+        Index("ix_audit_action_time", "action", "timestamp"),
+        Index("ix_audit_entity_history", "entity_type", "entity_id", "id"),
     )
 
 
-@event.listens_for(SyncSession, "before_flush")
-def _enforce_audit_log_append_only(
-    session: SyncSession, flush_context: object, instances: object | None
-) -> None:
-    """Court compliance: audit rows are insert-only via the ORM (tamper resistance)."""
-    for obj in session.deleted:
-        if isinstance(obj, AuditLog):
-            raise InvalidRequestError(
-                "audit_log is append-only; DELETE blocked (court audit retention)."
-            )
-    for obj in session.dirty:
-        if isinstance(obj, AuditLog):
-            raise InvalidRequestError(
-                "audit_log is append-only; UPDATE blocked (court audit retention)."
-            )
+append_only(AuditLog.__table__)

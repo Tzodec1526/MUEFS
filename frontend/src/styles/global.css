@@ -3814,3 +3814,18 @@ textarea:focus-visible {
   .filing-history { max-width: none; color: #000; }
   .receipt-card { break-inside: avoid; box-shadow: none; }
 }
+.admin-workspace { display: grid; grid-template-columns: minmax(260px, .75fr) minmax(0, 1.35fr); gap: 24px; align-items: start; }
+.admin-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.admin-directory-filter { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 16px; align-items: end; margin-bottom: 20px; }
+.admin-directory-filter .form-group { margin-bottom: 0; }
+.admin-user-card { margin-top: 12px; overflow-wrap: anywhere; }
+.admin-editor { min-width: 0; overflow-wrap: anywhere; }
+.admin-editor > .history-summary { margin-bottom: 20px; }
+.admin-detail-section { border-top: 1px solid var(--color-border, #d5deeb); padding-top: 20px; margin-top: 24px; }
+.admin-account-form > p, .admin-detail-section p { margin-bottom: 12px; }
+.admin-history { padding-left: 22px; }
+.admin-history > li { margin: 20px 0; }
+.admin-changes > div { margin: 10px 0; }
+.admin-changes dt { font-weight: 600; }
+.admin-changes dd { margin-left: 0; }
+@media (max-width: 800px) { .admin-workspace, .admin-directory-filter, .admin-form-grid { grid-template-columns: 1fr; } }

@@ -45,7 +45,7 @@ python run_demo.py
 - **API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
 
-Log in as an **Attorney**, **Court Clerk**, or **Self-Represented Litigant**, or **browse public court records without signing in**.
+Log in as an **Attorney**, **Court Clerk**, **System Administrator**, or **Self-Represented Litigant**, or **browse public court records without signing in**.
 
 A **60-second attorney walkthrough** is in [`demo/muefs-walkthrough-60s.mp4`](demo/muefs-walkthrough-60s.mp4) (regenerate with `scripts/record-walkthrough.ps1`).
 
@@ -128,9 +128,12 @@ MUEFS/
   failure recovery and court review of uncertain email outcomes
 
 ### For Court Administration
-- **Statewide analytics** — filing volumes, processing times, court coverage
+- **People & access** — explicitly provision identities, delegate court administration,
+  grant and revoke staff assignments, deactivate accounts and inspect retained changes
+- **Scoped administration** — court delegates manage their own court's staff; system
+  administrators control identity bindings and administrator privileges
+- **System counts** — courts, users, cases, filings and pending reviews
 - **Open source** — no vendor lock-in, transparent, community-driven
-- **Cost savings** — one system replaces multiple vendor contracts
 
 ### For the Public & Press
 - **Open docket search** — look up any non-sealed case by number or party name, no account required

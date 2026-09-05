@@ -1,10 +1,11 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DDL, DateTime, Enum, ForeignKey, Index, String, Text, event, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.models.retention import append_only
 
 
 class NotificationType(enum.StrEnum):
@@ -94,38 +95,4 @@ class NotificationDeliveryEvent(Base):
     message: Mapped[str | None] = mapped_column(Text)
 
 
-for operation in ("UPDATE", "DELETE"):
-    event.listen(
-        NotificationDeliveryEvent.__table__,
-        "after_create",
-        DDL(f"""
-        CREATE TRIGGER notification_delivery_events_no_{operation.lower()}
-        BEFORE {operation} ON notification_delivery_events
-        BEGIN SELECT RAISE(ABORT, 'notification_delivery_events is append-only'); END
-    """).execute_if(dialect="sqlite"),
-    )
-
-event.listen(
-    NotificationDeliveryEvent.__table__,
-    "after_create",
-    DDL("""
-    CREATE FUNCTION protect_notification_delivery_events() RETURNS trigger LANGUAGE plpgsql AS $$
-    BEGIN RAISE EXCEPTION 'notification_delivery_events is append-only'; END; $$
-""").execute_if(dialect="postgresql"),
-)
-event.listen(
-    NotificationDeliveryEvent.__table__,
-    "after_create",
-    DDL("""
-    CREATE TRIGGER notification_delivery_events_append_only
-    BEFORE UPDATE OR DELETE ON notification_delivery_events
-    FOR EACH ROW EXECUTE FUNCTION protect_notification_delivery_events()
-""").execute_if(dialect="postgresql"),
-)
-event.listen(
-    NotificationDeliveryEvent.__table__,
-    "after_drop",
-    DDL("DROP FUNCTION IF EXISTS protect_notification_delivery_events()").execute_if(
-        dialect="postgresql"
-    ),
-)
+append_only(NotificationDeliveryEvent.__table__)

@@ -73,7 +73,7 @@ function DeliveryDetails({ notice, onRetry }: { notice: NotificationItem; onRetr
 
 export default function NotificationsPage() {
   const courtId = getDemoCourtId();
-  const staff = getDemoRole() === 'clerk' && courtId != null;
+  const staff = ['clerk', 'admin'].includes(getDemoRole() || '') && courtId != null;
   const [scope, setScope] = useState(staff ? 'court' : 'mine');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);

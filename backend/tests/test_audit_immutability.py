@@ -1,31 +1,23 @@
-"""Audit log append-only enforcement."""
+"""Retention survives SQL that bypasses the ORM."""
 
 import pytest
-from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy import select, text
+from sqlalchemy.exc import DBAPIError
 
 from app.models.audit import AuditLog
 from app.services import audit_service
 
 
-@pytest.mark.asyncio
-async def test_audit_log_delete_blocked(db_session):
-    entry = await audit_service.log_action(
-        db_session, user_id=1, action="probe", entity_type="test",
-    )
-    await db_session.flush()
-    await db_session.delete(entry)
-    with pytest.raises(InvalidRequestError, match="append-only"):
-        await db_session.flush()
-
-
-@pytest.mark.asyncio
-async def test_audit_log_update_blocked(db_session):
-    entry = await audit_service.log_action(
-        db_session, user_id=1, action="probe2", entity_type="test",
-    )
-    await db_session.flush()
-    row = await db_session.get(AuditLog, entry.id)
-    assert row is not None
-    row.action = "tampered"
-    with pytest.raises(InvalidRequestError, match="append-only"):
-        await db_session.flush()
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "DELETE FROM audit_log",
+        "UPDATE audit_log SET action='tampered'",
+    ],
+)
+async def test_audit_records_cannot_be_rewritten_with_sql(db_session, statement):
+    await audit_service.log_action(db_session, user_id=1, action="original", entity_type="user")
+    with pytest.raises(DBAPIError, match="append-only"):
+        async with db_session.begin_nested():
+            await db_session.execute(text(statement))
+    assert list(await db_session.scalars(select(AuditLog.action))) == ["original"]

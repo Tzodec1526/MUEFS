@@ -4,7 +4,7 @@ import { FilePlus2, FolderOpen, Search, ClipboardCheck } from 'lucide-react';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Footer from './components/layout/Footer';
-import LoginScreen, { getDemoRole, getDemoCourtName, hasSession } from './components/auth/LoginScreen';
+import LoginScreen, { getDemoRole, getDemoCourtId, getDemoCourtName, hasSession } from './components/auth/LoginScreen';
 import PlatformStats from './components/marketing/PlatformStats';
 import MifileComparison from './components/marketing/MifileComparison';
 import { getFilingStatusCounts, getClerkQueue } from './api/filings';
@@ -15,6 +15,7 @@ const FilingHistoryPage = lazy(() => import('./components/filing/FilingHistoryPa
 const ReviewQueue = lazy(() => import('./components/clerk/ReviewQueue'));
 const CourtCalendarPage = lazy(() => import('./components/courts/CourtCalendarPage'));
 const NotificationsPage = lazy(() => import('./components/notifications/NotificationsPage'));
+const AdministrationPage = lazy(() => import('./components/admin/AdministrationPage'));
 const CaseSearch = lazy(() => import('./components/search/CaseSearch'));
 const Favorites = lazy(() => import('./components/search/Favorites'));
 const CaseDetailPage = lazy(() => import('./components/search/CaseDetailPage'));
@@ -34,7 +35,7 @@ function RequireRole({ children }: { children: React.ReactNode }) {
 }
 
 function RequireClerk({ children }: { children: React.ReactNode }) {
-  if (getDemoRole() !== 'clerk') {
+  if (!['clerk', 'admin'].includes(getDemoRole() || '') || getDemoCourtId() == null) {
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;
@@ -42,7 +43,7 @@ function RequireClerk({ children }: { children: React.ReactNode }) {
 
 function RequireFiler({ children }: { children: React.ReactNode }) {
   const r = getDemoRole();
-  if (r === 'clerk' || r === 'public') {
+  if (r === 'clerk' || r === 'admin' || r === 'public') {
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;
@@ -131,7 +132,7 @@ function PublicDashboard() {
 }
 
 function ClerkDashboard() {
-  const courtName = getDemoCourtName() || '3rd Circuit Court - Wayne County';
+  const courtName = getDemoCourtName() || 'Assigned court';
   const courtId = parseInt(localStorage.getItem('demo_court_id') || '3', 10);
   const [pending, setPending] = useState<number | null>(null);
   useEffect(() => {
@@ -169,7 +170,13 @@ function ClerkDashboard() {
 
 function Dashboard() {
   const role = getDemoRole();
+  if (role === 'admin') return <Navigate to="/admin" replace />;
   if (role === 'clerk') {
+    if (getDemoCourtId() == null) return <div className="empty-state">
+      <h2>Court assignment needed</h2>
+      <p>Your account is provisioned. A court administrator must assign access before you can review filings.</p>
+      <p>Sign in again after your assignment is recorded.</p>
+    </div>;
     return <ClerkDashboard />;
   }
   if (role === 'public') {
@@ -216,6 +223,7 @@ function App() {
                         <Route path="/cases/search" element={<CaseSearch />} />
                         <Route path="/courts/:courtId/calendar" element={<CourtCalendarPage key={location.pathname} />} />
                         <Route path="/notifications" element={<NotificationsPage />} />
+                        <Route path="/admin" element={<AdministrationPage />} />
                         <Route path="/cases/:caseId" element={<CaseDetailPage />} />
                         <Route path="/favorites" element={<RequireFiler><Favorites /></RequireFiler>} />
                         <Route path="/clerk/queue" element={<RequireClerk><ReviewQueue /></RequireClerk>} />

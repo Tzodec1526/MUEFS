@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { isDemoBuild } from '../../config/demoMode';
-import { getDemoRole, notifyDemoRoleChanged } from '../auth/LoginScreen';
+import { getDemoCourtId, getDemoRole, notifyDemoRoleChanged } from '../auth/LoginScreen';
 import MichiganMark from '../common/MichiganMark';
 import NotificationBell from './NotificationBell';
 import WebMcpHeaderLink from './WebMcpHeaderLink';
@@ -16,6 +16,7 @@ function Header() {
     localStorage.removeItem('demo_court_name');
     localStorage.removeItem('muefs_filing_draft');
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('administration_access');
     notifyDemoRoleChanged();
     navigate('/login');
   };
@@ -25,6 +26,7 @@ function Header() {
     clerk: 'Court Clerk',
     srl: 'Self-Represented Litigant',
     public: 'Public',
+    admin: 'System Administrator',
   };
 
   const roleLabel = role ? roleLabelMap[role] || role : '';
@@ -54,7 +56,7 @@ function Header() {
         {role && <Link to="/">Dashboard</Link>}
         {(role === 'attorney' || role === 'srl') && <Link to="/filing/new">New Filing</Link>}
         <Link to="/cases/search">Case Search</Link>
-        {role === 'clerk' && <Link to="/clerk/queue">Review Queue</Link>}
+        {(role === 'clerk' || role === 'admin') && getDemoCourtId() != null && <Link to="/clerk/queue">Review Queue</Link>}
       </nav>
       <div className="header-user">
         <NotificationBell />
@@ -67,7 +69,7 @@ function Header() {
         )}
         {role ? (
           <button className="header-switch-role" onClick={handleSwitchRole}>
-            Switch Role
+            {isDemoBuild() ? 'Switch Role' : 'Sign out'}
           </button>
         ) : (
           <button className="header-switch-role" onClick={() => navigate('/login')}>

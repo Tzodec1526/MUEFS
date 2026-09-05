@@ -114,6 +114,14 @@ def test_unversioned_demo_upgrade_preserves_filings(tmp_path):
                     delivery_status="SENT",
                 )
             )
+            grants = Table("user_court_roles", metadata, autoload_with=conn)
+            conn.execute(
+                grants.insert(),
+                [
+                    {"id": 1, "user_id": 1, "court_id": 1, "role": "CLERK"},
+                    {"id": 2, "user_id": 1, "court_id": 1, "role": "CLERK"},
+                ],
+            )
             conn.execute(text("DROP TABLE alembic_version"))
         prepare_demo_schema(engine)
         prepare_demo_schema(engine)  # A second boot must not reapply or duplicate anything.
@@ -130,6 +138,11 @@ def test_unversioned_demo_upgrade_preserves_filings(tmp_path):
             )
             assert conn.scalar(text("SELECT filing_date FROM filing_envelopes")) is None
             assert conn.scalar(text("SELECT verified_email FROM users")) is None
+            assert conn.scalar(text("SELECT administration_version FROM users")) == 0
+            assert conn.scalar(text("SELECT count(*) FROM user_court_roles")) == 1
+            duplicate = conn.execute(text("SELECT action, details FROM audit_log")).one()
+            assert duplicate.action == "identity.duplicate_role_removed"
+            assert '"former_id": 2' in duplicate.details
             assert (
                 conn.scalar(text("SELECT delivery_status FROM notifications WHERE id=1"))
                 == "DISABLED"

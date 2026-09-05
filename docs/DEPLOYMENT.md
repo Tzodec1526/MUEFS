@@ -36,11 +36,62 @@ processor; production payment requests remain unavailable until that integration
 - Provision privileged accounts (admin/clerk/judge) by binding their `keycloak_id`
   explicitly; do not rely on first-login auto-provisioning for them.
 
+Set `PROVISION_USER_ON_FIRST_OIDC_LOGIN=false` when the court requires every account to
+be approved before access. Build the frontend with `VITE_ALLOW_DEMO_MODE=false` and the
+same public `VITE_KEYCLOAK_URL` and `VITE_KEYCLOAK_REALM` as the API's `KEYCLOAK_URL` and
+`KEYCLOAK_REALM`. Configure a public frontend client (`VITE_KEYCLOAK_CLIENT_ID`) with
+authorization-code flow, PKCE S256, an exact HTTPS `/auth/callback` redirect, and the
+portal's exact web origin. Do not put a client secret in the frontend.
+
+Tokens must contain `sub`, `exp`, the configured issuer, and an API audience matching
+`KEYCLOAK_CLIENT_ID` or `JWT_AUDIENCES`; set `JWT_VERIFY_AUDIENCE=true`. Configure the
+frontend client's audience mapper to include the API. Keep Keycloak's `basic`, `profile`
+and `email` client scopes: current Keycloak versions obtain the subject through the
+`basic` scope. The local evaluation used Keycloak 26.7.3 with real browser PKCE and demo
+authentication disabled; it does not validate a state federation or its production policy.
+See [Keycloak's subject-mapper guidance](https://www.keycloak.org/docs/latest/upgrading/index.html).
+
+Apply migrations, then have an authorized database operator bind the first administrator
+from `backend`, using the deployment's database configuration and the exact IdP subject:
+
+```bash
+alembic upgrade head
+python -m app.admin_bootstrap --email administrator@example.gov --first-name Court --last-name Administrator --subject SUBJECT_FROM_IDP --reason "Initial appointment record ADMIN-001"
+```
+
+The command requires an unused email and subject and refuses to run while an active,
+bound system administrator exists. It records an operator bootstrap event; it does not
+create an IdP identity, password, verified email or court assignment. Protect database
+operator access, including use of this command for recovery when no bound administrator
+remains active.
+
+Sign in and open **People & access** to provision further identities, including a second
+system administrator for access changes and recovery. Only system administrators can
+edit identity bindings, account types, active status and manually verified bar numbers,
+or delegate court administration. Delegated administrators can grant and revoke clerk
+and judge access within their courts; judicial grants require a provisioned judge account.
+Use a court-approved source before marking a bar number verified: it can authorize access
+to counsel's private case records.
+
+Every change requires a reason or authority reference. Account type changes require
+revoking existing staff assignments first. An administrator cannot change their own
+system access or court grants. A stale form must be refreshed before saving. Deactivation
+and revocation are checked by subsequent API requests; users sign in again to refresh the
+court choices displayed in their browser. These operations do not revoke already downloaded
+documents or cancel an operation that already passed authorization.
+
 ## 3. TLS & reverse proxy
 
 Terminate TLS at a reverse proxy (nginx, Caddy, or your platform's load balancer) in front
 of the frontend and API. Forward `/` to the frontend and the API under its own path; set
 `ALLOWED_ORIGINS` to the public origin. Never expose the API over plain HTTP in production.
+
+When FastAPI serves the SPA, its browser policy permits connections to the configured
+Keycloak origin for PKCE token exchange. A separately hosted frontend must supply its own
+Content-Security-Policy with the exact API and IdP origins in `connect-src`; keeping only
+`'self'` blocks cross-origin sign-in. A stricter proxy policy can also block this flow, so
+verify the deployed callback in a browser. See
+[the browser connection policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/connect-src).
 
 ## 4. Data & object storage
 
@@ -73,6 +124,14 @@ unreachable.
   before routing filing traffic to a deployment.
 - **Audit log:** filing and access actions are recorded server-side; export them to your
   SIEM / log store for retention.
+
+Migration `d26e49b73c18` adds identity change versions, retained administration history and
+unique court grants. It archives redundant historical grant identifiers before removing
+duplicate assignments. SQLite and PostgreSQL triggers reject UPDATE and DELETE on the
+audit log, filing transactions, court calendars and email delivery events. Use a restricted
+runtime database role without ownership, DDL or TRUNCATE privileges; table owners can
+remove triggers. Protect and restore-test backups independently of these guards. The
+migration refuses an automatic downgrade that would discard the retained evidence.
 - **Rate limiting:** run against Redis (`RATE_LIMIT_BACKEND=redis`).
 
 ## 7. Filing notice email

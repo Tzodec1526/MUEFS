@@ -19,7 +19,7 @@ establish state approval or production readiness.
 | Deliver electronic service | Service-only documents can be recorded. | Verified service contacts, consent/eligibility, real transmission, failures/retries, non-electronic alternatives and retained proof. A recorded document or in-app notice is not proof of service. |
 | Send filing alerts reliably | An opt-in SMTP outbox commits with filing changes, checks verified recipients, retains messages and attempts, retries temporary failures and exposes uncertain outcomes to assigned court staff. | A court-approved relay and sender domain, bounce/delivery feedback, operational alerting and court approval of legally sufficient notice content and procedures. Generic email alerts do not establish legal service. |
 | Connect to the court's system of record | Acceptance is explicitly blocked outside demo mode when CMS integration is absent. | A documented court/vendor contract, credentialed sandbox, document/code mapping, idempotent delivery, status callbacks, error recovery and reconciliation. |
-| Operate statewide | Court-scoped access, PostgreSQL support, migrations, health checks and deployment guidance exist. | Identity lifecycle and delegated administration, availability targets, incident response, backup restoration drills, disaster recovery and migration from incumbent systems. |
+| Operate statewide | Explicit identity provisioning, delegated court administration, immediate checks on subsequent requests after revocation, retained changes, PostgreSQL migrations and deployment guidance exist. | State federation and lifecycle integration, access recertification, availability targets, incident response, backup restoration drills, disaster recovery and migration from incumbent systems. |
 | Serve the whole public | Responsive filing and history pages, keyboard controls and guided filing exist. | Independent accessibility testing, assistive-technology testing, language access, paper-filing accommodations and usability evaluation with self-represented filers. |
 
 ## Implemented receipt workflow
@@ -210,10 +210,71 @@ cover competing workers and retention guards on both fresh and migrated schemas.
 acceptance is not a bounce report, proof of reading, a service certificate, or a waiver
 decision deadline trigger. Those court procedures remain separate implementation work.
 
+## Identity administration and court access
+
+**People & access** provides a paginated identity directory, provisioning, identity-subject
+binding, account deactivation and court grants. System administrators manage identities
+and delegate administration for named courts. Court administrators see only their courts'
+assignments and change history. An exact-email lookup can find an already provisioned
+clerk or judge for assignment without exposing the statewide directory or other courts'
+grants. Delegates cannot edit identity subjects, verify bar numbers, create accounts or
+assign administrator privileges. A judicial grant requires a judge account.
+
+The first administrator is bound by `python -m app.admin_bootstrap` from an authorized
+database operator session, with a retained bootstrap event. Later changes require an
+authenticated system administrator. Active accounts require an IdP subject outside demo
+mode. Email verification can only come from matching verified IdP claims; it cannot be
+invented by a directory edit. A changed address or subject, or deactivation, clears it.
+Bar verification is an explicit human assertion using a court-approved source, not a
+connection to a bar registry or proof of current standing.
+
+Account changes and court grants retain the operator, reason, UTC time and before/after
+values in the same transaction. A version check rejects stale forms. Concurrent PostgreSQL
+requests recheck administrative authority after taking locks. Self-revocation and changes
+to one's own system identity binding require another administrator. Staff grants must be
+revoked before an account type changes, preventing a later type change from retaining
+unintended judicial authority. Disabling an account or revoking a grant denies subsequent
+protected requests even with a still-valid token. Cached navigation refreshes on sign-in;
+already downloaded records and work already authorized are outside that revocation boundary.
+
+Mutations lock only the actor and affected account, rather than every system administrator.
+Authentication can also update an actor's verified email; if those earlier writes cause
+overlapping changes to deadlock, the API rolls back the losing operation and returns a
+conflict requiring refresh. It does not replay an authority change automatically. The
+concurrency tests force this overlap with both fresh and previously verified identities.
+
+Database retention now covers the audit log itself, including raw SQL updates and deletes.
+One shared model helper replaces repeated trigger definitions and the ORM hook that scanned
+all dirty objects while missing bulk SQL. Migrations preserve their own frozen definitions.
+Migration `d26e49b73c18` archives duplicate grant identifiers and timestamps before enforcing
+uniqueness, adds an index for per-account history, and refuses a destructive downgrade.
+Database ownership and TRUNCATE privileges must remain outside the runtime role.
+
+Directory pages fetch court grants in one batch. System statistics now use one database
+round trip for five counts. The administration page loads only when opened. Production
+login no longer displays demo identities or invents a court assignment for unassigned
+staff; production tool discovery also excludes unavailable demo sign-in tools. The browser
+security policy allows token exchange with the configured IdP origin while retaining the
+separate restrictive API policy.
+
+Verification includes administration permissions, rollback with an audit failure, stale
+versions, first-administrator bootstrap, legacy migration and concurrent requests against
+PostgreSQL on model-created and migrated schemas. A local Keycloak 26.7.3 realm exercised
+real browser PKCE, provisioning, delegation, existing-token revocation, deactivation,
+private history and responsive layouts with demo authentication and auto-provisioning off.
+The local HTTP test realm and synthetic appointments are not a production identity review.
+State federation, MFA and session policy, signing-key rotation exercises, lifecycle imports,
+access recertification and recovery drills remain implementation work with the court.
+The current frontend keeps bearer tokens in browser storage; the production identity review
+must address that session design and XSS exposure. An IdP cookie does not itself establish
+an application session for this API.
+
 ## Sources guiding the evaluation
 
 - [RFC 5321, SMTP](https://www.rfc-editor.org/rfc/rfc5321): relay acceptance, response codes and uncertainty after a lost final response.
 - [Python SMTP client documentation](https://docs.python.org/3/library/smtplib.html): TLS, envelope commands, timeouts and transport exceptions.
+- [Keycloak upgrade guidance](https://www.keycloak.org/docs/latest/upgrading/index.html): the `basic` client scope and subject mapper needed when configuring current access tokens.
+- [Browser connection policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/connect-src): allowing the configured identity provider for browser token exchange.
 - [Michigan Court Rule 1.109, electronic filing and service](https://www.courts.michigan.gov/siteassets/rules-instructions-administrative-orders/michigan-court-rules/court-rules-book-ch-1-responsive-html5.zip/Court_Rules_Book_Ch_1/Court_Rules_Chapter_1/Court_Rules_Chapter_1.htm): transaction records and notices, filing timing, service and transmission failures.
 - [Michigan Court Rule 2.002](https://www.courts.michigan.gov/siteassets/rules-instructions-administrative-orders/michigan-court-rules/court-rules-book-ch-2-responsive-html5.zip/Court_Rules_Book_Ch_2/Court_Rules_Chapter_2/Court_Rules_Chapter_2.htm): waiver requests, nonpublic information and court decisions.
 - [NCSC electronic filing process standards](https://www.ncsc.org/__data/assets/pdf_file/0022/15367/recommended_-process_-standards_02_26_03.pdf): historical functional guidance on document integrity, security and transaction records; not a current product certification.
