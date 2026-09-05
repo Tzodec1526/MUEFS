@@ -1,0 +1,41 @@
+"""Run with python -m app.notification_worker; --once drains the currently due queue."""
+
+import argparse
+import asyncio
+import logging
+import time
+
+from app.config import settings
+from app.database import async_session, engine
+from app.services.email_delivery_service import (
+    deliver_next,
+    recover_interrupted,
+    validate_email_config,
+)
+
+
+async def run(once: bool = False) -> None:
+    validate_email_config()
+    if not settings.email_delivery_enabled:
+        raise RuntimeError("Set EMAIL_DELIVERY_ENABLED=true before starting the notice worker")
+    if settings.demo_isolated_sessions:
+        raise RuntimeError("The notice worker does not operate on isolated demo sessions")
+    last_recovery = time.monotonic() - 60
+    try:
+        while True:
+            if time.monotonic() - last_recovery >= 60:
+                await recover_interrupted(async_session)
+                last_recovery = time.monotonic()
+            if not await deliver_next(async_session):
+                if once:
+                    return
+                await asyncio.sleep(5)
+    finally:
+        await engine.dispose()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--once", action="store_true")
+    logging.basicConfig(level=logging.INFO)
+    asyncio.run(run(once=parser.parse_args().once))

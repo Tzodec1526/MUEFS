@@ -43,6 +43,7 @@ app.add_middleware(
         "Content-Type",
         "X-Demo-User-Id",
         "X-Demo-Auth-Secret",
+        "Idempotency-Key",
     ],
 )
 app.add_middleware(RateLimitMiddleware)

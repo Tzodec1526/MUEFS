@@ -1,4 +1,6 @@
-from pydantic import field_validator
+from typing import Literal
+
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -76,6 +78,16 @@ class Settings(BaseSettings):
 
     # Payments: no PSP integration in this repo — UI/API must reflect simulation
     payments_are_simulated: bool = True
+
+    # Notices are queued only when explicitly enabled. A separate worker sends them.
+    email_delivery_enabled: bool = False
+    portal_base_url: str = ""
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_tls: Literal["starttls", "ssl", "plain"] = "starttls"
+    smtp_username: str = ""
+    smtp_password: SecretStr = SecretStr("")
+    smtp_from: str = ""
 
     # Hosted public demo (deploy only): per-visitor isolated SQLite sandboxes.
     # When true, each browser session gets its own copy of a seeded template DB;

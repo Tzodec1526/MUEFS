@@ -1,3 +1,13 @@
+x-notice-environment: &notice-environment
+  EMAIL_DELIVERY_ENABLED: ${EMAIL_DELIVERY_ENABLED:-false}
+  PORTAL_BASE_URL: ${PORTAL_BASE_URL:-}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_TLS: ${SMTP_TLS:-starttls}
+  SMTP_FROM: ${SMTP_FROM:-}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+
 services:
   # PostgreSQL Database
   postgres:
@@ -92,6 +102,9 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
+      <<: *notice-environment
+      DEBUG: ${DEBUG:-true}
+      SECURITY_STRICT_STARTUP: ${SECURITY_STRICT_STARTUP:-false}
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://muefs:muefs_dev@postgres:5432/muefs}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-http://minio:9000}
@@ -131,6 +144,21 @@ services:
       redis:
         condition: service_healthy
       minio:
+        condition: service_healthy
+
+  # Opt-in notice sender; run migrations and configure the relay before starting it.
+  notice-worker:
+    profiles: ["email"]
+    build: ./backend
+    restart: unless-stopped
+    command: ["python", "-m", "app.notification_worker"]
+    environment:
+      <<: *notice-environment
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://muefs:muefs_dev@postgres:5432/muefs}
+      DEBUG: ${DEBUG:-true}
+      ALLOW_DEMO_MODE: ${ALLOW_DEMO_MODE:-true}
+    depends_on:
+      postgres:
         condition: service_healthy
 
   # Frontend

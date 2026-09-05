@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from app.config import settings
+from app.services.email_delivery_service import validate_email_config
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ _PLACEHOLDER_SECRETS = frozenset(
 def validate_security_config() -> None:
     """Log warnings or raise when production settings are unsafe."""
     issues: list[str] = []
+    validate_email_config()
 
     if settings.allow_demo_mode and not settings.debug and not settings.demo_mode_secret:
         issues.append(

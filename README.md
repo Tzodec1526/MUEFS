@@ -124,7 +124,8 @@ MUEFS/
 ### For Court Clerks
 - **Review queue** with batch accept, age tracking, and common rejection reasons
 - **Document compliance checks** — text-searchability, file format, size limits
-- **Real-time filing status** updates with notifications
+- **Filing status notices** — portal history plus optional SMTP alerts, retained attempts,
+  failure recovery and court review of uncertain email outcomes
 
 ### For Court Administration
 - **Statewide analytics** — filing volumes, processing times, court coverage

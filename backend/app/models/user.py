@@ -36,6 +36,8 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    # Set from a verified IdP claim; sending also checks it still matches email.
+    verified_email: Mapped[str | None] = mapped_column(String(255))
     first_name: Mapped[str] = mapped_column(String(100))
     last_name: Mapped[str] = mapped_column(String(100))
     bar_number: Mapped[str | None] = mapped_column(String(20), index=True)

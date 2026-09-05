@@ -89,7 +89,7 @@ apiClient.interceptors.response.use(
       const onPublicPath = path.startsWith('/cases');
       const role = localStorage.getItem('demo_role');
       if (role && role !== 'public' && !onPublicPath && path !== '/login') {
-        window.location.href = '/login';
+        window.location.href = `/login?next=${encodeURIComponent(path + window.location.search + window.location.hash)}`;
       }
     }
     return Promise.reject(error);

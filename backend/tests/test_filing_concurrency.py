@@ -21,6 +21,7 @@ from app.models.filing_transaction import FilingTransaction
 from app.models.notification import Notification
 from app.models.payment import Payment
 from app.services import filing_service
+from tests.test_email_delivery import smtp_sink as smtp_sink
 from tests.test_fee_waivers import decision_pdf
 from tests.test_filing_history import filing_fixture
 
@@ -201,10 +202,16 @@ async def test_postgres_retained_records_reject_sql_mutation(postgres_sessions):
     from sqlalchemy.exc import DBAPIError
 
     from app.models.court_calendar import CourtCalendar
+    from app.models.notification import NotificationDeliveryEvent
 
     fid, _filer, clerk = await prepare_filing(postgres_sessions)
     async with postgres_sessions.begin() as db:
         filing = await filing_service.submit_filing(db, fid)
+        notice_id = await db.scalar(select(Notification.id))
+        db.add(NotificationDeliveryEvent(
+            notification_id=notice_id, attempt_number=0, outcome="queued",
+            occurred_at=datetime.now(UTC), message="Synthetic retained message",
+        ))
         db.add(CourtCalendar(
             court_id=filing.court_id, timezone="America/Detroit",
             valid_from=date(2026, 1, 1), valid_through=date(2026, 12, 31),
@@ -216,6 +223,8 @@ async def test_postgres_retained_records_reject_sql_mutation(postgres_sessions):
         "DELETE FROM filing_transactions",
         "UPDATE court_calendars SET timezone = 'UTC'",
         "DELETE FROM court_calendars",
+        "UPDATE notification_delivery_events SET outcome = 'changed'",
+        "DELETE FROM notification_delivery_events",
     ):
         with pytest.raises(DBAPIError, match="append-only"):
             async with postgres_sessions.begin() as db:
@@ -223,3 +232,20 @@ async def test_postgres_retained_records_reject_sql_mutation(postgres_sessions):
     async with postgres_sessions() as db:
         assert await db.scalar(select(func.count()).select_from(FilingTransaction)) == 1
         assert await db.scalar(select(func.count()).select_from(CourtCalendar)) == 1
+        assert await db.scalar(select(func.count()).select_from(NotificationDeliveryEvent)) == 1
+
+
+@pytest.mark.parametrize("postgres_sessions", [False, True], indirect=True)
+async def test_postgres_workers_claim_a_notice_once(postgres_sessions, smtp_sink):
+    from app.services import email_delivery_service as delivery
+    from tests.test_email_delivery import prepare_notice
+
+    async with postgres_sessions.begin() as db:
+        nid, *_ = await prepare_notice(db)
+    outcomes = await asyncio.gather(delivery.deliver_next(postgres_sessions),
+                                    delivery.deliver_next(postgres_sessions))
+    assert sorted(outcomes) == [False, True]
+    assert len(smtp_sink["messages"]) == 1
+    async with postgres_sessions() as db:
+        notice = await db.get(Notification, nid)
+        assert notice.delivery_status.value == "sent" and notice.attempt_count == 1

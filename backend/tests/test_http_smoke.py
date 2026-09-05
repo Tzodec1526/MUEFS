@@ -21,6 +21,20 @@ async def test_openapi_docs_available() -> None:
     assert r.status_code == 200
 
 
+async def test_submission_preflight_allows_idempotency_header() -> None:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.options(
+            "/api/v1/filings/1/submit",
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type,idempotency-key,x-demo-user-id",
+            },
+        )
+    assert response.status_code == 200
+    assert "idempotency-key" in response.headers["access-control-allow-headers"].lower()
+
+
 @pytest.mark.asyncio
 async def test_api_v1_filings_create_requires_auth() -> None:
     """Public docket reads need no account, but creating a filing must fail closed (401).

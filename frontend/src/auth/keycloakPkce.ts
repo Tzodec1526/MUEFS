@@ -7,6 +7,19 @@ import { notifyDemoRoleChanged } from '../components/auth/LoginScreen';
 
 const STORAGE_VERIFIER = 'muefs_pkce_verifier';
 const STORAGE_STATE = 'muefs_pkce_state';
+const STORAGE_RETURN_PATH = 'muefs_login_return_path';
+
+export function safeLoginReturnPath(value: string | null): string {
+  if (!value?.startsWith('/')) return '/';
+  try {
+    const destination = new URL(value, window.location.origin);
+    if (destination.origin !== window.location.origin
+      || /^\/(?:login|auth)(?:\/|$)/i.test(decodeURIComponent(destination.pathname))) return '/';
+    return destination.pathname + destination.search + destination.hash;
+  } catch {
+    return '/';
+  }
+}
 
 function baseUrl(): string {
   const url = import.meta.env.VITE_KEYCLOAK_URL;
@@ -50,12 +63,13 @@ export function keycloakConfigured(): boolean {
   return Boolean(import.meta.env.VITE_KEYCLOAK_URL);
 }
 
-export async function startKeycloakLogin(): Promise<void> {
+export async function startKeycloakLogin(returnPath = '/'): Promise<void> {
   const verifier = randomString(48);
   const challenge = await sha256Base64Url(verifier);
   const state = randomString(16);
   sessionStorage.setItem(STORAGE_VERIFIER, verifier);
   sessionStorage.setItem(STORAGE_STATE, state);
+  sessionStorage.setItem(STORAGE_RETURN_PATH, safeLoginReturnPath(returnPath));
 
   const params = new URLSearchParams({
     client_id: clientId(),
@@ -73,18 +87,20 @@ export async function startKeycloakLogin(): Promise<void> {
 
 export async function handleKeycloakCallback(
   search: string,
-): Promise<'ok' | 'error'> {
+): Promise<string | null> {
   const params = new URLSearchParams(search);
   const code = params.get('code');
   const state = params.get('state');
   const savedState = sessionStorage.getItem(STORAGE_STATE);
   const verifier = sessionStorage.getItem(STORAGE_VERIFIER);
+  const returnPath = safeLoginReturnPath(sessionStorage.getItem(STORAGE_RETURN_PATH));
 
   sessionStorage.removeItem(STORAGE_STATE);
   sessionStorage.removeItem(STORAGE_VERIFIER);
+  sessionStorage.removeItem(STORAGE_RETURN_PATH);
 
   if (!code || !verifier || !state || state !== savedState) {
-    return 'error';
+    return null;
   }
 
   const body = new URLSearchParams({
@@ -102,13 +118,13 @@ export async function handleKeycloakCallback(
     body,
   });
 
-  if (!response.ok) return 'error';
+  if (!response.ok) return null;
 
   const tokens = (await response.json()) as { access_token?: string };
-  if (!tokens.access_token) return 'error';
+  if (!tokens.access_token) return null;
 
   localStorage.setItem('auth_token', tokens.access_token);
   localStorage.removeItem('demo_role');
   notifyDemoRoleChanged();
-  return 'ok';
+  return returnPath;
 }

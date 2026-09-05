@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, FilePlus2, FolderOpen, Search, Star, ClipboardCheck, Bot } from 'lucide-react';
+import { LayoutDashboard, FilePlus2, FolderOpen, Search, Star, ClipboardCheck, Bot, Mail } from 'lucide-react';
 import { webMcpStatus } from '../../webmcp';
 import { getDemoRole } from '../auth/LoginScreen';
 
@@ -21,6 +21,7 @@ function Sidebar() {
     { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['attorney', 'clerk', 'srl', 'public'] },
     { path: '/filing/new', label: 'New Filing', icon: FilePlus2, roles: ['attorney', 'srl'] },
     { path: '/filings', label: 'My Filings', icon: FolderOpen, roles: ['attorney', 'srl'] },
+    { path: '/notifications', label: 'Notices', icon: Mail, roles: ['attorney', 'srl', 'clerk'] },
     { path: '/cases/search', label: 'Case Search', icon: Search, roles: ['attorney', 'clerk', 'srl', 'public'] },
     { path: '/favorites', label: 'Favorites', icon: Star, roles: ['attorney', 'srl'] },
     { path: '/clerk/queue', label: 'Review Queue', icon: ClipboardCheck, roles: ['clerk'] },

@@ -1,29 +1,8 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.notification import DeliveryStatus, Notification, NotificationType
-
-
-async def create_notification(
-    db: AsyncSession,
-    *,
-    notification_type: NotificationType,
-    recipient_id: int,
-    filing_envelope_id: int | None,
-    subject: str,
-    body: str,
-) -> Notification:
-    notification = Notification(
-        notification_type=notification_type,
-        recipient_id=recipient_id,
-        filing_envelope_id=filing_envelope_id,
-        subject=subject,
-        body=body,
-        delivery_status=DeliveryStatus.PENDING,
-    )
-    db.add(notification)
-    await db.flush()
-    return notification
+from app.models.notification import Notification, NotificationType
+from app.services.email_delivery_service import queue_email
 
 
 async def notify_filing_status_change(
@@ -61,11 +40,14 @@ async def notify_filing_status_change(
     if reason:
         body_parts.append(f"Reason: {reason}")
 
-    return await create_notification(
-        db,
+    notification = Notification(
         notification_type=notification_type,
         recipient_id=filer_id,
         filing_envelope_id=filing_id,
         subject=subject,
         body="\n".join(body_parts),
     )
+    db.add(notification)
+    await db.flush()
+    await queue_email(db, notification)
+    return notification

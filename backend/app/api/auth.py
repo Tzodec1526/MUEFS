@@ -8,7 +8,7 @@ from app.models.court import Court
 from app.models.user import User, UserCourtRole, UserType
 from app.schemas.user import CourtAssignment, UserCreate, UserProfile, UserResponse
 from app.security.demo_auth import demo_headers_permitted
-from app.services.user_provision_service import provision_user_from_oidc
+from app.services.user_provision_service import provision_user_from_oidc, sync_verified_email
 from app.utils.keycloak_jwt import JWTError, decode_keycloak_access_token
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -84,6 +84,7 @@ async def get_current_user_id(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Account disabled",
             )
+        sync_verified_email(user, claims)
         return user.id
 
     if (
@@ -129,6 +130,7 @@ async def get_optional_user_id(
                 if not user and settings.provision_user_on_first_oidc_login:
                     user = await provision_user_from_oidc(db, sub=sub, claims=claims)
                 if user and user.is_active:
+                    sync_verified_email(user, claims)
                     return user.id
 
     if (

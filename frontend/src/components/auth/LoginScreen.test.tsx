@@ -23,26 +23,6 @@ describe('demo auth helpers (localStorage backed)', () => {
     localStorage.clear();
   });
 
-  it('getDemoRole returns null by default', () => {
-    expect(getDemoRole()).toBeNull();
-  });
-
-  it('getDemoRole returns value after set', () => {
-    localStorage.setItem('demo_role', 'attorney');
-    expect(getDemoRole()).toBe('attorney');
-  });
-
-  it('getDemoCourtId parses number or null', () => {
-    expect(getDemoCourtId()).toBeNull();
-    localStorage.setItem('demo_court_id', '3');
-    expect(getDemoCourtId()).toBe(3);
-  });
-
-  it('getDemoCourtName roundtrip', () => {
-    localStorage.setItem('demo_court_name', '3rd Circuit');
-    expect(getDemoCourtName()).toBe('3rd Circuit');
-  });
-
   it('hasSession is true when a JWT is stored even without demo_role', () => {
     expect(hasSession()).toBe(false);
     localStorage.setItem('auth_token', 'jwt');

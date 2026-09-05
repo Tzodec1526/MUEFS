@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react';
 import { isDemoBuild } from '../../config/demoMode';
 import MichiganMark from '../common/MichiganMark';
 import MifileComparison from '../marketing/MifileComparison';
-import { keycloakConfigured, startKeycloakLogin } from '../../auth/keycloakPkce';
+import { keycloakConfigured, safeLoginReturnPath, startKeycloakLogin } from '../../auth/keycloakPkce';
 import { logAgentActivity } from '../../webmcp/activity';
 
 export function getDemoRole(): string | null {
@@ -102,17 +102,18 @@ export function applySessionFromProfile(profile: SessionProfile): void {
 function LoginScreen() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const returnPath = safeLoginReturnPath(searchParams.get('next'));
 
   useEffect(() => {
     const role = searchParams.get('role');
     if (!role || !roles.some((r) => r.role === role)) return;
     applyDemoRole(role);
-    navigate(role === 'public' ? '/cases/search' : '/', { replace: true });
-  }, [searchParams, navigate]);
+    navigate(role === 'public' ? '/cases/search' : returnPath, { replace: true });
+  }, [searchParams, navigate, returnPath]);
 
   const handleSignIn = (option: RoleOption) => {
     applyDemoRole(option.role);
-    navigate(option.role === 'public' ? '/cases/search' : '/');
+    navigate(option.role === 'public' ? '/cases/search' : returnPath);
   };
 
   return (
@@ -138,7 +139,7 @@ function LoginScreen() {
               if (!roles.some((r) => r.role === role)) return;
               logAgentActivity('sign_in_demo_role', { role, via: 'declarative_form' }, true, 0);
               applyDemoRole(role);
-              navigate(role === 'public' ? '/cases/search' : '/');
+              navigate(role === 'public' ? '/cases/search' : returnPath);
             }}
           >
             <label className="sr-only" htmlFor="demoRoleSelect">
@@ -190,7 +191,7 @@ function LoginScreen() {
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => startKeycloakLogin()}
+              onClick={() => startKeycloakLogin(returnPath)}
             >
               Sign in with Keycloak (PKCE)
             </button>

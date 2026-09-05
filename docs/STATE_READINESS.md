@@ -17,6 +17,7 @@ establish state approval or production readiness.
 | Resolve fee waivers correctly | A completed application accompanies the filing. Clerk waivers, referral and judicial decisions are separate court-scoped actions. Signed decision PDFs and denial amounts remain in private history; a filer can pay after denial without resubmitting. | Actual notice delivery, de novo review and judicial assignment, deadline calculation, case-wide continuation and reinstatement, court verification of signed forms and prisoner-specific procedures. |
 | Collect and reconcile funds | Demo fee quoting, simulated payments and linked payment references work. | Audited court fee schedules, a real hosted payment processor, signed webhooks, reconciliation, refunds and accounting exports. |
 | Deliver electronic service | Service-only documents can be recorded. | Verified service contacts, consent/eligibility, real transmission, failures/retries, non-electronic alternatives and retained proof. A recorded document or in-app notice is not proof of service. |
+| Send filing alerts reliably | An opt-in SMTP outbox commits with filing changes, checks verified recipients, retains messages and attempts, retries temporary failures and exposes uncertain outcomes to assigned court staff. | A court-approved relay and sender domain, bounce/delivery feedback, operational alerting and court approval of legally sufficient notice content and procedures. Generic email alerts do not establish legal service. |
 | Connect to the court's system of record | Acceptance is explicitly blocked outside demo mode when CMS integration is absent. | A documented court/vendor contract, credentialed sandbox, document/code mapping, idempotent delivery, status callbacks, error recovery and reconciliation. |
 | Operate statewide | Court-scoped access, PostgreSQL support, migrations, health checks and deployment guidance exist. | Identity lifecycle and delegated administration, availability targets, incident response, backup restoration drills, disaster recovery and migration from incumbent systems. |
 | Serve the whole public | Responsive filing and history pages, keyboard controls and guided filing exist. | Independent accessibility testing, assistive-technology testing, language access, paper-filing accommodations and usability evaluation with self-represented filers. |
@@ -68,7 +69,8 @@ same migration on startup. No receipt is invented for a filing submitted before 
 Database triggers block transaction UPDATE and DELETE in SQLite and PostgreSQL. Database
 owners can remove these controls; they are not a substitute for restricted production
 roles, protected backups or an external archive. Document retention needs a court-approved
-policy before production use. In-app notices are available; email transmission is not.
+policy before production use. Email alerts require an explicitly configured relay and worker;
+the portal retains notices even when delivery is disabled or fails.
 
 ## Independent fee waiver review
 
@@ -160,8 +162,58 @@ filing dates, and refuses an automatic downgrade that would erase these records.
 different court timezones, holidays, adjacent years, revisions, permissions and receipt
 preservation. The migration and PostgreSQL suites cover the retained records as well.
 
+## Filing notice email
+
+`EMAIL_DELIVERY_ENABLED` defaults to false. When enabled, a filing transition creates its
+portal notice and a generic email in the same transaction. The request performs no SMTP
+work. The queued message contains an authenticated portal link and notice reference;
+case captions, decision reasons, financial information and attachments stay in the portal.
+The destination survives demo sign-in, the OIDC callback and expired-session redirects;
+external destinations and sign-in loops are rejected.
+
+Successful OIDC authentication records a verified email only when the claim matches the
+account address. Missing, changed or unverified claims remove that verification. Existing
+accounts and demo role headers do not invent verification. The worker rechecks the active
+account and matching address immediately before sending. Blocked recipients remain visible
+in **Notices** and can be retried after verification.
+
+Run `python -m app.notification_worker` in a separate process with the API's database and
+mail settings. `--once` drains messages currently due and exits. PostgreSQL workers claim
+independent rows with `SKIP LOCKED`; the claim and started event commit before network I/O.
+The database connection is released during SMTP. Automatic retries preserve the original
+message and Message-ID, with at most five attempts and delays of 2, 4, 8 and 16 minutes.
+
+A successful final SMTP response records **Accepted by email relay**, not inbox delivery.
+A refused message records a temporary or permanent failure. A lost final response, or a
+started attempt without an outcome after ten minutes, becomes **Email outcome unknown**.
+These messages are not automatically resent. Assigned court staff must inspect relay
+records and give a reason before queuing another email. This avoids claiming exactly-once
+delivery where SMTP and a database cannot provide it. Late workers cannot overwrite a
+newer retry. Recipients can retry confirmed failures; they cannot resend accepted or
+uncertain messages themselves.
+
+`/notifications` provides paginated personal and court-scoped notice lists, status filters
+and private delivery history. Retry requests are serialized and logged with the operator's
+reason. Queued events preserve the exact message; attempt events retain times and SMTP
+response codes. SQLite and PostgreSQL triggers reject event updates and deletion. This
+archive still requires production database privilege controls and protected backups.
+
+Migration `b51d804a3e62` adds verification, outbox fields and delivery events. It leaves old
+pending notices portal-only and archives earlier sent/delivered/failed claims as unverified
+historical statuses. Enabling email does not send an old backlog. Fabricated notification
+seed data has been removed. The migration refuses an automatic downgrade that would erase
+transport evidence.
+
+The local SMTP tests exercise actual wire exchanges, rejection, lost final responses,
+retry timing, privacy, TLS refusal, recipient verification and rollback. PostgreSQL tests
+cover competing workers and retention guards on both fresh and migrated schemas. Relay
+acceptance is not a bounce report, proof of reading, a service certificate, or a waiver
+decision deadline trigger. Those court procedures remain separate implementation work.
+
 ## Sources guiding the evaluation
 
+- [RFC 5321, SMTP](https://www.rfc-editor.org/rfc/rfc5321): relay acceptance, response codes and uncertainty after a lost final response.
+- [Python SMTP client documentation](https://docs.python.org/3/library/smtplib.html): TLS, envelope commands, timeouts and transport exceptions.
 - [Michigan Court Rule 1.109, electronic filing and service](https://www.courts.michigan.gov/siteassets/rules-instructions-administrative-orders/michigan-court-rules/court-rules-book-ch-1-responsive-html5.zip/Court_Rules_Book_Ch_1/Court_Rules_Chapter_1/Court_Rules_Chapter_1.htm): transaction records and notices, filing timing, service and transmission failures.
 - [Michigan Court Rule 2.002](https://www.courts.michigan.gov/siteassets/rules-instructions-administrative-orders/michigan-court-rules/court-rules-book-ch-2-responsive-html5.zip/Court_Rules_Book_Ch_2/Court_Rules_Chapter_2/Court_Rules_Chapter_2.htm): waiver requests, nonpublic information and court decisions.
 - [NCSC electronic filing process standards](https://www.ncsc.org/__data/assets/pdf_file/0022/15367/recommended_-process_-standards_02_26_03.pdf): historical functional guidance on document integrity, security and transaction records; not a current product certification.

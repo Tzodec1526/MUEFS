@@ -26,6 +26,9 @@ Copy `.env.example` to `.env` and change every demo value:
 Generate secrets with `openssl rand -hex 32` and store them in your platform's secret
 manager — never in the repo.
 
+`PAYMENTS_ARE_SIMULATED=false` disables the demo payment path. It does not connect a payment
+processor; production payment requests remain unavailable until that integration exists.
+
 ## 2. Identity (Keycloak)
 
 - Run production with Keycloak (or a state SSO) as the only auth path (`ALLOW_DEMO_MODE=false`).
@@ -65,17 +68,66 @@ unreachable.
 
 ## 6. Monitoring & operations
 
-- **Health:** the API exposes `GET /health`; wire it to your platform's liveness/readiness
-  checks (the `docker-compose.yml` backend service and the production `Dockerfile` already do).
+- **Health:** the API exposes `GET /health` for process liveness; the Compose backend
+  already checks it. Verify database, object storage and other dependencies separately
+  before routing filing traffic to a deployment.
 - **Audit log:** filing and access actions are recorded server-side; export them to your
   SIEM / log store for retention.
 - **Rate limiting:** run against Redis (`RATE_LIMIT_BACKEND=redis`).
 
-## 7. Container images
+## 7. Filing notice email
 
-The production root `Dockerfile` builds the SPA + API into one image, runs as a non-root user
-(`appuser`), and ships a `HEALTHCHECK`. For full reproducibility, pin base images to a digest
-in your build pipeline. See `render.yaml` for a worked single-instance deployment.
+Email is disabled by default. Configure the API and the separate notice worker with the
+same database, sender and public portal origin:
+
+```dotenv
+EMAIL_DELIVERY_ENABLED=true
+PORTAL_BASE_URL=https://filing.example.gov
+SMTP_HOST=your-approved-relay
+SMTP_PORT=587
+SMTP_TLS=starttls
+SMTP_FROM=notices@your-approved-domain
+SMTP_USERNAME=your-relay-account
+SMTP_PASSWORD=provided-through-your-secret-manager
+```
+
+Use `SMTP_TLS=ssl` with port 465 when the approved relay requires implicit TLS. TLS
+certificates and hostnames are verified. SMTP credentials are optional for a relay that
+authenticates the deployment by another approved method. Plain SMTP is restricted to a
+loopback mail sink with `DEBUG=true`; demo mode cannot use an external relay.
+
+Run migrations before enabling mail, then supervise the sender independently of the API:
+
+```bash
+alembic upgrade head
+python -m app.notification_worker
+```
+
+For the Compose stack, the optional worker is available through
+`docker compose --profile email up -d --build notice-worker` after configuration and
+migration. It shares mail settings with the API. For a bounded operations run, use
+`python -m app.notification_worker --once`; this drains only messages currently due.
+
+Monitor the process and the oldest pending notice. A stopped worker leaves queued
+messages in PostgreSQL. A started attempt without a result is marked unknown after ten
+minutes once a worker runs recovery; court staff inspect the relay records and decide
+whether to retry from **Notices**. Confirmed temporary failures retry up to five attempts.
+Keep the relay's logs available for that investigation. SMTP acceptance alone does not
+prove inbox delivery or legal service. Configure bounce handling, sender-domain
+authentication and operational alerts with the selected provider before a court pilot.
+
+Only verified account addresses receive email. Require the IdP's matching `email` and
+`email_verified` claims on authentication. Generic alerts link to protected filing history;
+the email does not attach court documents or expose case details. Existing pending notices
+remain portal-only when upgrading; no backlog is sent automatically.
+
+## 8. Container images
+
+The root `Dockerfile` builds the hosted demo, including `app.demo.server` and isolated
+SQLite sessions. A court deployment must run `app.main:app` against its PostgreSQL database,
+disable demo mode and isolated sessions, and serve the built frontend with its production
+configuration. Supervise the notice worker as a separate process. Pin base images to a
+digest in the production build pipeline; `render.yaml` is a demo deployment example.
 
 ## Pre-launch checklist
 

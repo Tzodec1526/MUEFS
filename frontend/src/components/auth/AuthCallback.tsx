@@ -10,8 +10,8 @@ function AuthCallback() {
 
   useEffect(() => {
     handleKeycloakCallback(window.location.search)
-      .then(async (result) => {
-        if (result !== 'ok') {
+      .then(async (returnPath) => {
+        if (!returnPath) {
           setError(true);
           return;
         }
@@ -21,7 +21,7 @@ function AuthCallback() {
         } catch {
           notifyDemoRoleChanged();
         }
-        navigate('/', { replace: true });
+        navigate(returnPath, { replace: true });
       })
       .catch(() => setError(true));
   }, [navigate]);

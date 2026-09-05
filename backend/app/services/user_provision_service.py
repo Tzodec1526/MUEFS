@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 
+from email_validator import EmailNotValidError, validate_email
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,23 +21,25 @@ from app.models.user import User, UserType
 
 logger = logging.getLogger(__name__)
 
-# Account kinds that must never be auto-linked to an OIDC subject by a first-login email
-# match. Binding these requires explicit admin provisioning of keycloak_id. The exclusion
-# is deliberately limited to elevated/bar-holding accounts; low-privilege SELF_REPRESENTED
-# and PUBLIC accounts may still be adopted by a verified-email first login (no escalation).
-_PRIVILEGED_USER_TYPES = frozenset({UserType.ADMIN, UserType.CLERK, UserType.JUDGE})
 
-
-def _email_is_verified(claims: dict) -> bool:
-    """True only if the IdP asserts the email is verified (boolean True or the string "true")."""
+def verified_email_from_claims(claims: dict) -> str | None:
     value = claims.get("email_verified")
-    return value is True or (isinstance(value, str) and value.strip().lower() == "true")
+    if not (value is True or isinstance(value, str) and value.strip().lower() == "true"):
+        return None
+    email = claims.get("email")
+    if not isinstance(email, str):
+        return None
+    try:
+        return validate_email(
+            email.strip(), check_deliverability=False, allow_smtputf8=False
+        ).normalized.lower()
+    except EmailNotValidError:
+        return None
 
 
-def _is_privileged_account(user: User) -> bool:
-    # A bar number grants counsel-of-record access to sealed cases, so bar-holding
-    # accounts are sensitive too — never auto-adopt them by email match.
-    return user.user_type in _PRIVILEGED_USER_TYPES or bool(user.bar_number)
+def sync_verified_email(user: User, claims: dict) -> None:
+    email = verified_email_from_claims(claims)
+    user.verified_email = email if email == user.email.strip().lower() else None
 
 
 async def provision_user_from_oidc(
@@ -51,18 +54,11 @@ async def provision_user_from_oidc(
     an email already bound to a different subject, or an attempt to auto-adopt a
     privileged pre-existing account).
     """
-    email = claims.get("email")
-    if not email or not isinstance(email, str):
-        logger.warning("OIDC token missing email claim; cannot auto-provision user sub=%s", sub)
+    email = verified_email_from_claims(claims)
+    if email is None:
+        logger.warning("OIDC token email not verified; refusing to auto-provision/link sub=%s", sub)
         return None
 
-    if not _email_is_verified(claims):
-        logger.warning(
-            "OIDC token email not verified; refusing to auto-provision/link sub=%s", sub
-        )
-        return None
-
-    email = email.strip().lower()
     first = (claims.get("given_name") or claims.get("first_name") or "").strip() or "User"
     last = (claims.get("family_name") or claims.get("last_name") or "").strip() or "Name"
 
@@ -74,8 +70,11 @@ async def provision_user_from_oidc(
             logger.warning("Email %s already bound to another OIDC subject", email)
             return None
         if not existing.keycloak_id:
-            # Never let a first-login email match silently take over a privileged account.
-            if _is_privileged_account(existing):
+            # A bar number can grant access to sealed cases. Bind these accounts explicitly.
+            if (
+                existing.user_type in (UserType.ADMIN, UserType.CLERK, UserType.JUDGE)
+                or existing.bar_number
+            ):
                 logger.warning(
                     "Refusing to auto-link OIDC sub=%s to privileged account %s; "
                     "an administrator must bind keycloak_id explicitly",
@@ -84,6 +83,7 @@ async def provision_user_from_oidc(
                 )
                 return None
             existing.keycloak_id = sub
+            sync_verified_email(existing, claims)
             await db.flush()
             await db.refresh(existing)
             return existing
@@ -91,6 +91,7 @@ async def provision_user_from_oidc(
 
     user = User(
         email=email,
+        verified_email=email,
         first_name=first[:100],
         last_name=last[:100],
         user_type=UserType.SELF_REPRESENTED,
