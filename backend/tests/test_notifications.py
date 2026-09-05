@@ -3,9 +3,10 @@
 import pytest
 
 from app.models.court import CaseCategory, CaseType, Court, CourtType
-from app.models.filing import FilingEnvelope, FilingStatus
+from app.models.filing import FilingEnvelope
 from app.models.notification import Notification, NotificationType
 from app.models.user import CourtRole, User, UserCourtRole, UserType
+from app.services import filing_service
 
 
 async def test_notification_history_recipient_and_paging(db_session, api_client):
@@ -47,9 +48,10 @@ async def test_clerk_accept_notifies_filer_in_both_review_paths(db_session, api_
     db_session.add(UserCourtRole(user_id=clerk.id, court_id=court.id, role=CourtRole.CLERK))
     await db_session.flush()
     filing = FilingEnvelope(court_id=court.id, case_type_id=case_type.id, filer_id=filer.id,
-                            case_title="Notification test", status=FilingStatus.SUBMITTED)
+                            case_title="Notification test")
     db_session.add(filing)
     await db_session.flush()
+    await filing_service.submit_filing(db_session, filing.id)
     api_client.headers["X-Demo-User-Id"] = str(clerk.id)
     if batch:
         response = await api_client.post("/api/v1/clerk/queue/batch-review", json={
@@ -63,5 +65,5 @@ async def test_clerk_accept_notifies_filer_in_both_review_paths(db_session, api_
     assert response.status_code == 200
     api_client.headers["X-Demo-User-Id"] = str(filer.id)
     notices = (await api_client.get("/api/v1/notifications")).json()
-    assert notices["total"] == 1
+    assert notices["total"] == 2
     assert "accepted" in notices["notifications"][0]["subject"].lower()

@@ -37,6 +37,8 @@ export interface FilingEnvelope {
   created_at: string;
   updated_at: string;
   submission_count: number;
+  filing_date: string | null;
+  filing_date_basis: FilingDateAssessment | null;
 }
 
 export interface FilingValidation {
@@ -124,6 +126,7 @@ export interface FilingTransaction {
     payment?: { amount_cents: number; transaction_ref: string; is_simulated: boolean } | null;
     basis?: string;
     amount_due_cents?: number;
+    filing_date_basis?: FilingDateAssessment | null;
     documents?: FilingDocument[];
     cms_case_number?: string | null;
     cms_filing_id?: string | null;
@@ -139,6 +142,18 @@ export interface FilingHistory {
   page: number;
   page_size: number;
   fee_waiver: FeeWaiverState | null;
+  filing_date: string | null;
+  filing_date_basis: FilingDateAssessment | null;
+  court_id: number;
+}
+
+export interface FilingDateAssessment {
+  filing_date: string | null;
+  timezone: string | null;
+  local_received_date: string | null;
+  calendar_ids: number[];
+  skipped_dates: Record<string, string>;
+  error: string | null;
 }
 
 export interface FeeWaiverState {

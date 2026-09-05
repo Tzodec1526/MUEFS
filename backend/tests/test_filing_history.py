@@ -193,11 +193,11 @@ async def test_failed_batch_item_rolls_back_its_records_only(
         case_type_id=original.case_type_id,
         filer_id=filer,
         case_title="Second",
-        status=FilingStatus.SUBMITTED,
     )
     db_session.add(second)
     await db_session.flush()
     second_id = second.id
+    await filing_service.submit_filing(db_session, second_id)
     real_review = filing_service.review_filing
 
     async def interrupted_review(db, filing_id, **kwargs):
@@ -221,8 +221,8 @@ async def test_failed_batch_item_rolls_back_its_records_only(
     assert first.status == FilingStatus.SUBMITTED
     assert first.case_id is None
     assert await db_session.scalar(select(func.count()).select_from(Case)) == 1
-    assert await db_session.scalar(select(func.count()).select_from(FilingTransaction)) == 2
-    assert await db_session.scalar(select(func.count()).select_from(Notification)) == 2
+    assert await db_session.scalar(select(func.count()).select_from(FilingTransaction)) == 3
+    assert await db_session.scalar(select(func.count()).select_from(Notification)) == 3
 
 
 @pytest.mark.parametrize("sealed", [False, True])

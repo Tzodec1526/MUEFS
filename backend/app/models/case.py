@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime
+from datetime import date, datetime
 
 import sqlalchemy as sa
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text, func
@@ -38,6 +38,7 @@ class Case(Base):
     is_sealed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     status: Mapped[CaseStatus] = mapped_column(Enum(CaseStatus), default=CaseStatus.OPEN)
     filed_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    filing_date: Mapped[date | None]
     judge_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
 
     __table_args__ = (

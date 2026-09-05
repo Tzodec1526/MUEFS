@@ -49,6 +49,7 @@ async def notify_filing_status_change(
         "waiver_granted": "Fee waiver granted",
         "waiver_denied": "Fee waiver denied",
         "payment_recorded": "Payment recorded",
+        "filing_date_assessed": "Filing date assessed using court calendar",
     }.get(status, status.replace("_", " ").title())
     subject = f"Filing #{filing_id} - {label} - {court_name}"
     body_parts = [

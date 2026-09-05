@@ -10,39 +10,12 @@ from app.models.filing import FilingEnvelope
 from app.models.user import CourtRole, UserCourtRole
 from app.schemas.case import (
     CaseDocketResponse,
-    CaseSearchItemResponse,
-    CaseSearchParticipantPublic,
     CaseSearchResponse,
 )
 from app.schemas.filing import CaseFilingResponse
 from app.services import access_service, search_service
 
 router = APIRouter(prefix="/cases", tags=["Cases"])
-
-
-def _to_search_item(case: Case) -> CaseSearchItemResponse:
-    """Strip participant contact fields from search results (least-privilege listing)."""
-    participants = [
-        CaseSearchParticipantPublic(
-            party_name=p.party_name,
-            role=p.role,
-            attorney_bar_number=p.attorney_bar_number,
-        )
-        for p in (case.participants or [])
-    ]
-    return CaseSearchItemResponse(
-        id=case.id,
-        court_id=case.court_id,
-        case_number=case.case_number,
-        case_type_id=case.case_type_id,
-        title=case.title,
-        status=case.status,
-        filed_date=case.filed_date,
-        judge_id=case.judge_id,
-        created_at=case.created_at,
-        is_sealed=case.is_sealed,
-        participants=participants,
-    )
 
 
 @router.get("/search", response_model=CaseSearchResponse)
@@ -70,7 +43,7 @@ async def search_cases(
         page_size=page_size,
     )
     return CaseSearchResponse(
-        cases=[_to_search_item(c) for c in cases],
+        cases=[CaseDocketResponse.model_validate(c) for c in cases],
         total=total,
         page=page,
         page_size=page_size,

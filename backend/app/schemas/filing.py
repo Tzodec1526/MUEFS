@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from pydantic import BaseModel, Field, field_serializer
 
@@ -70,6 +70,8 @@ class FilingEnvelopeResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     submission_count: int = 0
+    filing_date: date | None = None
+    filing_date_basis: dict | None = None
 
     model_config = {"from_attributes": True}
 
@@ -93,6 +95,7 @@ class CaseFilingResponse(BaseModel):
     rejection_reason: str | None
     documents: list[FilingDocumentResponse]
     created_at: datetime
+    filing_date: date | None = None
 
     model_config = {"from_attributes": True}
 
@@ -154,3 +157,6 @@ class FilingHistoryResponse(BaseModel):
     page: int
     page_size: int
     fee_waiver: FeeWaiverState | None = None
+    filing_date: date | None = None
+    filing_date_basis: dict | None = None
+    court_id: int

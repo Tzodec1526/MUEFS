@@ -36,6 +36,14 @@ export function formatShortDate(d: string | null): string {
   });
 }
 
+/** A court filing date is a civil date; never shift it to the viewer's timezone. */
+export function formatCourtDate(value: string | null): string {
+  if (!value) return 'Not established';
+  return new Date(`${value}T00:00:00Z`).toLocaleDateString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC',
+  });
+}
+
 const DOCUMENT_LABELS: Record<string, string> = {
   COMPLAINT: 'Complaint', SUMMONS: 'Summons', PETITION: 'Petition',
   INFORMATION: 'Information / Complaint', WARRANT: 'Warrant',

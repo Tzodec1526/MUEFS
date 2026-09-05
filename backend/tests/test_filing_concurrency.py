@@ -195,18 +195,31 @@ async def test_concurrent_submission_retries_create_one_receipt(postgres_session
 
 
 @pytest.mark.parametrize("postgres_sessions", [False, True], indirect=True)
-async def test_postgres_transactions_reject_sql_mutation(postgres_sessions):
+async def test_postgres_retained_records_reject_sql_mutation(postgres_sessions):
+    from datetime import UTC, date, datetime
+
     from sqlalchemy.exc import DBAPIError
 
-    fid, _filer, _clerk = await prepare_filing(postgres_sessions)
+    from app.models.court_calendar import CourtCalendar
+
+    fid, _filer, clerk = await prepare_filing(postgres_sessions)
     async with postgres_sessions.begin() as db:
-        await filing_service.submit_filing(db, fid)
+        filing = await filing_service.submit_filing(db, fid)
+        db.add(CourtCalendar(
+            court_id=filing.court_id, timezone="America/Detroit",
+            valid_from=date(2026, 1, 1), valid_through=date(2026, 12, 31),
+            closed_dates={"2026-09-07": "Labor Day"}, authority_reference="Test court calendar",
+            published_by=clerk, published_at=datetime.now(UTC),
+        ))
     for statement in (
         "UPDATE filing_transactions SET actor_name = 'Changed'",
         "DELETE FROM filing_transactions",
+        "UPDATE court_calendars SET timezone = 'UTC'",
+        "DELETE FROM court_calendars",
     ):
         with pytest.raises(DBAPIError, match="append-only"):
             async with postgres_sessions.begin() as db:
                 await db.execute(text(statement))
     async with postgres_sessions() as db:
         assert await db.scalar(select(func.count()).select_from(FilingTransaction)) == 1
+        assert await db.scalar(select(func.count()).select_from(CourtCalendar)) == 1

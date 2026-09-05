@@ -87,6 +87,8 @@ async def review_filing(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Court CMS rejected the filing: {exc.detail}",
         ) from exc
+    except filing_service.FilingDateUnavailableError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not filing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

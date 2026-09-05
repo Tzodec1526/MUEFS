@@ -38,6 +38,7 @@ async def record_transaction(
             "filing_type": filing.filing_type,
             "filing_description": filing.filing_description,
             "fee_waiver_requested": filing.fee_waiver_requested,
+            "filing_date_basis": filing.filing_date_basis,
             # Financial hardship text is deliberately not copied into notices/receipts.
             "payment": {
                 "id": payment.id, "amount_cents": payment.amount_cents,
@@ -53,7 +54,8 @@ async def record_transaction(
                 doc.retained_at = now
     elif event_type == "accepted":
         details.update(case_id=filing.case_id, cms_case_number=filing.cms_case_number,
-                       cms_filing_id=filing.cms_filing_id)
+                       cms_filing_id=filing.cms_filing_id,
+                       filing_date_basis=filing.filing_date_basis)
 
     transaction = FilingTransaction(
         filing_id=filing.id, submission_number=filing.submission_count,

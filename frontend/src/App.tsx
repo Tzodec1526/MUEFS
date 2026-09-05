@@ -13,6 +13,7 @@ const FilingWizard = lazy(() => import('./components/filing/FilingWizard'));
 const MyFilings = lazy(() => import('./components/filing/MyFilings'));
 const FilingHistoryPage = lazy(() => import('./components/filing/FilingHistoryPage'));
 const ReviewQueue = lazy(() => import('./components/clerk/ReviewQueue'));
+const CourtCalendarPage = lazy(() => import('./components/courts/CourtCalendarPage'));
 const CaseSearch = lazy(() => import('./components/search/CaseSearch'));
 const Favorites = lazy(() => import('./components/search/Favorites'));
 const CaseDetailPage = lazy(() => import('./components/search/CaseDetailPage'));
@@ -24,7 +25,8 @@ function RequireRole({ children }: { children: React.ReactNode }) {
   // Public docket routes are open to anonymous visitors (no account). Everything else
   // requires a (demo) role and bounces unauthenticated visitors to the login screen.
   const isPublicPath =
-    location.pathname.startsWith('/cases') || location.pathname.startsWith('/agent');
+    location.pathname.startsWith('/cases') || location.pathname.startsWith('/agent')
+    || location.pathname.startsWith('/courts/');
   if (!hasSession() && !isPublicPath && location.pathname !== '/login') {
     return <Navigate to="/login" replace />;
   }
@@ -212,6 +214,7 @@ function App() {
                         <Route path="/filings" element={<RequireFiler><MyFilings /></RequireFiler>} />
                         <Route path="/filings/:filingId/history" element={<FilingHistoryPage key={location.pathname} />} />
                         <Route path="/cases/search" element={<CaseSearch />} />
+                        <Route path="/courts/:courtId/calendar" element={<CourtCalendarPage key={location.pathname} />} />
                         <Route path="/cases/:caseId" element={<CaseDetailPage />} />
                         <Route path="/favorites" element={<RequireFiler><Favorites /></RequireFiler>} />
                         <Route path="/clerk/queue" element={<RequireClerk><ReviewQueue /></RequireClerk>} />

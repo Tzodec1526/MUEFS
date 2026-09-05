@@ -13,8 +13,8 @@ establish state approval or production readiness.
 | Preserve corrections and decisions | Corrections create another numbered submission. Earlier document bytes remain downloadable by the filer and court staff. Acceptance, return, rejection and CMS failure are separate retained events. | Effective filing-date decisions, judicial relief for transmission failures, and certified/file-stamped copies. |
 | Survive retries and simultaneous actions | Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Batch review uses a savepoint per filing. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
 | Protect private material | Private envelopes and receipts require filer or court-staff access. Dockets exclude waiver application data, confidential document metadata, superseded documents and other filers' drafts. Fee-waiver documents are nonpublic even if the filer omits the checkbox. | Full classification/retention policy for every case and document type; independent security assessment. |
-| Record the correct legal filing date | Each submission's actual receipt time is preserved independently of later clerk decisions. | Court timezones, approved holiday/closure calendars, business-day rules and authorized date adjustments. The UI does not promise that correcting a document preserves its legal filing date. |
-| Resolve fee waivers correctly | A completed application accompanies the filing. Clerk waivers, referral and judicial decisions are separate court-scoped actions. Signed decision PDFs and denial amounts remain in private history; a filer can pay after denial without resubmitting. | Actual notice delivery, de novo review and judicial assignment, court calendars/deadlines, case-wide continuation and reinstatement, court verification of signed forms and prisoner-specific procedures. |
+| Record the correct legal filing date | Receipt instants and filing dates are separate. Published court calendar revisions specify timezone, coverage, holidays and closures. Submissions retain their date assessment; acceptance records any revised assessment without rewriting the original receipt. | Court verification of calendar completeness, authorized date adjustments, relief for transmission failures and review of closures published after acceptance. Correcting a document does not automatically preserve its legal filing date. |
+| Resolve fee waivers correctly | A completed application accompanies the filing. Clerk waivers, referral and judicial decisions are separate court-scoped actions. Signed decision PDFs and denial amounts remain in private history; a filer can pay after denial without resubmitting. | Actual notice delivery, de novo review and judicial assignment, deadline calculation, case-wide continuation and reinstatement, court verification of signed forms and prisoner-specific procedures. |
 | Collect and reconcile funds | Demo fee quoting, simulated payments and linked payment references work. | Audited court fee schedules, a real hosted payment processor, signed webhooks, reconciliation, refunds and accounting exports. |
 | Deliver electronic service | Service-only documents can be recorded. | Verified service contacts, consent/eligibility, real transmission, failures/retries, non-electronic alternatives and retained proof. A recorded document or in-app notice is not proof of service. |
 | Connect to the court's system of record | Acceptance is explicitly blocked outside demo mode when CMS integration is absent. | A documented court/vendor contract, credentialed sandbox, document/code mapping, idempotent delivery, status callbacks, error recovery and reconciliation. |
@@ -116,6 +116,49 @@ private signed orders, retained downloads, denial/payment and draft-edit bypass 
 The PostgreSQL suite also races waiver decisions and post-denial payments. The upload
 pipeline is shared with filer documents so size limits, MIME inspection, malware screening
 and off-thread PDF processing apply to both.
+
+## Court calendars and filing dates
+
+The calendar page at `/courts/{court_id}/calendar` is public. A user with an administrator
+or judge assignment to that court can publish a revision; clerks have read-only access.
+Each revision records an IANA timezone, inclusive date coverage, dated closure reasons,
+approving authority or source, publisher and UTC publication time. Publication also creates
+an audit entry. A court must verify the entries; the application does not supply or certify
+a holiday list. All unlisted weekdays within the published coverage are treated as open.
+
+The implementation applies MCR 1.109(G)(5)(b)'s receipt-day/business-day rule. It calculates
+the local receipt date and advances over weekends and listed closures, using the newest
+revision covering each date. Adjacent calendars can cover a year-end transition. Missing
+coverage or a timezone change before the next business day produces an unresolved date.
+The calculation loads the relevant revisions in one query, with no database query per day.
+
+Submission preserves the UTC receipt instant and calendar assessment, including revision
+IDs and skipped dates. Acceptance reassesses the same receipt instant against the published
+calendar and records a separate event if the assessment changed. New cases keep the receipt
+instant in `filed_date` and the civil date in `filing_date`; neither uses the clerk's acceptance
+time. Date-only fields display consistently across viewer timezones. Search and docket
+detail share the same public response schema, and timestamp responses include a UTC offset.
+
+If coverage is unresolved, submission still records receipt. Production acceptance returns
+409 until the court resolves the calendar; demo acceptance may continue with a clearly
+unestablished date. Existing historical dates are retained as unverified. Calendar revision
+publication does not retroactively change accepted filings or cases. Judicial adjustments,
+correction-date relief, transmission-failure relief and the effect of post-denial payment
+remain court procedures requiring further implementation. This is not a deadline calculator.
+
+- `GET /api/v1/courts/{id}/calendars`: public revision history, 25 per page, and the viewer's
+  publication permission.
+- `POST /api/v1/courts/{id}/calendars`: court-scoped publication of a retained revision.
+- `GET /api/v1/courts/{id}/filing-date?received_at={ISO_timestamp_with_offset}`: read-only
+  preview; it does not alter a filing or create an official receipt.
+
+Migration `a8b712e43c90` adds calendars, envelope date assessments and case filing dates.
+SQLite and PostgreSQL triggers reject calendar UPDATE and DELETE, including in schemas
+created through Alembic. The migration does not invent calendars or backfill historical
+filing dates, and refuses an automatic downgrade that would erase these records.
+`backend/tests/test_court_calendars.py` covers midnight, daylight-saving transitions,
+different court timezones, holidays, adjacent years, revisions, permissions and receipt
+preservation. The migration and PostgreSQL suites cover the retained records as well.
 
 ## Sources guiding the evaluation
 

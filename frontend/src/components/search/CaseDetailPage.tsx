@@ -4,7 +4,7 @@ import { Link2 } from 'lucide-react';
 import { apiClient } from '../../api/client';
 import { addFavorite, removeFavorite, listFavorites } from '../../api/favorites';
 import { getCaseTypes } from '../../api/courts';
-import { formatBytes, formatShortDate, getDocumentLabel } from '../../utils/format';
+import { formatBytes, formatCourtDate, formatShortDate, getDocumentLabel } from '../../utils/format';
 import { getDemoRole } from '../auth/LoginScreen';
 import { useToast } from '../common/Toast';
 import DocumentDownload from '../common/DocumentDownload';
@@ -18,6 +18,7 @@ interface CaseDetail {
   is_sealed?: boolean;
   status: string;
   filed_date: string;
+  filing_date: string | null;
   judge_id: number | null;
   participants: Array<{
     id: number;
@@ -34,6 +35,7 @@ interface CaseFiling {
   case_title: string | null;
   filing_description: string | null;
   submitted_at: string | null;
+  filing_date: string | null;
   reviewed_at: string | null;
   rejection_reason: string | null;
   documents: Array<{
@@ -251,7 +253,8 @@ function CaseDetailPage() {
             <div><label>Case Type</label><span>{caseTypeName || '--'}</span></div>
             <div><label>Status</label><span className={`status-badge ${caseData.status}`}>{caseData.status}</span></div>
             <div><label>Court</label><span>{courtName}</span></div>
-            <div><label>Filed Date</label><span>{formatShortDate(caseData.filed_date)}</span></div>
+            <div><label>Filing Date</label><span>{formatCourtDate(caseData.filing_date)}</span></div>
+            {!caseData.filing_date && <div><label>Stored date (not calendar-verified)</label><span>{formatShortDate(caseData.filed_date)}</span></div>}
           </div>
         </div>
 
@@ -296,7 +299,10 @@ function CaseDetailPage() {
                 <div className="docket-entry-header">
                   <span className="docket-entry-id">#{f.id}</span>
                   <span className={`status-badge ${docketStatus(f.status).cls}`}>{docketStatus(f.status).label}</span>
-                  <span className="docket-entry-date">{formatShortDate(f.submitted_at || f.created_at)}</span>
+                  <span className="docket-entry-date">{f.filing_date
+                    ? `Filing date: ${formatCourtDate(f.filing_date)}`
+                    : f.submitted_at ? `Received: ${formatShortDate(f.submitted_at)}`
+                      : `Created: ${formatShortDate(f.created_at)}`}</span>
                 </div>
                 <div className="docket-entry-desc">
                   {f.filing_description || 'No description'}

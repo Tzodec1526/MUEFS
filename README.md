@@ -112,6 +112,8 @@ MUEFS/
 - **Pre-submission validation** — catch errors before clerk review
 - **Submission receipts and correction history** — timestamped document manifests,
   retained earlier versions, clerk decisions and downloadable receipts
+- **Court calendars and filing dates** — published timezone/holiday/closure revisions,
+  separate receipt timestamps and date-only filing records, with preserved calculation history
 
 ### For Self-Represented Litigants
 - **Guided filing wizard** with plain-language instructions

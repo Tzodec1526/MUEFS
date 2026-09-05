@@ -6,7 +6,7 @@ import { listFavorites, addFavorite, removeFavorite } from '../../api/favorites'
 import { getDemoRole } from '../auth/LoginScreen';
 import LoadError from '../common/LoadError';
 import { useToast } from '../common/Toast';
-import { parseServerDate } from '../../utils/format';
+import { formatCourtDate, parseServerDate } from '../../utils/format';
 import { logAgentActivity } from '../../webmcp/activity';
 
 interface CaseResult {
@@ -16,6 +16,7 @@ interface CaseResult {
   status: string;
   court_id: number;
   filed_date: string;
+  filing_date: string | null;
   participants: Array<{
     party_name: string;
     role: string;
@@ -241,7 +242,8 @@ function CaseSearch() {
                     <td>
                       <span className={`status-badge ${c.status}`}>{c.status}</span>
                     </td>
-                    <td>{parseServerDate(c.filed_date).toLocaleDateString()}</td>
+                    <td>{c.filing_date ? formatCourtDate(c.filing_date)
+                      : `${parseServerDate(c.filed_date).toLocaleDateString()} (unverified)`}</td>
                     <td>
                       {c.participants.map((p) => `${p.party_name} (${p.role})`).join(', ')}
                     </td>

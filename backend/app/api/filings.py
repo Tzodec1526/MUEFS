@@ -380,4 +380,6 @@ async def filing_history(
         transactions=list(transactions),  # type: ignore[arg-type]
         total=total, page=page, page_size=page_size,
         fee_waiver=await waiver_state(db, filing, user_id) if filing.fee_waiver_requested else None,
+        filing_date=filing.filing_date, filing_date_basis=filing.filing_date_basis,
+        court_id=filing.court_id,
     )

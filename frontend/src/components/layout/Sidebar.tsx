@@ -24,6 +24,7 @@ function Sidebar() {
     { path: '/cases/search', label: 'Case Search', icon: Search, roles: ['attorney', 'clerk', 'srl', 'public'] },
     { path: '/favorites', label: 'Favorites', icon: Star, roles: ['attorney', 'srl'] },
     { path: '/clerk/queue', label: 'Review Queue', icon: ClipboardCheck, roles: ['clerk'] },
+    { path: `/courts/${localStorage.getItem('demo_court_id') || '3'}/calendar`, label: 'Court Calendar', icon: ClipboardCheck, roles: ['clerk'] },
   ];
 
   const links = allLinks.filter((link) => {

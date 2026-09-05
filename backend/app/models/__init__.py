@@ -1,6 +1,7 @@
 from app.models.audit import AuditLog
 from app.models.case import Case, CaseParticipant
 from app.models.court import CaseType, Court, FeeSchedule, FilingChecklist, FilingRequirement
+from app.models.court_calendar import CourtCalendar
 from app.models.filing import FilingDocument, FilingEnvelope
 from app.models.filing_transaction import FilingTransaction
 from app.models.notification import Notification, ServiceContact
@@ -13,6 +14,7 @@ __all__ = [
     "FavoriteCase",
     "FavoriteCourt",
     "Court",
+    "CourtCalendar",
     "CaseType",
     "FeeSchedule",
     "FilingRequirement",

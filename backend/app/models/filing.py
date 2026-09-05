@@ -1,7 +1,7 @@
 import enum
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -58,6 +58,8 @@ class FilingEnvelope(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     submission_count: Mapped[int] = mapped_column(default=0, server_default="0")
+    filing_date: Mapped[date | None]
+    filing_date_basis: Mapped[dict | None] = mapped_column(JSON)
 
     documents: Mapped[list["FilingDocument"]] = relationship(
         back_populates="envelope",

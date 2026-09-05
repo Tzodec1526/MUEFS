@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
 
+from app.config import settings
 from app.integrations.cms_adapter import submit_filing_to_cms
 from app.models.case import Case, CaseParticipant, CaseStatus, ParticipantRole
 from app.models.court import FilingRequirement
@@ -15,6 +16,7 @@ from app.schemas.filing import (
     FilingValidationResult,
 )
 from app.services import access_service
+from app.services.court_calendar_service import filing_date_for_receipt
 from app.services.filing_record_service import record_transaction
 
 
@@ -29,6 +31,10 @@ class CmsSubmissionError(Exception):
     def __init__(self, detail: str):
         self.detail = detail
         super().__init__(detail)
+
+
+class FilingDateUnavailableError(Exception):
+    pass
 
 # Document-code classifiers shared by the submission validator and the
 # requirements API, so the UI shows exactly the set the validator enforces.
@@ -313,6 +319,10 @@ async def submit_filing(
     filing.rejection_reason = None
     filing.cms_error = None
     filing.submission_count += 1
+    if filing.filing_type != "service_only":
+        assessment = await filing_date_for_receipt(db, filing.court_id, now)
+        filing.filing_date = assessment.filing_date
+        filing.filing_date_basis = assessment.model_dump(mode="json")
 
     # Service-only filings skip clerk review entirely
     if filing.filing_type == "service_only":
@@ -344,7 +354,8 @@ async def _case_for_accept(db: AsyncSession, filing: FilingEnvelope, now: dateti
         case_type_id=filing.case_type_id,
         title=filing.case_title or "Untitled Case",
         status=CaseStatus.OPEN,
-        filed_date=now,
+        filed_date=filing.submitted_at,
+        filing_date=filing.filing_date,
     )
     return case
 
@@ -395,6 +406,21 @@ async def review_filing(
     filing.reviewed_at = now
 
     if action == "accept":
+        if filing.submitted_at is None:
+            raise FilingDateUnavailableError("The filing has no recorded receipt time")
+        assessment = await filing_date_for_receipt(db, filing.court_id, filing.submitted_at)
+        if assessment.filing_date is None and not settings.allow_demo_mode:
+            raise FilingDateUnavailableError(
+                assessment.error or "The court filing date is unresolved"
+            )
+        basis = assessment.model_dump(mode="json")
+        if filing.filing_date_basis != basis:
+            previous_date = filing.filing_date.isoformat() if filing.filing_date else None
+            filing.filing_date = assessment.filing_date
+            filing.filing_date_basis = basis
+            await record_transaction(db, filing, "filing_date_assessed", reviewer_id, details={
+                "previous_filing_date": previous_date, "filing_date_basis": basis,
+            })
         filing.status = FilingStatus.UNDER_REVIEW
         case = await _case_for_accept(db, filing, now)
         cms_result = await submit_filing_to_cms(case.case_number, filing.id)

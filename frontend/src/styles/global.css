@@ -3767,6 +3767,12 @@ textarea:focus-visible {
 
 /* Retained receipts use the same court-document hierarchy on screen and on paper. */
 .filing-history { max-width: 1060px; margin-inline: auto; }
+.court-calendar-page { max-width: 1060px; margin-inline: auto; }
+.court-calendar-page .review-card { margin-block: 1.25rem; }
+.court-calendar-page summary { cursor: pointer; font-weight: 600; }
+.court-calendar-page form > button { margin-top: 1rem; }
+.calendar-range { display: flex; gap: 1rem; flex-wrap: wrap; }
+.calendar-range .form-group { flex: 1; min-width: 12rem; }
 .history-summary, .receipt-heading, .receipt-document-heading {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
 }

@@ -127,6 +127,7 @@ async def test_anonymous_search_returns_open_not_sealed(public_app):
     numbers = {c["case_number"] for c in body["cases"]}
     assert "MI-PUB-OPEN-1" in numbers
     assert "MI-PUB-SEAL-1" not in numbers
+    assert all(c["filed_date"].endswith("+00:00") for c in body["cases"])
 
 
 @pytest.mark.asyncio
@@ -135,6 +136,7 @@ async def test_anonymous_opens_non_sealed_docket(public_app):
     r = await client.get(f"/api/v1/cases/{ids['open_case']}")
     assert r.status_code == 200
     assert r.json()["case_number"] == "MI-PUB-OPEN-1"
+    assert r.json()["filed_date"].endswith("+00:00")
 
 
 @pytest.mark.asyncio
