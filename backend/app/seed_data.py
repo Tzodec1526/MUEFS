@@ -650,7 +650,11 @@ def seed_database(reset: bool = False):
     if reset:
         print("Reset: dropping application tables...")
         Base.metadata.drop_all(engine)
-    Base.metadata.create_all(engine)
+    if engine.dialect.name == "sqlite":
+        from app.demo.schema import prepare_demo_schema
+        prepare_demo_schema(engine)
+    else:
+        Base.metadata.create_all(engine)
 
     with Session(engine) as session:
         # Check if already seeded

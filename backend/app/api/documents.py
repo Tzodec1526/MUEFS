@@ -1,6 +1,8 @@
 import hashlib
+import mimetypes
 import re
 from contextlib import closing
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -74,6 +76,9 @@ async def download_document(
             status_code=status.HTTP_404_NOT_FOUND,
         )
     safe_filename = sanitize_filename(doc.title)
+    extension = mimetypes.guess_extension(doc.mime_type) or ""
+    if extension and not safe_filename.lower().endswith(extension):
+        safe_filename += extension
 
     def chunks():
         with closing(file_stream):
@@ -83,7 +88,7 @@ async def download_document(
     return StreamingResponse(
         chunks(),
         media_type=doc.mime_type,
-        headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'},
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(safe_filename)}"},
         background=BackgroundTask(file_stream.close),
     )
 

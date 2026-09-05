@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 
 from app.models.filing import FilingStatus
 
@@ -18,6 +18,10 @@ class FilingDocumentResponse(BaseModel):
     uploaded_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_serializer("uploaded_at")
+    def serialize_uploaded_at(self, value: datetime) -> str:
+        return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
 
 
 class FilingEnvelopeCreate(BaseModel):
@@ -62,6 +66,7 @@ class FilingEnvelopeResponse(BaseModel):
     documents: list[FilingDocumentResponse] = []
     created_at: datetime
     updated_at: datetime
+    submission_count: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -72,6 +77,21 @@ class FilingListResponse(BaseModel):
     page: int
     page_size: int
 
+
+class CaseFilingResponse(BaseModel):
+    """Docket fields only; payment references and waiver applications are private."""
+
+    id: int
+    status: FilingStatus
+    case_title: str | None
+    filing_description: str | None
+    submitted_at: datetime | None
+    reviewed_at: datetime | None
+    rejection_reason: str | None
+    documents: list[FilingDocumentResponse]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 class MyFilingsResponse(FilingListResponse):
     status_counts: dict[FilingStatus, int]
@@ -94,3 +114,28 @@ class FilingValidationResult(BaseModel):
     errors: list[str] = []
     warnings: list[str] = []
     missing_required_documents: list[str] = []
+
+
+class FilingTransactionResponse(BaseModel):
+    id: str
+    submission_number: int
+    event_type: str
+    actor_name: str
+    occurred_at: datetime
+    details: dict
+
+    model_config = {"from_attributes": True}
+
+    @field_serializer("occurred_at")
+    def serialize_occurred_at(self, value: datetime) -> str:
+        return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
+
+
+class FilingHistoryResponse(BaseModel):
+    filing_id: int
+    status: FilingStatus
+    submission_count: int
+    transactions: list[FilingTransactionResponse]
+    total: int
+    page: int
+    page_size: int

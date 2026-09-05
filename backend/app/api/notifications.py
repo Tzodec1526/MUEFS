@@ -27,6 +27,7 @@ async def list_notifications(
         "notifications": [
             {
                 "id": n.id,
+                "filing_envelope_id": n.filing_envelope_id,
                 "type": n.notification_type,
                 "subject": n.subject,
                 "body": n.body,

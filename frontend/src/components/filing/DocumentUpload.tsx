@@ -555,10 +555,11 @@ function DocumentUpload({
           <label>
             <input
               type="checkbox"
-              checked={isConfidential}
+              checked={docType === 'FEE_WAIVER' || isConfidential}
+              disabled={docType === 'FEE_WAIVER'}
               onChange={(e) => setIsConfidential(e.target.checked)}
             />
-            Mark as confidential (sealed from public access)
+            {docType === 'FEE_WAIVER' ? 'Fee waiver request — nonpublic' : 'Mark as confidential (not public)'}
           </label>
         </div>
         <button

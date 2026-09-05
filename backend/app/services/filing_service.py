@@ -7,7 +7,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.integrations.cms_adapter import submit_filing_to_cms
 from app.models.case import Case, CaseParticipant, CaseStatus, ParticipantRole
-from app.models.court import Court, FilingRequirement
+from app.models.court import FilingRequirement
 from app.models.filing import FilingEnvelope, FilingStatus
 from app.models.user import User, UserType
 from app.schemas.filing import (
@@ -15,7 +15,7 @@ from app.schemas.filing import (
     FilingValidationResult,
 )
 from app.services import access_service
-from app.services.notification_service import notify_filing_status_change
+from app.services.filing_record_service import record_transaction
 
 
 class FilingCreateError(Exception):
@@ -149,12 +149,19 @@ async def fee_obligation_met(db: AsyncSession, filing: FilingEnvelope) -> bool:
     return fees.total_cents == 0
 
 
-async def get_filing(db: AsyncSession, filing_id: int) -> FilingEnvelope | None:
-    result = await db.execute(
+async def get_filing(
+    db: AsyncSession, filing_id: int, *, for_update: bool = False,
+) -> FilingEnvelope | None:
+    query = (
         select(FilingEnvelope)
         .options(selectinload(FilingEnvelope.documents))
         .where(FilingEnvelope.id == filing_id)
     )
+    if for_update:
+        # A request may already have read the row for authorization. Refresh that
+        # identity-map entry after the lock, or concurrent decisions can use stale status.
+        query = query.with_for_update().execution_options(populate_existing=True)
+    result = await db.execute(query)
     return result.scalar_one_or_none()
 
 
@@ -288,15 +295,9 @@ async def validate_filing(
 async def submit_filing(
     db: AsyncSession,
     filing_id: int,
+    *, idempotency_key: str | None = None,
 ) -> FilingEnvelope | None:
-    # Lock the row to prevent double-submit
-    result = await db.execute(
-        select(FilingEnvelope)
-        .options(selectinload(FilingEnvelope.documents))
-        .where(FilingEnvelope.id == filing_id)
-        .with_for_update()
-    )
-    filing = result.scalar_one_or_none()
+    filing = await get_filing(db, filing_id, for_update=True)
     if not filing or filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
         return None
 
@@ -305,6 +306,8 @@ async def submit_filing(
     filing.reviewed_at = None
     filing.reviewer_id = None
     filing.rejection_reason = None
+    filing.cms_error = None
+    filing.submission_count += 1
 
     # Service-only filings skip clerk review entirely
     if filing.filing_type == "service_only":
@@ -313,6 +316,10 @@ async def submit_filing(
     else:
         filing.status = FilingStatus.SUBMITTED
 
+    await record_transaction(
+        db, filing, "service_recorded" if filing.filing_type == "service_only" else "submitted",
+        filing.filer_id, idempotency_key=idempotency_key,
+    )
     await db.flush()
     await db.refresh(filing)
     await db.refresh(filing, ["documents"])
@@ -374,14 +381,7 @@ async def review_filing(
     action: str,
     reason: str | None = None,
 ) -> FilingEnvelope | None:
-    # Lock the row to prevent concurrent review
-    result = await db.execute(
-        select(FilingEnvelope)
-        .options(selectinload(FilingEnvelope.documents))
-        .where(FilingEnvelope.id == filing_id)
-        .with_for_update()
-    )
-    filing = result.scalar_one_or_none()
+    filing = await get_filing(db, filing_id, for_update=True)
     if not filing or filing.status not in (FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW):
         return None
 
@@ -397,6 +397,7 @@ async def review_filing(
             filing.cms_error = cms_result.error_message or "CMS submission failed"
             filing.cms_filing_id = None
             filing.cms_case_number = None
+            await record_transaction(db, filing, "cms_failed", reviewer_id, reason=filing.cms_error)
             await db.flush()
             await db.refresh(filing)
             await db.refresh(filing, ["documents"])
@@ -423,12 +424,7 @@ async def review_filing(
     else:
         return None
 
-    court = await db.get(Court, filing.court_id)
-    await notify_filing_status_change(
-        db, filer_id=filing.filer_id, filing_id=filing.id, status=filing.status.value,
-        court_name=court.name if court else f"Court #{filing.court_id}",
-        case_title=filing.case_title, reason=reason,
-    )
+    await record_transaction(db, filing, filing.status.value, reviewer_id, reason=reason)
     await db.flush()
     await db.refresh(filing)
     await db.refresh(filing, ["documents"])

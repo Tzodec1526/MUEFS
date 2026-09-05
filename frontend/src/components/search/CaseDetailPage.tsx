@@ -7,6 +7,7 @@ import { getCaseTypes } from '../../api/courts';
 import { formatBytes, formatShortDate, getDocumentLabel } from '../../utils/format';
 import { getDemoRole } from '../auth/LoginScreen';
 import { useToast } from '../common/Toast';
+import DocumentDownload from '../common/DocumentDownload';
 
 interface CaseDetail {
   id: number;
@@ -307,17 +308,14 @@ function CaseDetailPage() {
                 )}
                 <div className="docket-entry-docs">
                   {f.documents.map((doc) => (
-                    <a
+                    <div
                       key={doc.id}
-                      className="docket-doc docket-doc-link"
-                      href={`${import.meta.env.VITE_API_URL || ''}/api/v1/documents/${doc.id}/download`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Download document"
+                      className="docket-doc"
                     >
                       {doc.title} ({getDocumentLabel(doc.document_type_code)}, {formatBytes(doc.file_size_bytes)}
                       {doc.page_count ? `, ${doc.page_count}p` : ''})
-                    </a>
+                      <DocumentDownload id={doc.id} title={doc.title} />
+                    </div>
                   ))}
                 </div>
               </div>

@@ -14,7 +14,7 @@ from app.schemas.case import (
     CaseSearchParticipantPublic,
     CaseSearchResponse,
 )
-from app.schemas.filing import FilingEnvelopeResponse
+from app.schemas.filing import CaseFilingResponse
 from app.services import access_service, search_service
 
 router = APIRouter(prefix="/cases", tags=["Cases"])
@@ -98,7 +98,7 @@ async def get_case(
     return case
 
 
-@router.get("/{case_id}/filings", response_model=list[FilingEnvelopeResponse])
+@router.get("/{case_id}/filings", response_model=list[CaseFilingResponse])
 async def get_case_filings(
     case_id: int,
     page: int = Query(1, ge=1),
@@ -118,24 +118,26 @@ async def get_case_filings(
         .where(FilingEnvelope.case_id == case_id)
         .order_by(FilingEnvelope.created_at.desc(), FilingEnvelope.id.desc())
     )
-    # Case access above already establishes standing on a sealed docket. For an
-    # open docket, filter before paging so hidden filings never displace visible ones.
+    # Standing on a case does not expose another filer's drafts or waiver request.
     if case is None:
         raise HTTPException(status_code=404, detail="Case not found")
-    if not case.is_sealed:
-        staff_courts = select(UserCourtRole.court_id).where(
-            UserCourtRole.user_id == user_id,
-            UserCourtRole.role.in_([CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]),
-        )
-        visible: ColumnElement[bool] = FilingEnvelope.status.in_(
-            access_service.PUBLIC_DOCKET_FILING_STATUSES
-        )
-        if user_id is not None:
-            visible = or_(
-                visible,
-                FilingEnvelope.filer_id == user_id,
-                FilingEnvelope.court_id.in_(staff_courts),
-            )
-        query = query.where(visible)
+    staff_courts = select(UserCourtRole.court_id).where(
+        UserCourtRole.user_id == user_id,
+        UserCourtRole.role.in_([CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]),
+    )
+    visible: ColumnElement[bool] = FilingEnvelope.status.in_(
+        access_service.PUBLIC_DOCKET_FILING_STATUSES
+    )
+    if user_id is not None:
+        visible = or_(visible, FilingEnvelope.filer_id == user_id,
+                      FilingEnvelope.court_id.in_(staff_courts))
+    query = query.where(visible)
     result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
-    return list(result.scalars().all())
+    staff = await access_service.user_is_court_staff_for_court(db, user_id, case.court_id)
+    entries = []
+    for filing in result.scalars():
+        entry = CaseFilingResponse.model_validate(filing)
+        if not staff and filing.filer_id != user_id:
+            entry.documents = [doc for doc in entry.documents if not doc.is_confidential]
+        entries.append(entry)
+    return entries

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { listNotifications, type NotificationItem } from '../../api/notifications';
 import { getDemoRole } from '../auth/LoginScreen';
 import LoadError from '../common/LoadError';
@@ -69,6 +70,7 @@ function NotificationBell() {
                 <li key={n.id}>
                   <strong>{n.subject}</strong>
                   <p>{n.body}</p>
+                  {n.filing_envelope_id && <Link to={`/filings/${n.filing_envelope_id}/history`} onClick={() => setOpen(false)}>View filing history</Link>}
                 </li>
               ))}
             </ul>

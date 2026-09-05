@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { submitFiling, validateFiling, FilingValidation, FilingEnvelope } from '../../api/filings';
 import { formatBytes, getDocumentLabel } from '../../utils/format';
 import { getErrorDetail } from '../../utils/errors';
@@ -30,6 +31,7 @@ function FilingReview({ filingData, submission, onPaymentComplete, onSubmitSucce
   const [validation, setValidation] = useState<FilingValidation | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submissionKey = useRef<string | null>(null);
 
   const needsPayment =
     !readOnly &&
@@ -60,7 +62,8 @@ function FilingReview({ filingData, submission, onPaymentComplete, onSubmitSucce
     setSubmitting(true);
     setError(null);
     try {
-      const result = await submitFiling(filingId);
+      submissionKey.current ??= crypto.randomUUID();
+      const result = await submitFiling(filingId, submissionKey.current);
       onSubmitSuccess?.(result);
     } catch (err: unknown) {
       const detail = getErrorDetail(err);
@@ -103,6 +106,7 @@ function FilingReview({ filingData, submission, onPaymentComplete, onSubmitSucce
           You can track the status of your filing from your dashboard under &quot;My Filings.&quot;
         </p>
         <div className="success-actions">
+          <Link to={`/filings/${filingId}/history`} className="btn btn-primary">View submission receipt</Link>
           <a href="/" className="btn btn-primary">Return to Dashboard</a>
           <a href="/filing/new" className="btn btn-secondary">File Another</a>
         </div>

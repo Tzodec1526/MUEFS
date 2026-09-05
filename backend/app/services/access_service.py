@@ -124,6 +124,9 @@ async def user_may_read_filing_envelope(
     if await user_is_court_staff_for_court(db, user_id, envelope.court_id):
         return True
 
+    if envelope.status not in PUBLIC_DOCKET_FILING_STATUSES:
+        return False
+
     if envelope.case_id is None:
         return False
 
@@ -135,10 +138,7 @@ async def user_may_read_filing_envelope(
     if case.is_sealed:
         return await user_may_read_sealed_case(db, user_id, envelope.case_id)
 
-    if envelope.status == FilingStatus.DRAFT:
-        return False
-
-    return envelope.status in PUBLIC_DOCKET_FILING_STATUSES
+    return True
 
 
 async def user_may_read_document(
@@ -151,7 +151,9 @@ async def user_may_read_document(
     if not envelope:
         return False
 
-    if doc.is_confidential:
+    # Superseded documents remain available to their filer and court staff, even
+    # after a corrected filing is accepted. They must never enter the public docket.
+    if doc.is_confidential or doc.removed_at is not None:
         if envelope.filer_id == user_id:
             return True
         return await user_is_court_staff_for_court(db, user_id, envelope.court_id)

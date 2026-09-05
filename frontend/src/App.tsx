@@ -11,6 +11,7 @@ import { getFilingStatusCounts, getClerkQueue } from './api/filings';
 
 const FilingWizard = lazy(() => import('./components/filing/FilingWizard'));
 const MyFilings = lazy(() => import('./components/filing/MyFilings'));
+const FilingHistoryPage = lazy(() => import('./components/filing/FilingHistoryPage'));
 const ReviewQueue = lazy(() => import('./components/clerk/ReviewQueue'));
 const CaseSearch = lazy(() => import('./components/search/CaseSearch'));
 const Favorites = lazy(() => import('./components/search/Favorites'));
@@ -209,6 +210,7 @@ function App() {
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/filing/new" element={<RequireFiler><FilingWizard key={location.key} /></RequireFiler>} />
                         <Route path="/filings" element={<RequireFiler><MyFilings /></RequireFiler>} />
+                        <Route path="/filings/:filingId/history" element={<FilingHistoryPage key={location.pathname} />} />
                         <Route path="/cases/search" element={<CaseSearch />} />
                         <Route path="/cases/:caseId" element={<CaseDetailPage />} />
                         <Route path="/favorites" element={<RequireFiler><Favorites /></RequireFiler>} />

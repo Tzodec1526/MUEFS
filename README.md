@@ -110,6 +110,8 @@ MUEFS/
 - **Case favorites** — star cases for quick access across sessions
 - **Auto-save drafts** — never lose work in progress
 - **Pre-submission validation** — catch errors before clerk review
+- **Submission receipts and correction history** — timestamped document manifests,
+  retained earlier versions, clerk decisions and downloadable receipts
 
 ### For Self-Represented Litigants
 - **Guided filing wizard** with plain-language instructions
@@ -187,12 +189,13 @@ for the full security model, threat boundaries, and hardening guide.
 - **Hardened authentication** — Keycloak RS256 JWTs (signature, issuer, expiry verified; no `none` algorithm); OIDC auto-provisioning requires a verified email and won't adopt privileged accounts.
 - **Audit logging & ownership checks** on every object, with parameterized queries throughout.
 
-**Court Rule compliance**
+**Court-rule features and evaluation**
 - **MCR 1.109** — text-searchable PDFs, electronic signatures, PII detection
 - **MCR 2.002** — fee waiver support for indigent filers
 - **MCR 2.119** — motion companion documents (brief, proposed order)
 - **MCR 2.313** — meet-and-confer certification for discovery motions
-- **WCAG 2.1 AA** — accessibility compliance
+- Accessibility requires an independent conformance evaluation; responsive layouts and
+  keyboard controls alone do not establish WCAG compliance.
 
 **Why this is lower-risk than the status quo:** one auditable, open-source codebase (shipping
 a documented security review and `SECURITY.md`) instead of multiple closed vendor systems —

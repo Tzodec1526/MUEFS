@@ -1,19 +1,21 @@
 import hashlib
 import re
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import (
     APIRouter,
     Depends,
     File,
     Form,
+    Header,
     HTTPException,
     Query,
     Request,
     UploadFile,
     status,
 )
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
@@ -21,13 +23,15 @@ from app.api.auth import get_current_user_id, require_user_may_manage_efilings
 from app.config import settings
 from app.database import get_db
 from app.models.court import Court
-from app.models.filing import FilingDocument, FilingStatus
+from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
+from app.models.filing_transaction import FilingTransaction
 from app.models.user import User
 from app.schemas.document import DocumentUploadResponse
 from app.schemas.filing import (
     FilingEnvelopeCreate,
     FilingEnvelopeResponse,
     FilingEnvelopeUpdate,
+    FilingHistoryResponse,
     FilingValidationResult,
     MyFilingsResponse,
 )
@@ -103,7 +107,11 @@ async def get_filing(
     filing = await filing_service.get_filing(db, filing_id)
     if not filing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
-    if not await access_service.user_may_read_filing_envelope(db, user_id, filing):
+    # The full envelope contains the fee-waiver application. Case access uses the
+    # separately filtered docket endpoint, not this private filing record.
+    if filing.filer_id != user_id and not await access_service.user_is_court_staff_for_court(
+        db, user_id, filing.court_id,
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access this filing",
@@ -119,7 +127,7 @@ async def update_filing(
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
-    filing = await filing_service.get_filing(db, filing_id)
+    filing = await filing_service.get_filing(db, filing_id, for_update=True)
     if not filing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
     if filing.filer_id != user_id:
@@ -169,16 +177,27 @@ async def submit_filing(
     filing_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_user_may_manage_efilings),
+    idempotency_key: uuid.UUID | None = Header(None),
 ):
     user_id = current_user.id
     # Ownership check
-    filing_check = await filing_service.get_filing(db, filing_id)
+    filing_check = await filing_service.get_filing(db, filing_id, for_update=True)
     if not filing_check:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
     if filing_check.filer_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access this filing",
+        )
+
+    if idempotency_key and await db.scalar(select(FilingTransaction.id).where(
+        FilingTransaction.filing_id == filing_id,
+        FilingTransaction.idempotency_key == str(idempotency_key),
+    )):
+        return filing_check
+    if filing_check.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
+        raise HTTPException(
+            status_code=400, detail="Only draft or returned filings can be submitted",
         )
 
     if not await filing_service.fee_obligation_met(db, filing_check):
@@ -202,7 +221,9 @@ async def submit_filing(
             detail="Filing validation failed. " + " | ".join(error_parts),
         )
 
-    filing = await filing_service.submit_filing(db, filing_id)
+    filing = await filing_service.submit_filing(
+        db, filing_id, idempotency_key=str(idempotency_key) if idempotency_key else None,
+    )
     if not filing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -236,7 +257,7 @@ async def upload_document(
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
-    filing = await filing_service.get_filing(db, filing_id)
+    filing = await filing_service.get_filing(db, filing_id, for_update=True)
     if not filing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
     if filing.filer_id != user_id:
@@ -306,7 +327,9 @@ async def upload_document(
             mime_type=content_type,
             page_count=page_count,
             sha256_hash=sha256,
-            is_confidential=is_confidential,
+            # The fee-waiver application is nonpublic under MCR 2.002(B),
+            # regardless of whether the filer selected the confidentiality checkbox.
+            is_confidential=is_confidential or document_type_code == "FEE_WAIVER",
             is_text_searchable=is_searchable,
         )
         db.add(doc)
@@ -349,7 +372,7 @@ async def remove_document(
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
-    filing = await filing_service.get_filing(db, filing_id)
+    filing = await filing_service.get_filing(db, filing_id, for_update=True)
     if not filing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
     if filing.filer_id != user_id:
@@ -366,11 +389,15 @@ async def remove_document(
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    # Delete from DB first, then storage — if DB fails, storage is intact
-    file_key = doc.file_key
-    await db.delete(doc)
-    await db.flush()
-    await run_in_threadpool(document_service.delete_document, file_key)
+    if doc.retained_at is not None or filing.submitted_at is not None:
+        # Corrections remove a document from the next submission, not from history.
+        doc.removed_at = datetime.now(UTC)
+        await db.flush()
+    else:
+        file_key = doc.file_key
+        await db.delete(doc)
+        await db.flush()
+        await run_in_threadpool(document_service.delete_document, file_key)
 
     await audit_service.log_action(
         db,
@@ -381,4 +408,37 @@ async def remove_document(
         details={"filing_id": filing_id},
         ip_address=client_ip(request),
         user_agent=client_user_agent(request),
+    )
+
+
+@router.get("/{filing_id}/history", response_model=FilingHistoryResponse)
+async def filing_history(
+    filing_id: int,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(25, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    filing = await db.get(FilingEnvelope, filing_id)
+    if not filing:
+        raise HTTPException(status_code=404, detail="Filing not found")
+    # Receipts include rejected submissions, private document metadata, and payment
+    # references. Standing on the public/sealed case alone does not grant this access.
+    if filing.filer_id != user_id and not await access_service.user_is_court_staff_for_court(
+        db, user_id, filing.court_id,
+    ):
+        raise HTTPException(
+            status_code=403, detail="Only the filer and court staff can view receipts",
+        )
+    query = select(FilingTransaction).where(FilingTransaction.filing_id == filing_id)
+    transactions = await db.scalars(query.order_by(
+        FilingTransaction.occurred_at.desc(), FilingTransaction.id.desc(),
+    ).offset((page - 1) * page_size).limit(page_size))
+    total = await db.scalar(select(func.count()).select_from(FilingTransaction).where(
+        FilingTransaction.filing_id == filing_id,
+    )) or 0
+    return FilingHistoryResponse(
+        filing_id=filing.id, status=filing.status, submission_count=filing.submission_count,
+        transactions=list(transactions),  # type: ignore[arg-type]
+        total=total, page=page, page_size=page_size,
     )

@@ -20,6 +20,7 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 
 from fastapi import Request
+from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
@@ -66,6 +67,15 @@ def seed_template() -> None:
 
         seed_data.DATABASE_URL = f"sqlite:///{template}"
         seed_data.seed_database()
+    else:
+        from app.demo.schema import prepare_demo_schema
+
+        for path in (template, *_sessions_dir().glob("*.db")):
+            engine = create_engine(f"sqlite:///{path}")
+            try:
+                prepare_demo_schema(engine)
+            finally:
+                engine.dispose()
     shutil.copyfile(template, _session_path(SHARED_SID))
 
 

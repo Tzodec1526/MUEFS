@@ -5,6 +5,10 @@ parts are deliberately demo-grade. This page is an honest accounting of what is
 production-ready versus what is still a demonstration, so no one mistakes the demo for a
 finished court system.
 
+The implementation goal, current evidence and unresolved requirements are tracked in
+[State implementation evaluation](STATE_READINESS.md). Retained submission receipts,
+correction history and PostgreSQL concurrency checks now form part of the core workflow.
+
 ## Known limitations (demo-grade today)
 
 - **CMS integration is not connected.** Demo acceptance records a simulated identifier.

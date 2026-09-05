@@ -33,6 +33,7 @@ export interface FilingEnvelope {
   documents: FilingDocument[];
   created_at: string;
   updated_at: string;
+  submission_count: number;
 }
 
 export interface FilingValidation {
@@ -97,8 +98,45 @@ export async function validateFiling(filingId: number): Promise<FilingValidation
   return data;
 }
 
-export async function submitFiling(filingId: number): Promise<FilingEnvelope> {
-  const { data } = await apiClient.post(`/filings/${filingId}/submit`);
+export async function submitFiling(filingId: number, idempotencyKey?: string): Promise<FilingEnvelope> {
+  const { data } = await apiClient.post(`/filings/${filingId}/submit`, undefined, {
+    headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+  });
+  return data;
+}
+
+export interface FilingTransaction {
+  id: string;
+  submission_number: number;
+  event_type: string;
+  actor_name: string;
+  occurred_at: string;
+  details: {
+    reason?: string;
+    court_name?: string;
+    case_title?: string | null;
+    case_number?: string | null;
+    filing_description?: string | null;
+    fee_waiver_requested?: boolean;
+    payment?: { amount_cents: number; transaction_ref: string; is_simulated: boolean } | null;
+    documents?: FilingDocument[];
+    cms_case_number?: string | null;
+    cms_filing_id?: string | null;
+  };
+}
+
+export interface FilingHistory {
+  filing_id: number;
+  status: string;
+  submission_count: number;
+  transactions: FilingTransaction[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export async function getFilingHistory(filingId: number, page: number, signal?: AbortSignal): Promise<FilingHistory> {
+  const { data } = await apiClient.get(`/filings/${filingId}/history`, { params: { page }, signal });
   return data;
 }
 

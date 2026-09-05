@@ -62,7 +62,8 @@ async def review_filing(
             detail="Action must be 'accept', 'reject', or 'return'",
         )
 
-    if data.action in ("reject", "return") and not data.reason:
+    reason = data.reason.strip() if data.reason else None
+    if data.action in ("reject", "return") and not reason:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Reason is required for reject/return actions",
@@ -78,7 +79,7 @@ async def review_filing(
 
     try:
         filing = await filing_service.review_filing(
-            db, filing_id, reviewer_id=user_id, action=data.action, reason=data.reason
+            db, filing_id, reviewer_id=user_id, action=data.action, reason=reason
         )
     except filing_service.CmsSubmissionError as exc:
         raise HTTPException(
@@ -138,20 +139,21 @@ async def batch_review_filings(
         )
 
     results: dict[str, list[int]] = {"succeeded": [], "failed": []}
-    for fid in data.filing_ids:
+    for fid in dict.fromkeys(data.filing_ids):
         try:
-            filing_check = await filing_service.get_filing(db, fid)
-            if not filing_check:
-                results["failed"].append(fid)
-                continue
-            await _require_clerk_role(db, user_id, filing_check.court_id)
-            f = await filing_service.review_filing(
-                db, fid, reviewer_id=user_id, action=data.action
-            )
-            if f is not None and f.status == FilingStatus.ACCEPTED:
-                results["succeeded"].append(fid)
-            else:
-                results["failed"].append(fid)
+            # One failure must roll back that filing's case, receipt, and notices,
+            # without poisoning the transaction for the rest of the batch.
+            async with db.begin_nested():
+                filing_check = await filing_service.get_filing(db, fid)
+                if not filing_check:
+                    results["failed"].append(fid)
+                    continue
+                await _require_clerk_role(db, user_id, filing_check.court_id)
+                f = await filing_service.review_filing(
+                    db, fid, reviewer_id=user_id, action=data.action
+                )
+                succeeded = f is not None and f.status == FilingStatus.ACCEPTED
+            results["succeeded" if succeeded else "failed"].append(fid)
         except Exception:
             results["failed"].append(fid)
 

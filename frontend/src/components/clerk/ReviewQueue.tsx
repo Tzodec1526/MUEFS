@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { batchReview, getClerkQueue, reviewFiling, FilingEnvelope } from '../../api/filings';
 import { getDemoCourtName } from '../auth/LoginScreen';
 import LoadError from '../common/LoadError';
+import DocumentDownload from '../common/DocumentDownload';
 import { formatBytes, getDocumentLabel, parseServerDate } from '../../utils/format';
 
 function ReviewQueue() {
@@ -327,6 +329,7 @@ function ReviewQueue() {
 
             <div className="detail-section">
               <h4>Case Information</h4>
+              <Link to={`/filings/${selectedFiling.id}/history`} className="btn btn-secondary btn-small">Receipts &amp; history</Link>
               <div className="detail-grid">
                 <div><label>Title</label><span>{selectedFiling.case_title || 'N/A'}</span></div>
                 <div><label>Submitted</label><span>{formatDate(selectedFiling.submitted_at)}</span></div>
@@ -359,14 +362,7 @@ function ReviewQueue() {
                       {doc.is_confidential && (
                         <span className="flag-badge confidential">Confidential</span>
                       )}
-                      <a
-                        className="btn btn-small btn-secondary doc-open"
-                        href={`${import.meta.env.VITE_API_URL || ''}/api/v1/documents/${doc.id}/download`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Open
-                      </a>
+                      <DocumentDownload id={doc.id} title={doc.title} />
                     </div>
                   </div>
                 ))}
@@ -427,7 +423,7 @@ function ReviewQueue() {
               </div>
               <p className="info-text review-action-note">
                 <strong>Return for Correction</strong> sends it back so the filer can fix and
-                re-file (their filing date is preserved). <strong>Reject</strong> is final.
+                re-file; the earlier submission remains in their history. <strong>Reject</strong> is final.
               </p>
             </div>
           </div>

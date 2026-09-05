@@ -53,7 +53,7 @@ function Sidebar() {
         <h4>Quick Info</h4>
         <p>Trial, Appellate &amp; Specialized Courts</p>
         <p>All 83 Counties</p>
-        <p>MCR 1.109 Compliant</p>
+          <p>MCR 1.109 guidance</p>
       </div>
     </aside>
   );

@@ -1,0 +1,113 @@
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { getFilingHistory, type FilingHistory, type FilingTransaction } from '../../api/filings';
+import { getDemoRole } from '../auth/LoginScreen';
+import DocumentDownload from '../common/DocumentDownload';
+import LoadError from '../common/LoadError';
+import { formatBytes, formatCents, getDocumentLabel, parseServerDate } from '../../utils/format';
+
+const eventLabels: Record<string, string> = {
+  submitted: 'Submission received', accepted: 'Accepted by the court',
+  returned: 'Returned for correction', rejected: 'Rejected',
+  cms_failed: 'Court system submission failed', service_recorded: 'Service-only documents recorded',
+};
+
+function saveReceipt(filingId: number, transaction: FilingTransaction) {
+  const file = new Blob([JSON.stringify({ filing_id: filingId, ...transaction }, null, 2)], {
+    type: 'application/json',
+  });
+  const url = URL.createObjectURL(file);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `filing-${filingId}-receipt-${transaction.id}.json`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export default function FilingHistoryPage() {
+  const { filingId } = useParams();
+  const [history, setHistory] = useState<FilingHistory | null>(null);
+  const [page, setPage] = useState(1);
+  const [attempt, setAttempt] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await getFilingHistory(Number(filingId), page, controller.signal);
+        if (!controller.signal.aborted) setHistory(result);
+      } catch {
+        if (!controller.signal.aborted) setError('Could not load filing history. Receipts are available to the filer and court staff.');
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+    load();
+    return () => controller.abort();
+  }, [filingId, page, attempt]);
+
+  return <section className="filing-history">
+    <div className="page-header">
+      <div><h2>Filing #{filingId}: receipts &amp; history</h2>
+        <p>Submission records and clerk decisions, newest first.</p></div>
+      <Link className="btn btn-secondary" to={getDemoRole() === 'clerk' ? '/clerk/queue' : '/filings'}>
+        {getDemoRole() === 'clerk' ? 'Back to queue' : 'My Filings'}
+      </Link>
+    </div>
+    {loading && <p role="status">Loading filing history…</p>}
+    {error && <LoadError message={error} onRetry={() => setAttempt(n => n + 1)} />}
+    {!loading && !error && history && <>
+      <div className="history-summary">
+        <span className={`status-badge ${history.status}`}>{history.status.replace(/_/g, ' ')}</span>
+        <span>{history.submission_count} recorded submission{history.submission_count === 1 ? '' : 's'}</span>
+        <button className="btn btn-secondary btn-small" onClick={() => window.print()}>Print this page</button>
+      </div>
+      <p className="info-text">A receipt records what this system received. Court acceptance is a separate decision.
+        Times below are recorded in UTC. Service-only records do not prove delivery to another party.</p>
+      {history.transactions.length === 0 && <div className="empty-state">
+        <h3>No recorded transactions</h3>
+        <p>Receipts are created when a filing is submitted. Filings that predate receipt tracking do not have reconstructed receipts.</p>
+      </div>}
+      <ol className="filing-timeline">
+        {history.transactions.map(transaction => <li key={transaction.id} className="receipt-card">
+          <div className="receipt-heading">
+            <h3>{eventLabels[transaction.event_type] || transaction.event_type}</h3>
+            <span>{transaction.submission_number ? `Submission ${transaction.submission_number}` : 'Legacy filing'}</span>
+          </div>
+          <p><time dateTime={parseServerDate(transaction.occurred_at).toISOString()}>
+            {parseServerDate(transaction.occurred_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}
+          </time> · {transaction.actor_name}</p>
+          <p className="receipt-reference">Transaction <code>{transaction.id}</code></p>
+          {transaction.details.reason && <div className="alert alert-warning">{transaction.details.reason}</div>}
+          {transaction.details.court_name && <dl className="receipt-details">
+            <div><dt>Court</dt><dd>{transaction.details.court_name}</dd></div>
+            <div><dt>Case at submission</dt><dd>{transaction.details.case_title || 'Not specified'}
+              {transaction.details.case_number && ` · ${transaction.details.case_number}`}</dd></div>
+            <div><dt>Payment at submission</dt><dd>{transaction.details.payment
+              ? `${formatCents(transaction.details.payment.amount_cents)} · ${transaction.details.payment.transaction_ref}${transaction.details.payment.is_simulated ? ' (simulated)' : ''}`
+              : transaction.details.fee_waiver_requested ? 'Fee waiver requested' : 'No payment recorded'}</dd></div>
+          </dl>}
+          {transaction.details.cms_case_number && <p>Court case number: <strong>{transaction.details.cms_case_number}</strong></p>}
+          {transaction.details.documents && <>
+            <h4>Documents received ({transaction.details.documents.length})</h4>
+            <ul className="receipt-documents">{transaction.details.documents.map(doc => <li key={doc.id}>
+              <div className="receipt-document-heading"><strong>{doc.title}</strong><DocumentDownload id={doc.id} title={doc.title} /></div>
+              <p>{getDocumentLabel(doc.document_type_code)} · {formatBytes(doc.file_size_bytes)}{doc.is_confidential ? ' · Confidential' : ''}</p>
+              <details><summary>Document fingerprint (SHA-256)</summary><code>{doc.sha256_hash}</code></details>
+            </li>)}</ul>
+          </>}
+          <button className="btn btn-secondary btn-small" onClick={() => saveReceipt(history.filing_id, transaction)}>Download transaction JSON</button>
+        </li>)}
+      </ol>
+      {history.total > history.page_size && <nav className="pagination" aria-label="Filing history pages">
+        <button className="btn btn-secondary" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</button>
+        <span>Page {page} of {Math.ceil(history.total / history.page_size)}</span>
+        <button className="btn btn-secondary" disabled={page * history.page_size >= history.total} onClick={() => setPage(p => p + 1)}>Next</button>
+      </nav>}
+    </>}
+  </section>;
+}

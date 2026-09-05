@@ -306,6 +306,17 @@ h1, h2 {
   margin: 0.25rem 0 0;
   font-size: 0.85rem;
   color: var(--gray-600);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 768px) {
+  .notification-panel {
+    position: fixed;
+    inset: 9rem 0.75rem auto;
+    width: auto;
+    max-height: min(26rem, calc(100dvh - 10rem));
+  }
 }
 
 .notification-empty {
@@ -3754,3 +3765,39 @@ textarea:focus-visible {
   font-size: 0.85rem;
 }
 
+/* Retained receipts use the same court-document hierarchy on screen and on paper. */
+.filing-history { max-width: 1060px; margin-inline: auto; }
+.history-summary, .receipt-heading, .receipt-document-heading {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+}
+.history-summary { margin-bottom: 1rem; }
+.filing-timeline, .receipt-documents { list-style: none; padding: 0; }
+.receipt-card {
+  margin-block: 1.25rem; padding: 1.5rem; border: 1px solid #d9e2ec;
+  border-left: 4px solid #244c7a; border-radius: 8px; background: #fff;
+}
+.receipt-heading h3 { margin: 0; }
+.receipt-heading > span { color: #52667d; font-size: .9rem; }
+.receipt-reference { color: #52667d; font-size: .85rem; overflow-wrap: anywhere; }
+.receipt-details { display: grid; gap: .9rem; margin-block: 1.25rem; }
+.receipt-details dt { color: #52667d; font-size: .85rem; }
+.receipt-details dd { margin: .2rem 0 0; overflow-wrap: anywhere; }
+.receipt-documents li { border-top: 1px solid #d9e2ec; padding-block: 1rem; }
+.receipt-documents p { margin: .35rem 0; }
+.receipt-documents details { color: #52667d; font-size: .85rem; }
+.receipt-documents summary { cursor: pointer; padding-block: .35rem; }
+.receipt-documents code { overflow-wrap: anywhere; }
+.document-download { display: inline-flex; gap: .4rem; flex-direction: column; }
+.download-error { color: #a12727; font-size: .85rem; }
+@media (max-width: 600px) {
+  .receipt-card { padding: 1rem; }
+  .receipt-document-heading { align-items: flex-start; }
+}
+@media print {
+  body:has(.filing-history) header, body:has(.filing-history) footer,
+  body:has(.filing-history) .sidebar, .filing-history button,
+  .filing-history .page-header > a, .filing-history .pagination { display: none !important; }
+  body:has(.filing-history) .main-content { margin: 0; padding: 0; }
+  .filing-history { max-width: none; color: #000; }
+  .receipt-card { break-inside: avoid; box-shadow: none; }
+}

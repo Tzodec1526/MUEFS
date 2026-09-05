@@ -23,15 +23,15 @@ os.environ["REDIS_URL"] = "redis://localhost:6379/0"
 # Patch the database module to use SQLite
 def setup_demo_db():
     """Create tables and seed data using SQLite."""
-    from sqlalchemy import create_engine, JSON
+    from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
-    from app.database import Base
 
     # Import all models to register them
     import app.models  # noqa
 
     engine = create_engine("sqlite:///./demo.db", echo=False)
-    Base.metadata.create_all(engine)
+    from app.demo.schema import prepare_demo_schema
+    prepare_demo_schema(engine)
     print("Demo database created.")
 
     # Seed data

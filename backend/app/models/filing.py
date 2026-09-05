@@ -54,8 +54,14 @@ class FilingEnvelope(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+    submission_count: Mapped[int] = mapped_column(default=0, server_default="0")
 
-    documents: Mapped[list["FilingDocument"]] = relationship(back_populates="envelope")
+    documents: Mapped[list["FilingDocument"]] = relationship(
+        back_populates="envelope",
+        primaryjoin="and_(FilingEnvelope.id == FilingDocument.envelope_id, "
+        "FilingDocument.removed_at.is_(None))",
+        order_by="FilingDocument.id",
+    )
 
     __table_args__ = (
         Index('ix_filing_court_status', 'court_id', 'status'),
@@ -80,5 +86,7 @@ class FilingDocument(Base):
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    retained_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     envelope: Mapped["FilingEnvelope"] = relationship(back_populates="documents")
