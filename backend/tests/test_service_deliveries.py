@@ -6,7 +6,7 @@ import os
 from datetime import UTC, datetime
 from email import policy
 from email.parser import Parser
-from uuid import uuid4
+from uuid import UUID, uuid4
 from zipfile import ZipFile
 
 import pytest
@@ -21,7 +21,7 @@ from app.models.filing_transaction import FilingTransaction
 from app.models.notification import DeliveryStatus, Notification, ServiceContact
 from app.models.service_delivery import ServiceEvent, ServicePacket, ServiceRecipient
 from app.models.user import User
-from app.schemas.service_delivery import ServicePacketCreate
+from app.schemas.service_delivery import ServiceFailureReport, ServicePacketCreate
 from app.services import document_service, email_delivery_service, filing_service
 from app.services.case_participant_service import participant_snapshot
 from app.services.service_delivery_service import create_packet
@@ -302,7 +302,30 @@ async def test_archive_keeps_delivery_contents_addresses_and_acknowledgment(
                 details={},
             )
         )
-        f["contact"].email, f["contact"].version = "changed@test.com", 2
+    while await email_delivery_service.deliver_next(case_records["sessions"]):
+        pass
+    async with case_records["sessions"].begin() as db:
+        from app.api.service_deliveries import report_delivery_failure
+
+        notice = await db.get(Notification, recipient.notification_id)
+        assert notice.delivery_status == DeliveryStatus.SENT
+        await report_delivery_failure(
+            UUID(recipient.id),
+            ServiceFailureReport(
+                source="relay_notice",
+                source_reference="Synthetic archived relay report",
+                description="Mailbox rejected after relay acceptance",
+                observed_at=datetime.now(UTC),
+                expected_message_id=notice.email_message_id,
+                expected_attempt_count=notice.attempt_count,
+                reviewed=True,
+            ),
+            db,
+            await db.get(User, f["staff"]),
+            uuid4(),
+        )
+        contact = await db.get(ServiceContact, f["contact"].id)
+        contact.email, contact.version = "changed@test.com", 2
     output = tmp_path / "delivery.zip"
     result = await case_export.export_case(f["case"].id, output)
     assert case_export.verify_archive(output, result["manifest_sha256"])["status"] == "verified"
@@ -319,7 +342,18 @@ async def test_archive_keeps_delivery_contents_addresses_and_acknowledgment(
             json.loads(archive.read("records/service_contacts.jsonl"))["email"]
             == "changed@test.com"
         )
-        assert json.loads(archive.read("records/service_events.jsonl"))["action"] == "acknowledged"
+        events = [
+            json.loads(line) for line in archive.read("records/service_events.jsonl").splitlines()
+        ]
+        assert {event["action"] for event in events} == {"acknowledged", "failure_reported"}
+        failure = next(event for event in events if event["action"] == "failure_reported")
+        assert failure["details"]["source_reference"] == "Synthetic archived relay report"
+        notices = [
+            json.loads(line) for line in archive.read("records/notifications.jsonl").splitlines()
+        ]
+        assert any(
+            notice["id"] == failure["details"]["sender_notification_id"] for notice in notices
+        )
 
 
 @pytest.mark.parametrize("outcome", ["accepted", "changed_contact", "unknown"])

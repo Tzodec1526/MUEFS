@@ -41,6 +41,8 @@ export interface DeliveryDetails {
   delivery_status: string;
   last_error: string | null;
   message_id: string | null;
+  attempt_count: number;
+  can_report_failure: boolean;
   acknowledged_at: string | null;
   can_acknowledge: boolean;
   can_retry: boolean;

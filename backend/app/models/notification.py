@@ -26,6 +26,7 @@ class DeliveryStatus(enum.StrEnum):
     UNKNOWN = "unknown"
     LEGACY = "legacy"
     FAILED = "failed"
+    FAILURE_REPORTED = "failure_reported"
 
 
 class ServiceMethod(enum.StrEnum):

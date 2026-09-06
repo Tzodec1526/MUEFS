@@ -65,6 +65,12 @@ and explicit recipient acknowledgment as separate evidence. SMTP uncertainty req
 review before retrying. Changed email instructions require a new delivery; old packages keep
 their original addresses and stable account recipients. Private exports include that history.
 
+Assigned staff can also record a later relay or recipient failure report with a source
+reference and observation time. It alerts the sender, requires staff review before retrying,
+and retains the earlier relay result and acknowledgment. Versioned attempt checks and
+idempotent report keys prevent duplicate notices and stale reports replacing newer retries.
+This is a court review workflow; automatic provider bounce ingestion remains outstanding.
+
 Automated verification covers real loopback SMTP, PostgreSQL concurrent requests and
 append-only guards, SQLite/PostgreSQL migrations and exports, and S3-backed browser downloads.
 The production frontend was exercised with synthetic signed identities on desktop and mobile.

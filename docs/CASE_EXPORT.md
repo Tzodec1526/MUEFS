@@ -49,6 +49,9 @@ The archive contains the selected case and its court and case types, plus:
 - Selected document delivery packages, frozen recipient instructions and addresses, and
   recipient acknowledgments, download requests and retry requests. Linked notification
   events retain the corresponding email messages and relay outcomes.
+- Court-reviewed delivery-failure reports, including their source references, observation
+  times and linked sender attention notices. Source evidence referenced by a report is
+  outside this archive unless separately retained among the case's documents.
 - The court's published calendar revisions and audit events tied to the exported case,
   filings, documents, copies, payments and notifications.
 - Limited profiles for referenced users, preserving attribution without exporting their

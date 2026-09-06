@@ -1,6 +1,8 @@
 """Explicit, recipient-scoped delivery of retained subsequent documents."""
 
-from datetime import UTC
+import hashlib
+import json
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -10,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import raiseload
 
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, lock_current_user
 from app.api.documents import DocumentResponse
 from app.config import settings
 from app.database import get_db
@@ -21,12 +23,13 @@ from app.models.notification import (
     DeliveryStatus,
     Notification,
     NotificationDeliveryEvent,
+    NotificationType,
     ServiceContact,
     ServiceMethod,
 )
 from app.models.service_delivery import ServiceEvent, ServicePacket, ServiceRecipient
 from app.models.user import User
-from app.schemas.service_delivery import ServicePacketCreate
+from app.schemas.service_delivery import ServiceFailureReport, ServicePacketCreate
 from app.services import access_service
 from app.services import service_delivery_service as service
 from app.services.email_delivery_service import queue_email
@@ -219,6 +222,16 @@ async def delivery_details(delivery_id: UUID, db: Db, actor: Actor):
         "delivery_status": notice.delivery_status,
         "last_error": notice.last_error,
         "message_id": notice.email_message_id,
+        "attempt_count": notice.attempt_count,
+        "can_report_failure": staff
+        and notice.email_message_id is not None
+        and notice.attempt_count > 0
+        and notice.delivery_status
+        in (
+            DeliveryStatus.SENT,
+            DeliveryStatus.UNKNOWN,
+            DeliveryStatus.FAILURE_REPORTED,
+        ),
         "acknowledged_at": acknowledged.replace(tzinfo=acknowledged.tzinfo or UTC)
         if acknowledged
         else None,
@@ -230,7 +243,12 @@ async def delivery_details(delivery_id: UUID, db: Db, actor: Actor):
             notice.delivery_status
             in (DeliveryStatus.BLOCKED, DeliveryStatus.DISABLED, DeliveryStatus.FAILED)
             or staff
-            and notice.delivery_status in (DeliveryStatus.UNKNOWN, DeliveryStatus.LEGACY)
+            and notice.delivery_status
+            in (
+                DeliveryStatus.UNKNOWN,
+                DeliveryStatus.LEGACY,
+                DeliveryStatus.FAILURE_REPORTED,
+            )
         ),
     }
 
@@ -327,6 +345,7 @@ async def acknowledge_delivery(delivery_id: UUID, db: Db, actor: Actor):
 
 @router.post("/deliveries/{delivery_id}/retry")
 async def retry_delivery(delivery_id: UUID, data: RetryRequest, db: Db, actor: Actor):
+    actor = await lock_current_user(db, actor.id)
     recipient, packet, notice, staff = await service.require_delivery_viewer(
         db,
         actor,
@@ -341,13 +360,118 @@ async def retry_delivery(delivery_id: UUID, data: RetryRequest, db: Db, actor: A
         DeliveryStatus.FAILED,
         DeliveryStatus.UNKNOWN,
         DeliveryStatus.LEGACY,
+        DeliveryStatus.FAILURE_REPORTED,
     ):
         raise HTTPException(409, "The alert is already queued, sending or accepted by the relay")
-    if notice.delivery_status in (DeliveryStatus.UNKNOWN, DeliveryStatus.LEGACY) and not staff:
-        raise HTTPException(403, "Court staff must review an uncertain SMTP outcome")
+    if (
+        notice.delivery_status
+        in (
+            DeliveryStatus.UNKNOWN,
+            DeliveryStatus.LEGACY,
+            DeliveryStatus.FAILURE_REPORTED,
+        )
+        and not staff
+    ):
+        raise HTTPException(403, "Court staff must review this delivery outcome before retrying")
     _, error = await email_context(db, notice.id)
     if error:
         raise HTTPException(409, error)
     await queue_email(db, notice, actor_id=actor.id, reason=data.reason)
     service.record_service_event(db, recipient, actor, "retry_requested", reason=data.reason)
     return {"delivery_status": notice.delivery_status}
+
+
+@router.post("/deliveries/{delivery_id}/failure-reports", status_code=201)
+async def report_delivery_failure(
+    delivery_id: UUID,
+    data: ServiceFailureReport,
+    db: Db,
+    actor: Actor,
+    idempotency_key: Annotated[UUID, Header()],
+):
+    actor = await lock_current_user(db, actor.id)
+    recipient, packet, notice, staff = await service.require_delivery_viewer(
+        db,
+        actor,
+        str(delivery_id),
+        lock=True,
+    )
+    if not staff:
+        raise HTTPException(403, "Assigned court staff must review delivery-failure reports")
+    details = data.model_dump(mode="json")
+    fingerprint = hashlib.sha256(json.dumps(details, sort_keys=True).encode()).hexdigest()
+    # The notice lock serializes replay, reporting and retrying for this recipient.
+    previous = await db.scalar(
+        select(ServiceEvent)
+        .where(
+            ServiceEvent.service_recipient_id == recipient.id,
+            ServiceEvent.action == "failure_reported",
+            ServiceEvent.details["idempotency_key"].as_string() == str(idempotency_key),
+        )
+        .limit(1)
+    )
+    if previous:
+        if previous.details.get("request_sha256") != fingerprint:
+            raise HTTPException(409, "This report key was already used for different information")
+        return {"report_id": previous.id, "delivery_status": notice.delivery_status}
+    if (
+        notice.email_message_id != data.expected_message_id
+        or notice.attempt_count != data.expected_attempt_count
+    ):
+        raise HTTPException(
+            409, "The delivery attempt changed. Refresh and review it before reporting"
+        )
+    if notice.delivery_status not in (
+        DeliveryStatus.SENT,
+        DeliveryStatus.UNKNOWN,
+        DeliveryStatus.FAILURE_REPORTED,
+    ):
+        raise HTTPException(
+            409, "Review a completed or uncertain transmission before reporting a failure"
+        )
+    observed_at = data.observed_at.astimezone(UTC)
+    if (
+        observed_at > datetime.now(UTC)
+        or notice.last_attempt_at is None
+        # Source notices and the review form commonly record whole seconds.
+        or observed_at
+        < notice.last_attempt_at.replace(
+            tzinfo=notice.last_attempt_at.tzinfo or UTC,
+            microsecond=0,
+        )
+    ):
+        raise HTTPException(
+            422, "The report time must follow the transmission and cannot be in the future"
+        )
+    async with db.begin_nested():
+        details.update(
+            idempotency_key=str(idempotency_key),
+            request_sha256=fingerprint,
+            previous_status=notice.delivery_status,
+            email_recipient=notice.email_recipient,
+        )
+        # A reviewed report is an observation, not a fabricated SMTP exchange.
+        # Keep the original relay time, message and transport events intact.
+        notice.delivery_status = DeliveryStatus.FAILURE_REPORTED
+        notice.next_attempt_at = None
+        notice.last_error = f"Delivery failure reported: {data.description}"
+        if packet.actor_id != actor.id:
+            alert = Notification(
+                notification_type=NotificationType.CASE_UPDATE,
+                recipient_id=packet.actor_id,
+                filing_envelope_id=packet.filing_id,
+                subject="Document delivery needs attention",
+                body=f"Court staff recorded a delivery-failure report for delivery {recipient.id}. "
+                "Open the filing's document delivery records to review the report and any "
+                "required action. The earlier relay result and recipient acknowledgments "
+                "remain in the delivery history.",
+            )
+            db.add(alert)
+            await db.flush()
+            await queue_email(
+                db, alert, actor_id=actor.id, reason="Delivery-failure report recorded"
+            )
+            details["sender_notification_id"] = alert.id
+        event = service.record_service_event(db, recipient, actor, "failure_reported", **details)
+        await db.flush()
+    return {"report_id": event.id, "delivery_status": notice.delivery_status}

@@ -22,7 +22,7 @@ Live demo: https://webmcp.tomcedoz.com/agent · https://demo.tomcedoz.com · Age
 | **Motion companions** | Filers must know MCR rules | Validates & prompts (MCR 2.119) |
 | **File from case docket** | Existing-case filing supported | Pre-filled from case detail |
 | **Case favorites** | Not available | Star cases, quick access |
-| **Service-only records** | Varies; often separate workflow | Record documents; arrange delivery outside the app |
+| **Service-only records** | Varies; often separate workflow | Retained documents and opt-in delivery to reviewed recipients; other service methods remain external |
 | **Draft autosave** | Vendor-dependent | Browser draft recovery |
 | **Clerk review tools** | Queue tools vary by court | Batch accept, age badges, quick reject reasons |
 | **Case participants and access** | Court-dependent | Assigned staff record roles, explicit access grants and retained changes |

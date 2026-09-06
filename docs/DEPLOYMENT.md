@@ -432,3 +432,28 @@ and download requests do not prove inbox receipt, transfer completion or legally
 service. This release does not ingest bounces, record postal service evidence, certify proof
 of service, or calculate remedies/deadlines. Establish those procedures and validate the
 deployed configuration before a court pilot. Use only a loopback mail sink for synthetic tests.
+
+### Court-reviewed delivery-failure reports
+
+Assigned staff can open a delivery record and select **Record a delivery-failure report**
+after a completed or uncertain transmission. Record the relay notice or recipient report,
+its source reference, observation time and description, and review it against the displayed
+recipient, Message-ID and attempt. The application retains that court observation in the
+delivery history and alerts the sender through the existing notices/outbox flow. Keep the
+underlying source evidence under the court's records policy; this form does not ingest or
+authenticate a provider webhook or a delivery-status message.
+
+The new `failure_reported` status distinguishes a reviewed report from an SMTP exchange.
+It preserves the original message, relay acceptance time and recipient acknowledgment.
+It schedules no automatic retry. Only assigned staff can request another alert after
+reviewing that report, and current frozen contact checks still apply. A new attempt
+invalidates an old review form; replaying the same report key returns its original record
+without replacing a newer retry or sending a duplicate attention notice. Concurrent
+reviewers and late SMTP results cannot overwrite the newer state. Reports and linked
+sender notifications are included in private case archives.
+
+Deploy the updated API and notice worker together: older application versions do not
+recognize `failure_reported`. The existing text-backed delivery-status column and retained
+event tables support this change without another database migration. A report records a
+court-reviewed observation; it does not adjudicate service, extend a deadline or establish
+that an alternative service method has been completed.
