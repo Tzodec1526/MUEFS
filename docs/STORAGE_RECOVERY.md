@@ -14,11 +14,23 @@ The command checks:
 - Document ownership and fingerprints retained in submission, service-recording and
   fee-waiver decision manifests, plus public-copy publication snapshots. These checks
   catch missing document metadata and current hashes altered to conceal changed bytes.
+- Each document-delivery packet's case, filing and original submission/service-recording
+  receipt, including both sides of a damaged cross-case reference.
+- The selected document manifests against that original receipt, plus the retained request
+  fingerprint binding the selected document IDs and contact IDs/versions. Missing selections
+  are discrepancies even when some documents or recipients remain.
+- Frozen recipient identity/instructions and their participant, contact and notification
+  links. When the contact still has the frozen version, its complete snapshot must match.
+  Later reviewed contact versions, retired participation and later filing submissions do
+  not invalidate the historical packet. Recipient rows whose packet is missing are reported.
 
-Receipt comparison uses batched metadata lookups rather than downloading files again.
-The command fetches at most 250 file rows at a time and 25 transaction rows per page; each
-transaction includes its stored JSON manifest. It does not load ORM relationships or the
-complete collection into memory. PostgreSQL uses a read-only repeatable-read transaction;
+Receipt and delivery comparisons use batched metadata lookups rather than downloading
+files again. The command fetches at most 250 file rows at a time, 25 transaction rows per
+page and 25 delivery packets per page, including their JSON manifests. It counts recipients
+before loading them and rejects packets outside the sending contract's 1..100 recipients;
+a packet page loads at most 2,500 recipient snapshots. Delivery validation does not fetch
+email message bodies. It does not load ORM relationships or the complete collection into
+memory. PostgreSQL uses a read-only repeatable-read transaction;
 SQLite uses a read-only file connection and an explicit read transaction. The database
 snapshot does not freeze external objects. Use a restored or otherwise quiescent collection
 to avoid concurrent writes and long-lived snapshots on the live court database.
@@ -63,10 +75,15 @@ Reading an absent local file or directory does not create it.
 
 ## Interpret the evidence
 
-Each report starts with a run ID, schema version, UTC start time and court scope. File
-records identify the document/copy and its expected and observed fingerprint/size. Receipt
-records identify the transaction and referenced document/copy. Private titles, filenames,
-storage keys, database URLs, credentials and raw provider error messages are omitted.
+Each report starts with a run ID, report schema version, UTC start time and court scope.
+Current reports use `schema_version: 2`; version 1 reports did not validate delivery packets.
+File records identify the document/copy and its expected and observed fingerprint/size.
+Receipt records identify the transaction and referenced document/copy. New `service_packet`
+and `service_recipient` rows identify the retained links. A valid packet request fingerprint
+is included as `selection_sha256`, and a frozen contact snapshot's fingerprint as
+`contact_sha256`. Compare these with the pre-backup report as well as the IDs and counts.
+Private titles, addresses, filenames, storage keys, database URLs, credentials and raw
+provider error messages are omitted.
 The identifiers and hashes can still relate to private cases; protect the report.
 
 | Status | Meaning and response |
@@ -78,9 +95,10 @@ The identifiers and hashes can still relate to private cases; protect the report
 | `unavailable` | A storage read failed, including denied access or transport failure. Resolve configuration/availability and rerun. |
 | `invalid_reference` | A local storage key fails path validation. Investigate the database record. |
 | `invalid_metadata` | The file record lacks a valid SHA-256 or byte count. Recover authoritative metadata; an invented fingerprint is not evidence. |
-| `missing_metadata` | A retained transaction refers to an absent document or public-copy record. Recover the matching database backup. |
+| `missing_metadata` | A retained receipt or delivery refers to an absent document, packet, participant, contact, account or notification record. Recover the matching database backup. |
 | `receipt_mismatch` | Current ownership or fingerprints conflict with the retained transaction. Investigate both database and object recovery. |
-| `invalid_manifest` | A required retained manifest is missing or malformed. Its file history could not be established. |
+| `invalid_manifest` | A required document manifest or recipient selection/snapshot is missing or malformed. Its retained history could not be established. |
+| `delivery_mismatch` | A packet's original receipt, document/contact selections, frozen instructions or notification links disagree. Recover the corresponding records; do not recompute fingerprints to conceal the discrepancy. |
 
 Exit **0** means the scan completed without reported discrepancies. Exit **1** means it
 completed and found discrepancies. Exit **2** means it could not complete or write its
@@ -93,7 +111,11 @@ the pre-backup inventory or audit of the same quiescent collection. A zero-discr
 report alone cannot detect records and receipts both absent from the restored database.
 An empty collection reports zero checked files; it does not prove that an expected court
 collection was recovered. Confirm notices, payments, access history and other database
-records through the separate restore procedure as well.
+records through the separate restore procedure as well. Packet checks establish the listed
+document and routing relationships; they do not validate every portal-activity detail or
+SMTP exchange, authenticate a delivery-failure report's external source, or establish
+legally sufficient service. An orphan with no surviving case/court link can only be
+identified by a full-collection audit, not attributed by a scoped report.
 
 The command does not repair data, delete unreferenced objects, scan malware, certify
 redactions or legal filing dates, validate retention policy, or prove continuing storage
@@ -115,6 +137,10 @@ provider's configuration.
 `backend/tests/test_storage_audit.py` covers local audit behavior, malformed or missing
 manifests, confidentiality of reports, bounded paging, report preservation and configured
 local storage, including paths with spaces/URI characters and concurrent database changes.
+`backend/tests/test_service_recovery.py` covers damaged packet selections and destinations,
+cross-case links, lost recipients, malformed snapshots, legitimate historical changes,
+orphaned records, bounded queries and sanitized CLI failures. It exercises both SQLite and
+PostgreSQL; set `MUEFS_TEST_POSTGRES_URL` for the isolated PostgreSQL cases.
 `backend/tests/test_s3_storage.py` exercises concurrent transfers, multipart
 objects and missing-object behavior against disposable local S3-compatible storage. Set
 `MUEFS_TEST_S3_ENDPOINT`, `MUEFS_TEST_S3_ACCESS_KEY` and `MUEFS_TEST_S3_SECRET_KEY` to enable

@@ -10,24 +10,14 @@ from app.models.service_delivery import ServicePacket, ServiceRecipient
 from app.models.user import User, UserType
 from app.services.case_participant_service import participant_snapshot
 
+CONTACT_SNAPSHOT_FIELDS = (
+    "id", "participant_id", "participant_snapshot", "user_id", "name",
+    "method", "email", "address", "is_active", "authority", "version",
+)
+
 
 def contact_snapshot(contact: ServiceContact) -> dict:
-    return {
-        field: getattr(contact, field)
-        for field in (
-            "id",
-            "participant_id",
-            "participant_snapshot",
-            "user_id",
-            "name",
-            "method",
-            "email",
-            "address",
-            "is_active",
-            "authority",
-            "version",
-        )
-    }
+    return {field: getattr(contact, field) for field in CONTACT_SNAPSHOT_FIELDS}
 
 
 def routing_issues(

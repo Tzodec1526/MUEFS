@@ -35,6 +35,15 @@ and unsafe archive paths. It never extracts or executes documents. Omitting the 
 fingerprint checks the archive's internal consistency only. A checksum is not a digital
 signature or independent proof of court authenticity.
 
+Before publishing an archive, export also validates document-delivery packets against
+their original receipt, selected document manifests, retained selection fingerprint and
+frozen recipient/notification links. Missing or inconsistent delivery evidence stops the
+export before a completed archive is created. A cross-case receipt, contact or notification
+reference blocks export of either affected case. Properly versioned later contact changes
+and later filing submissions leave historical packets valid. These checks share the
+[recovery audit](STORAGE_RECOVERY.md); they do not certify service or independently
+authenticate the retained portal/SMTP activity.
+
 ## Included records
 
 The archive contains the selected case and its court and case types, plus:

@@ -31,7 +31,7 @@ from app.models.service_delivery import ServiceEvent, ServicePacket, ServiceReci
 from app.models.user import User
 from app.readonly_database import ReadOnlyDatabaseError, read_only_connection
 from app.services import document_service
-from app.storage_audit import inspect_receipts
+from app.storage_audit import inspect_receipts, inspect_service_packets
 
 _CHUNK = 64 * 1024
 _MAX_MANIFEST_BYTES = 32 * 1024 * 1024
@@ -104,11 +104,13 @@ async def export_case(case_id: int, output: Path) -> dict:
         revision = await connection.scalar(text("SELECT version_num FROM alembic_version"))
         if not revision:
             raise CaseExportError("The database has no recorded schema revision")
-        async for result in inspect_receipts(connection, case_id=case_id):
-            if result["status"] != "metadata_consistent":
-                raise CaseExportError(
-                    "The case has missing or inconsistent retained document evidence"
-                )
+        for inspection in (inspect_receipts, inspect_service_packets):
+            async for result in inspection(connection, case_id=case_id):
+                if result["status"] != "metadata_consistent":
+                    raise CaseExportError(
+                        "The case has missing or inconsistent retained "
+                        "document or delivery evidence"
+                    )
         filing_ids = select(FilingEnvelope.id).where(FilingEnvelope.case_id == case_id)
         outside_payment = await connection.scalar(
             select(Payment.id)
@@ -413,7 +415,7 @@ def main() -> int:
     except (
         OSError,
         ValueError,
-        KeyError,
+        LookupError,
         TypeError,
         BadZipFile,
         SQLAlchemyError,

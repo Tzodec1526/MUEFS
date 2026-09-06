@@ -743,8 +743,14 @@ records never existed. The tool does not repair data or decide which objects may
 The [case export command](CASE_EXPORT.md) produces a private ZIP package of a case's
 linked records and exact stored bytes, including superseded documents and unpublished
 copies. The database snapshot is read-only, and the recovery audit's retained-manifest
-checks are reused. A missing file or inconsistent receipt prevents publication of a
-completed archive. Concurrent exporters cannot overwrite each other's destination.
+checks are reused. A missing file, inconsistent receipt or damaged delivery packet prevents
+publication of a completed archive. Delivery checks compare the original source, selected
+documents, contact/version fingerprint and frozen recipient/notification links, including
+both cases touched by an inconsistent cross-case link. Later reviewed contact versions
+and later submissions preserve historical packets. Recovery report format 2 includes
+selection and contact-snapshot fingerprints for comparison with the pre-backup inventory;
+it does not certify service or validate every portal/SMTP activity detail. Concurrent
+exporters cannot overwrite each other's destination.
 
 JSONL records preserve source identifiers and current metadata; the package also retains
 the original transaction snapshots. Every binary source is verified while streaming in
