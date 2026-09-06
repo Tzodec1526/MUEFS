@@ -19,9 +19,8 @@ from uuid import uuid4
 
 from botocore.exceptions import BotoCoreError, ClientError
 from sqlalchemy import select, true
-from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncConnection
 from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
@@ -29,13 +28,10 @@ from app.models.court import Court
 from app.models.document_public_copy import DocumentPublicCopy
 from app.models.filing import FilingDocument, FilingEnvelope
 from app.models.filing_transaction import FilingTransaction
+from app.readonly_database import ReadOnlyDatabaseError, read_only_connection
 from app.services import document_service
 
 _BATCH_SIZE = 250
-
-
-class AuditConfigurationError(ValueError):
-    """Operator guidance that is safe to retain without connection details."""
 
 
 def _valid_fingerprint(digest: object, size: object) -> bool:
@@ -145,6 +141,8 @@ async def _compare_receipt_batch(connection: AsyncConnection, references: list[d
 async def inspect_receipts(
     connection: AsyncConnection,
     court_id: int | None = None,
+    *,
+    case_id: int | None = None,
 ) -> AsyncIterator[dict]:
     query = select(
         FilingTransaction.id,
@@ -169,6 +167,12 @@ async def inspect_receipts(
         query = query.where(
             FilingTransaction.filing_id.in_(
                 select(FilingEnvelope.id).where(FilingEnvelope.court_id == court_id),
+            )
+        )
+    if case_id is not None:
+        query = query.where(
+            FilingTransaction.filing_id.in_(
+                select(FilingEnvelope.id).where(FilingEnvelope.case_id == case_id),
             )
         )
     last_id: str | None = None
@@ -250,40 +254,12 @@ async def run_audit(output: TextIO, court_id: int | None = None) -> int:
     counts: Counter[str] = Counter()
     checked: Counter[str] = Counter()
     complete = False
-    engine = None
     try:
-        url = make_url(settings.database_url)
-        if url.get_backend_name() == "sqlite":
-            if not url.database or url.database == ":memory:" or url.query.get("uri"):
-                raise AuditConfigurationError(
-                    "Use a file-backed SQLite database URL without URI options"
-                )
-            # Open read-only: a typo must not create an empty database to 'verify'.
-            try:
-                database = Path(url.database).resolve(strict=True)
-            except FileNotFoundError as exc:
-                raise AuditConfigurationError(
-                    "The configured SQLite database does not exist"
-                ) from exc
-            url = url.set(
-                database=database.as_uri(),
-                query={**url.query, "mode": "ro", "uri": "true"},
-            )
-        elif url.get_backend_name() != "postgresql":
-            raise AuditConfigurationError("Storage auditing supports PostgreSQL and SQLite")
-        engine = create_async_engine(url, echo=False)
-        async with engine.connect() as connection:
-            if url.get_backend_name() == "postgresql":
-                await connection.execution_options(isolation_level="REPEATABLE READ")
-                await connection.exec_driver_sql("SET TRANSACTION READ ONLY")
-            else:
-                await connection.exec_driver_sql("PRAGMA query_only=ON")
-                # Explicit BEGIN also covers sqlite3's legacy SELECT transaction mode.
-                await connection.exec_driver_sql("BEGIN")
+        async with read_only_connection(settings.database_url) as connection:
             if court_id is not None and not await connection.scalar(
                 select(Court.id).where(Court.id == court_id),
             ):
-                raise AuditConfigurationError("The selected court does not exist")
+                raise ReadOnlyDatabaseError("The selected court does not exist")
             for inspection in (inspect_files, inspect_receipts):
                 async for result in inspection(connection, court_id):
                     counts[result["status"]] += 1
@@ -301,16 +277,13 @@ async def run_audit(output: TextIO, court_id: int | None = None) -> int:
                     "status": "incomplete",
                     "error_type": type(exc).__name__,
                     "message": str(exc)
-                    if isinstance(exc, AuditConfigurationError)
+                    if isinstance(exc, ReadOnlyDatabaseError)
                     else "Could not read the collection. Check database access and schema.",
                 }
             ),
             file=output,
             flush=True,
         )
-    finally:
-        if engine:
-            await engine.dispose()
     failures = sum(
         count
         for status, count in counts.items()

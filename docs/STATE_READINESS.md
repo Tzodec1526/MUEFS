@@ -22,6 +22,7 @@ establish state approval or production readiness.
 | Send filing alerts reliably | An opt-in SMTP outbox commits with filing changes, checks verified recipients, retains messages and attempts, retries temporary failures and exposes uncertain outcomes to assigned court staff. | A court-approved relay and sender domain, bounce/delivery feedback, operational alerting and court approval of legally sufficient notice content and procedures. Generic email alerts do not establish legal service. |
 | Connect to the court's system of record | Acceptance is explicitly blocked outside demo mode when CMS integration is absent. | A documented court/vendor contract, credentialed sandbox, document/code mapping, idempotent delivery, status callbacks, error recovery and reconciliation. |
 | Operate statewide | Explicit identity provisioning, delegated court administration, immediate checks on subsequent requests after revocation, retained changes, PostgreSQL migrations and deployment guidance exist. | State federation and lifecycle integration, access recertification, availability targets, incident response, backup restoration drills, disaster recovery and migration from incumbent systems. |
+| Transfer a case's retained records | A private case archive includes linked metadata, transaction history, original versions, orders, public copies, payments and notice evidence. A read-only snapshot and file fingerprints protect export consistency; offline verification detects altered or incomplete packages. | Court-controlled custody/signing, source inventory reconciliation, receiving-system mapping, approved retention and an evaluated import/restore procedure. |
 | Serve the whole public | Responsive filing and history pages, keyboard controls and guided filing exist. | Independent accessibility testing, assistive-technology testing, language access, paper-filing accommodations and usability evaluation with self-represented filers. |
 
 ## Implemented receipt workflow
@@ -546,6 +547,23 @@ Full restore evidence still requires comparison with the backup inventory, recov
 non-file database records, protected object versions, court retention policies and tested
 recovery targets. A matching audit of an incomplete database cannot prove that omitted
 records never existed. The tool does not repair data or decide which objects may be deleted.
+
+## Portable case archives
+
+The [case export command](CASE_EXPORT.md) produces a private ZIP package of a case's
+linked records and exact stored bytes, including superseded documents and unpublished
+copies. The database snapshot is read-only, and the recovery audit's retained-manifest
+checks are reused. A missing file or inconsistent receipt prevents publication of a
+completed archive. Concurrent exporters cannot overwrite each other's destination.
+
+JSONL records preserve source identifiers and current metadata; the package also retains
+the original transaction snapshots. Every binary source is verified while streaming in
+64 KiB chunks. Identical contents share one archive object, and already compressed
+document bytes are not recompressed. The manifest lists entry hashes, sizes and counts.
+A recipient can verify the package without database access using the separately retained
+manifest fingerprint. This supports records transfer and migration evaluation; court
+approval, custody controls, source completeness, receiving-system mapping and restoration
+remain separate requirements.
 
 ## Sources guiding the evaluation
 

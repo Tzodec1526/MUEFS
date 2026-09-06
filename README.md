@@ -136,6 +136,8 @@ MUEFS/
   failure recovery and court review of uncertain email outcomes
 
 ### For Court Administration
+- **Private case archives** — export linked case records and every retained document version
+  with a verifiable manifest for records transfer; see [case export](docs/CASE_EXPORT.md)
 - **People & access** — explicitly provision identities, delegate court administration,
   grant and revoke staff assignments, deactivate accounts and inspect retained changes
 - **Scoped administration** — court delegates manage their own court's staff; system
