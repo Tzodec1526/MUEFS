@@ -118,12 +118,14 @@ def download_document(file_key: str) -> BinaryIO:
     return response["Body"]
 
 
-def stored_sha256(file_key: str) -> str:
+def stored_integrity(file_key: str) -> tuple[str, int]:
     with closing(download_document(file_key)) as stream:
         digest = hashlib.sha256()
+        size = 0
         while chunk := stream.read(64 * 1024):
             digest.update(chunk)
-        return digest.hexdigest()
+            size += len(chunk)
+        return digest.hexdigest(), size
 
 
 def delete_document(file_key: str) -> None:
@@ -167,8 +169,3 @@ def inspect_pdf(file_data: bytes, max_pages: int = 5) -> PdfInspection:
     except Exception as e:
         logger.warning("Failed to inspect PDF: %s", e)
     return inspection
-
-
-def inspect_stored_pdf(file_key: str) -> PdfInspection:
-    with closing(download_document(file_key)) as stream:
-        return inspect_pdf(stream.read())

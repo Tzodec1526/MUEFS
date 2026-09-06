@@ -14,7 +14,7 @@ from app.schemas.filing import (
     FilingEnvelopeCreate,
     FilingValidationResult,
 )
-from app.services import access_service
+from app.services import access_service, document_service
 from app.services.court_calendar_service import filing_date_for_receipt
 from app.services.filing_record_service import record_transaction
 
@@ -34,6 +34,31 @@ class CmsSubmissionError(Exception):
 
 class FilingDateUnavailableError(Exception):
     pass
+
+
+class FilingDocumentError(Exception):
+    pass
+
+
+async def verify_filing_documents(filing: FilingEnvelope) -> None:
+    """Confirm current attachment bytes before creating a receipt or accepting a filing."""
+    from botocore.exceptions import BotoCoreError, ClientError
+
+    if not filing.documents:
+        raise FilingDocumentError("The filing has no current documents to verify")
+    for doc in filing.documents:
+        try:
+            digest, size = await run_in_threadpool(document_service.stored_integrity, doc.file_key)
+        except (OSError, BotoCoreError, ClientError) as exc:
+            raise FilingDocumentError(
+                f"Stored document '{doc.title}' is unavailable. "
+                "Retry when storage is available, or contact the court to restore the file."
+            ) from exc
+        if digest != doc.sha256_hash or size != doc.file_size_bytes:
+            raise FilingDocumentError(
+                f"Stored document '{doc.title}' does not match its recorded fingerprint or size. "
+                "Replace the draft attachment or contact the court to restore the original."
+            )
 
 # Document-code classifiers shared by the submission validator and the
 # requirements API, so the UI shows exactly the set the validator enforces.
@@ -280,18 +305,17 @@ async def validate_filing(
                 "MCR 1.109 requires text-searchable PDFs."
             )
 
-    # PII detection on PDF documents (MCR 1.109 redaction requirements)
-    from app.services import document_service
-
+    # Advisory screening is tied to the uploaded bytes. Transitions independently
+    # verify those bytes; repeating PDF extraction here adds no new assurance.
     for doc in filing.documents:
         if doc.mime_type == "application/pdf":
-            try:
-                inspection = await run_in_threadpool(
-                    document_service.inspect_stored_pdf, doc.file_key
+            if doc.pii_warnings is None:
+                warnings.append(
+                    f"Document '{doc.title}' has no retained PII screening result. "
+                    "Review its full contents before submission."
                 )
-                warnings.extend(f"Document '{doc.title}': {w}" for w in inspection.pii_warnings)
-            except Exception:
-                pass  # Skip PII check if file can't be read
+            else:
+                warnings.extend(f"Document '{doc.title}': {w}" for w in doc.pii_warnings)
 
     is_valid = len(errors) == 0 and len(missing_docs) == 0
     return FilingValidationResult(
@@ -311,6 +335,7 @@ async def submit_filing(
     if not filing or filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
         return None
 
+    await verify_filing_documents(filing)
     now = datetime.now(UTC)
     filing.submitted_at = now
     filing.reviewed_at = None
@@ -370,6 +395,8 @@ async def review_filing(
     if not filing or filing.status not in (FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW):
         return None
 
+    if action == "accept":
+        await verify_filing_documents(filing)
     now = datetime.now(UTC)
     filing.reviewer_id = reviewer_id
     filing.reviewed_at = now

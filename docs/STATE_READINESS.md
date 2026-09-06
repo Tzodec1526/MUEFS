@@ -368,6 +368,53 @@ at most five pages and cannot prove that redaction is complete. A complete class
 matrix, court-authorized release policy, file-stamped derivatives, retention/disposition
 procedures and storage/recovery validation remain outside this implementation.
 
+## Stored-file integrity and validation cost
+
+Submission, service-only recording and acceptance stream every current attachment before
+recording the transition. Both SHA-256 and actual byte count must match the uploaded record.
+Missing objects, storage failures and mismatches return HTTP 409 without changing filing
+status, reviewer fields, receipts or CMS acceptance. Rejection and return remain possible.
+The clerk queue retains the specific document and recovery guidance in its error panel.
+An already completed idempotent submission retry returns its existing result without
+reading files or creating another receipt.
+
+PDF uploads must be readable. Their sampled PII screening warnings are saved once and
+reused during advisory validation, removing the previous whole-file reads and repeated
+PDF parsing. Migration `a71b03d9e6f2` preserves legacy records with a null screening result;
+validation explicitly asks for review instead of treating unknown history as a clean scan.
+The scan still samples at most five pages, performs no OCR or redaction, and cannot prove
+that a document is free of protected information.
+
+A local comparison against commit `ec8f0d5`, using sixteen five-page PDFs totaling 322,110
+bytes and the median of five warmed samples, measured:
+
+| Operation | Median | File reads | PDF parses |
+| --- | ---: | ---: | ---: |
+| Previous advisory validation | 194.821 ms | 16 | 16 |
+| Validation using retained screening | 2.560 ms | 0 | 0 |
+| Required streaming integrity pass | 13.693 ms | 16 | 0 |
+
+These are synthetic local-filesystem measurements, not production load or S3 latency
+evidence. Integrity reads use 64 KiB chunks in worker threads. A shared actor lock keeps
+authority stable during the transition while allowing unrelated filings and foreign-key
+references; ordered envelope locks avoid reversed batch lock acquisition. Account and
+court-role administration remain serialized with these transitions. PostgreSQL's
+[row-lock conflict rules](https://www.postgresql.org/docs/16/explicit-locking.html#LOCKING-ROWS)
+inform that choice; concurrency tests exercise the actual request behavior.
+
+Regression checks cover same-length corruption, wrong recorded sizes, missing files,
+storage outages, retry after restoration, idempotent replay, partial batch success,
+responsive health requests during slow reads, account revocation after authentication and
+same-filer uploads during another submission. Transition fixtures now store real bytes;
+search and SMTP tests no longer run irrelevant filing/acceptance workflows. Fresh demo
+seeds generate marked synthetic PDFs with matching metadata. Existing retained records
+are preserved and are never silently rewritten to match newly fabricated files.
+
+This verifies integrity at the transition, not continuing storage immutability. Court
+storage permissions, versioning, backup/restore, retention and reconciliation procedures
+remain necessary. Full document review and the separate CMS, payment and electronic-service
+integration requirements remain unresolved.
+
 ## Sources guiding the evaluation
 
 - [RFC 5321, SMTP](https://www.rfc-editor.org/rfc/rfc5321): relay acceptance, response codes and uncertainty after a lost final response.

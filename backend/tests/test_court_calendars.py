@@ -140,9 +140,11 @@ async def test_calendar_publication_is_scoped_validated_and_retained(db_session,
 
 
 async def test_acceptance_uses_receipt_date_and_preserves_old_calendar_evidence(
-    db_session, monkeypatch
+    db_session, monkeypatch, stored_document,
 ):
     fid, filer, clerk, _ = await filing_fixture(db_session)
+    db_session.add(stored_document(fid))
+    await db_session.flush()
     filing = await filing_service.get_filing(db_session, fid)
     old = calendar()
     old.court_id, old.published_by = filing.court_id, clerk
@@ -180,8 +182,12 @@ async def test_acceptance_uses_receipt_date_and_preserves_old_calendar_evidence(
     assert reassessment.details["filing_date_basis"]["calendar_ids"] == [2]
 
 
-async def test_production_acceptance_requires_calendar_coverage(db_session, monkeypatch):
+async def test_production_acceptance_requires_calendar_coverage(
+    db_session, monkeypatch, stored_document,
+):
     fid, _filer, clerk, _ = await filing_fixture(db_session)
+    db_session.add(stored_document(fid))
+    await db_session.flush()
     filing = await filing_service.submit_filing(db_session, fid)
     assert filing.filing_date is None and filing.filing_date_basis["error"]
     monkeypatch.setattr(settings, "allow_demo_mode", False)

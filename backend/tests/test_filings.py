@@ -9,7 +9,7 @@ from sqlalchemy import select
 from app.integrations.cms_adapter import CMSFilingResult
 from app.models.case import Case, CaseParticipant, CaseStatus
 from app.models.court import CaseCategory, CaseType, Court, CourtType
-from app.models.filing import FilingDocument, FilingStatus
+from app.models.filing import FilingStatus
 from app.models.user import User, UserType
 from app.schemas.filing import FilingEnvelopeCreate
 from app.services import filing_service
@@ -68,7 +68,7 @@ async def test_create_filing(db_session):
 
 
 @pytest.mark.asyncio
-async def test_filing_lifecycle(db_session):
+async def test_filing_lifecycle(db_session, stored_document):
     user, court, case_type = await create_test_fixtures(db_session)
 
     # Create
@@ -80,17 +80,7 @@ async def test_filing_lifecycle(db_session):
     filing = await filing_service.create_filing(db_session, user.id, data)
     assert filing.status == FilingStatus.DRAFT
 
-    # Add a document (directly, bypassing S3)
-    doc = FilingDocument(
-        envelope_id=filing.id,
-        document_type_code="COMPLAINT",
-        title="Complaint",
-        file_key="test/complaint.pdf",
-        file_size_bytes=1024,
-        mime_type="application/pdf",
-        sha256_hash="abc123",
-        is_text_searchable=True,
-    )
+    doc = stored_document(filing.id)
     db_session.add(doc)
     await db_session.flush()
 
@@ -126,7 +116,7 @@ async def test_filing_lifecycle(db_session):
 
 
 @pytest.mark.asyncio
-async def test_reject_filing(db_session):
+async def test_reject_filing(db_session, stored_document):
     user, court, case_type = await create_test_fixtures(db_session)
 
     data = FilingEnvelopeCreate(
@@ -137,16 +127,7 @@ async def test_reject_filing(db_session):
     filing = await filing_service.create_filing(db_session, user.id, data)
 
     # Add doc and submit
-    doc = FilingDocument(
-        envelope_id=filing.id,
-        document_type_code="MOTION",
-        title="Motion",
-        file_key="test/motion.pdf",
-        file_size_bytes=512,
-        mime_type="application/pdf",
-        sha256_hash="def456",
-        is_text_searchable=True,
-    )
+    doc = stored_document(filing.id, document_type_code="MOTION", title="Motion")
     db_session.add(doc)
     await db_session.flush()
 
@@ -287,7 +268,9 @@ async def test_create_filing_on_sealed_case_denied_to_stranger(db_session):
 
 
 @pytest.mark.asyncio
-async def test_accept_does_not_mark_accepted_when_cms_fails(db_session, monkeypatch):
+async def test_accept_does_not_mark_accepted_when_cms_fails(
+    db_session, monkeypatch, stored_document,
+):
     user, court, case_type = await create_test_fixtures(db_session)
     data = FilingEnvelopeCreate(
         court_id=court.id,
@@ -295,16 +278,7 @@ async def test_accept_does_not_mark_accepted_when_cms_fails(db_session, monkeypa
         case_title="CMS Fail",
     )
     filing = await filing_service.create_filing(db_session, user.id, data)
-    db_session.add(FilingDocument(
-        envelope_id=filing.id,
-        document_type_code="COMPLAINT",
-        title="Complaint",
-        file_key="test/cms-fail.pdf",
-        file_size_bytes=1024,
-        mime_type="application/pdf",
-        sha256_hash="cmsfail",
-        is_text_searchable=True,
-    ))
+    db_session.add(stored_document(filing.id))
     await db_session.flush()
     await filing_service.submit_filing(db_session, filing.id)
 
@@ -329,7 +303,7 @@ async def test_accept_does_not_mark_accepted_when_cms_fails(db_session, monkeypa
 
 
 @pytest.mark.asyncio
-async def test_accept_does_not_decide_requested_fee_waiver(db_session):
+async def test_accept_does_not_decide_requested_fee_waiver(db_session, stored_document):
     user, court, case_type = await create_test_fixtures(db_session)
     data = FilingEnvelopeCreate(
         court_id=court.id,
@@ -339,16 +313,7 @@ async def test_accept_does_not_decide_requested_fee_waiver(db_session):
         fee_waiver_reason="Indigent",
     )
     filing = await filing_service.create_filing(db_session, user.id, data)
-    db_session.add(FilingDocument(
-        envelope_id=filing.id,
-        document_type_code="COMPLAINT",
-        title="Complaint",
-        file_key="test/ifp.pdf",
-        file_size_bytes=1024,
-        mime_type="application/pdf",
-        sha256_hash="ifp",
-        is_text_searchable=True,
-    ))
+    db_session.add(stored_document(filing.id))
     await db_session.flush()
     await filing_service.submit_filing(db_session, filing.id)
     clerk = User(

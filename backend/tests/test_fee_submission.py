@@ -6,13 +6,15 @@ import pytest
 from sqlalchemy import func, select
 
 from app.models.court import CaseCategory, CaseType, Court, CourtType, FeeSchedule
-from app.models.filing import FilingDocument, FilingEnvelope
+from app.models.filing import FilingEnvelope
 from app.models.payment import Payment
 from app.models.user import User, UserType
 
 
 @pytest.mark.parametrize("additional_cents", [0, 750])
-async def test_zero_base_fee_submission_uses_full_quote(db_session, api_client, additional_cents):
+async def test_zero_base_fee_submission_uses_full_quote(
+    db_session, api_client, additional_cents, stored_document,
+):
     court = Court(name="Fee Court", county="Wayne", court_type=CourtType.CIRCUIT)
     filer = User(email="fees@test.com", first_name="Fee", last_name="Filer",
                  user_type=UserType.ATTORNEY)
@@ -40,11 +42,7 @@ async def test_zero_base_fee_submission_uses_full_quote(db_session, api_client, 
                             filer_id=filer.id, case_title="Free v Fee", filing_type="initial")
     db_session.add(filing)
     await db_session.flush()
-    db_session.add(FilingDocument(
-        envelope_id=filing.id, document_type_code="COMPLAINT", title="Complaint",
-        file_key="fee-test", file_size_bytes=1, mime_type="application/pdf",
-        sha256_hash="0" * 64, is_text_searchable=True,
-    ))
+    db_session.add(stored_document(filing.id))
     await db_session.flush()
     api_client.headers["X-Demo-User-Id"] = str(filer.id)
     quote = await api_client.post("/api/v1/payments/calculate", json={

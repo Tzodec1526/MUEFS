@@ -1,5 +1,7 @@
 """Tests for filing motions to existing cases and case search functionality."""
 
+from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy import select
 
@@ -58,40 +60,12 @@ async def create_court_with_case(db_session):
     db_session.add(subp_type)
     await db_session.flush()
 
-    # Create an initial filing, add a document, submit, and accept it to create a case
-    initial_filing = FilingEnvelope(
-        court_id=court.id,
-        case_type_id=case_type.id,
-        filer_id=user.id,
-        case_title="Johnson v. Smith Industries LLC",
-        filing_description="Initial complaint for breach of contract",
-        status=FilingStatus.DRAFT,
+    case = Case(
+        court_id=court.id, case_type_id=case_type.id, case_number="MOTION-CASE-1",
+        title="Johnson v. Smith Industries LLC", filed_date=datetime.now(UTC),
     )
-    db_session.add(initial_filing)
+    db_session.add(case)
     await db_session.flush()
-
-    doc = FilingDocument(
-        envelope_id=initial_filing.id,
-        document_type_code="COMPLAINT",
-        title="Complaint for Breach of Contract",
-        file_key="test/complaint.pdf",
-        file_size_bytes=2048,
-        mime_type="application/pdf",
-        sha256_hash="abc123initial",
-        is_text_searchable=True,
-    )
-    db_session.add(doc)
-    await db_session.flush()
-
-    # Submit and accept the filing (creates a case)
-    await filing_service.submit_filing(db_session, initial_filing.id)
-    accepted = await filing_service.review_filing(
-        db_session, initial_filing.id, reviewer_id=clerk.id, action="accept"
-    )
-
-    # Add participants to the case
-    case = await db_session.execute(select(Case).where(Case.id == accepted.case_id))
-    case = case.scalar_one()
 
     db_session.add(CaseParticipant(
         case_id=case.id, user_id=user.id,
@@ -117,7 +91,7 @@ async def create_court_with_case(db_session):
 
 
 @pytest.mark.asyncio
-async def test_file_motion_to_existing_case(db_session):
+async def test_file_motion_to_existing_case(db_session, stored_document):
     """Test filing a motion to an already-existing case."""
     user, clerk, court, case_type, _, case = await create_court_with_case(db_session)
 
@@ -135,29 +109,13 @@ async def test_file_motion_to_existing_case(db_session):
     assert motion_filing.status == FilingStatus.DRAFT
 
     # Add motion document
-    motion_doc = FilingDocument(
-        envelope_id=motion_filing.id,
-        document_type_code="MOTION",
-        title="Motion for Summary Disposition",
-        file_key="test/motion_sd.pdf",
-        file_size_bytes=4096,
-        mime_type="application/pdf",
-        sha256_hash="motion_hash_001",
-        is_text_searchable=True,
-    )
+    motion_doc = stored_document(motion_filing.id, document_type_code="MOTION",
+        title="Motion for Summary Disposition")
     db_session.add(motion_doc)
 
     # Add brief in support
-    brief_doc = FilingDocument(
-        envelope_id=motion_filing.id,
-        document_type_code="BRIEF",
-        title="Brief in Support of Motion for Summary Disposition",
-        file_key="test/brief_sd.pdf",
-        file_size_bytes=8192,
-        mime_type="application/pdf",
-        sha256_hash="brief_hash_001",
-        is_text_searchable=True,
-    )
+    brief_doc = stored_document(motion_filing.id, document_type_code="BRIEF",
+        title="Brief in Support of Motion for Summary Disposition")
     db_session.add(brief_doc)
     await db_session.flush()
 
@@ -195,29 +153,15 @@ async def test_file_multiple_motions_to_same_case(db_session):
             case_type_id=case_type.id,
             filing_description=title,
         )
-        filing = await filing_service.create_filing(db_session, user.id, data)
-        doc = FilingDocument(
-            envelope_id=filing.id,
-            document_type_code="MOTION",
-            title=title,
-            file_key=f"test/{title.lower().replace(' ', '_')}.pdf",
-            file_size_bytes=1024,
-            mime_type="application/pdf",
-            sha256_hash=f"hash_{title[:8]}",
-            is_text_searchable=True,
-        )
-        db_session.add(doc)
-        await db_session.flush()
-
+        await filing_service.create_filing(db_session, user.id, data)
     # Verify all filings are linked to the same case
     filings, total, _ = await filing_service.list_filings(db_session, user.id)
     case_filings = [f for f in filings if f.case_id == case.id]
-    # Initial complaint + 3 motions = 4 filings linked to this case
-    assert len(case_filings) == 4
+    assert len(case_filings) == 3
 
 
 @pytest.mark.asyncio
-async def test_motion_rejected_and_refiled(db_session):
+async def test_motion_rejected_and_refiled(db_session, stored_document):
     """Test motion rejected by clerk, then corrected and resubmitted."""
     user, clerk, court, case_type, _, case = await create_court_with_case(db_session)
 
@@ -228,16 +172,8 @@ async def test_motion_rejected_and_refiled(db_session):
         filing_description="Motion to Dismiss",
     )
     filing = await filing_service.create_filing(db_session, user.id, data)
-    doc = FilingDocument(
-        envelope_id=filing.id,
-        document_type_code="MOTION",
-        title="Motion to Dismiss",
-        file_key="test/motion_dismiss.pdf",
-        file_size_bytes=1024,
-        mime_type="application/pdf",
-        sha256_hash="dismiss_hash",
-        is_text_searchable=True,
-    )
+    doc = stored_document(filing.id, document_type_code="MOTION",
+        title="Motion to Dismiss")
     db_session.add(doc)
     await db_session.flush()
 
@@ -253,7 +189,7 @@ async def test_motion_rejected_and_refiled(db_session):
 
 
 @pytest.mark.asyncio
-async def test_domesticating_subpoena_filing(db_session):
+async def test_domesticating_subpoena_filing(db_session, stored_document):
     """Test filing a domesticating subpoena under Michigan Uniform Depositions Act."""
     user, clerk, court, _, subp_type, _ = await create_court_with_case(db_session)
 
@@ -266,29 +202,13 @@ async def test_domesticating_subpoena_filing(db_session):
     filing = await filing_service.create_filing(db_session, user.id, data)
 
     # Upload the out-of-state subpoena
-    subpoena_doc = FilingDocument(
-        envelope_id=filing.id,
-        document_type_code="SUBPOENA",
-        title="Ohio Subpoena - Authenticated Copy",
-        file_key="test/ohio_subpoena.pdf",
-        file_size_bytes=3072,
-        mime_type="application/pdf",
-        sha256_hash="ohio_subp_hash",
-        is_text_searchable=True,
-    )
+    subpoena_doc = stored_document(filing.id, document_type_code="SUBPOENA",
+        title="Ohio Subpoena - Authenticated Copy")
     db_session.add(subpoena_doc)
 
     # Upload proposed Michigan subpoena
-    proposed_doc = FilingDocument(
-        envelope_id=filing.id,
-        document_type_code="PROPOSED_SUBP",
-        title="Proposed Michigan Subpoena",
-        file_key="test/proposed_mi_subpoena.pdf",
-        file_size_bytes=2048,
-        mime_type="application/pdf",
-        sha256_hash="proposed_subp_hash",
-        is_text_searchable=True,
-    )
+    proposed_doc = stored_document(filing.id, document_type_code="PROPOSED_SUBP",
+        title="Proposed Michigan Subpoena")
     db_session.add(proposed_doc)
     await db_session.flush()
 
@@ -305,7 +225,7 @@ async def test_domesticating_subpoena_filing(db_session):
 
 
 @pytest.mark.asyncio
-async def test_service_only_filing(db_session):
+async def test_service_only_filing(db_session, stored_document):
     """Test service-only filing that skips clerk review."""
     user, clerk, court, case_type, _, case = await create_court_with_case(db_session)
 
@@ -320,16 +240,8 @@ async def test_service_only_filing(db_session):
     assert filing.filing_type == "service_only"
 
     # Add discovery document
-    doc = FilingDocument(
-        envelope_id=filing.id,
-        document_type_code="DISC_INTERROG",
-        title="Plaintiff's First Set of Interrogatories",
-        file_key="test/interrogatories.pdf",
-        file_size_bytes=2048,
-        mime_type="application/pdf",
-        sha256_hash="interrog_hash",
-        is_text_searchable=True,
-    )
+    doc = stored_document(filing.id, document_type_code="DISC_INTERROG",
+        title="Plaintiff's First Set of Interrogatories")
     db_session.add(doc)
     await db_session.flush()
 

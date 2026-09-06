@@ -7,12 +7,18 @@ These guard the curation rules behind the filing checklists:
 - the circuit civil checklist stays limited to required / highly probable documents.
 """
 
+import hashlib
+from io import BytesIO
+
 import pytest
+from pypdf import PdfReader
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import Session
 
 import app.seed_data as seed_data
 from app.models.court import CaseType, Court, CourtType, FilingRequirement
+from app.models.filing import FilingDocument
+from app.services import document_service
 from app.services.filing_service import requirements_for_filing_type
 
 # Served on parties, not filed with the court (MCR 2.302(H)).
@@ -30,11 +36,14 @@ def seeded_session(tmp_path_factory):
     original = seed_data.DATABASE_URL
     seed_data.DATABASE_URL = url
     try:
-        seed_data.seed_database()
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(document_service, "_local_storage_path", lambda: db_path.parent / "files")
+            seed_data.seed_database()
     finally:
         seed_data.DATABASE_URL = original
     engine = create_engine(url)
     with Session(engine) as session:
+        session.info["document_root"] = db_path.parent / "files"
         yield session
     engine.dispose()
 
@@ -114,9 +123,10 @@ def test_circuit_court_names_use_correct_ordinals(seeded_session):
         assert f"{good} Circuit Court" in names, good
 
 
-def test_seed_reset_flag_rebuilds_from_scratch(tmp_path):
+def test_seed_reset_flag_rebuilds_from_scratch(tmp_path, monkeypatch):
     """--reset drops and reseeds the app tables; a plain rerun still skips."""
     url = f"sqlite:///{tmp_path / 'reset.db'}"
+    monkeypatch.setattr(document_service, "_local_storage_path", lambda: tmp_path / "files")
     original = seed_data.DATABASE_URL
     seed_data.DATABASE_URL = url
     engine = create_engine(url)
@@ -140,3 +150,16 @@ def test_seed_reset_flag_rebuilds_from_scratch(tmp_path):
     finally:
         engine.dispose()
         seed_data.DATABASE_URL = original
+
+
+def test_sample_docket_has_real_marked_documents_with_matching_metadata(seeded_session):
+    documents = seeded_session.query(FilingDocument).all()
+    assert documents
+    for doc in documents:
+        payload = (seeded_session.info["document_root"] / doc.file_key).read_bytes()
+        assert hashlib.sha256(payload).hexdigest() == doc.sha256_hash
+        assert len(payload) == doc.file_size_bytes
+        pdf = PdfReader(BytesIO(payload))
+        assert len(pdf.pages) == doc.page_count
+        assert "DEMONSTRATION ONLY - NOT A COURT FILING" in pdf.pages[0].extract_text()
+        assert doc.pii_warnings == []

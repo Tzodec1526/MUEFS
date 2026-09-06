@@ -35,7 +35,9 @@ async def test_notification_history_recipient_and_paging(db_session, api_client)
 
 
 @pytest.mark.parametrize("batch", [False, True])
-async def test_clerk_accept_notifies_filer_in_both_review_paths(db_session, api_client, batch):
+async def test_clerk_accept_notifies_filer_in_both_review_paths(
+    db_session, api_client, batch, stored_document,
+):
     filer = User(email="filer@notify.test", first_name="F", last_name="Filer",
                  user_type=UserType.ATTORNEY)
     clerk = User(email="clerk@notify.test", first_name="C", last_name="Clerk",
@@ -50,6 +52,8 @@ async def test_clerk_accept_notifies_filer_in_both_review_paths(db_session, api_
     filing = FilingEnvelope(court_id=court.id, case_type_id=case_type.id, filer_id=filer.id,
                             case_title="Notification test")
     db_session.add(filing)
+    await db_session.flush()
+    db_session.add(stored_document(filing.id))
     await db_session.flush()
     await filing_service.submit_filing(db_session, filing.id)
     api_client.headers["X-Demo-User-Id"] = str(clerk.id)

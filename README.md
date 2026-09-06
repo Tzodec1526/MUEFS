@@ -168,6 +168,12 @@ rm backend/demo.db                                            # run_demo.py rese
 stored documents are untouched. For a fully clean slate (all volumes, including
 uploaded documents), use `docker compose down -v && docker compose up --build`.
 
+Fresh seeds include real, visibly marked sample PDFs with matching file hashes and sizes.
+An upgrade preserves existing document metadata and receipts; it does not fabricate files
+for older demo rows. Rebuild only disposable demo data to get the new samples. A missing
+or altered stored file blocks submission and acceptance until the original is restored
+or a draft attachment is replaced.
+
 ### Frontend
 ```bash
 cd frontend
@@ -197,7 +203,10 @@ for the full security model, threat boundaries, and hardening guide.
 - **Sealed case access** — requires an explicit participant grant or authorized court/system role. Counsel grants require a linked account and matching verified bar number. Individually restricted originals remain available only to the filer and assigned court staff.
 - **Reviewed public copies** — staff inspect a separate PDF and approved title before publishing. Publication restricts the original; withdrawal removes the active copy without restoring the original. The court supplies redactions and authority; automated scanning does not certify a safe release.
 - **Upload malware screening** — every upload is screened (built-in executable/EICAR heuristic, optional ClamAV) and rejected before storage.
-- **MCR 1.109 PII warnings at upload** — likely SSNs, dates of birth, and account numbers are flagged for redaction.
+- **Retained upload screening** — sampled PDF text is checked for likely SSNs, dates of
+  birth and account numbers. Validation reuses those warnings; it does not certify redaction.
+- **Stored-file integrity** — submission and acceptance stream every current attachment
+  and require its SHA-256 and byte count to match the uploaded record before proceeding.
 - **Hardened authentication** — Keycloak RS256 JWTs (signature, issuer, expiry verified; no `none` algorithm); OIDC auto-provisioning requires a verified email and won't adopt privileged accounts.
 - **Audit logging & ownership checks** on every object, with parameterized queries throughout.
 

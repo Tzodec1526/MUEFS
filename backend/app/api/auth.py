@@ -167,6 +167,17 @@ async def require_user_may_manage_efilings(current_user: User = Depends(get_curr
     return current_user
 
 
+async def lock_current_user(db: AsyncSession, user_id: int) -> User:
+    """Hold authority stable while allowing other filings and foreign-key references."""
+    user = await db.scalar(
+        select(User).where(User.id == user_id).with_for_update(read=True)
+        .execution_options(populate_existing=True)
+    )
+    if not user or not user.is_active:
+        raise HTTPException(status_code=403, detail="This account is no longer active")
+    return user
+
+
 @router.get("/me", response_model=UserProfile)
 async def get_profile(
     current_user: User = Depends(get_current_user),

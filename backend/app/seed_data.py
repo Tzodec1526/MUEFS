@@ -16,6 +16,7 @@ from sqlalchemy import create_engine, func
 from sqlalchemy.orm import Session
 
 from app.database import Base
+from app.demo.documents import sample_document
 from app.models.court import (
     CaseCategory,
     CaseType,
@@ -1294,7 +1295,7 @@ def seed_database(reset: bool = False):
 
         # --- Demo Cases & Filings for frontend testing ---
         from app.models.case import Case, CaseParticipant, CaseStatus, ParticipantRole
-        from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
+        from app.models.filing import FilingEnvelope, FilingStatus
         from app.models.user import FavoriteCase, FavoriteCourt
 
         now = datetime.now(UTC)
@@ -1365,12 +1366,8 @@ def seed_database(reset: bool = False):
             )
             session.add(filing1)
             session.flush()
-            session.add(FilingDocument(
-                envelope_id=filing1.id, document_type_code="COMPLAINT",
-                title="Complaint for Breach of Contract",
-                file_key="demo/case1/complaint.pdf", file_size_bytes=45056,
-                mime_type="application/pdf", sha256_hash="demo_hash_001",
-                page_count=12, is_text_searchable=True,
+            session.add(sample_document(
+                filing1, "COMPLAINT", "Complaint for Breach of Contract",
             ))
 
             # Motion filing (submitted, pending review)
@@ -1389,19 +1386,11 @@ def seed_database(reset: bool = False):
             )
             session.add(filing1_motion)
             session.flush()
-            session.add(FilingDocument(
-                envelope_id=filing1_motion.id, document_type_code="MOTION",
-                title="Motion for Summary Disposition",
-                file_key="demo/case1/motion_sd.pdf", file_size_bytes=28672,
-                mime_type="application/pdf", sha256_hash="demo_hash_002",
-                page_count=8, is_text_searchable=True,
+            session.add(sample_document(
+                filing1_motion, "MOTION", "Motion for Summary Disposition",
             ))
-            session.add(FilingDocument(
-                envelope_id=filing1_motion.id, document_type_code="BRIEF",
-                title="Brief in Support of Motion for Summary Disposition",
-                file_key="demo/case1/brief_sd.pdf", file_size_bytes=61440,
-                mime_type="application/pdf", sha256_hash="demo_hash_003",
-                page_count=18, is_text_searchable=True,
+            session.add(sample_document(
+                filing1_motion, "BRIEF", "Brief in Support of Motion for Summary Disposition",
             ))
 
             # --- Case 2: Personal injury tort case ---
@@ -1446,12 +1435,8 @@ def seed_database(reset: bool = False):
             )
             session.add(filing2)
             session.flush()
-            session.add(FilingDocument(
-                envelope_id=filing2.id, document_type_code="COMPLAINT",
-                title="Complaint for Personal Injury",
-                file_key="demo/case2/complaint.pdf", file_size_bytes=38912,
-                mime_type="application/pdf", sha256_hash="demo_hash_004",
-                page_count=10, is_text_searchable=True,
+            session.add(sample_document(
+                filing2, "COMPLAINT", "Complaint for Personal Injury",
             ))
 
             # --- Case 3: Divorce case ---
@@ -1488,12 +1473,8 @@ def seed_database(reset: bool = False):
                 )
                 session.add(filing3)
                 session.flush()
-                session.add(FilingDocument(
-                    envelope_id=filing3.id, document_type_code="COMPLAINT",
-                    title="Complaint for Divorce",
-                    file_key="demo/case3/divorce_complaint.pdf", file_size_bytes=22528,
-                    mime_type="application/pdf", sha256_hash="demo_hash_005",
-                    page_count=6, is_text_searchable=True,
+                session.add(sample_document(
+                    filing3, "COMPLAINT", "Complaint for Divorce",
                 ))
 
             # --- Case 4: Domesticating subpoena ---
@@ -1524,19 +1505,11 @@ def seed_database(reset: bool = False):
                 )
                 session.add(filing4)
                 session.flush()
-                session.add(FilingDocument(
-                    envelope_id=filing4.id, document_type_code="SUBPOENA",
-                    title="Ohio Subpoena - Authenticated Copy",
-                    file_key="demo/case4/ohio_subpoena.pdf", file_size_bytes=15360,
-                    mime_type="application/pdf", sha256_hash="demo_hash_006",
-                    page_count=4, is_text_searchable=True,
+                session.add(sample_document(
+                    filing4, "SUBPOENA", "Ohio Subpoena - Authenticated Copy",
                 ))
-                session.add(FilingDocument(
-                    envelope_id=filing4.id, document_type_code="PROPOSED_SUBP",
-                    title="Proposed Michigan Subpoena",
-                    file_key="demo/case4/proposed_mi_subpoena.pdf", file_size_bytes=12288,
-                    mime_type="application/pdf", sha256_hash="demo_hash_007",
-                    page_count=3, is_text_searchable=True,
+                session.add(sample_document(
+                    filing4, "PROPOSED_SUBP", "Proposed Michigan Subpoena",
                 ))
 
             # --- Case 5: Rejected filing (returned for correction) ---
@@ -1556,12 +1529,8 @@ def seed_database(reset: bool = False):
             )
             session.add(filing5)
             session.flush()
-            session.add(FilingDocument(
-                envelope_id=filing5.id, document_type_code="COMPLAINT",
-                title="Complaint for Medical Malpractice",
-                file_key="demo/case5/complaint.pdf", file_size_bytes=51200,
-                mime_type="application/pdf", sha256_hash="demo_hash_008",
-                page_count=15, is_text_searchable=True,
+            session.add(sample_document(
+                filing5, "COMPLAINT", "Complaint for Medical Malpractice",
             ))
 
             # Auto-favorite case 1 for the demo attorney

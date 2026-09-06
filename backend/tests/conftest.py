@@ -1,6 +1,8 @@
 """Test configuration and fixtures."""
 
+import hashlib
 import os
+from uuid import uuid4
 
 # Before any app.settings load: pin the test environment to demo mode (SQLite + local
 # document storage) so tests never reach for Postgres / Redis / S3. This mirrors how the
@@ -13,6 +15,7 @@ os.environ.setdefault("ALLOW_DEMO_MODE", "true")
 
 from collections.abc import AsyncGenerator
 
+import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -20,6 +23,26 @@ from app.database import Base
 from app.models import *  # noqa: F401, F403
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+
+@pytest.fixture
+def stored_document(monkeypatch, tmp_path):
+    from app.models.filing import FilingDocument
+    from app.services import document_service
+
+    monkeypatch.setattr(document_service, "_local_storage_path", lambda: tmp_path)
+
+    def create(envelope_id, *, document_type_code="COMPLAINT", title="Complaint"):
+        content = f"Synthetic {title}".encode()
+        key = f"tests/{uuid4()}.txt"
+        document_service.upload_document(content, key, "text/plain")
+        return FilingDocument(
+            envelope_id=envelope_id, document_type_code=document_type_code, title=title,
+            file_key=key, file_size_bytes=len(content), mime_type="text/plain",
+            sha256_hash=hashlib.sha256(content).hexdigest(), pii_warnings=[],
+        )
+
+    return create
 
 
 @pytest_asyncio.fixture(scope="function")

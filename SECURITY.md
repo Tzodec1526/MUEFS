@@ -80,6 +80,13 @@ regardless of demo mode:
 - **Upload safety.** Uploads are size-limited (streamed, 100 MB), restricted to an
   allowlisted set of document/image MIME types, stored under server-generated keys
   (path-traversal-guarded), and **malware-screened** (see below).
+- **Stored-file integrity.** Submission, service-only recording and acceptance verify the
+  actual SHA-256 and byte count of every current attachment using bounded reads off the
+  event loop. Missing, altered or unavailable files block the transition without a new
+  receipt or reviewer decision. Published copies and the verification endpoint check both
+  values too. This checks bytes at the transition; private, versioned storage and protected
+  backups must prevent or recover later changes. Upload PII warnings are retained advisory
+  results, not exhaustive inspection or proof of redaction.
 - **SQL injection / path traversal.** All database access is parameterized via SQLAlchemy;
   document storage paths are containment-checked.
 

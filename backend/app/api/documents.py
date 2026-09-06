@@ -109,8 +109,10 @@ async def verify_document(
         )
 
     try:
-        current_hash = await run_in_threadpool(document_service.stored_sha256, doc.file_key)
-        is_valid = current_hash == doc.sha256_hash
+        current_hash, size = await run_in_threadpool(
+            document_service.stored_integrity, doc.file_key,
+        )
+        is_valid = current_hash == doc.sha256_hash and size == doc.file_size_bytes
     except OSError:
         return DocumentVerifyResponse(
             document_id=document_id,

@@ -197,6 +197,7 @@ async def test_failed_batch_item_rolls_back_its_records_only(
     db_session.add(second)
     await db_session.flush()
     second_id = second.id
+    await upload(api_client, second_id, b"Second complaint")
     await filing_service.submit_filing(db_session, second_id)
     real_review = filing_service.review_filing
 

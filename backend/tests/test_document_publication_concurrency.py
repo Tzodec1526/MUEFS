@@ -117,7 +117,7 @@ async def test_staff_revocation_during_integrity_check_blocks_publication(
 ):
     client, did, clerk, _, copy = court_document
     started, release = threading.Event(), threading.Event()
-    hash_file = document_service.stored_sha256
+    hash_file = document_service.stored_integrity
 
     def pause_after_read(file_key):
         result = hash_file(file_key)
@@ -125,7 +125,7 @@ async def test_staff_revocation_during_integrity_check_blocks_publication(
         assert release.wait(5), "Integrity check was not released"
         return result
 
-    monkeypatch.setattr(document_service, "stored_sha256", pause_after_read)
+    monkeypatch.setattr(document_service, "stored_integrity", pause_after_read)
     pending = asyncio.create_task(
         client.post(
             f"/api/v1/clerk/documents/{did}/publication",

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import get_current_user_id
+from app.api.auth import get_current_user_id, lock_current_user
 from app.database import get_db
 from app.models.filing import FilingStatus
 from app.schemas.filing import (
@@ -71,6 +71,7 @@ async def review_filing(
         )
 
     # Look up filing to check court authorization
+    await lock_current_user(db, user_id)
     filing_check = await filing_service.get_filing(db, filing_id)
     if not filing_check:
         raise HTTPException(
@@ -87,7 +88,7 @@ async def review_filing(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Court CMS rejected the filing: {exc.detail}",
         ) from exc
-    except filing_service.FilingDateUnavailableError as exc:
+    except (filing_service.FilingDateUnavailableError, filing_service.FilingDocumentError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not filing:
         raise HTTPException(
@@ -141,8 +142,10 @@ async def batch_review_filings(
             ),
         )
 
+    await lock_current_user(db, user_id)
     results: dict[str, list[int]] = {"succeeded": [], "failed": []}
-    for fid in dict.fromkeys(data.filing_ids):
+    # Different reviewers must acquire envelope locks in the same order.
+    for fid in sorted(set(data.filing_ids)):
         try:
             # One failure must roll back that filing's case, receipt, and notices,
             # without poisoning the transaction for the rest of the batch.

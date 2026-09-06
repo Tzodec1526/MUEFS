@@ -22,8 +22,11 @@ correction history and PostgreSQL concurrency checks now form part of the core w
 - **Malware scanning defaults to the built-in heuristic.** Real signature-based scanning
   requires enabling the optional ClamAV backend.
 - **Document validation is advisory.** MCR 1.109 checks (text-searchability, PII) produce
-  warnings, not hard blocks, and PII detection is heuristic (regex), not exhaustive. Deeper
-  processing (server-side OCR / PDF-A conversion) is not implemented.
+  warnings, and PII detection samples at most five pages using heuristics. Those upload
+  results are retained and reused; legacy documents without results carry an explicit
+  review warning. PDF uploads must be readable, and submission/acceptance block when stored
+  bytes fail hash/size verification. Deeper processing (server-side OCR / PDF-A conversion)
+  is not implemented, and storage retention/recovery still requires operational validation.
 - **Demo persistence is lightweight.** `run_demo.py` and the hosted demo use SQLite + local
   file storage; production uses PostgreSQL + MinIO/S3.
 - **Electronic service is not implemented.** An opt-in SMTP outbox sends generic filing

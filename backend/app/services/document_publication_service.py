@@ -88,10 +88,10 @@ async def publish_copy(
     if not copy:
         raise HTTPException(404, "Public copy not found for this document")
     try:
-        digest = await run_in_threadpool(document_service.stored_sha256, copy.file_key)
+        digest, size = await run_in_threadpool(document_service.stored_integrity, copy.file_key)
     except OSError as exc:
         raise HTTPException(409, "The prepared copy is unavailable. Prepare it again") from exc
-    if digest != copy.sha256_hash:
+    if digest != copy.sha256_hash or size != copy.file_size_bytes:
         raise HTTPException(409, "The prepared copy failed its integrity check. Prepare it again")
     doc, filing = await document_context(db, actor, document_id, for_update=True)
     if blocked := publication_block(doc, filing):

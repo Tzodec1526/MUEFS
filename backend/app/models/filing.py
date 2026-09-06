@@ -93,6 +93,7 @@ class FilingDocument(Base):
     sha256_hash: Mapped[str] = mapped_column(String(64))
     is_confidential: Mapped[bool] = mapped_column(default=False)
     is_text_searchable: Mapped[bool] = mapped_column(default=False)
+    pii_warnings: Mapped[list[str] | None] = mapped_column(JSON)
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

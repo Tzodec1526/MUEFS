@@ -154,6 +154,7 @@ def test_unversioned_demo_upgrade_preserves_filings(tmp_path):
         prepare_demo_schema(engine)  # A second boot must not reapply or duplicate anything.
         with engine.connect() as conn:
             assert conn.scalar(text("SELECT file_key FROM filing_documents")) == "keep-me"
+            assert conn.scalar(text("SELECT pii_warnings FROM filing_documents")) is None
             assert conn.scalar(text("SELECT retained_at FROM filing_documents")) is not None
             assert conn.scalar(text("SELECT is_confidential FROM filing_documents")) == 1
             assert conn.scalar(text("SELECT count(*) FROM filing_transactions")) == 0

@@ -25,7 +25,7 @@ def decision_pdf():
 
 
 @pytest_asyncio.fixture
-async def waiver_case(db_session, api_client, tmp_path, monkeypatch):
+async def waiver_case(db_session, api_client, tmp_path, monkeypatch, stored_document):
     monkeypatch.setattr(document_service, "_local_storage_path", lambda: tmp_path)
     court = Court(name="Waiver Court", county="Wayne", court_type=CourtType.CIRCUIT)
     other_court = Court(name="Other Court", county="Kent", court_type=CourtType.CIRCUIT)
@@ -75,17 +75,7 @@ async def waiver_case(db_session, api_client, tmp_path, monkeypatch):
     )
     db_session.add(filing)
     await db_session.flush()
-    db_session.add(
-        FilingDocument(
-            envelope_id=filing.id,
-            title="Complaint",
-            document_type_code="COMPLAINT",
-            file_key="complaint.txt",
-            mime_type="text/plain",
-            file_size_bytes=1,
-            sha256_hash="a" * 64,
-        )
-    )
+    db_session.add(stored_document(filing.id))
     await db_session.flush()
     api_client.headers["X-Demo-User-Id"] = str(users[0].id)
     return filing, users, case_type

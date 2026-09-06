@@ -11,13 +11,13 @@ from app.integrations.cms_adapter import CMSFilingResult
 from app.main import app
 from app.models.case import Case
 from app.models.court import CaseCategory, CaseType, Court, CourtType
-from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
+from app.models.filing import FilingEnvelope, FilingStatus
 from app.models.user import CourtRole, User, UserCourtRole, UserType
 from app.services import filing_service
 
 
 @pytest_asyncio.fixture
-async def cms_fail_app(monkeypatch):
+async def cms_fail_app(monkeypatch, stored_document):
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -59,11 +59,7 @@ async def cms_fail_app(monkeypatch):
         )
         s.add(env)
         await s.flush()
-        s.add(FilingDocument(
-            envelope_id=env.id, document_type_code="COMPLAINT", title="Complaint",
-            file_key="k", file_size_bytes=1, mime_type="application/pdf",
-            sha256_hash="0" * 64, is_text_searchable=True,
-        ))
+        s.add(stored_document(env.id))
         await s.flush()
         submitted = await filing_service.submit_filing(s, env.id)
         assert submitted is not None

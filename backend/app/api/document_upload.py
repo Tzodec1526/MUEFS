@@ -60,7 +60,7 @@ async def inspect_upload(
     inspection = document_service.PdfInspection()
     if content_type == "application/pdf":
         inspection = await run_in_threadpool(document_service.inspect_pdf, file_data)
-        if require_pdf and not inspection.page_count:
+        if not inspection.page_count:
             raise HTTPException(status_code=422, detail="The document must be a readable PDF")
     return file_data, content_type, sha256, inspection
 
@@ -95,6 +95,7 @@ async def store_document_upload(
             ),
             retained_at=datetime.now(UTC) if document_type_code == "FEE_WAIVER_ORDER" else None,
             is_text_searchable=inspection.is_text_searchable,
+            pii_warnings=inspection.pii_warnings,
         )
         db.add(doc)
         await db.flush()

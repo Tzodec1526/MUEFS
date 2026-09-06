@@ -4,6 +4,7 @@ Each test uses a uniquely named schema and drops only that schema on completion.
 """
 
 import asyncio
+import hashlib
 import os
 from pathlib import Path
 from uuid import uuid4
@@ -20,7 +21,7 @@ from app.models.filing import FilingDocument, FilingStatus
 from app.models.filing_transaction import FilingTransaction
 from app.models.notification import Notification
 from app.models.payment import Payment
-from app.services import filing_service
+from app.services import document_service, filing_service
 from tests.test_email_delivery import smtp_sink as smtp_sink
 from tests.test_fee_waivers import decision_pdf
 from tests.test_filing_history import filing_fixture
@@ -84,7 +85,7 @@ async def test_concurrent_waiver_and_post_denial_payment_commit_once(
 
 
 @pytest_asyncio.fixture
-async def postgres_sessions(request):
+async def postgres_sessions(request, stored_document):
     schema = f"filing_test_{uuid4().hex}"
     admin = create_async_engine(POSTGRES_URL)
     async with admin.begin() as conn:
@@ -121,15 +122,19 @@ async def postgres_sessions(request):
 async def prepare_filing(factory):
     async with factory.begin() as db:
         fid, filer, clerk, _other = await filing_fixture(db)
+        content = b"Synthetic complaint"
+        file_key = f"postgres-tests/{uuid4()}.txt"
+        document_service.upload_document(content, file_key, "text/plain")
         db.add(
             FilingDocument(
                 envelope_id=fid,
                 title="Complaint",
                 document_type_code="COMPLAINT",
-                file_key="test.txt",
+                file_key=file_key,
                 mime_type="text/plain",
-                file_size_bytes=1,
-                sha256_hash="a" * 64,
+                file_size_bytes=len(content),
+                sha256_hash=hashlib.sha256(content).hexdigest(),
+                pii_warnings=[],
             )
         )
     return fid, filer, clerk

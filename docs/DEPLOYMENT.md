@@ -223,7 +223,7 @@ digest in the production build pipeline; `render.yaml` is a demo deployment exam
 - [ ] Health checks and audit-log export wired up
 - [ ] `pip-audit`, `trivy fs .`, and `npm --prefix frontend audit --omit=dev` reviewed
 
-## 9. Reviewed public-copy rollout
+## 10. Reviewed public-copy rollout
 
 Run migration `f94c81e2b7d5` before enabling the new document access screen. It creates
 retained copy records and a versioned active-copy pointer without modifying original files,
@@ -247,3 +247,30 @@ crash or commit failure can leave an unreferenced private object. Reconcile thes
 under an approved retention procedure; never infer permission to delete a referenced copy.
 Preserve `private, no-store` on API responses through any proxy/CDN. Withdrawal controls
 subsequent downloads; files already downloaded cannot be recalled.
+
+## 11. Stored-file integrity and retained screening
+
+Run migration `a71b03d9e6f2` before this application version. It adds nullable upload PII
+warnings to document records. Existing documents keep `NULL`, meaning no screening result
+was retained; an empty list means the sampled upload check recorded no warnings. The
+migration does not reread files or invent historical scans, hashes or receipts. Automatic
+downgrade is refused because it would discard retained results.
+
+Submission and acceptance now stream each current attachment and compare both SHA-256 and
+actual byte count with its record. A missing file, storage error or mismatch returns HTTP
+409 and leaves the filing and transaction history unchanged. Rejection and return remain
+available. The clerk's review panel retains the document-specific error. A completed
+idempotent submission retry replays its existing result without another storage pass.
+
+Before rollout, reconcile referenced files against a restored copy of the database and
+object store. Investigate mismatches; do not update hashes merely to make verification
+pass. Restore retained files from approved backups. Draft files can be removed and uploaded
+again through the normal correction workflow. Older demo seeds with invented file keys
+require a fresh disposable demo database to obtain the new, marked sample PDFs; production
+and retained evaluation records must not be reset to solve storage failures.
+
+Measure the added storage-read cost with representative document sizes and the deployed
+object store. Advisory validation performs no document reads, while submission/acceptance
+read all current attachments in 64 KiB chunks off the event loop. Keep storage private,
+apply the court's retention/versioning policy and exercise recovery. A successful integrity
+check cannot prevent an out-of-band object replacement after the check.

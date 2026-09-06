@@ -17,7 +17,7 @@ from app.models.filing import FilingEnvelope
 from app.models.notification import DeliveryStatus, Notification, NotificationDeliveryEvent
 from app.models.user import User, UserType
 from app.services import email_delivery_service as delivery
-from app.services import filing_service
+from app.services.notification_service import notify_filing_status_change
 from tests.test_filing_history import filing_fixture
 
 
@@ -95,15 +95,17 @@ async def prepare_notice(db):
     user.verified_email = user.email
     filing = await db.get(FilingEnvelope, fid)
     filing.case_title = "Protected caption and financial information"
-    await filing_service.submit_filing(db, fid)
-    notice = await db.scalar(select(Notification))
+    notice = await notify_filing_status_change(
+        db, filer_id=filer, filing_id=fid, status="submitted",
+        court_name="Records Court", case_title=filing.case_title,
+    )
     return notice.id, fid, filer, clerk, other
 
 
 async def test_smtp_acceptance_retains_generic_message_and_attempts(mail_sessions, smtp_sink):
     async with mail_sessions.begin() as db:
         nid, _fid, _filer, _clerk, _other = await prepare_notice(db)
-    assert smtp_sink["messages"] == []  # A filing request queues; it never opens SMTP.
+    assert smtp_sink["messages"] == []  # Queuing a notice never opens SMTP.
     assert await delivery.deliver_next(mail_sessions)
     assert not await delivery.deliver_next(mail_sessions)
     async with mail_sessions() as db:

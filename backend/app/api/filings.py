@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
-from app.api.auth import get_current_user_id, require_user_may_manage_efilings
+from app.api.auth import get_current_user_id, lock_current_user, require_user_may_manage_efilings
 from app.api.document_upload import store_document_upload
 from app.database import get_db
 from app.models.court import Court
@@ -190,6 +190,7 @@ async def submit_filing(
 ):
     user_id = current_user.id
     # Ownership check
+    await require_user_may_manage_efilings(await lock_current_user(db, user_id))
     filing_check = await filing_service.get_filing(db, filing_id, for_update=True)
     if not filing_check:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
@@ -230,9 +231,12 @@ async def submit_filing(
             detail="Filing validation failed. " + " | ".join(error_parts),
         )
 
-    filing = await filing_service.submit_filing(
-        db, filing_id, idempotency_key=str(idempotency_key) if idempotency_key else None,
-    )
+    try:
+        filing = await filing_service.submit_filing(
+            db, filing_id, idempotency_key=str(idempotency_key) if idempotency_key else None,
+        )
+    except filing_service.FilingDocumentError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not filing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

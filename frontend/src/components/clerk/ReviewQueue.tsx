@@ -5,6 +5,7 @@ import { getDemoCourtName } from '../auth/LoginScreen';
 import LoadError from '../common/LoadError';
 import DocumentDownload from '../common/DocumentDownload';
 import { formatBytes, getDocumentLabel, parseServerDate } from '../../utils/format';
+import { getErrorDetail } from '../../utils/errors';
 
 function ReviewQueue() {
   const clerkCourtId = parseInt(localStorage.getItem('demo_court_id') || '3', 10);
@@ -80,7 +81,7 @@ function ReviewQueue() {
       setReviewReason('');
       await fetchQueue();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Review failed';
+      const msg = getErrorDetail(err) || (err instanceof Error ? err.message : 'Review failed');
       setReviewError(`Failed to ${action} filing #${filingId}: ${msg}`);
     } finally {
       setActionInProgress(false);
