@@ -107,7 +107,8 @@ async def test_returned_filing_can_be_corrected_and_resubmitted(filing_client, d
     await db_session.flush()
     original_id = envelope.id
     updated = await client.patch(f"/api/v1/filings/{original_id}",
-                                 json={"filing_description": "Corrected description"})
+                                 json={"expected_details_token": envelope.details_token,
+                                       "filing_description": "Corrected description"})
     assert updated.status_code == 200, updated.text
     uploaded = await client.post(
         f"/api/v1/filings/{original_id}/documents",
@@ -130,6 +131,7 @@ async def test_returned_filing_can_be_corrected_and_resubmitted(filing_client, d
     second_submit = await client.post(f"/api/v1/filings/{original_id}/submit")
     assert second_submit.status_code == 400
     edit_submitted = await client.patch(
-        f"/api/v1/filings/{original_id}", json={"case_title": "Edit"}
+        f"/api/v1/filings/{original_id}",
+        json={"expected_details_token": envelope.details_token, "case_title": "Edit"},
     )
     assert edit_submitted.status_code == 400

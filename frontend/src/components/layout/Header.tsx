@@ -1,3 +1,4 @@
+import { clearFilingDrafts } from '../../utils/filingDraft';
 import { useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { isDemoBuild } from '../../config/demoMode';
@@ -12,6 +13,7 @@ function Header() {
   const { court, role } = useContext(CourtContext)!;
 
   const handleSwitchRole = () => {
+    clearFilingDrafts();
     localStorage.removeItem('demo_role');
     localStorage.removeItem('demo_user_name');
     localStorage.removeItem('demo_court_id');

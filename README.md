@@ -23,7 +23,7 @@ Live demo: https://webmcp.tomcedoz.com/agent · https://demo.tomcedoz.com · Age
 | **File from case docket** | Existing-case filing supported | Pre-filled from case detail |
 | **Case favorites** | Not available | Star cases, quick access |
 | **Service-only records** | Varies; often separate workflow | Retained documents and opt-in delivery to reviewed recipients; other service methods remain external |
-| **Draft autosave** | Vendor-dependent | Browser draft recovery |
+| **Draft editing** | Vendor-dependent | Save to account, recover edits within a tab, and compare conflicting versions |
 | **Clerk review tools** | Queue tools vary by court | Batch accept, age badges, quick reject reasons |
 | **Case participants and access** | Court-dependent | Assigned staff record roles, explicit access grants and retained changes |
 | **Reviewed public copies** | Court-dependent | Prepare, inspect, publish and withdraw a separate PDF; retain the filed original |
@@ -112,7 +112,7 @@ MUEFS/
 - **Companion document alerts** — system tells you when a motion requires a brief (MCR 2.119), meet-and-confer certification (MCR 2.313), or proposed order
 - **One-click motion filing** — open a case, click "File with Court", and court/case/type are pre-filled
 - **Case favorites** — star cases for quick access across sessions
-- **Auto-save drafts** — never lose work in progress
+- **Draft saves and recovery** — save work to your account, recover unsaved edits in the same tab, and compare conflicting changes before replacing saved details
 - **Pre-submission validation** — catch errors before clerk review
 - **Submission receipts and correction history** — timestamped document manifests,
   retained earlier versions, clerk decisions and downloadable receipts

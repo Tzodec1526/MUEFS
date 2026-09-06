@@ -3902,3 +3902,8 @@ textarea:focus-visible {
 @media (max-width: 720px) {
   .document-publication-page .publication-grid { grid-template-columns: 1fr; gap: 0; }
 }
+
+.draft-comparison { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 1rem; margin-block: 1rem; }
+.draft-comparison > div { min-width: 0; overflow-wrap: anywhere; }
+.draft-comparison p { white-space: pre-wrap; }
+.draft-conflict .draft-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }

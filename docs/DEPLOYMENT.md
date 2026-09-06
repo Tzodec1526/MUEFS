@@ -14,6 +14,13 @@ External clients must retain the submission number the reviewer saw and require 
 review after HTTP 409; retrying with a newly fetched number without review is unsafe.
 See the [review request contract](STATE_READINESS.md#implemented-receipt-workflow).
 
+Deploy the draft editor and API together as well. Changing a filing's title or description
+now requires `expected_details_token` from the detail response's `details_token`.
+Older detail-edit requests without this precondition receive HTTP 422; a conflicting
+version receives 409 and requires comparison before another save. This change needs no
+database migration. See [draft editing and recovery](STATE_READINESS.md#draft-editing-and-recovery)
+for recovery scope and legacy browser entries.
+
 Filing list responses now contain summaries with `document_count`, rather than full
 envelopes and attachment arrays. This applies to `GET /api/v1/filings` and
 `GET /api/v1/clerk/queue`, including pending waivers. Deploy their clients and API together;

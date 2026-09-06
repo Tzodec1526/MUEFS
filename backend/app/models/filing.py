@@ -1,4 +1,6 @@
 import enum
+import hashlib
+import json
 from datetime import date, datetime
 
 from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
@@ -28,6 +30,15 @@ class FilingType(enum.StrEnum):
 
 class FilingEnvelope(Base):
     __tablename__ = "filing_envelopes"
+
+    @property
+    def details_token(self) -> str:
+        """Identify the editable details and submission the filer actually opened."""
+        values = [
+            self.id, self.status, self.submission_count,
+            self.case_title, self.filing_description,
+        ]
+        return hashlib.sha256(json.dumps(values, ensure_ascii=False).encode("utf-8")).hexdigest()
 
     id: Mapped[int] = mapped_column(primary_key=True)
     court_id: Mapped[int] = mapped_column(ForeignKey("courts.id"), index=True)

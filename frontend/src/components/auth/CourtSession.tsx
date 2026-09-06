@@ -8,6 +8,7 @@ import {
 } from './LoginScreen';
 
 interface CourtSessionState {
+  userId?: number;
   role: string | null;
   courts: CourtAssignment[];
   court: CourtAssignment | undefined;
@@ -23,7 +24,7 @@ export function CourtSession({ children }: { children: ReactNode }) {
   const signedIn = hasSession();
   const [attempt, setAttempt] = useState(0);
   const [selectedId, setSelectedId] = useState(getDemoCourtId);
-  const [result, setResult] = useState<{ attempt: number; courts: CourtAssignment[]; error?: string }>();
+  const [result, setResult] = useState<{ attempt: number; userId?: number; courts: CourtAssignment[]; error?: string }>();
   const current = result?.attempt === attempt ? result : undefined;
   const courts = signedIn ? current?.courts ?? [] : [];
   const court = courts.find(item => item.court_id === selectedId) ?? courts[0];
@@ -31,11 +32,11 @@ export function CourtSession({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!signedIn) return;
     const controller = new AbortController();
-    apiClient.get<SessionProfile>('/auth/me', { signal: controller.signal }).then(({ data }) => {
+    apiClient.get<SessionProfile & { id: number }>('/auth/me', { signal: controller.signal }).then(({ data }) => {
       if (controller.signal.aborted) return;
       const courts = applySessionFromProfile(data);
       setSelectedId(getDemoCourtId());
-      setResult({ attempt, courts });
+      setResult({ attempt, userId: data.id, courts });
     }).catch(err => {
       if (!controller.signal.aborted) setResult({ attempt, courts: [], error: getErrorDetail(err) || 'Could not verify court assignments.' });
     });
@@ -49,7 +50,7 @@ export function CourtSession({ children }: { children: ReactNode }) {
     notifyDemoRoleChanged();
   }
 
-  return <CourtContext.Provider value={{ role: getDemoRole(), courts, court, loading: signedIn && !current,
+  return <CourtContext.Provider value={{ userId: signedIn ? current?.userId : undefined, role: getDemoRole(), courts, court, loading: signedIn && !current,
     error: current?.error, selectCourt, refresh: () => setAttempt(n => n + 1) }}>
     {children}
   </CourtContext.Provider>;

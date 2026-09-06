@@ -10,6 +10,7 @@ establish state approval or production readiness.
 | Requirement | Current evidence | Remaining work |
 |---|---|---|
 | Prove what was submitted | Each new submission has a retained transaction ID, UTC receipt time, filer name, document manifest and SHA-256 fingerprints, payment reference where present, and a downloadable receipt. A read-only recovery audit compares stored bytes and retained transaction references. | Court-approved retention schedules, trusted time monitoring, external archival controls and validation of the deployed storage/recovery configuration. |
+| Preserve draft work | Account saves, filing-specific recovery within a verified account/tab, explicit conflict comparison and cross-tab identity invalidation are implemented. PostgreSQL concurrent saves preserve the winning version. | Broader offline/device testing, reconciliation after an unconfirmed initial draft creation, and assistive-technology evaluation. |
 | Preserve corrections and decisions | Corrections create another numbered submission. Earlier document bytes remain downloadable by the filer and court staff. Acceptance, return, rejection, CMS failure and signed filing-date orders are separate retained events. | Court procedures for deciding relief, certified/file-stamped copies and court-approved retention. |
 | Route filings to the correct court and case | Creation and submission validate the filing kind, court, case type, existing case and current filer access. Intake flags are enforced by the API. Acceptance checks legacy routing before a CMS call; valid received work remains reviewable after intake closes. | Court procedures for changing intake configuration, reconciling legacy assignments and correcting a filing's destination without losing its retained evidence. |
 | Survive retries and simultaneous actions | Database commits finish before HTTP success responses. Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Review decisions identify the numbered submission the reviewer saw; an intervening resubmission invalidates that decision. Batch review uses a savepoint per filing and reports each failed item. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
@@ -26,6 +27,50 @@ establish state approval or production readiness.
 | Find public records across courts | Anonymous search filters by court and identifies each result's court and county. Shared links preserve filters and pages; courts with closed intake remain searchable. PostgreSQL substring indexes and batched court metadata improve selective searches while excluding sealed cases and participant contact fields. | Representative concurrency, data-distribution and write-load testing; independent accessibility evaluation and court-approved public-index policy. |
 | Transfer a case's retained records | A private case archive includes linked metadata, transaction history, original versions, orders, public copies, payments and notice evidence. A read-only snapshot and file fingerprints protect export consistency; offline verification detects altered or incomplete packages. | Court-controlled custody/signing, source inventory reconciliation, receiving-system mapping, approved retention and an evaluated import/restore procedure. |
 | Serve the whole public | Responsive filing and history pages, keyboard controls and guided filing exist. | Independent accessibility testing, assistive-technology testing, language access, paper-filing accommodations and usability evaluation with self-represented filers. |
+
+## Draft editing and recovery
+
+On the details step, **Save draft** saves the title and description to the filer's account.
+**Continue** also saves before advancing. New saves acquire a filing ID; later saves use
+that same filing. **My Filings → Continue Filing** resumes the account's saved record,
+including from a browser with no local recovery data.
+
+An envelope response includes `details_token`. A `PATCH /api/v1/filings/{id}` that changes
+`case_title` or `filing_description` must supply its opened version as
+`expected_details_token`. Missing/malformed preconditions return 422. The API compares
+the token under the filing's existing row lock and returns 409 when the saved details,
+status or numbered submission changed. The token is derived from those values, so no
+schema migration or separate version counter is needed. Unrelated fee changes leave it
+valid; document, fee and submission operations retain their separate checks.
+
+On conflict, the interface preserves the entered text, shows it beside the saved version
+and moves keyboard focus to the comparison. The filer chooses the saved details or keeps
+their edits for a subsequent explicit save. Reloading preserves an unresolved comparison.
+Once a filing has been submitted, recovered text stays available for copying and history
+remains accessible; it cannot be saved into that received filing.
+
+Recovery uses versioned `sessionStorage` entries for each verified account and filing.
+It stores form fields and their original details token, omitting document lists and
+payment state. Different tabs have independent recovery storage. Account changes in
+another tab invalidate the old screens and reverify the identity; signing out clears
+the current tab's recovery entries. A legacy browser entry associated with a saved filing
+is offered only after the server verifies ownership, and its unknown base requires
+comparison. Unscoped entries without a verifiable saved filing are left unadopted.
+
+Recovery is limited to the browser's tab session. Save to the account before closing
+the tab or switching devices. The interface warns about unsaved changes and storage
+refusal; browser recovery cannot guarantee survival of crashes, cleared data or closed
+sessions. Failed saves retain the form text. If the first creation response is lost,
+check My Filings before creating another draft; creation has no idempotency key.
+
+Verification reproduced a stale tab overwriting a newer save before the fix, and a live
+tab retaining the previous account's editor after a cross-tab identity change. API tests
+now cover required preconditions, PostgreSQL simultaneous saves, fee independence and new
+submission cycles. Rendered checks exercised new creation, separate filing recovery,
+offline failures, storage refusal, legacy recovery, desktop/mobile comparison and account
+switching. In a synthetic 24-document filing, the recovery payload decreased from 2,327
+to 374 bytes (about 84%); this is a storage/serialization measurement, not a typing-latency
+or statewide load benchmark.
 
 ## Court service instructions
 

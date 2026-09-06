@@ -131,6 +131,15 @@ async def update_filing(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
     if filing.filer_id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your filing")
+    if (
+        data.expected_details_token is not None
+        and data.expected_details_token != filing.details_token
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="This filing changed after you opened it. Compare the saved details "
+            "with your edits before saving again.",
+        )
     if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

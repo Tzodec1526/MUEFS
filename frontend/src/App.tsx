@@ -201,6 +201,17 @@ function NotFound() {
 
 function App() {
   const location = useLocation();
+  const [sessionEpoch, setSessionEpoch] = useState(0);
+  useEffect(() => {
+    const sessionChanged = (event: StorageEvent) => {
+      if (event.storageArea !== localStorage) return;
+      if (event.key === null || (event.oldValue !== event.newValue && (
+        event.key === 'auth_token' || (event.key === 'demo_role' && !localStorage.getItem('auth_token'))
+      ))) setSessionEpoch(value => value + 1);
+    };
+    window.addEventListener('storage', sessionChanged);
+    return () => window.removeEventListener('storage', sessionChanged);
+  }, []);
   return (
     <Suspense fallback={<p className="loading" role="status">Loading page...</p>}>
       <Routes>
@@ -212,7 +223,7 @@ function App() {
           path="*"
           element={
             <RequireRole>
-              <CourtSession>
+              <CourtSession key={sessionEpoch}>
               <div className="app-layout">
                 <a className="skip-link" href="#main-content">Skip to main content</a>
                 <Header />

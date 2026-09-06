@@ -14,6 +14,7 @@ export interface FilingDocument {
 }
 
 export interface FilingEnvelope {
+  details_token: string;
   id: number;
   court_id: number;
   case_id: number | null;
@@ -95,6 +96,7 @@ export async function getFiling(filingId: number, signal?: AbortSignal): Promise
 export async function updateFiling(
   filingId: number,
   patch: {
+    expected_details_token?: string;
     case_title?: string;
     filing_description?: string;
     fee_waiver_requested?: boolean;

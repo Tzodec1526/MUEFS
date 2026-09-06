@@ -47,13 +47,23 @@ class FilingEnvelopeCreate(BaseModel):
 
 
 class FilingEnvelopeUpdate(BaseModel):
+    expected_details_token: str | None = Field(None, pattern=r"^[0-9a-f]{64}$")
     case_title: str | None = Field(None, max_length=500)
     filing_description: str | None = Field(None, max_length=5000)
     fee_waiver_requested: bool | None = None
     fee_waiver_reason: str | None = Field(None, max_length=2000)
 
+    @model_validator(mode="after")
+    def require_details_token(self) -> Self:
+        if (
+            self.case_title is not None or self.filing_description is not None
+        ) and not self.expected_details_token:
+            raise ValueError("Load the filing's current details before editing them")
+        return self
+
 
 class FilingEnvelopeResponse(BaseModel):
+    details_token: str
     id: int
     court_id: int
     case_id: int | None

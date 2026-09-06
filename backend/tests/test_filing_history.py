@@ -121,7 +121,11 @@ async def test_receipts_keep_original_documents_through_correction(
     assert (
         await api_client.get(f"/api/v1/documents/{original}/download")
     ).content == b"Original complaint"
-    await api_client.patch(f"/api/v1/filings/{fid}", json={"case_title": "Corrected title"})
+    draft = (await api_client.get(f"/api/v1/filings/{fid}")).json()
+    corrected_details = await api_client.patch(f"/api/v1/filings/{fid}", json={
+        "expected_details_token": draft["details_token"], "case_title": "Corrected title",
+    })
+    assert corrected_details.status_code == 200, corrected_details.text
     corrected = await upload(api_client, fid, b"Corrected complaint")
     submitted = await api_client.post(
         f"/api/v1/filings/{fid}/submit", headers={"Idempotency-Key": str(uuid4())}
