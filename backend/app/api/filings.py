@@ -1,3 +1,5 @@
+import hashlib
+import json
 import uuid
 from datetime import UTC, datetime
 
@@ -14,7 +16,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -22,10 +24,16 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import JSONResponse
 
 from app.api.auth import get_current_user_id, lock_current_user, require_user_may_manage_efilings
-from app.api.document_upload import store_document_upload
+from app.api.document_upload import read_upload, store_document_upload
 from app.database import get_db
 from app.models.court import Court
-from app.models.filing import COURT_DOCUMENT_TYPES, FilingEnvelope, FilingStatus
+from app.models.filing import (
+    COURT_DOCUMENT_TYPES,
+    DocumentUploadRequest,
+    FilingDocument,
+    FilingEnvelope,
+    FilingStatus,
+)
 from app.models.filing_transaction import FilingTransaction
 from app.models.user import User
 from app.schemas.document import DocumentUploadResponse
@@ -321,6 +329,7 @@ async def submit_filing(
 async def upload_document(
     request: Request,
     filing_id: int,
+    idempotency_key: uuid.UUID = Header(alias="Idempotency-Key"),
     file: UploadFile = File(...),
     document_type_code: str = Form(...),
     title: str = Form(...),
@@ -334,34 +343,58 @@ async def upload_document(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
     if filing.filer_id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your filing")
-    if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot upload documents to this filing",
-        )
 
-    if document_type_code in COURT_DOCUMENT_TYPES:
-        raise HTTPException(
-            status_code=403, detail="Court decisions must be recorded by authorized court staff",
+    def fingerprint(sha256: str, size: int) -> str:
+        fields = [document_type_code, title, is_confidential,
+                  file.filename, file.content_type, size, sha256]
+        return hashlib.sha256(json.dumps(fields, separators=(",", ":")).encode()).hexdigest()
+
+    key = str(idempotency_key)
+    recorded = await db.get(DocumentUploadRequest, (filing_id, key))
+    if recorded:
+        content = await read_upload(file)
+        digest = (await run_in_threadpool(hashlib.sha256, content)).hexdigest()
+        if recorded.fingerprint != fingerprint(digest, len(content)):
+            raise HTTPException(status_code=409, detail=(
+                "This upload request key was already used for a different document. "
+                "Review the saved filing before starting another upload."
+            ))
+        doc = await db.get(FilingDocument, recorded.document_id) if recorded.document_id else None
+        if doc is None or doc.removed_at is not None:
+            raise HTTPException(status_code=409, detail=(
+                "This document was already uploaded and later removed. "
+                "Review the saved filing before starting another upload."
+            ))
+    else:
+        if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
+            raise HTTPException(status_code=400, detail="Cannot upload documents to this filing")
+        if document_type_code in COURT_DOCUMENT_TYPES:
+            raise HTTPException(
+                status_code=403,
+                detail="Court decisions must be recorded by authorized court staff",
+            )
+        doc = await store_document_upload(
+            db, filing_id, file, document_type_code, title, is_confidential,
         )
-    doc, pii_warnings = await store_document_upload(
-        db, filing_id, file, document_type_code, title, is_confidential,
-    )
-    try:
-        filing.fee_version += 1
-        await audit_service.log_action(
-            db, user_id=user_id, action="upload_document", entity_type="filing_document",
-            entity_id=doc.id, details={"filing_id": filing_id, "filename": file.filename},
-            ip_address=client_ip(request), user_agent=client_user_agent(request),
-        )
-    except Exception:
-        await run_in_threadpool(document_service.delete_document, doc.file_key)
-        raise
+        try:
+            db.add(DocumentUploadRequest(
+                envelope_id=filing_id, key=key, document_id=doc.id,
+                fingerprint=fingerprint(doc.sha256_hash, doc.file_size_bytes),
+            ))
+            filing.fee_version += 1
+            await audit_service.log_action(
+                db, user_id=user_id, action="upload_document", entity_type="filing_document",
+                entity_id=doc.id, details={"filing_id": filing_id, "filename": file.filename},
+                ip_address=client_ip(request), user_agent=client_user_agent(request),
+            )
+        except Exception:
+            await run_in_threadpool(document_service.delete_document, doc.file_key)
+            raise
     return DocumentUploadResponse(
         id=doc.id, title=doc.title, file_size_bytes=doc.file_size_bytes,
         mime_type=doc.mime_type, sha256_hash=doc.sha256_hash,
         is_text_searchable=doc.is_text_searchable, page_count=doc.page_count,
-        warnings=pii_warnings,
+        warnings=doc.pii_warnings or [],
     )
 
 
@@ -398,6 +431,10 @@ async def remove_document(
         doc.removed_at = datetime.now(UTC)
         await db.flush()
     else:
+        # SQLite demo connections do not enforce ON DELETE, and may reuse this document ID.
+        await db.execute(update(DocumentUploadRequest).where(
+            DocumentUploadRequest.document_id == doc.id,
+        ).values(document_id=None))
         file_key = doc.file_key
         await db.delete(doc)
         await db.flush()

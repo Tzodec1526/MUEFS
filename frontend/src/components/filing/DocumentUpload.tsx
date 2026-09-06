@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { uploadDocument, removeDocument } from '../../api/filings';
+import { getFiling, uploadDocument, removeDocument } from '../../api/filings';
 import { getFilingChecklists, FilingChecklist } from '../../api/courts';
 import { getErrorDetail } from '../../utils/errors';
 import { formatBytes } from '../../utils/format';
@@ -18,6 +18,7 @@ interface Props {
   caseTypeId: number;
   documents: DocumentInfo[];
   onDocumentsChange: (docs: DocumentInfo[]) => void;
+  onBusyChange: (busy: boolean) => void;
   motionSubtype?: string | null;  // for dynamic companion pre-fill in civil motion filings
 }
 
@@ -340,9 +341,12 @@ function DocumentUpload({
   caseTypeId: _caseTypeId,
   documents,
   onDocumentsChange,
+  onBusyChange,
   motionSubtype,
 }: Props) {
-  const [uploading, setUploading] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'upload' | 'remove' | null>(null);
+  const busy = pendingAction !== null;
+  const uploadRequest = useRef<{ file: File; metadata: string; key: string }>();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [docType, setDocType] = useState('');
   const [docTitle, setDocTitle] = useState('');
@@ -365,6 +369,14 @@ function DocumentUpload({
     }
   };
 
+  const refreshDocuments = async () => {
+    const saved = await getFiling(filingId);
+    onDocumentsChange(saved.documents.map(doc => ({
+      id: doc.id, title: doc.title, type: doc.document_type_code,
+      size: doc.file_size_bytes, isSearchable: doc.is_text_searchable,
+    })));
+  };
+
   const handleUpload = async () => {
     const file = fileInputRef.current?.files?.[0];
     if (!file) {
@@ -380,22 +392,21 @@ function DocumentUpload({
       return;
     }
 
-    setUploading(true);
+    const metadata = JSON.stringify([filingId, docType, docTitle, isConfidential]);
+    if (uploadRequest.current?.file !== file || uploadRequest.current.metadata !== metadata) {
+      uploadRequest.current = { file, metadata, key: crypto.randomUUID() };
+    }
+    setPendingAction('upload');
+    onBusyChange(true);
     setError(null);
     setWarnings([]);
 
     try {
-      const result = await uploadDocument(filingId, file, docType, docTitle, isConfidential);
-      onDocumentsChange([
-        ...documents,
-        {
-          id: result.id,
-          title: result.title,
-          type: docType,
-          size: result.file_size_bytes,
-          isSearchable: result.is_text_searchable ?? false,
-        },
-      ]);
+      const result = await uploadDocument(
+        filingId, file, docType, docTitle, uploadRequest.current.key, isConfidential,
+      );
+      await refreshDocuments();
+      uploadRequest.current = undefined;
       setWarnings(result.warnings ?? []);
       setDocTitle('');
       setDocType('');
@@ -404,19 +415,26 @@ function DocumentUpload({
     } catch (err: unknown) {
       // Surface the backend detail (e.g. malware 422 "Rejected: ...", unsupported-type 415).
       const detail = getErrorDetail(err);
-      const message = detail || (err instanceof Error ? err.message : 'Upload failed');
+      const message = detail || 'Could not confirm the upload. Retry with the same file, or refresh this filing to check its saved documents.';
       setError(message);
     } finally {
-      setUploading(false);
+      setPendingAction(null);
+      onBusyChange(false);
     }
   };
 
   const handleRemove = async (docId: number) => {
+    setPendingAction('remove');
+    onBusyChange(true);
+    setError(null);
     try {
       await removeDocument(filingId, docId);
-      onDocumentsChange(documents.filter((d) => d.id !== docId));
-    } catch {
-      setError('Failed to remove document');
+      await refreshDocuments();
+    } catch (err) {
+      setError(getErrorDetail(err) || 'Could not confirm removal. Refresh the filing before retrying.');
+    } finally {
+      setPendingAction(null);
+      onBusyChange(false);
     }
   };
 
@@ -463,7 +481,7 @@ function DocumentUpload({
         All PDFs must be text-searchable per MCR 1.109. Maximum file size: 100MB.
       </p>
 
-      {error && <div className="alert alert-error">{error}</div>}
+      {error && <div className="alert alert-error" role="alert">{error}</div>}
 
       {warnings.length > 0 && (
         <div className="alert alert-warning" role="status">
@@ -481,6 +499,7 @@ function DocumentUpload({
             <label htmlFor="docCategory">Category</label>
             <select
               id="docCategory"
+              disabled={busy}
               value={selectedCategory}
               onChange={(e) => { setSelectedCategory(e.target.value); setDocType(''); }}
             >
@@ -496,6 +515,7 @@ function DocumentUpload({
             </label>
             <select
               id="docType"
+              disabled={busy}
               value={docType}
               onChange={(e) => handleDocTypeChange(e.target.value)}
             >
@@ -533,6 +553,7 @@ function DocumentUpload({
           </label>
           <input
             id="docTitle"
+              disabled={busy}
             type="text"
             value={docTitle}
             onChange={(e) => setDocTitle(e.target.value)}
@@ -545,6 +566,7 @@ function DocumentUpload({
           </label>
           <input
             id="docFile"
+              disabled={busy}
             type="file"
             ref={fileInputRef}
             accept=".pdf,.doc,.docx,.txt,.rtf,.tiff,.tif,.jpg,.jpeg,.png"
@@ -556,7 +578,7 @@ function DocumentUpload({
             <input
               type="checkbox"
               checked={docType === 'FEE_WAIVER' || isConfidential}
-              disabled={docType === 'FEE_WAIVER'}
+              disabled={busy || docType === 'FEE_WAIVER'}
               onChange={(e) => setIsConfidential(e.target.checked)}
             />
             {docType === 'FEE_WAIVER' ? 'Fee waiver request — nonpublic' : 'Mark as confidential (not public)'}
@@ -565,9 +587,9 @@ function DocumentUpload({
         <button
           className="btn btn-primary"
           onClick={handleUpload}
-          disabled={uploading || !docType}
+          disabled={busy || !docType}
         >
-          {uploading ? 'Uploading...' : 'Upload Document'}
+          {pendingAction === 'upload' ? 'Uploading...' : 'Upload Document'}
         </button>
       </div>
 
@@ -595,7 +617,7 @@ function DocumentUpload({
                     // focus file input
                     setTimeout(() => fileInputRef.current?.focus(), 0);
                   }}
-                  disabled={uploading}
+                  disabled={busy}
                 >
                   + {item.label} {item.required ? '(required)' : ''}
                 </button>
@@ -638,6 +660,7 @@ function DocumentUpload({
                     <button
                       className="btn btn-small btn-danger"
                       onClick={() => handleRemove(doc.id)}
+                      disabled={busy}
                     >
                       Remove
                     </button>

@@ -1,5 +1,7 @@
 """Court assessments, retained evidence, and balances exercised through the HTTP workflow."""
 
+from uuid import uuid4
+
 import pytest
 import pytest_asyncio
 from sqlalchemy import func, select
@@ -190,6 +192,7 @@ async def test_changed_documents_require_reassessment_and_credit_prior_payments(
     assert (await api_client.delete(f"/api/v1/filings/{fid}/documents/{doc.id}")).status_code == 204
     replacement = await api_client.post(
         f"/api/v1/filings/{fid}/documents",
+        headers={"Idempotency-Key": str(uuid4())},
         data={
             "title": "Corrected complaint",
             "document_type_code": "COMPLAINT",

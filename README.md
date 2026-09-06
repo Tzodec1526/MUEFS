@@ -210,6 +210,9 @@ for the full security model, threat boundaries, and hardening guide.
 **Security**
 - **Sealed case access** — requires an explicit participant grant or authorized court/system role. Counsel grants require a linked account and matching verified bar number. Individually restricted originals remain available only to the filer and assigned court staff.
 - **Reviewed public copies** — staff inspect a separate PDF and approved title before publishing. Publication restricts the original; withdrawal removes the active copy without restoring the original. The court supplies redactions and authority; automated scanning does not certify a safe release.
+- **Upload recovery** — document and waiver uploads retain request keys so a lost response
+  can be retried without duplicate documents, repeated screening or another fee revision.
+  Changed requests and retries after removal return a conflict.
 - **Upload malware screening** — every upload is screened (built-in executable/EICAR heuristic, optional ClamAV) and rejected before storage.
 - **Retained upload screening** — sampled PDF text is checked for likely SSNs, dates of
   birth and account numbers. Validation reuses those warnings; it does not certify redaction.

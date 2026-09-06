@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import threading
 from datetime import UTC, datetime
+from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -50,12 +51,12 @@ async def test_upload_size_limit_and_stored_document_integrity(filing_client, db
     payload = b"a" * (1024 * 1024)
     url = f"/api/v1/filings/{envelope.id}/documents"
     fields = {"title": "Record", "document_type_code": "COMPLAINT"}
-    rejected = await client.post(url, data=fields,
+    rejected = await client.post(url, headers={"Idempotency-Key": str(uuid4())}, data=fields,
                                  files={"file": ("record.txt", payload + b"x", "text/plain")})
     assert rejected.status_code == 413
     assert not list(storage.rglob("*.txt"))
 
-    uploaded = await client.post(url, data=fields,
+    uploaded = await client.post(url, headers={"Idempotency-Key": str(uuid4())}, data=fields,
                                  files={"file": ("record.txt", payload, "text/plain")})
     assert uploaded.status_code == 200, uploaded.text
     document = uploaded.json()
@@ -85,6 +86,7 @@ async def test_pdf_processing_does_not_block_unrelated_requests(filing_client, m
     monkeypatch.setattr(document_service, "resolve_upload_mime_type", lambda *_: "application/pdf")
     upload = asyncio.create_task(client.post(
         f"/api/v1/filings/{envelope.id}/documents",
+        headers={"Idempotency-Key": str(uuid4())},
         data={"title": "Record", "document_type_code": "COMPLAINT"},
         files={"file": ("record.pdf", b"%PDF-1.7\n", "application/pdf")},
     ))
@@ -114,6 +116,7 @@ async def test_returned_filing_can_be_corrected_and_resubmitted(filing_client, d
     assert updated.status_code == 200, updated.text
     uploaded = await client.post(
         f"/api/v1/filings/{original_id}/documents",
+        headers={"Idempotency-Key": str(uuid4())},
         data={"title": "Corrected complaint", "document_type_code": "COMPLAINT"},
         files={"file": ("complaint.txt", b"Corrected complaint", "text/plain")},
     )

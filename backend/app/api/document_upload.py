@@ -15,10 +15,7 @@ from app.services import document_service
 from app.utils import malware_scan
 
 
-async def inspect_upload(
-    file: UploadFile,
-    *, require_pdf: bool = False,
-) -> tuple[bytes, str, str, document_service.PdfInspection]:
+async def read_upload(file: UploadFile) -> bytes:
     # Bound the read without retaining both a chunk list and a joined copy.
     max_bytes = settings.max_file_size_mb * 1024 * 1024
     file_data = await file.read(max_bytes + 1)
@@ -27,6 +24,15 @@ async def inspect_upload(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=f"File exceeds maximum size of {settings.max_file_size_mb}MB",
         )
+
+    return file_data
+
+
+async def inspect_upload(
+    file: UploadFile,
+    *, require_pdf: bool = False,
+) -> tuple[bytes, str, str, document_service.PdfInspection]:
+    file_data = await read_upload(file)
 
     # Validate MIME type from file content (never trust client Content-Type alone).
     try:
@@ -80,7 +86,7 @@ async def store_document_upload(
     document_type_code: str,
     title: str,
     is_confidential: bool = False,
-) -> tuple[FilingDocument, list[str]]:
+) -> FilingDocument:
     file_data, content_type, sha256, inspection = await inspect_upload(
         file, require_pdf=document_type_code == "FEE_WAIVER_ORDER",
     )
@@ -111,4 +117,4 @@ async def store_document_upload(
     except Exception:
         await run_in_threadpool(document_service.delete_document, file_key)
         raise
-    return doc, inspection.pii_warnings
+    return doc

@@ -777,6 +777,7 @@ function FilingForm({ userId }: { userId: number }) {
             caseTypeId={filingData.caseTypeId!}
             documents={filingData.documents}
             onDocumentsChange={(docs) => updateData({ documents: docs, paymentComplete: false })}
+            onBusyChange={setSaving}
             motionSubtype={filingData.motionSubtype}
           />
         )}

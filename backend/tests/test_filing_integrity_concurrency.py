@@ -2,6 +2,7 @@
 
 import asyncio
 import threading
+from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -210,6 +211,7 @@ async def test_slow_submission_does_not_block_same_filers_other_upload(
                 # would block its FK check until the unrelated submission ends.
                 uploaded = await asyncio.wait_for(client.post(
                     f"/api/v1/filings/{second_id}/documents",
+                    headers={"Idempotency-Key": str(uuid4())},
                     data={"title": "Complaint", "document_type_code": "COMPLAINT"},
                     files={"file": ("complaint.txt", b"Synthetic complaint", "text/plain")},
                 ), 5)

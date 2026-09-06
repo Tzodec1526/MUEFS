@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense, type FormEvent } from 'react';
+import { useState, useRef, useEffect, lazy, Suspense, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { getFilingFees, processPayment, type FilingFees } from '../../api/documents';
@@ -16,6 +16,7 @@ export default function PaymentForm({ filingId, onFeesChange }: {
   const [attempt, setAttempt] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('credit_card');
   const [waiverFile, setWaiverFile] = useState<File | null>(null);
+  const waiverUpload = useRef<{ filingId: number; file: File; key: string }>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -56,7 +57,12 @@ export default function PaymentForm({ filingId, onFeesChange }: {
       if (selectedMethod === 'waiver') {
         if (!filing.documents.some(doc => doc.document_type_code === 'FEE_WAIVER')) {
           if (!waiverFile) { setError('Attach the completed, signed Fee Waiver Request (MC 20).'); return; }
-          await uploadDocument(filingId, waiverFile, 'FEE_WAIVER', 'Fee Waiver Request (MC 20)', true);
+          if (waiverUpload.current?.file !== waiverFile || waiverUpload.current.filingId !== filingId) {
+            waiverUpload.current = { filingId, file: waiverFile, key: crypto.randomUUID() };
+          }
+          await uploadDocument(
+            filingId, waiverFile, 'FEE_WAIVER', 'Fee Waiver Request (MC 20)', waiverUpload.current.key, true,
+          );
         }
         await updateFiling(filingId, { fee_waiver_requested: true });
         setNotice('Fee waiver request attached. Submit the filing to send the application for court review.');

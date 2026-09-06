@@ -232,6 +232,7 @@ export async function uploadDocument(
   file: File,
   documentTypeCode: string,
   title: string,
+  uploadKey: string,
   isConfidential: boolean = false,
 ): Promise<DocumentUploadResult> {
   const formData = new FormData();
@@ -241,7 +242,7 @@ export async function uploadDocument(
   formData.append('is_confidential', String(isConfidential));
 
   const { data } = await apiClient.post(`/filings/${filingId}/documents`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    headers: { 'Content-Type': 'multipart/form-data', 'Idempotency-Key': uploadKey },
   });
   return data;
 }

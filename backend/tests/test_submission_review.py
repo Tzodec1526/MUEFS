@@ -32,6 +32,7 @@ async def test_changed_review_cannot_create_a_receipt(
     if change == "waiver":
         attached = await api_client.post(
             f"/api/v1/filings/{fid}/documents",
+            headers={"Idempotency-Key": str(uuid4())},
             files={"file": ("waiver.txt", b"Signed synthetic waiver request", "text/plain")},
             data={"title": "Waiver", "document_type_code": "FEE_WAIVER"},
         )

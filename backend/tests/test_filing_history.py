@@ -73,6 +73,7 @@ async def record_filing(db_session, api_client, monkeypatch):
 async def upload(client, fid, content):
     response = await client.post(
         f"/api/v1/filings/{fid}/documents",
+        headers={"Idempotency-Key": str(uuid4())},
         files={"file": ("filing.txt", content, "text/plain")},
         data={"title": "Complaint", "document_type_code": "COMPLAINT"},
     )
@@ -369,6 +370,7 @@ async def test_fee_waiver_document_is_nonpublic_without_checkbox(
     fid = record_filing[0]
     response = await api_client.post(
         f"/api/v1/filings/{fid}/documents",
+        headers={"Idempotency-Key": str(uuid4())},
         files={"file": ("waiver.txt", b"Financial hardship", "text/plain")},
         data={
             "title": "Fee waiver request",

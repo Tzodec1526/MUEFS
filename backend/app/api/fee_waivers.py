@@ -69,7 +69,7 @@ async def decide_fee_waiver(
         event = "waiver_referred"
     else:
         assert file is not None
-        doc, _ = await store_document_upload(
+        doc = await store_document_upload(
             db,
             filing.id,
             file,

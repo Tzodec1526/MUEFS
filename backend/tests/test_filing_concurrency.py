@@ -323,7 +323,7 @@ async def test_document_upload_cannot_leave_a_concurrent_assessment_current(post
                     headers={"X-Demo-User-Id": str(clerk)},
                     json=assessment(first.json()["version"], 750)),
                 client.post(f"/api/v1/filings/{fid}/documents",
-                    headers={"X-Demo-User-Id": str(filer)},
+                    headers={"X-Demo-User-Id": str(filer), "Idempotency-Key": str(uuid4())},
                     data={"title": "Additional evidence", "document_type_code": "EXHIBIT"},
                     files={"file": ("evidence.pdf", decision_pdf(), "application/pdf")}),
             ), 15)
@@ -375,7 +375,7 @@ async def test_fee_screen_reads_documents_and_balance_from_one_revision(
                 headers={"X-Demo-User-Id": str(filer)}))
             await asyncio.wait_for(read_ready.wait(), 10)
             upload = asyncio.create_task(client.post(f"/api/v1/filings/{fid}/documents",
-                headers={"X-Demo-User-Id": str(filer)},
+                headers={"X-Demo-User-Id": str(filer), "Idempotency-Key": str(uuid4())},
                 data={"title": "New evidence", "document_type_code": "EXHIBIT"},
                 files={"file": ("evidence.pdf", decision_pdf(), "application/pdf")}))
             await asyncio.wait_for(upload_started.wait(), 10)

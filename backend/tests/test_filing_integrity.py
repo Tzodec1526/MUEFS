@@ -28,6 +28,7 @@ async def stored_filing(db_session, api_client, tmp_path, monkeypatch):
     ]:
         response = await api_client.post(
             f"/api/v1/filings/{fid}/documents",
+            headers={"Idempotency-Key": str(uuid4())},
             data={"title": name, "document_type_code": "EXHIBIT"},
             files={"file": (name, content, mime)},
         )
@@ -210,6 +211,7 @@ async def test_unreadable_pdf_is_rejected_before_it_becomes_an_attachment(
     count = await db_session.scalar(select(func.count()).select_from(FilingDocument))
     response = await api_client.post(
         f"/api/v1/filings/{fid}/documents",
+        headers={"Idempotency-Key": str(uuid4())},
         data={"title": "Broken", "document_type_code": "EXHIBIT"},
         files={"file": ("broken.pdf", b"%PDF-1.7\nnot a PDF", "application/pdf")},
     )

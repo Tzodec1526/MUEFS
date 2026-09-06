@@ -150,3 +150,17 @@ class FilingDocument(Base):
     ))
 
     envelope: Mapped["FilingEnvelope"] = relationship(back_populates="documents")
+
+
+class DocumentUploadRequest(Base):
+    """A completed upload remains recognizable even after its draft document is removed."""
+
+    __tablename__ = "document_upload_requests"
+
+    envelope_id: Mapped[int] = mapped_column(ForeignKey("filing_envelopes.id"), primary_key=True)
+    key: Mapped[str] = mapped_column(String(36), primary_key=True)
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    document_id: Mapped[int | None] = mapped_column(
+        ForeignKey("filing_documents.id", ondelete="SET NULL"), unique=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

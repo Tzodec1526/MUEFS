@@ -971,6 +971,32 @@ Actual-daemon checks separately cover clean data, the upload-size boundary, comp
 antivirus test data and archive-limit enforcement. API tests cover error/truncated/oversize
 responses, timeouts, backpressure, cancellation and safe retries without stored artifacts.
 
+## Recovering an uncertain document upload
+
+Document and fee-waiver uploads carry a required UUID request key. The API binds it to
+the file hash/size and upload metadata, and commits it with the document. A matching
+retry returns that document without another scan, storage write, audit event or fee
+revision. The same key with changed input returns a conflict. Removed documents cannot
+be recreated by an old retry; successful uploads remain recoverable after submission
+while enforcing current account and filing ownership checks.
+Removal explicitly clears draft request links, including on SQLite where foreign-key
+actions are disabled and document IDs can be reused.
+
+The forms retain the key across an uncertain response, preserve the selected file and
+explain how to retry. Uploads disable competing document edits and wizard navigation.
+After a successful upload/removal, the document list is fetched from the server so it
+also includes changes made in another tab. The shared upload helper returns the stored
+document directly; its retained warnings no longer travel in a duplicate return value.
+
+API regressions cover request mismatches, removed and submitted records, disabled
+accounts and scanner outages. PostgreSQL tests exercise simultaneous identical and
+conflicting uploads, visibility at HTTP response headers, and migration from a populated
+prior schema. Browser checks deliberately discard successful responses for ordinary and
+waiver uploads, verify exact byte counts and SHA-256 hashes, and recover one document
+using the same key on desktop/mobile. Replays avoid the repeated screening and storage
+work observed in the original duplicate-upload regression. Broader network/device load
+and independent accessibility evaluation remain outstanding.
+
 ## Sources guiding the evaluation
 
 - [RFC 5321, SMTP](https://www.rfc-editor.org/rfc/rfc5321): relay acceptance, response codes and uncertainty after a lost final response.

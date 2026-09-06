@@ -34,6 +34,22 @@ any deployment-wide transaction; a rerun handles committed columns and an invali
 index. SQLite uses ordinary DDL. Downgrade is refused once creation keys exist, because
 discarding them would allow previously completed requests to create duplicates.
 
+Document uploads also require a UUID `Idempotency-Key` on
+`POST /api/v1/filings/{id}/documents`. Deploy the API and both document/waiver upload forms
+together after migration `d84a19f2c6b0`. Keep the same key, file bytes, filename, declared
+content type, document type, title and confidentiality choice when retrying an uncertain
+response. A matching completed request returns the original document without rescanning,
+rewriting storage or changing fees again. Missing/malformed keys return 422; changed
+requests and retries after document removal return 409. Refresh the saved filing before
+starting another upload after a conflict. A completed request can be replayed after
+submission, subject to current account and filing ownership checks.
+
+The migration adds `document_upload_requests`; legacy documents remain unchanged. The
+filing row lock serializes uploads and submission, and the request record commits with
+the document before HTTP success. Removing a draft document clears its foreign-key link
+while preserving the request key and fingerprint. Downgrade is refused once keys exist;
+discarding them would allow completed uploads to be repeated.
+
 Filing list responses now contain summaries with `document_count`, rather than full
 envelopes and attachment arrays. This applies to `GET /api/v1/filings` and
 `GET /api/v1/clerk/queue`, including pending waivers. Deploy their clients and API together;

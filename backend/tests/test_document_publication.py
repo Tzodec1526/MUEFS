@@ -2,6 +2,7 @@
 
 import hashlib
 from io import BytesIO
+from uuid import uuid4
 
 import pytest
 from pypdf import PdfWriter
@@ -51,6 +52,7 @@ async def public_record(db_session, api_client, monkeypatch, tmp_path):
     api_client.headers["X-Demo-User-Id"] = str(filer)
     upload = await api_client.post(
         f"/api/v1/filings/{fid}/documents",
+        headers={"Idempotency-Key": str(uuid4())},
         data={"title": "Private original title", "document_type_code": "COMPLAINT"},
         files={"file": ("original.pdf", original, "application/pdf")},
     )

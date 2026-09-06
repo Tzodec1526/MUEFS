@@ -2,6 +2,7 @@
 
 import io
 from datetime import UTC, datetime
+from uuid import uuid4
 
 import pytest
 import pytest_asyncio
@@ -88,6 +89,7 @@ async def submit_application(api_client, filing):
 
     uploaded = await api_client.post(
         f"/api/v1/filings/{filing.id}/documents",
+        headers={"Idempotency-Key": str(uuid4())},
         data={
             "document_type_code": "FEE_WAIVER",
             "title": "MC 20 private application",
