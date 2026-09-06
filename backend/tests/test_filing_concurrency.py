@@ -22,6 +22,7 @@ from app.models.filing_transaction import FilingTransaction
 from app.models.notification import Notification
 from app.models.payment import Payment
 from app.services import document_service, filing_service
+from tests.filing_requests import submission_review
 from tests.test_email_delivery import smtp_sink as smtp_sink
 from tests.test_fee_waivers import decision_pdf
 from tests.test_filing_history import filing_fixture
@@ -210,7 +211,11 @@ async def test_intake_change_waits_for_submission_to_commit(
                                headers={"X-Demo-User-Id": str(filer)}) as client:
             key = {"Idempotency-Key": str(uuid4())}
             submission = asyncio.create_task(
-                client.post(f"/api/v1/filings/{fid}/submit", headers=key)
+                client.post(
+                    f"/api/v1/filings/{fid}/submit",
+                    json=await submission_review(client, fid),
+                    headers=key,
+                )
             )
             pending.append(submission)
             await asyncio.wait_for(reached_storage.wait(), 5)
@@ -225,7 +230,11 @@ async def test_intake_change_waits_for_submission_to_commit(
             release.set()
             response, _ = await asyncio.wait_for(asyncio.gather(submission, closure), 10)
             assert response.status_code == 200, response.text
-            replay = await client.post(f"/api/v1/filings/{fid}/submit", headers=key)
+            replay = await client.post(
+                f"/api/v1/filings/{fid}/submit",
+                json=await submission_review(client, fid),
+                headers=key,
+            )
             assert replay.status_code == 200, replay.text
             assert replay.json() == response.json()
             new_draft = await client.post("/api/v1/filings", json={
@@ -502,11 +511,13 @@ async def test_concurrent_submission_retries_create_one_receipt(postgres_session
     app.dependency_overrides[get_db] = database
     try:
         async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
-            headers = {"X-Demo-User-Id": str(filer), "Idempotency-Key": str(uuid4())}
+            client.headers["X-Demo-User-Id"] = str(filer)
+            headers = {"Idempotency-Key": str(uuid4())}
+            review = await submission_review(client, fid)
             responses = await asyncio.wait_for(
                 asyncio.gather(
                     *[
-                        client.post(f"/api/v1/filings/{fid}/submit", headers=headers)
+                        client.post(f"/api/v1/filings/{fid}/submit", json=review, headers=headers)
                         for _ in range(2)
                     ]
                 ),
@@ -580,3 +591,60 @@ async def test_postgres_workers_claim_a_notice_once(postgres_sessions, smtp_sink
     async with postgres_sessions() as db:
         notice = await db.get(Notification, nid)
         assert notice.delivery_status.value == "sent" and notice.attempt_count == 1
+
+
+@pytest.mark.parametrize("postgres_sessions", [True], indirect=True)
+@pytest.mark.parametrize("change", ["details", "document"])
+async def test_submission_waits_for_edit_then_rejects_stale_review(postgres_sessions, change):
+    from httpx import ASGITransport, AsyncClient
+
+    from app.models.filing import FilingEnvelope
+
+    fid, filer, _ = await prepare_filing(postgres_sessions)
+    async with postgres_sessions() as db:
+        opened = await filing_service.get_filing(db, fid)
+        review = {"expected_submission_token": opened.submission_token}
+    requested = asyncio.Event()
+    request_pid = None
+
+    async def database():
+        nonlocal request_pid
+        async with postgres_sessions.begin() as db:
+            request_pid = await db.scalar(text("SELECT pg_backend_pid()"))
+            requested.set()
+            yield db
+
+    app.dependency_overrides[get_db] = database
+    pending = None
+    try:
+        async with AsyncClient(transport=ASGITransport(app), base_url="http://test",
+                               headers={"X-Demo-User-Id": str(filer)}) as client:
+            async with postgres_sessions.begin() as editor:
+                filing = await filing_service.get_filing(editor, fid, for_update=True)
+                if change == "details":
+                    filing.case_title = "Changed while submission waits"
+                else:
+                    filing.documents[0].is_confidential = True
+                await editor.flush()
+                pending = asyncio.create_task(client.post(
+                    f"/api/v1/filings/{fid}/submit", json=review,
+                ))
+                await asyncio.wait_for(requested.wait(), 5)
+                async with asyncio.timeout(5), postgres_sessions() as observer:
+                    while not await observer.scalar(text(
+                        "SELECT cardinality(pg_blocking_pids(:pid))"
+                    ), {"pid": request_pid}):
+                        await asyncio.sleep(0.01)
+                assert not pending.done()
+            response = await asyncio.wait_for(pending, 5)
+            assert response.status_code == 409, response.text
+        async with postgres_sessions() as db:
+            filing = await db.get(FilingEnvelope, fid)
+            assert filing.status == FilingStatus.DRAFT and filing.submission_count == 0
+            assert await db.scalar(select(func.count()).select_from(FilingTransaction)) == 0
+            assert await db.scalar(select(func.count()).select_from(Notification)) == 0
+    finally:
+        if pending and not pending.done():
+            pending.cancel()
+            await asyncio.gather(pending, return_exceptions=True)
+        app.dependency_overrides.pop(get_db, None)

@@ -40,6 +40,23 @@ class FilingEnvelope(Base):
         ]
         return hashlib.sha256(json.dumps(values, ensure_ascii=False).encode("utf-8")).hexdigest()
 
+    @property
+    def submission_token(self) -> str:
+        """Bind final review to the details, active documents, and fee state."""
+        values = [
+            self.details_token, self.court_id, self.case_id, self.case_type_id,
+            self.filing_type, self.fee_version, self.payment_id,
+            self.fee_waiver_requested, self.fee_waiver_granted,
+            self.fee_waiver_reason, self.fee_waiver_amount_due_cents,
+            [
+                [doc.id, doc.document_type_code, doc.title, doc.sha256_hash,
+                 doc.file_size_bytes, doc.mime_type, doc.page_count,
+                 doc.is_confidential, doc.is_text_searchable]
+                for doc in sorted(self.documents, key=lambda doc: doc.id)
+            ],
+        ]
+        return hashlib.sha256(json.dumps(values, ensure_ascii=False).encode("utf-8")).hexdigest()
+
     id: Mapped[int] = mapped_column(primary_key=True)
     court_id: Mapped[int] = mapped_column(ForeignKey("courts.id"), index=True)
     case_id: Mapped[int | None] = mapped_column(ForeignKey("cases.id"), index=True)

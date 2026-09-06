@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.models.filing_transaction import FilingTransaction
 from app.services import document_service, filing_service
+from tests.filing_requests import submission_review
 from tests.test_document_publication import publication_pdf
 from tests.test_filing_history import filing_fixture
 
@@ -48,7 +49,10 @@ async def test_missing_or_changed_bytes_cannot_be_submitted_or_accepted(
 ):
     fid, _, clerk, documents, storage = stored_filing
     if action == "accept":
-        assert (await api_client.post(f"/api/v1/filings/{fid}/submit")).status_code == 200
+        assert (await api_client.post(
+            f"/api/v1/filings/{fid}/submit",
+            json=await submission_review(api_client, fid),
+        )).status_code == 200
         api_client.headers["X-Demo-User-Id"] = str(clerk)
     doc, content = documents[0]
     path = storage / doc.file_key
@@ -80,7 +84,7 @@ async def test_missing_or_changed_bytes_cannot_be_submitted_or_accepted(
         **(
             {"json": {"action": "accept", "expected_submission_count": 1}}
             if action == "accept"
-            else {}
+            else {"json": await submission_review(api_client, fid)}
         ),
     )
     assert response.status_code == 409
@@ -97,7 +101,10 @@ async def test_missing_or_changed_bytes_cannot_be_submitted_or_accepted(
     await db_session.flush()
     monkeypatch.setattr(document_service, "download_document", download)
     if action == "submit":
-        assert (await api_client.post(f"/api/v1/filings/{fid}/submit")).status_code == 200
+        assert (await api_client.post(
+            f"/api/v1/filings/{fid}/submit",
+            json=await submission_review(api_client, fid),
+        )).status_code == 200
 
 
 async def test_validation_reuses_upload_screening_without_reading_storage(
@@ -149,7 +156,10 @@ async def test_integrity_streams_in_chunks_and_keeps_the_event_loop_available(
             self.stream.close()
 
     monkeypatch.setattr(document_service, "download_document", SlowStream)
-    submit = asyncio.create_task(api_client.post(f"/api/v1/filings/{fid}/submit"))
+    submit = asyncio.create_task(api_client.post(
+        f"/api/v1/filings/{fid}/submit",
+        json=await submission_review(api_client, fid),
+    ))
     try:
         assert await asyncio.to_thread(started.wait, 3)
         assert (await asyncio.wait_for(api_client.get("/health"), 2)).status_code == 200
@@ -169,14 +179,22 @@ async def test_submission_retry_replays_receipt_without_new_file_work(
 ):
     fid, _, _, documents, _ = stored_filing
     key = {"Idempotency-Key": str(uuid4())}
-    first = await api_client.post(f"/api/v1/filings/{fid}/submit", headers=key)
+    first = await api_client.post(
+        f"/api/v1/filings/{fid}/submit",
+        json=await submission_review(api_client, fid),
+        headers=key,
+    )
     assert first.status_code == 200
 
     def unexpected_read(*args):
         pytest.fail("An already completed submission was verified and recorded again")
 
     monkeypatch.setattr(document_service, "stored_integrity", unexpected_read)
-    assert (await api_client.post(f"/api/v1/filings/{fid}/submit", headers=key)).status_code == 200
+    assert (await api_client.post(
+        f"/api/v1/filings/{fid}/submit",
+        json=await submission_review(api_client, fid),
+        headers=key,
+    )).status_code == 200
     transactions = list(await db_session.scalars(select(FilingTransaction)))
     assert len(transactions) == 1
     assert (
@@ -206,7 +224,10 @@ async def test_batch_acceptance_preserves_healthy_filing_when_another_file_is_mi
     db_session,
 ):
     fid, filer, clerk, documents, storage = stored_filing
-    assert (await api_client.post(f"/api/v1/filings/{fid}/submit")).status_code == 200
+    assert (await api_client.post(
+        f"/api/v1/filings/{fid}/submit",
+        json=await submission_review(api_client, fid),
+    )).status_code == 200
     source = await db_session.get(FilingEnvelope, fid)
     second = FilingEnvelope(
         court_id=source.court_id,
@@ -219,7 +240,10 @@ async def test_batch_acceptance_preserves_healthy_filing_when_another_file_is_mi
     await db_session.flush()
     db_session.add(stored_document(second.id))
     await db_session.flush()
-    assert (await api_client.post(f"/api/v1/filings/{second.id}/submit")).status_code == 200
+    assert (await api_client.post(
+        f"/api/v1/filings/{second.id}/submit",
+        json=await submission_review(api_client, second.id),
+    )).status_code == 200
     (storage / documents[0][0].file_key).unlink()
     api_client.headers["X-Demo-User-Id"] = str(clerk)
     response = await api_client.post(

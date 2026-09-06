@@ -467,7 +467,7 @@ function FilingForm({ userId }: { userId: number }) {
         {conflictView}
         <p>Status: <span className={`status-badge ${loadedFiling.status}`}>{loadedFiling.status.replace('_', ' ')}</span></p>
         {loadedFiling.rejection_reason && <p role="note">Clerk note: {loadedFiling.rejection_reason}</p>}
-        <FilingReview filingData={filingData} readOnly />
+        <FilingReview filingId={loadedFiling.id} courtName={filingData.courtName} caseTypeName={filingData.caseTypeName} readOnly />
       </div>
     );
   }
@@ -534,6 +534,12 @@ function FilingForm({ userId }: { userId: number }) {
         then <Link to={`/filing/new?filing_id=${creationConflictId}&step=details`}>open the saved filing</Link> to compare them.
       </p>}
 
+      {loadedFiling?.status === 'returned' && loadedFiling.rejection_reason && !submission && (
+        <div className="alert alert-warning" role="note">
+          <strong>Returned for correction:</strong> {loadedFiling.rejection_reason}
+        </div>
+      )}
+
       {/* Step Progress Bar - clickable for completed steps */}
       <nav className="wizard-steps" aria-label="Filing progress">
         {steps.map((step, index) => (
@@ -560,7 +566,7 @@ function FilingForm({ userId }: { userId: number }) {
       </nav>
 
       {/* Filing Summary Sidebar */}
-      {filingData.courtId && (
+      {filingData.courtId && currentStep !== 'review' && (
         <div className="filing-summary-bar">
           <span><strong>Court:</strong> {filingData.courtName}</span>
           {filingData.caseTypeName && (
@@ -777,9 +783,12 @@ function FilingForm({ userId }: { userId: number }) {
 
         {currentStep === 'review' && (
           <FilingReview
-            filingData={filingData}
+            filingId={filingData.filingId!}
+            courtName={filingData.courtName}
+            caseTypeName={filingData.caseTypeName}
             submission={submission}
             onFeesChange={handleFeesChange}
+            onSubmittingChange={setSaving}
             onSubmitSuccess={(filing) => { clearFilingDraft(draftKey, filing.id); setSubmission(filing); }}
           />
         )}

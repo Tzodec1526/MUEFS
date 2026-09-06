@@ -15,6 +15,7 @@ from app.models.filing import FilingDocument, FilingEnvelope
 from app.models.filing_transaction import FilingTransaction
 from app.models.user import CourtRole, User, UserCourtRole, UserType
 from app.services import document_service
+from tests.filing_requests import submission_review
 from tests.test_document_publication import prepare_copy
 from tests.test_filing_concurrency import POSTGRES_URL, prepare_filing
 from tests.test_filing_concurrency import postgres_sessions as postgres_sessions
@@ -48,7 +49,10 @@ async def court_document(postgres_sessions, monkeypatch, tmp_path):
     try:
         async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
             client.headers["X-Demo-User-Id"] = str(filer)
-            assert (await client.post(f"/api/v1/filings/{fid}/submit")).status_code == 200
+            assert (await client.post(
+                f"/api/v1/filings/{fid}/submit",
+                json=await submission_review(client, fid),
+            )).status_code == 200
             client.headers["X-Demo-User-Id"] = str(clerk)
             assert (
                 await client.post(

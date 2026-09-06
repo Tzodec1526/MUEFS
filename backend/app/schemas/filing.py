@@ -62,7 +62,12 @@ class FilingEnvelopeUpdate(BaseModel):
         return self
 
 
+class FilingSubmitRequest(BaseModel):
+    expected_submission_token: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class FilingEnvelopeResponse(BaseModel):
+    submission_token: str
     details_token: str
     id: int
     court_id: int

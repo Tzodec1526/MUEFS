@@ -16,6 +16,7 @@ from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.models.filing_transaction import FilingTransaction
 from app.models.user import User, UserType
 from app.services import audit_service, document_service
+from tests.filing_requests import submission_review
 from tests.test_filing_history import filing_fixture
 
 
@@ -55,7 +56,10 @@ async def public_record(db_session, api_client, monkeypatch, tmp_path):
     )
     assert upload.status_code == 200, upload.text
     did = upload.json()["id"]
-    assert (await api_client.post(f"/api/v1/filings/{fid}/submit")).status_code == 200
+    assert (await api_client.post(
+        f"/api/v1/filings/{fid}/submit",
+        json=await submission_review(api_client, fid),
+    )).status_code == 200
     receipt = (await api_client.get(f"/api/v1/filings/{fid}/history")).json()["transactions"][0]
     api_client.headers["X-Demo-User-Id"] = str(clerk)
     accepted = await api_client.post(

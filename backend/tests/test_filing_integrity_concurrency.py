@@ -14,6 +14,7 @@ from app.models.filing import FilingEnvelope
 from app.models.filing_transaction import FilingTransaction
 from app.models.user import CourtRole, User, UserCourtRole, UserType
 from app.services import document_service, filing_service
+from tests.filing_requests import submission_review
 from tests.test_filing_concurrency import POSTGRES_URL, prepare_filing
 from tests.test_filing_concurrency import postgres_sessions as postgres_sessions
 
@@ -28,6 +29,9 @@ async def test_deactivation_after_authentication_blocks_filing_transition(
     if action == "accept":
         async with postgres_sessions.begin() as db:
             await filing_service.submit_filing(db, fid)
+    async with postgres_sessions() as db:
+        reviewed = await filing_service.get_filing(db, fid)
+        review = {"expected_submission_token": reviewed.submission_token}
     actor = filer if action == "submit" else clerk
     authenticated, revoked = asyncio.Event(), asyncio.Event()
 
@@ -52,7 +56,7 @@ async def test_deactivation_after_authentication_blocks_filing_transition(
                     **(
                         {"json": {"action": "accept", "expected_submission_count": 1}}
                         if action == "accept"
-                        else {}
+                        else {"json": review}
                     ),
                 )
             )
@@ -196,7 +200,10 @@ async def test_slow_submission_does_not_block_same_filers_other_upload(
             transport=ASGITransport(app), base_url="http://test",
             headers={"X-Demo-User-Id": str(filer)},
         ) as client:
-            pending = asyncio.create_task(client.post(f"/api/v1/filings/{first}/submit"))
+            pending = asyncio.create_task(client.post(
+                f"/api/v1/filings/{first}/submit",
+                json=await submission_review(client, first),
+            ))
             try:
                 assert await asyncio.to_thread(started.wait, 5)
                 # The audit insert references this user. An exclusive user lock

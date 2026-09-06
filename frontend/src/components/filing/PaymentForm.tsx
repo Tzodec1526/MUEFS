@@ -22,6 +22,7 @@ export default function PaymentForm({ filingId, onFeesChange }: {
   const key = `${filingId}:${attempt}`;
   const current = result?.key === key ? result : undefined;
   const fees = current?.fees, filing = current?.filing;
+  const selectedMethod = fees?.can_pay ? paymentMethod : 'waiver';
   useEffect(() => {
     const controller = new AbortController();
     getFilingFees(filingId, controller.signal)
@@ -52,7 +53,7 @@ export default function PaymentForm({ filingId, onFeesChange }: {
     if (!fees || !filing) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      if (paymentMethod === 'waiver') {
+      if (selectedMethod === 'waiver') {
         if (!filing.documents.some(doc => doc.document_type_code === 'FEE_WAIVER')) {
           if (!waiverFile) { setError('Attach the completed, signed Fee Waiver Request (MC 20).'); return; }
           await uploadDocument(filingId, waiverFile, 'FEE_WAIVER', 'Fee Waiver Request (MC 20)', true);
@@ -61,7 +62,7 @@ export default function PaymentForm({ filingId, onFeesChange }: {
         setNotice('Fee waiver request attached. Submit the filing to send the application for court review.');
       } else {
         if (fees.balance_due_cents === null) return;
-        await processPayment(filingId, fees.balance_due_cents, paymentMethod, fees.version);
+        await processPayment(filingId, fees.balance_due_cents, selectedMethod, fees.version);
         setNotice('Simulated payment recorded. No money was charged.');
       }
       setAttempt(n => n + 1);
@@ -105,12 +106,12 @@ export default function PaymentForm({ filingId, onFeesChange }: {
           { value: 'credit_card', label: 'Credit card' }, { value: 'debit_card', label: 'Debit card' },
           { value: 'ach', label: 'ACH / eCheck' }, { value: 'waiver', label: 'Fee waiver request' },
         ].filter(method => method.value === 'waiver' ? fees.can_request_waiver : fees.can_pay).map(method => <label
-          key={method.value} className={`payment-option ${paymentMethod === method.value ? 'selected' : ''}`}>
-          <input type="radio" name="paymentMethod" value={method.value} checked={paymentMethod === method.value}
+          key={method.value} className={`payment-option ${selectedMethod === method.value ? 'selected' : ''}`}>
+          <input type="radio" name="paymentMethod" value={method.value} checked={selectedMethod === method.value}
             disabled={busy || (method.value !== 'waiver' && !fees.payments_simulated)} onChange={() => setPaymentMethod(method.value)} />{method.label}
         </label>)}
       </div></div>
-      {paymentMethod === 'waiver' && fees.can_request_waiver && <div className="fee-waiver-section">
+      {selectedMethod === 'waiver' && fees.can_request_waiver && <div className="fee-waiver-section">
         <p>Complete and sign the <a href="https://www.courts.michigan.gov/siteassets/forms/scao-approved/mc20.pdf" target="_blank" rel="noreferrer">approved Fee Waiver Request (MC 20)</a>. The application accompanies your filing and remains nonpublic.</p>
         {filing.documents.some(doc => doc.document_type_code === 'FEE_WAIVER') ? <p>A fee waiver application is already attached. Review it with your documents.</p>
           : <div className="form-group"><label htmlFor="waiver-application">Completed, signed application (PDF)</label>
@@ -118,8 +119,8 @@ export default function PaymentForm({ filingId, onFeesChange }: {
         <p>If filing as a prisoner under the Michigan Department of Corrections, also attach the certified institutional account statement required by MCR 2.002(B), marked confidential.</p>
       </div>}
       {fees.can_pay && <p className="info-text">{fees.payments_simulated ? 'Payment records are simulated. No card or bank information is collected and no money is charged.' : 'Online payment is unavailable. Contact the court about payment options.'}</p>}
-      <button className="btn btn-primary" disabled={busy || (paymentMethod === 'waiver' ? !fees.can_request_waiver : !fees.can_pay || !fees.payments_simulated)} onClick={pay}>
-        {busy ? 'Recording…' : paymentMethod === 'waiver' ? 'Attach waiver request to filing' : `Record simulated payment — ${formatCents(fees.balance_due_cents ?? 0)}`}
+      <button className="btn btn-primary" disabled={busy || (selectedMethod === 'waiver' ? !fees.can_request_waiver : !fees.can_pay || !fees.payments_simulated)} onClick={pay}>
+        {busy ? 'Recording…' : selectedMethod === 'waiver' ? 'Attach waiver request to filing' : `Record simulated payment — ${formatCents(fees.balance_due_cents ?? 0)}`}
       </button>
     </>}
     {fees.can_assess && <Suspense fallback={<p role="status">Loading assessment form…</p>}>

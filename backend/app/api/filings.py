@@ -34,6 +34,7 @@ from app.schemas.filing import (
     FilingEnvelopeResponse,
     FilingEnvelopeUpdate,
     FilingHistoryResponse,
+    FilingSubmitRequest,
     FilingValidationResult,
     MyFilingsResponse,
 )
@@ -236,6 +237,7 @@ async def validate_filing(
 async def submit_filing(
     request: Request,
     filing_id: int,
+    data: FilingSubmitRequest,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
     idempotency_key: uuid.UUID | None = Header(None),
@@ -257,6 +259,13 @@ async def submit_filing(
         FilingTransaction.idempotency_key == str(idempotency_key),
     )):
         return filing_check
+    if data.expected_submission_token != filing_check.submission_token:
+        raise HTTPException(
+            status_code=409,
+            detail="This filing changed after you opened the review. "
+                   "Refresh the review and check the saved details and documents "
+                   "before submitting.",
+        )
     if filing_check.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
         raise HTTPException(
             status_code=400, detail="Only draft or returned filings can be submitted",

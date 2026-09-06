@@ -14,6 +14,7 @@ export interface FilingDocument {
 }
 
 export interface FilingEnvelope {
+  submission_token: string;
   details_token: string;
   id: number;
   court_id: number;
@@ -107,14 +108,18 @@ export async function updateFiling(
   return data;
 }
 
-export async function validateFiling(filingId: number): Promise<FilingValidation> {
-  const { data } = await apiClient.post(`/filings/${filingId}/validate`);
+export async function validateFiling(filingId: number, signal?: AbortSignal): Promise<FilingValidation> {
+  const { data } = await apiClient.post(`/filings/${filingId}/validate`, undefined, { signal });
   return data;
 }
 
-export async function submitFiling(filingId: number, idempotencyKey?: string): Promise<FilingEnvelope> {
-  const { data } = await apiClient.post(`/filings/${filingId}/submit`, undefined, {
-    headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+export async function submitFiling(
+  filingId: number, expectedSubmissionToken: string, idempotencyKey: string,
+): Promise<FilingEnvelope> {
+  const { data } = await apiClient.post(`/filings/${filingId}/submit`, {
+    expected_submission_token: expectedSubmissionToken,
+  }, {
+    headers: { 'Idempotency-Key': idempotencyKey },
   });
   return data;
 }

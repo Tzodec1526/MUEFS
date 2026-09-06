@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from app.models.court import CaseCategory, CaseType, Court, CourtType
 from app.models.filing import FilingEnvelope, FilingStatus
 from app.models.filing_transaction import FilingTransaction
+from tests.filing_requests import submission_review
 from tests.test_motions_and_search import create_court_with_case
 
 
@@ -105,7 +106,11 @@ async def test_saved_draft_rechecks_intake_and_retry_preserves_its_receipt(
         def unexpected_read(_key):
             pytest.fail("Invalid intake reached document storage")
         blocked.setattr(document_service, "stored_integrity", unexpected_read)
-        response = await api_client.post(f"/api/v1/filings/{fid}/submit", headers=key)
+        response = await api_client.post(
+            f"/api/v1/filings/{fid}/submit",
+            json=await submission_review(api_client, fid),
+            headers=key,
+        )
     assert response.status_code == expected, response.text
     filing = await db_session.get(FilingEnvelope, fid)
     assert filing.status == FilingStatus.DRAFT
@@ -117,7 +122,11 @@ async def test_saved_draft_rechecks_intake_and_retry_preserves_its_receipt(
     court.is_efiling_enabled = case_type.is_active = True
     case.case_type_id, case.is_sealed = case_type.id, False
     await db_session.flush()
-    submitted = await api_client.post(f"/api/v1/filings/{fid}/submit", headers=key)
+    submitted = await api_client.post(
+        f"/api/v1/filings/{fid}/submit",
+        json=await submission_review(api_client, fid),
+        headers=key,
+    )
     assert submitted.status_code == 200, submitted.text
     receipt = submitted.json()
     assert receipt["submission_count"] == 1
@@ -125,7 +134,11 @@ async def test_saved_draft_rechecks_intake_and_retry_preserves_its_receipt(
     assert receipt["updated_at"] and receipt["submitted_at"]
     court.is_efiling_enabled = False
     await db_session.flush()
-    replay = await api_client.post(f"/api/v1/filings/{fid}/submit", headers=key)
+    replay = await api_client.post(
+        f"/api/v1/filings/{fid}/submit",
+        json=await submission_review(api_client, fid),
+        headers=key,
+    )
     assert replay.status_code == 200, replay.text
     assert replay.json() == receipt
     assert await db_session.scalar(select(func.count()).select_from(FilingTransaction)) == 1

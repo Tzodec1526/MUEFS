@@ -16,6 +16,7 @@ from app.models.filing_transaction import FilingTransaction
 from app.models.notification import Notification
 from app.models.user import CourtRole, User, UserCourtRole, UserType
 from app.services import document_service, filing_service
+from tests.filing_requests import submission_review
 
 
 async def filing_fixture(db):
@@ -87,9 +88,18 @@ async def test_receipts_keep_original_documents_through_correction(
     fid, filer, clerk, other = record_filing
     original = await upload(api_client, fid, b"Original complaint")
     key = {"Idempotency-Key": str(uuid4())}
-    first = await api_client.post(f"/api/v1/filings/{fid}/submit", headers=key)
+    review = await submission_review(api_client, fid)
+    first = await api_client.post(
+        f"/api/v1/filings/{fid}/submit",
+        json=review,
+        headers=key,
+    )
     assert first.status_code == 200, first.text
-    replay = await api_client.post(f"/api/v1/filings/{fid}/submit", headers=key)
+    replay = await api_client.post(
+        f"/api/v1/filings/{fid}/submit",
+        json=review,
+        headers=key,
+    )
     assert replay.status_code == 200
     assert replay.json()["submission_count"] == 1
     first_receipt = (await api_client.get(f"/api/v1/filings/{fid}/history")).json()["transactions"][
@@ -128,7 +138,9 @@ async def test_receipts_keep_original_documents_through_correction(
     assert corrected_details.status_code == 200, corrected_details.text
     corrected = await upload(api_client, fid, b"Corrected complaint")
     submitted = await api_client.post(
-        f"/api/v1/filings/{fid}/submit", headers={"Idempotency-Key": str(uuid4())}
+        f"/api/v1/filings/{fid}/submit",
+        json=await submission_review(api_client, fid),
+        headers={"Idempotency-Key": str(uuid4())},
     )
     assert submitted.json()["submission_count"] == 2
     assert [d["id"] for d in submitted.json()["documents"]] == [corrected]
@@ -194,7 +206,10 @@ async def test_transaction_retention_blocks_direct_sql(
 ):
     fid = record_filing[0]
     await upload(api_client, fid, b"Complaint")
-    await api_client.post(f"/api/v1/filings/{fid}/submit")
+    await api_client.post(
+        f"/api/v1/filings/{fid}/submit",
+        json=await submission_review(api_client, fid),
+    )
     with pytest.raises(DBAPIError, match="append-only"):
         async with db_session.begin_nested():
             await db_session.execute(text(statement))
@@ -211,7 +226,10 @@ async def test_failed_batch_item_rolls_back_its_records_only(
 ):
     fid, filer, clerk, _other = record_filing
     await upload(api_client, fid, b"Complaint")
-    await api_client.post(f"/api/v1/filings/{fid}/submit")
+    await api_client.post(
+        f"/api/v1/filings/{fid}/submit",
+        json=await submission_review(api_client, fid),
+    )
     original = await db_session.get(FilingEnvelope, fid)
     second = FilingEnvelope(
         court_id=original.court_id,

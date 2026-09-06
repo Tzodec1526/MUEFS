@@ -15,6 +15,7 @@ from app.models.notification import Notification
 from app.models.user import CourtRole, User, UserCourtRole, UserType
 from app.services import document_service, filing_service
 from app.services.fee_assessment_service import fee_state
+from tests.filing_requests import submission_review
 
 
 def decision_pdf():
@@ -83,6 +84,8 @@ async def waiver_case(db_session, api_client, tmp_path, monkeypatch, stored_docu
 
 
 async def submit_application(api_client, filing):
+    from sqlalchemy.ext.asyncio import async_object_session
+
     uploaded = await api_client.post(
         f"/api/v1/filings/{filing.id}/documents",
         data={
@@ -92,7 +95,12 @@ async def submit_application(api_client, filing):
         files={"file": ("mc20.pdf", decision_pdf(), "application/pdf")},
     )
     assert uploaded.status_code == 200, uploaded.text
-    submitted = await api_client.post(f"/api/v1/filings/{filing.id}/submit")
+    # This fixture shares an identity map between HTTP requests.
+    await async_object_session(filing).refresh(filing, ["documents"])
+    submitted = await api_client.post(
+        f"/api/v1/filings/{filing.id}/submit",
+        json=await submission_review(api_client, filing.id),
+    )
     assert submitted.status_code == 200, submitted.text
 
 
@@ -102,7 +110,10 @@ async def test_application_required_and_clerk_referral_has_no_filing_decision(
     db_session,
 ):
     filing, users, _ = waiver_case
-    missing = await api_client.post(f"/api/v1/filings/{filing.id}/submit")
+    missing = await api_client.post(
+        f"/api/v1/filings/{filing.id}/submit",
+        json=await submission_review(api_client, filing.id),
+    )
     assert missing.status_code == 400 and "MC 20" in missing.text
     await submit_application(api_client, filing)
     endpoint = f"/api/v1/clerk/filings/{filing.id}/fee-waiver"
@@ -251,7 +262,10 @@ async def test_denial_can_be_paid_without_resubmission_or_fee_recalculation(
             },
         )
     ).status_code == 409
-    assert (await api_client.post(f"/api/v1/filings/{filing.id}/submit")).status_code == 402
+    assert (await api_client.post(
+        f"/api/v1/filings/{filing.id}/submit",
+        json=await submission_review(api_client, filing.id),
+    )).status_code == 402
     # Acceptance does not override denial; payment can be received afterward, too.
     filing.status = FilingStatus.SUBMITTED
     await db_session.flush()

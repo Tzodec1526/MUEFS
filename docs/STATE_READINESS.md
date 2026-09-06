@@ -13,7 +13,7 @@ establish state approval or production readiness.
 | Preserve draft work | Account saves, filing-specific recovery within a verified account/tab, explicit conflict comparison and cross-tab identity invalidation are implemented. Creation keys recover lost initial responses; PostgreSQL concurrent saves preserve the winning version. | Broader offline/device testing and assistive-technology evaluation. |
 | Preserve corrections and decisions | Corrections create another numbered submission. Earlier document bytes remain downloadable by the filer and court staff. Acceptance, return, rejection, CMS failure and signed filing-date orders are separate retained events. | Court procedures for deciding relief, certified/file-stamped copies and court-approved retention. |
 | Route filings to the correct court and case | Creation and submission validate the filing kind, court, case type, existing case and current filer access. Intake flags are enforced by the API. Acceptance checks legacy routing before a CMS call; valid received work remains reviewable after intake closes. | Court procedures for changing intake configuration, reconciling legacy assignments and correcting a filing's destination without losing its retained evidence. |
-| Survive retries and simultaneous actions | Database commits finish before HTTP success responses. Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Review decisions identify the numbered submission the reviewer saw; an intervening resubmission invalidates that decision. Batch review uses a savepoint per filing and reports each failed item. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
+| Survive retries and simultaneous actions | Database commits finish before HTTP success responses. Submission requires the version of the details, active documents and fee state the filer reviewed. Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Review decisions identify the numbered submission the reviewer saw; an intervening resubmission invalidates that decision. Batch review uses a savepoint per filing and reports each failed item. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
 | Locate and assess received work | Assigned staff search the review queue by case title/number or exact filing number and filter by status and elapsed receipt age. Counts cover all matching pages; oldest-first reads use an index for pending work. | Court-approved intake priorities, staffing procedures, representative load testing and independent accessibility evaluation. Elapsed age does not establish a deadline violation. |
 | Publish reviewed public copies | Assigned staff prepare and inspect a separate PDF and public title, explicitly publish it, and withdraw public access with retained authority/history. Originals and receipts stay intact; fee-waiver records cannot use this publication path. | Court-approved classification/redaction policy, approved review tools, storage immutability and retention schedules. |
 | Protect private material | Private envelopes and receipts require filer or court-staff access. Dockets exclude waiver application data, confidential document metadata, superseded documents and other filers' drafts. Fee-waiver documents are nonpublic even if the filer omits the checkbox. | Full classification/retention policy for every case and document type; independent security assessment. |
@@ -907,6 +907,39 @@ the replacement index removed that sort. Substring searches, exact counts and de
 offset pages still require representative load testing. Rendered verification exercised
 searches, all-page counts, status/age filters, accepted pending waivers, an empty search,
 refresh failure/retry and current-detail loading on desktop and mobile.
+
+## Submit the filing that was reviewed
+
+Full filing responses expose `submission_token`. Every `POST /filings/{id}/submit`
+requires a JSON body containing `expected_submission_token` from the saved filing
+shown at final review. Clients must update together with this API contract. List
+summaries are not a substitute for loading and reviewing the full filing.
+
+The API compares the token under the existing filing row lock after checking the
+active owner's authority. It binds editable details, routing, status, submission
+number, active document metadata/content hashes and the filing's fee state. A
+mismatch returns 409 before creating a submission receipt or notification. Existing
+idempotency keys recover their recorded submission before this comparison, even if
+the court has since returned it. A new key cannot submit that returned filing with
+an earlier review token. Existing byte-integrity, intake and fee checks still run.
+No database migration, file reread or additional query is needed to derive the token.
+
+Final review loads the current saved filing and validates it, offers authenticated
+document downloads, and shows confidentiality labels. It replaces the stale duplicate
+summary. Changed fee data or a submission conflict requires an explicit refresh and
+review; the UI never refreshes the token and silently resubmits. Wizard navigation
+waits for the submission response. Returned filings show the clerk's correction note
+while being edited. A recovered submission shows its current status and receipt link.
+When only a waiver is available, the fee form selects that available option.
+
+API regressions cover missing review tokens, changed details, added/removed documents,
+waiver changes, returned cycles and retry ownership. PostgreSQL contention tests hold
+an editing lock through competing submission and verify that the old review cannot
+create a receipt or notice. Production-auth browser checks use retained object-store
+documents, court fee assessments and a published synthetic calendar; they cover
+correction, retries, downloads, fee refresh, load failure, service-only recording and
+mobile rendering. Court policy, real payment/CMS integration and deployed verification
+remain separate readiness requirements.
 
 ## Sources guiding the evaluation
 

@@ -15,6 +15,7 @@ from app.models.payment import Payment, PaymentStatus
 from app.models.user import User, UserType
 from app.services import audit_service, document_service, filing_service
 from app.services.fee_assessment_service import fee_state
+from tests.filing_requests import submission_review
 from tests.test_fee_waivers import decision_pdf
 from tests.test_filing_history import filing_fixture
 
@@ -73,7 +74,10 @@ async def test_review_assessment_payment_and_submission_preserve_the_basis(
     filing = await filing_service.get_filing(db_session, fid)
     assert filing.status == FilingStatus.DRAFT and filing.submitted_at is None
     assert filing.submission_count == 0 and doc.retained_at is not None
-    assert (await api_client.post(f"/api/v1/filings/{fid}/submit")).status_code == 402
+    assert (await api_client.post(
+        f"/api/v1/filings/{fid}/submit",
+        json=await submission_review(api_client, fid),
+    )).status_code == 402
     assert (
         await api_client.get(
             "/api/v1/clerk/fee-reviews",
@@ -112,7 +116,10 @@ async def test_review_assessment_payment_and_submission_preserve_the_basis(
     assert (await api_client.get(f"/api/v1/filings/{fid}/fees")).status_code == 403
     api_client.headers["X-Demo-User-Id"] = str(filer)
     if total:
-        assert (await api_client.post(f"/api/v1/filings/{fid}/submit")).status_code == 402
+        assert (await api_client.post(
+            f"/api/v1/filings/{fid}/submit",
+            json=await submission_review(api_client, fid),
+        )).status_code == 402
         payment = {
             "envelope_id": fid,
             "payment_method": "credit_card",
@@ -143,7 +150,10 @@ async def test_review_assessment_payment_and_submission_preserve_the_basis(
         assert (await api_client.post("/api/v1/payments/process", json=payment)).status_code == 409
         record = await db_session.get(Payment, paid.json()["id"])
         assert record.envelope_id == fid and record.fee_basis["assessment_id"] == assessed.id
-    submitted = await api_client.post(f"/api/v1/filings/{fid}/submit")
+    submitted = await api_client.post(
+        f"/api/v1/filings/{fid}/submit",
+        json=await submission_review(api_client, fid),
+    )
     assert submitted.status_code == 200, submitted.text
     receipt = (await api_client.get(f"/api/v1/filings/{fid}/history")).json()["transactions"][0]
     assert receipt["event_type"] == "submitted" and receipt["submission_number"] == 1
@@ -190,7 +200,10 @@ async def test_changed_documents_require_reassessment_and_credit_prior_payments(
     current = (await api_client.get(f"/api/v1/filings/{fid}/fees")).json()
     assert current["assessment_stale"] and current["total_cents"] is None
     assert current["paid_cents"] == 1000 and not current["obligation_met"]
-    assert (await api_client.post(f"/api/v1/filings/{fid}/submit")).status_code == 402
+    assert (await api_client.post(
+        f"/api/v1/filings/{fid}/submit",
+        json=await submission_review(api_client, fid),
+    )).status_code == 402
     assert (
         await api_client.get(f"/api/v1/documents/{doc.id}/download")
     ).content == b"Synthetic Complaint"
@@ -232,7 +245,10 @@ async def test_changed_documents_require_reassessment_and_credit_prior_payments(
     )
     assert first.details == first_details
     api_client.headers["X-Demo-User-Id"] = str(filer)
-    assert (await api_client.post(f"/api/v1/filings/{fid}/submit")).status_code == 200
+    assert (await api_client.post(
+        f"/api/v1/filings/{fid}/submit",
+        json=await submission_review(api_client, fid),
+    )).status_code == 200
     receipt = (await api_client.get(f"/api/v1/filings/{fid}/history")).json()["transactions"][0]
     assert [payment["amount_cents"] for payment in receipt["details"]["payments"]] == [1000, 500]
     assert receipt["details"]["fee_assessment"]["overpaid_cents"] == 300

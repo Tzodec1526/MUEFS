@@ -15,6 +15,7 @@ from app.database import get_db
 from app.main import app
 from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.services import document_service
+from tests.filing_requests import submission_review
 from tests.test_filings import create_test_fixtures
 
 
@@ -100,6 +101,7 @@ async def test_pdf_processing_does_not_block_unrelated_requests(filing_client, m
 
 async def test_returned_filing_can_be_corrected_and_resubmitted(filing_client, db_session):
     client, envelope, _ = filing_client
+    client.headers["X-Demo-User-Id"] = str(envelope.filer_id)
     envelope.status = FilingStatus.RETURNED
     envelope.rejection_reason = "Correct the description"
     envelope.reviewer_id = envelope.filer_id
@@ -118,7 +120,10 @@ async def test_returned_filing_can_be_corrected_and_resubmitted(filing_client, d
     assert uploaded.status_code == 200, uploaded.text
     # Production requests get a fresh session; discard this test session's cached list.
     db_session.expire(envelope, ["documents"])
-    submitted = await client.post(f"/api/v1/filings/{original_id}/submit")
+    submitted = await client.post(
+        f"/api/v1/filings/{original_id}/submit",
+        json=await submission_review(client, original_id),
+    )
     assert submitted.status_code == 200, submitted.text
     result = submitted.json()
     assert result["id"] == original_id
@@ -128,7 +133,10 @@ async def test_returned_filing_can_be_corrected_and_resubmitted(filing_client, d
     assert result["reviewer_id"] is None
     assert result["reviewed_at"] is None
     assert result["rejection_reason"] is None
-    second_submit = await client.post(f"/api/v1/filings/{original_id}/submit")
+    second_submit = await client.post(
+        f"/api/v1/filings/{original_id}/submit",
+        json=await submission_review(client, original_id),
+    )
     assert second_submit.status_code == 400
     edit_submitted = await client.patch(
         f"/api/v1/filings/{original_id}",

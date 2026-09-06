@@ -15,7 +15,7 @@ from app.models.audit import AuditLog
 from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.models.filing_transaction import FilingTransaction
 from app.models.notification import Notification
-from app.services import document_service
+from app.services import document_service, filing_service
 from tests.test_filing_concurrency import POSTGRES_URL, prepare_filing
 from tests.test_filing_concurrency import postgres_sessions as postgres_sessions
 
@@ -47,6 +47,10 @@ async def test_submission_commits_before_http_success(
                 FOR EACH ROW EXECUTE FUNCTION reject_filing_commit()
             """))
 
+    async with postgres_sessions() as db:
+        reviewed = await filing_service.get_filing(db, fid)
+        review = {"expected_submission_token": reviewed.submission_token}
+
     visible_at_headers = []
 
     async def observe_response(scope, receive, send):
@@ -70,7 +74,7 @@ async def test_submission_commits_before_http_success(
         base_url="http://test",
         headers={"X-Demo-User-Id": str(filer), "Idempotency-Key": str(uuid4())},
     ) as client:
-        response = await client.post(f"/api/v1/filings/{fid}/submit")
+        response = await client.post(f"/api/v1/filings/{fid}/submit", json=review)
         if deferred_failure:
             assert response.status_code == 500, response.text
             assert response.json() == {"detail": "Internal server error"}
@@ -79,12 +83,12 @@ async def test_submission_commits_before_http_success(
                 filing = await db.get(FilingEnvelope, fid)
                 assert filing.submission_count == 0
                 await db.execute(text("DROP TRIGGER reject_filing_commit ON filing_transactions"))
-            response = await client.post(f"/api/v1/filings/{fid}/submit")
+            response = await client.post(f"/api/v1/filings/{fid}/submit", json=review)
         assert response.status_code == 200, response.text
         assert visible_at_headers[-1] == (200, FilingStatus.SUBMITTED, 1, 1)
         assert response.json()["submission_count"] == 1
         # The same client key remains safe after both a failed commit and a lost response.
-        replay = await client.post(f"/api/v1/filings/{fid}/submit")
+        replay = await client.post(f"/api/v1/filings/{fid}/submit", json=review)
         assert replay.status_code == 200
         assert replay.json()["submission_count"] == 1
         assert visible_at_headers[-1] == (200, FilingStatus.SUBMITTED, 1, 1)
