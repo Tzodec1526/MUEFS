@@ -158,6 +158,7 @@ async def inspect_receipts(
                 "service_recorded",
                 "waiver_granted",
                 "waiver_denied",
+                "filing_date_ordered",
                 "public_copy_published",
             ]
         ),

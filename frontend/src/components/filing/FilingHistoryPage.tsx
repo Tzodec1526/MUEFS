@@ -5,6 +5,7 @@ import { getDemoRole } from '../auth/LoginScreen';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
 import FeeWaiverPanel, { waiverActionLabels } from './FeeWaiverPanel';
+import FilingDateEvidence from './FilingDateEvidence';
 import { formatBytes, formatCents, formatCourtDate, getDocumentLabel, parseServerDate } from '../../utils/format';
 
 const eventLabels: Record<string, string> = {
@@ -14,6 +15,7 @@ const eventLabels: Record<string, string> = {
   waiver_referred: 'Fee waiver referred for judicial review', waiver_granted: 'Fee waiver granted',
   waiver_denied: 'Fee waiver denied', payment_recorded: 'Payment recorded',
   filing_date_assessed: 'Filing date assessed using court calendar',
+  filing_date_ordered: 'Court-ordered filing date recorded',
   public_copy_published: 'Reviewed public copy published',
   document_withheld: 'Document withheld from public access',
 };
@@ -76,13 +78,17 @@ export default function FilingHistoryPage() {
       </div>
       <p className="info-text">A receipt records what this system received. Court acceptance is a separate decision.
         Times below are recorded in UTC. Service-only records do not prove delivery to another party.</p>
-      {history.filing_date_basis && <div className="review-card">
+      <div className="review-card">
         <h3>Filing date: {formatCourtDate(history.filing_date)}</h3>
-        {history.filing_date_basis.error && <p className="alert alert-warning">{history.filing_date_basis.error}</p>}
-        <p>This date uses the court&apos;s published business-day calendar. It does not decide relief from
+        {history.filing_date_basis && <FilingDateEvidence basis={history.filing_date_basis} />}
+        {history.filing_date_basis?.source !== 'court_order' && <p>This date uses the court&apos;s published business-day calendar. It does not decide relief from
           a deadline, the effect of a correction, or timely payment after a fee-waiver denial.</p>
-        <Link to={`/courts/${history.court_id}/calendar`}>View court calendar and revisions</Link>
-      </div>}
+        }
+        <div className="participant-actions">
+          <Link to={`/courts/${history.court_id}/calendar`}>View court calendar and revisions</Link>
+          {history.can_manage_documents && <Link to={`/filings/${filingId}/filing-date`}>Record a filing-date order</Link>}
+        </div>
+      </div>
       {history.fee_waiver && <FeeWaiverPanel key={`${filingId}-${attempt}`} filingId={history.filing_id}
         waiver={history.fee_waiver} onChange={() => { setPage(1); setAttempt(n => n + 1); }} />}
       {history.transactions.length === 0 && <div className="empty-state">
@@ -105,13 +111,11 @@ export default function FilingHistoryPage() {
           {transaction.details.amount_due_cents != null && <p>Amount due under the decision: <strong>{formatCents(transaction.details.amount_due_cents)}</strong></p>}
           {transaction.details.filing_date_basis && <div className="receipt-date-basis">
             <p>Filing date at this transaction: <strong>{formatCourtDate(transaction.details.filing_date_basis.filing_date)}</strong></p>
-            {transaction.details.filing_date_basis.error && <p>{transaction.details.filing_date_basis.error}</p>}
-            {transaction.details.filing_date_basis.timezone && <p>
-              Court timezone: {transaction.details.filing_date_basis.timezone} · Calendar revisions: {transaction.details.filing_date_basis.calendar_ids.join(', ')}
-            </p>}
-            {Object.entries(transaction.details.filing_date_basis.skipped_dates).map(([day, reason]) =>
-              <p key={day}>{formatCourtDate(day)}: {reason}</p>)}
+            {'previous_filing_date' in transaction.details && <p>Previous filing date: {formatCourtDate(transaction.details.previous_filing_date ?? null)}</p>}
+            <FilingDateEvidence basis={transaction.details.filing_date_basis} />
           </div>}
+          {transaction.details.case_date_change && <p>Case opening date for {transaction.details.case_date_change.case_number}:
+            {' '}{formatCourtDate(transaction.details.case_date_change.previous_filing_date)} → {formatCourtDate(transaction.details.case_date_change.filing_date)}.</p>}
           {transaction.event_type === 'payment_recorded' && transaction.details.payment && <p>
             {formatCents(transaction.details.payment.amount_cents)} · {transaction.details.payment.transaction_ref}
             {transaction.details.payment.is_simulated && ' (simulated)'}

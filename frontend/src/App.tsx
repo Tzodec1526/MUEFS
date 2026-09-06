@@ -12,6 +12,7 @@ import { getFilingStatusCounts, getClerkQueue } from './api/filings';
 const FilingWizard = lazy(() => import('./components/filing/FilingWizard'));
 const MyFilings = lazy(() => import('./components/filing/MyFilings'));
 const FilingHistoryPage = lazy(() => import('./components/filing/FilingHistoryPage'));
+const FilingDateOrderPage = lazy(() => import('./components/clerk/FilingDateOrderPage'));
 const ReviewQueue = lazy(() => import('./components/clerk/ReviewQueue'));
 const CourtCaseDirectory = lazy(() => import('./components/courts/CourtCaseDirectory'));
 const DocumentPublicationPage = lazy(() => import('./components/courts/DocumentPublicationPage'));
@@ -223,6 +224,7 @@ function App() {
                         <Route path="/filing/new" element={<RequireFiler><FilingWizard key={location.key} /></RequireFiler>} />
                         <Route path="/filings" element={<RequireFiler><MyFilings /></RequireFiler>} />
                         <Route path="/filings/:filingId/history" element={<FilingHistoryPage key={location.pathname} />} />
+                        <Route path="/filings/:filingId/filing-date" element={<RequireClerk><FilingDateOrderPage key={location.pathname} /></RequireClerk>} />
                         <Route path="/cases/search" element={<CaseSearch />} />
                         <Route path="/courts/:courtId/calendar" element={<CourtCalendarPage key={location.pathname} />} />
                         <Route path="/notifications" element={<NotificationsPage />} />

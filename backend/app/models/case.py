@@ -46,6 +46,7 @@ class Case(Base):
     status: Mapped[CaseStatus] = mapped_column(Enum(CaseStatus), default=CaseStatus.OPEN)
     filed_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     filing_date: Mapped[date | None]
+    filing_date_version: Mapped[int] = mapped_column(default=0, server_default="0")
     judge_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
     participant_version: Mapped[int] = mapped_column(default=0, server_default="0")
 

@@ -21,7 +21,7 @@ from app.api.auth import get_current_user_id, lock_current_user, require_user_ma
 from app.api.document_upload import store_document_upload
 from app.database import get_db
 from app.models.court import Court
-from app.models.filing import FilingEnvelope, FilingStatus
+from app.models.filing import COURT_DOCUMENT_TYPES, FilingEnvelope, FilingStatus
 from app.models.filing_transaction import FilingTransaction
 from app.models.user import User
 from app.schemas.document import DocumentUploadResponse
@@ -281,7 +281,7 @@ async def upload_document(
             detail="Cannot upload documents to this filing",
         )
 
-    if document_type_code == "FEE_WAIVER_ORDER":
+    if document_type_code in COURT_DOCUMENT_TYPES:
         raise HTTPException(
             status_code=403, detail="Court decisions must be recorded by authorized court staff",
         )

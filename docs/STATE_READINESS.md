@@ -10,12 +10,12 @@ establish state approval or production readiness.
 | Requirement | Current evidence | Remaining work |
 |---|---|---|
 | Prove what was submitted | Each new submission has a retained transaction ID, UTC receipt time, filer name, document manifest and SHA-256 fingerprints, payment reference where present, and a downloadable receipt. A read-only recovery audit compares stored bytes and retained transaction references. | Court-approved retention schedules, trusted time monitoring, external archival controls and validation of the deployed storage/recovery configuration. |
-| Preserve corrections and decisions | Corrections create another numbered submission. Earlier document bytes remain downloadable by the filer and court staff. Acceptance, return, rejection and CMS failure are separate retained events. | Effective filing-date decisions, judicial relief for transmission failures, and certified/file-stamped copies. |
+| Preserve corrections and decisions | Corrections create another numbered submission. Earlier document bytes remain downloadable by the filer and court staff. Acceptance, return, rejection, CMS failure and signed filing-date orders are separate retained events. | Court procedures for deciding relief, certified/file-stamped copies and court-approved retention. |
 | Survive retries and simultaneous actions | Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Batch review uses a savepoint per filing. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
 | Publish reviewed public copies | Assigned staff prepare and inspect a separate PDF and public title, explicitly publish it, and withdraw public access with retained authority/history. Originals and receipts stay intact; fee-waiver records cannot use this publication path. | Court-approved classification/redaction policy, approved review tools, storage immutability and retention schedules. |
 | Protect private material | Private envelopes and receipts require filer or court-staff access. Dockets exclude waiver application data, confidential document metadata, superseded documents and other filers' drafts. Fee-waiver documents are nonpublic even if the filer omits the checkbox. | Full classification/retention policy for every case and document type; independent security assessment. |
 | Control case participation and access | Assigned staff record participants, counsel representation and explicit restricted-case grants with retained reasons, before/after history, stale-edit checks and revocation. Filing acceptance no longer assigns party roles or grants case access. | Court-approved access rules, review of legacy records, CMS appearance/withdrawal synchronization, limited-scope representation and service enrollment. |
-| Record the correct legal filing date | Receipt instants and filing dates are separate. Published court calendar revisions specify timezone, coverage, holidays and closures. Submissions retain their date assessment; acceptance records any revised assessment without rewriting the original receipt. | Court verification of calendar completeness, authorized date adjustments, relief for transmission failures and review of closures published after acceptance. Correcting a document does not automatically preserve its legal filing date. |
+| Record the correct legal filing date | Receipt instants and filing dates are separate. Published calendars establish business dates. Assigned staff can record a signed order establishing a different date, with retained before/after evidence and explicit case opening date changes. Acceptance honors the order without rewriting the receipt. | Court verification of calendars and signed orders, motion/adjudication procedures, downstream CMS synchronization and review of closures published after acceptance. Correcting a document does not automatically preserve its legal filing date. |
 | Resolve fee waivers correctly | A completed application accompanies the filing. Clerk waivers, referral and judicial decisions are separate court-scoped actions. Signed decision PDFs and denial amounts remain in private history; a filer can pay after denial without resubmitting. | Actual notice delivery, de novo review and judicial assignment, deadline calculation, case-wide continuation and reinstatement, court verification of signed forms and prisoner-specific procedures. |
 | Collect and reconcile funds | Demo fee quoting, simulated payments and linked payment references work. | Audited court fee schedules, a real hosted payment processor, signed webhooks, reconciliation, refunds and accounting exports. |
 | Deliver electronic service | Service-only documents can be recorded. | Verified service contacts, consent/eligibility, real transmission, failures/retries, non-electronic alternatives and retained proof. A recorded document or in-app notice is not proof of service. |
@@ -137,18 +137,17 @@ coverage or a timezone change before the next business day produces an unresolve
 The calculation loads the relevant revisions in one query, with no database query per day.
 
 Submission preserves the UTC receipt instant and calendar assessment, including revision
-IDs and skipped dates. Acceptance reassesses the same receipt instant against the published
-calendar and records a separate event if the assessment changed. New cases keep the receipt
+IDs and skipped dates. Unless a court order has established the date for that submission,
+acceptance reassesses the same receipt instant against the published calendar and records
+a separate event if the assessment changed. New cases keep the receipt
 instant in `filed_date` and the civil date in `filing_date`; neither uses the clerk's acceptance
 time. Date-only fields display consistently across viewer timezones. Search and docket
 detail share the same public response schema, and timestamp responses include a UTC offset.
 
 If coverage is unresolved, submission still records receipt. Production acceptance returns
-409 until the court resolves the calendar; demo acceptance may continue with a clearly
+409 until the court resolves the calendar or records a signed filing-date order; demo acceptance may continue with a clearly
 unestablished date. Existing historical dates are retained as unverified. Calendar revision
-publication does not retroactively change accepted filings or cases. Judicial adjustments,
-correction-date relief, transmission-failure relief and the effect of post-denial payment
-remain court procedures requiring further implementation. This is not a deadline calculator.
+publication does not retroactively change accepted filings or cases. This is not a deadline calculator.
 
 - `GET /api/v1/courts/{id}/calendars`: public revision history, 25 per page, and the viewer's
   publication permission.
@@ -163,6 +162,61 @@ filing dates, and refuses an automatic downgrade that would erase these records.
 `backend/tests/test_court_calendars.py` covers midnight, daylight-saving transitions,
 different court timezones, holidays, adjacent years, revisions, permissions and receipt
 preservation. The migration and PostgreSQL suites cover the retained records as well.
+
+### Recording signed filing-date orders
+
+Assigned clerks, judges and court administrators can open **Record a filing-date order**
+from a filing's private history. The form requires a readable PDF of an existing signed
+order, its signing date and reference, the ordered filing date, the reason, and an explicit
+attestation that staff reviewed the order. Recording requires a court assignment; being a
+system administrator alone is insufficient. Drafts and service-only records are ineligible.
+An order can be recorded against a pending, accepted, returned or rejected submission;
+this action does not accept or reopen it. Legacy records keep missing receipt times missing.
+
+This supports recording the outcome of a court procedure. MCR 1.109(G)(7)(a) permits a
+motion for a court order establishing an earlier filing date after a transmission failure,
+subject to findings by the court. MUEFS does not decide those findings, calculate relief,
+authenticate a signature, or infer an earlier date from an outage. The same recording path
+can retain another authorized date decision after the court follows its applicable procedure.
+
+The `filing_date_ordered` transaction retains the previous date and basis, the new ordered
+date and reference, the actor, UTC decision recording time and signed PDF manifest. Earlier
+transactions and file bytes remain intact. The original receipt timestamp is never changed.
+The signed PDF initially has restricted access for the filer and assigned court staff;
+staff can use the existing public-copy workflow to publish a reviewed copy on the accepted
+case docket. Court orders are excluded from filer attachment manifests and cannot be
+uploaded or removed through the filer's document controls. Recovery audits include their
+retained manifests. Acceptance verifies the current order's stored bytes as well as the
+filing attachments and preserves the ordered date; the CMS acceptance boundary still applies.
+
+Staff must explicitly select applying the same order to an existing case's opening date.
+The case's original `filed_date` instant stays unchanged. No relationship to a historical
+initiating filing is guessed. Acceptance of a new case uses its envelope's ordered filing
+date. A later corrected submission receives a fresh calendar assessment; the prior order
+stays attached to its original submission attempt and is not silently carried forward.
+
+Filing and case date versions reject stale decisions, including a form opened before
+acceptance creates a case. Account and court authority are checked again after PDF inspection,
+then locked through the transaction. Competing orders for one filing, or different filings
+changing one case date, cannot both overwrite the same version. Date, order metadata,
+receipt, notice and audit writes share one database transaction; failed writes remove the
+newly uploaded candidate. Document inspection and upload happen before these record locks.
+The docket loads documents and public copies in batches, including court orders without
+adding them to the filer's relationship or serializing hidden originals into public responses.
+
+- `GET /api/v1/clerk/filings/{id}/filing-date`: private current date, basis, receipt,
+  case opening date, versions and eligibility.
+- `POST /api/v1/clerk/filings/{id}/filing-date`: multipart signed order and decision,
+  with `expected_version` and, for a case change, `expected_case_version`.
+
+Migration `b2e4a8c19d70` adds the two version counters without changing historical dates.
+The order documents and append-only transaction tables are reused. An automatic downgrade
+is refused to prevent a previous application version from ignoring retained court orders.
+Twelve workflow and PostgreSQL concurrency cases cover receipt preservation, date/version
+conflicts, publication, legacy records, resubmission, corruption, rollback and authority
+changes. The full local backend suite passes 274 tests with PostgreSQL and S3-compatible
+storage enabled. Five browser checks exercise the form, download fingerprints, acceptance,
+stale edits, case dates and the public docket at desktop and mobile sizes.
 
 ## Filing notice email
 

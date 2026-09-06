@@ -9,7 +9,7 @@ from app.config import settings
 from app.integrations.cms_adapter import submit_filing_to_cms
 from app.models.case import Case, CaseStatus
 from app.models.court import FilingRequirement
-from app.models.filing import FilingEnvelope, FilingStatus
+from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.schemas.filing import (
     FilingEnvelopeCreate,
     FilingValidationResult,
@@ -40,13 +40,16 @@ class FilingDocumentError(Exception):
     pass
 
 
-async def verify_filing_documents(filing: FilingEnvelope) -> None:
+async def verify_filing_documents(
+    filing: FilingEnvelope, court_order: FilingDocument | None = None,
+) -> None:
     """Confirm current attachment bytes before creating a receipt or accepting a filing."""
     from botocore.exceptions import BotoCoreError, ClientError
 
     if not filing.documents:
         raise FilingDocumentError("The filing has no current documents to verify")
-    for doc in filing.documents:
+    documents = [*filing.documents, court_order] if court_order else filing.documents
+    for doc in documents:
         try:
             digest, size = await run_in_threadpool(document_service.stored_integrity, doc.file_key)
         except (OSError, BotoCoreError, ClientError) as exc:
@@ -343,6 +346,7 @@ async def submit_filing(
     filing.rejection_reason = None
     filing.cms_error = None
     filing.submission_count += 1
+    filing.filing_date_version += 1
     if filing.filing_type != "service_only":
         assessment = await filing_date_for_receipt(db, filing.court_id, now)
         filing.filing_date = assessment.filing_date
@@ -395,8 +399,21 @@ async def review_filing(
     if not filing or filing.status not in (FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW):
         return None
 
+    ordered_date = (filing.filing_date_basis or {}).get("source") == "court_order"
     if action == "accept":
-        await verify_filing_documents(filing)
+        court_order = None
+        if ordered_date:
+            basis = filing.filing_date_basis or {}
+            court_order = await db.scalar(select(FilingDocument).where(
+                FilingDocument.id == basis.get("order_document_id"),
+                FilingDocument.envelope_id == filing.id,
+                FilingDocument.document_type_code == "FILING_DATE_ORDER",
+                FilingDocument.retained_at.is_not(None),
+            ))
+            if (court_order is None or filing.filing_date is None
+                    or basis.get("submission_number") != filing.submission_count):
+                raise FilingDateUnavailableError("The filing-date order requires court review")
+        await verify_filing_documents(filing, court_order)
     now = datetime.now(UTC)
     filing.reviewer_id = reviewer_id
     filing.reviewed_at = now
@@ -404,19 +421,22 @@ async def review_filing(
     if action == "accept":
         if filing.submitted_at is None:
             raise FilingDateUnavailableError("The filing has no recorded receipt time")
-        assessment = await filing_date_for_receipt(db, filing.court_id, filing.submitted_at)
-        if assessment.filing_date is None and not settings.allow_demo_mode:
-            raise FilingDateUnavailableError(
-                assessment.error or "The court filing date is unresolved"
-            )
-        basis = assessment.model_dump(mode="json")
-        if filing.filing_date_basis != basis:
-            previous_date = filing.filing_date.isoformat() if filing.filing_date else None
-            filing.filing_date = assessment.filing_date
-            filing.filing_date_basis = basis
-            await record_transaction(db, filing, "filing_date_assessed", reviewer_id, details={
-                "previous_filing_date": previous_date, "filing_date_basis": basis,
-            })
+        if not ordered_date:
+            assessment = await filing_date_for_receipt(db, filing.court_id, filing.submitted_at)
+            if assessment.filing_date is None and not settings.allow_demo_mode:
+                raise FilingDateUnavailableError(
+                    assessment.error or "The court filing date is unresolved"
+                )
+            basis = assessment.model_dump(mode="json")
+            if filing.filing_date_basis != basis:
+                previous_date = filing.filing_date.isoformat() if filing.filing_date else None
+                filing.filing_date = assessment.filing_date
+                filing.filing_date_basis = basis
+                await record_transaction(db, filing, "filing_date_assessed", reviewer_id, details={
+                    "previous_filing_date": previous_date, "filing_date_basis": basis,
+                })
+        # Acceptance can create the case. An already-open date form must be refreshed.
+        filing.filing_date_version += 1
         filing.status = FilingStatus.UNDER_REVIEW
         case = await _case_for_accept(db, filing, now)
         cms_result = await submit_filing_to_cms(case.case_number, filing.id)
@@ -438,9 +458,11 @@ async def review_filing(
         filing.cms_case_number = cms_result.cms_case_number
         filing.cms_error = None
     elif action == "reject":
+        filing.filing_date_version += 1
         filing.status = FilingStatus.REJECTED
         filing.rejection_reason = reason
     elif action == "return":
+        filing.filing_date_version += 1
         filing.status = FilingStatus.RETURNED
         filing.rejection_reason = reason
     else:

@@ -7,7 +7,7 @@ from app.api.auth import get_optional_user_id
 from app.database import get_db
 from app.models.case import Case, CaseStatus
 from app.models.document_public_copy import DocumentPublicCopy
-from app.models.filing import PRIVATE_DOCUMENT_TYPES, FilingEnvelope
+from app.models.filing import PRIVATE_DOCUMENT_TYPES, FilingDocument, FilingEnvelope
 from app.models.user import CourtRole, UserCourtRole
 from app.schemas.case import (
     CaseDocketResponse,
@@ -90,7 +90,6 @@ async def get_case_filings(
     case = await db.get(Case, case_id)
     query = (
         select(FilingEnvelope)
-        .options(selectinload(FilingEnvelope.documents))
         .where(FilingEnvelope.case_id == case_id)
         .order_by(FilingEnvelope.created_at.desc(), FilingEnvelope.id.desc())
     )
@@ -111,8 +110,18 @@ async def get_case_filings(
     result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
     staff = await access_service.user_is_court_staff_for_court(db, user_id, case.court_id)
     filings = list(result.scalars())
+    # Court orders belong on the docket, but never in the filer's attachment manifest.
+    # Load all current docket documents once, including separately recorded date orders.
+    documents: dict[int, list[FilingDocument]] = {}
+    if filings:
+        for doc in await db.scalars(select(FilingDocument).where(
+            FilingDocument.envelope_id.in_([filing.id for filing in filings]),
+            FilingDocument.removed_at.is_(None),
+            FilingDocument.document_type_code != "FEE_WAIVER_ORDER",
+        ).order_by(FilingDocument.id)):
+            documents.setdefault(doc.envelope_id, []).append(doc)
     copy_ids = {
-        doc.public_copy_id for filing in filings for doc in filing.documents
+        doc.public_copy_id for filing in filings for doc in documents.get(filing.id, [])
         if doc.public_copy_id and not staff and filing.filer_id != user_id
     }
     copies = {copy.id: copy for copy in await db.scalars(
@@ -120,10 +129,9 @@ async def get_case_filings(
     )} if copy_ids else {}
     entries = []
     for filing in filings:
-        entry = CaseFilingResponse.model_validate(filing)
-        if not staff and filing.filer_id != user_id:
-            visible_documents = []
-            for doc, response in zip(filing.documents, entry.documents, strict=True):
+        visible_documents = []
+        for doc in documents.get(filing.id, []):
+            if not staff and filing.filer_id != user_id:
                 if doc.document_type_code in PRIVATE_DOCUMENT_TYPES:
                     continue
                 copy = copies.get(doc.public_copy_id) if doc.public_copy_id else None
@@ -139,7 +147,14 @@ async def get_case_filings(
                         uploaded_at=copy.created_at,
                     ))
                 elif not doc.is_confidential:
-                    visible_documents.append(response)
-            entry.documents = visible_documents
-        entries.append(entry)
+                    visible_documents.append(CaseDocumentResponse.model_validate(doc))
+            else:
+                visible_documents.append(CaseDocumentResponse.model_validate(doc))
+        entries.append(CaseFilingResponse(
+            id=filing.id, status=filing.status, case_title=filing.case_title,
+            filing_description=filing.filing_description, submitted_at=filing.submitted_at,
+            reviewed_at=filing.reviewed_at, rejection_reason=filing.rejection_reason,
+            documents=visible_documents, created_at=filing.created_at,
+            filing_date=filing.filing_date,
+        ))
     return entries

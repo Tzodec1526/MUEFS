@@ -38,7 +38,7 @@ export interface FilingEnvelope {
   updated_at: string;
   submission_count: number;
   filing_date: string | null;
-  filing_date_basis: FilingDateAssessment | null;
+  filing_date_basis: FilingDateBasis | null;
 }
 
 export interface FilingValidation {
@@ -126,7 +126,9 @@ export interface FilingTransaction {
     payment?: { amount_cents: number; transaction_ref: string; is_simulated: boolean } | null;
     basis?: string;
     amount_due_cents?: number;
-    filing_date_basis?: FilingDateAssessment | null;
+    filing_date_basis?: FilingDateBasis | null;
+    previous_filing_date?: string | null;
+    case_date_change?: { case_id: number; case_number: string; previous_filing_date: string | null; filing_date: string };
     documents?: FilingDocument[];
     document_id?: number;
     public_copy?: { id: number; title: string; sha256_hash: string; file_size_bytes: number };
@@ -145,12 +147,13 @@ export interface FilingHistory {
   page_size: number;
   fee_waiver: FeeWaiverState | null;
   filing_date: string | null;
-  filing_date_basis: FilingDateAssessment | null;
+  filing_date_basis: FilingDateBasis | null;
   court_id: number;
   can_manage_documents: boolean;
 }
 
 export interface FilingDateAssessment {
+  source?: never;
   filing_date: string | null;
   timezone: string | null;
   local_received_date: string | null;
@@ -158,6 +161,15 @@ export interface FilingDateAssessment {
   skipped_dates: Record<string, string>;
   error: string | null;
 }
+
+export type FilingDateBasis = FilingDateAssessment | {
+  source: 'court_order';
+  filing_date: string;
+  order_document_id: number;
+  order_signed_date: string;
+  authority_reference: string;
+  submission_number: number;
+};
 
 export interface FeeWaiverState {
   granted: boolean | null;

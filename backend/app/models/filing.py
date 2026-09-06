@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 PRIVATE_DOCUMENT_TYPES = frozenset({"FEE_WAIVER", "FEE_WAIVER_ORDER"})
+COURT_DOCUMENT_TYPES = frozenset({"FEE_WAIVER_ORDER", "FILING_DATE_ORDER"})
 
 
 class FilingStatus(enum.StrEnum):
@@ -62,12 +63,13 @@ class FilingEnvelope(Base):
     submission_count: Mapped[int] = mapped_column(default=0, server_default="0")
     filing_date: Mapped[date | None]
     filing_date_basis: Mapped[dict | None] = mapped_column(JSON)
+    filing_date_version: Mapped[int] = mapped_column(default=0, server_default="0")
 
     documents: Mapped[list["FilingDocument"]] = relationship(
         back_populates="envelope",
         primaryjoin="and_(FilingEnvelope.id == FilingDocument.envelope_id, "
         "FilingDocument.removed_at.is_(None), "
-        "FilingDocument.document_type_code != 'FEE_WAIVER_ORDER')",
+        "FilingDocument.document_type_code.not_in(('FEE_WAIVER_ORDER', 'FILING_DATE_ORDER')))",
         order_by="FilingDocument.id",
     )
 

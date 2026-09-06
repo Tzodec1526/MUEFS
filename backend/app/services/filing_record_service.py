@@ -71,7 +71,8 @@ async def record_transaction(
             court_name=court.name if court else f"Court #{filing.court_id}",
             case_title=filing.case_title,
             reason=("Open the private filing history to read the decision."
-                    if event_type.startswith("waiver_") else reason),
+                    if event_type.startswith("waiver_") or event_type == "filing_date_ordered"
+                    else reason),
         )
         notice.body += (
             f"\nTransaction: {transaction.id}\nRecorded (UTC): {now.isoformat()}"
