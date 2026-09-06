@@ -13,6 +13,7 @@ establish state approval or production readiness.
 | Preserve corrections and decisions | Corrections create another numbered submission. Earlier document bytes remain downloadable by the filer and court staff. Acceptance, return, rejection and CMS failure are separate retained events. | Effective filing-date decisions, judicial relief for transmission failures, and certified/file-stamped copies. |
 | Survive retries and simultaneous actions | Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Batch review uses a savepoint per filing. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
 | Protect private material | Private envelopes and receipts require filer or court-staff access. Dockets exclude waiver application data, confidential document metadata, superseded documents and other filers' drafts. Fee-waiver documents are nonpublic even if the filer omits the checkbox. | Full classification/retention policy for every case and document type; independent security assessment. |
+| Control case participation and access | Assigned staff record participants, counsel representation and explicit restricted-case grants with retained reasons, before/after history, stale-edit checks and revocation. Filing acceptance no longer assigns party roles or grants case access. | Court-approved access rules, review of legacy records, CMS appearance/withdrawal synchronization, limited-scope representation and service enrollment. |
 | Record the correct legal filing date | Receipt instants and filing dates are separate. Published court calendar revisions specify timezone, coverage, holidays and closures. Submissions retain their date assessment; acceptance records any revised assessment without rewriting the original receipt. | Court verification of calendar completeness, authorized date adjustments, relief for transmission failures and review of closures published after acceptance. Correcting a document does not automatically preserve its legal filing date. |
 | Resolve fee waivers correctly | A completed application accompanies the filing. Clerk waivers, referral and judicial decisions are separate court-scoped actions. Signed decision PDFs and denial amounts remain in private history; a filer can pay after denial without resubmitting. | Actual notice delivery, de novo review and judicial assignment, deadline calculation, case-wide continuation and reinstatement, court verification of signed forms and prisoner-specific procedures. |
 | Collect and reconcile funds | Demo fee quoting, simulated payments and linked payment references work. | Audited court fee schedules, a real hosted payment processor, signed webhooks, reconciliation, refunds and accounting exports. |
@@ -269,6 +270,51 @@ The current frontend keeps bearer tokens in browser storage; the production iden
 must address that session design and XSS exposure. An IdP cookie does not itself establish
 an application session for this API.
 
+## Court-managed participants and restricted-case access
+
+**Court Cases** lists public and sealed matters only for a staff member's assigned court,
+with an exact case-number lookup and 25-record pages. The case docket links assigned staff
+to **Manage participants**. Staff can record a party or counsel, identify a represented
+party, link an existing account and explicitly grant restricted-case access. Generic
+attorney roles accommodate representation that is not accurately described as plaintiff
+or defendant. Retiring a record preserves it as former participation and removes its grant.
+
+Acceptance previously inferred every filer to be a plaintiff or plaintiff's attorney and
+independently granted accepted filers access to sealed dockets. Both paths are deleted.
+An accepted envelope proves that a filing was accepted; it does not identify the filer's
+capacity or authorize all case records. Filers retain their own envelopes and receipts.
+Counsel grants now require an explicit account link and the account's current verified,
+matching bar number. A public bar-number match never links an account automatically.
+
+All staff changes require a reason and court authority/reference. Actor and case locks
+recheck current authority, and a case version rejects an obsolete editor. A failed audit
+write rolls back the participant change. Audit history retains the operator, UTC time,
+reason and before/after values. Staff cannot change their own participant record. A system
+administrator also needs an assignment at the case's court to manage participants.
+
+Migration `e83f2c91a6d4` preserves all legacy participant records and private contacts,
+adds a per-case review-needed event, and starts those rows without an access grant. Court
+review is required before enabling them. Multiple active records can legitimately grant
+the same account access; retiring one record does not remove independent grants or court
+roles. Current access is checked on subsequent protected requests, including favorites.
+The public docket exposes participant names, roles and representation, but excludes linked
+accounts, contact details, access flags and private administrative history.
+
+The court directory uses the `(court_id, id)` index and seeks from the last displayed ID
+instead of scanning an offset or counting every case. Participant account emails load in
+one joined query per page. Case-insensitive account lookup uses an expression index and
+rejects ambiguous legacy identities. Staff docket views no longer request favorites, and
+the new court screens load only when opened. The CORS policy now permits `PUT` for staff
+edits on deployments with separate frontend and API origins.
+
+Verification covers grant/retirement, retained private access, counsel identity checks,
+cross-court denials, ambiguous identities, pagination, stale edits, failed audit rollback,
+historical migration and PostgreSQL concurrency on fresh and migrated schemas. Local
+Chromium exercises the staff workflow, public-search boundary and desktop/mobile layouts.
+These administrative records do not establish legal appearance, approve withdrawal,
+replace the court's system of record, or enroll anyone in electronic service. A court
+must approve the access policy and migration review before operational use.
+
 ## Sources guiding the evaluation
 
 - [RFC 5321, SMTP](https://www.rfc-editor.org/rfc/rfc5321): relay acceptance, response codes and uncertainty after a lost final response.
@@ -277,6 +323,7 @@ an application session for this API.
 - [Browser connection policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/connect-src): allowing the configured identity provider for browser token exchange.
 - [Michigan Court Rule 1.109, electronic filing and service](https://www.courts.michigan.gov/siteassets/rules-instructions-administrative-orders/michigan-court-rules/court-rules-book-ch-1-responsive-html5.zip/Court_Rules_Book_Ch_1/Court_Rules_Chapter_1/Court_Rules_Chapter_1.htm): transaction records and notices, filing timing, service and transmission failures.
 - [Michigan Court Rule 2.002](https://www.courts.michigan.gov/siteassets/rules-instructions-administrative-orders/michigan-court-rules/court-rules-book-ch-2-responsive-html5.zip/Court_Rules_Book_Ch_2/Court_Rules_Chapter_2/Court_Rules_Chapter_2.htm): waiver requests, nonpublic information and court decisions.
+- [Michigan Court Rule 2.117](https://www.courts.michigan.gov/siteassets/rules-instructions-administrative-orders/michigan-court-rules/court-rules-book-ch-2-responsive-html5.zip/Court_Rules_Book_Ch_2/Court_Rules_Chapter_2/Court_Rules_Chapter_2.htm): appearances, limited-scope representation and withdrawal require their applicable court procedures.
 - [NCSC electronic filing process standards](https://www.ncsc.org/__data/assets/pdf_file/0022/15367/recommended_-process_-standards_02_26_03.pdf): historical functional guidance on document integrity, security and transaction records; not a current product certification.
 
 These sources guide implementation requirements. A participating court must validate the

@@ -26,8 +26,14 @@ correction history and PostgreSQL concurrency checks now form part of the core w
   processing (server-side OCR / PDF-A conversion) is not implemented.
 - **Demo persistence is lightweight.** `run_demo.py` and the hosted demo use SQLite + local
   file storage; production uses PostgreSQL + MinIO/S3.
-- **No e-service or email delivery.** Clerk decisions create in-app notifications.
-  Service-only filings record documents; delivery must be arranged outside the app.
+- **Electronic service is not implemented.** An opt-in SMTP outbox sends generic filing
+  alerts to verified accounts and retains transport outcomes. Those alerts do not establish
+  legal service. Service-only filings record documents; delivery must be arranged outside
+  the app. A court-approved relay, bounce handling and service procedures remain necessary.
+- **Participant records require court review.** Staff can record parties, counsel and
+  explicit restricted-case grants with retained authority and history. The portal does not
+  determine legal appearance, approve withdrawal or enroll a service contact. Legacy
+  participant links require review after migration; accepting a filing grants no case role.
 
 ## Roadmap (illustrative)
 

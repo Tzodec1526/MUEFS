@@ -12,43 +12,6 @@ from app.services import access_service
 
 
 @pytest.mark.asyncio
-async def test_case_access_party_by_user_id(db_session):
-    user = User(
-        email="party@test.com", first_name="P", last_name="arty",
-        user_type=UserType.SELF_REPRESENTED,
-    )
-    other = User(
-        email="other@test.com", first_name="O", last_name="ther",
-        user_type=UserType.ATTORNEY,
-    )
-    db_session.add_all([user, other])
-    court = Court(name="Test Court", county="X", court_type=CourtType.CIRCUIT)
-    db_session.add(court)
-    await db_session.flush()
-    ct = CaseType(
-        court_id=court.id, code="C", name="Civil",
-        category=CaseCategory.CIVIL, filing_fee_cents=100,
-    )
-    db_session.add(ct)
-    await db_session.flush()
-    case = Case(
-        court_id=court.id, case_number="T-1", case_type_id=ct.id,
-        title="A v B", status=CaseStatus.OPEN, filed_date=datetime.now(UTC),
-    )
-    db_session.add(case)
-    await db_session.flush()
-    db_session.add(CaseParticipant(
-        case_id=case.id, user_id=user.id, role=ParticipantRole.PLAINTIFF,
-        party_name="Party Person",
-    ))
-    await db_session.flush()
-
-    assert await access_service.user_may_read_case(db_session, user.id, case.id) is True
-    # Non-sealed: any authenticated user may view the docket (public transparency).
-    assert await access_service.user_may_read_case(db_session, other.id, case.id) is True
-
-
-@pytest.mark.asyncio
 async def test_case_access_court_staff(db_session):
     clerk = User(
         email="clerk2@test.com", first_name="C", last_name="lerk",
@@ -69,11 +32,12 @@ async def test_case_access_court_staff(db_session):
     await db_session.flush()
     case = Case(
         court_id=court.id, case_number="S-1", case_type_id=ct.id,
-        title="X v Y", status=CaseStatus.OPEN, filed_date=datetime.now(UTC),
+        title="X v Y", status=CaseStatus.OPEN, filed_date=datetime.now(UTC), is_sealed=True,
     )
     db_session.add(case)
     await db_session.flush()
 
+    assert await access_service.user_may_read_case(db_session, None, case.id) is False
     assert await access_service.user_may_read_case(db_session, clerk.id, case.id) is True
 
 
@@ -150,7 +114,7 @@ async def test_sealed_case_stranger_denied(db_session):
     await db_session.flush()
     db_session.add(CaseParticipant(
         case_id=case.id, user_id=party.id, role=ParticipantRole.PLAINTIFF,
-        party_name="Party Person",
+        party_name="Party Person", access_enabled=True,
     ))
     await db_session.flush()
 
@@ -280,138 +244,41 @@ async def test_sealed_submitted_envelope_denied_to_stranger(db_session):
 
 
 @pytest.mark.asyncio
-async def test_sealed_bar_on_party_row_does_not_grant_counsel_access(db_session):
-    """Bar number on a non-attorney participant does not open a sealed case to that lawyer."""
-    outsider = User(
-        email="outside_bar@test.com", first_name="O", last_name="ut",
-        user_type=UserType.ATTORNEY, bar_number="P777",
-    )
-    db_session.add(outsider)
-    court = Court(name="Bar Party Court", county="B", court_type=CourtType.CIRCUIT)
-    db_session.add(court)
-    await db_session.flush()
-    ct = CaseType(
-        court_id=court.id, code="C", name="Civil",
-        category=CaseCategory.CIVIL, filing_fee_cents=100,
-    )
-    db_session.add(ct)
-    await db_session.flush()
-    case = Case(
-        court_id=court.id, case_number="BP-1", case_type_id=ct.id,
-        title="Sealed", status=CaseStatus.OPEN, filed_date=datetime.now(UTC),
-        is_sealed=True,
-    )
-    db_session.add(case)
-    await db_session.flush()
-    db_session.add(CaseParticipant(
-        case_id=case.id, role=ParticipantRole.DEFENDANT,
-        party_name="Corp", attorney_bar_number="P777",
-    ))
-    await db_session.flush()
-    assert await access_service.user_may_read_case(db_session, outsider.id, case.id) is False
-
-
-@pytest.mark.asyncio
-async def test_sealed_counsel_of_record_by_verified_bar_and_role(db_session):
-    """Counsel on an attorney_* row may access a sealed case via a *verified* bar number."""
+async def test_sealed_counsel_requires_an_explicit_link_and_current_bar_verification(db_session):
     counsel = User(
-        email="on_file@test.com", first_name="C", last_name="ounsel",
+        email="counsel@test.com", first_name="Court", last_name="Counsel",
         user_type=UserType.ATTORNEY, bar_number="P888", bar_number_verified=True,
     )
     db_session.add(counsel)
-    court = Court(name="Counsel Court", county="C", court_type=CourtType.CIRCUIT)
-    db_session.add(court)
-    await db_session.flush()
-    ct = CaseType(
-        court_id=court.id, code="C", name="Civil",
-        category=CaseCategory.CIVIL, filing_fee_cents=100,
-    )
-    db_session.add(ct)
-    await db_session.flush()
+    court, case_type = await _court_and_case_type(db_session)
     case = Case(
-        court_id=court.id, case_number="OC-1", case_type_id=ct.id,
-        title="Sealed", status=CaseStatus.OPEN, filed_date=datetime.now(UTC),
-        is_sealed=True,
+        court_id=court.id, case_type_id=case_type.id, case_number="COUNSEL-1",
+        title="Sealed", filed_date=datetime.now(UTC), is_sealed=True,
     )
     db_session.add(case)
     await db_session.flush()
-    db_session.add(CaseParticipant(
+    record = CaseParticipant(
         case_id=case.id, role=ParticipantRole.ATTORNEY_DEFENDANT,
-        party_name="Lawyer", attorney_bar_number="P888",
-    ))
-    await db_session.flush()
-    assert await access_service.user_may_read_case(db_session, counsel.id, case.id) is True
-
-
-@pytest.mark.asyncio
-async def test_sealed_self_asserted_bar_denied(db_session):
-    """A self-asserted (unverified) bar number must NOT open a sealed case.
-
-    Regression test: public self-registration sets bar_number but leaves
-    bar_number_verified False, so an attacker cannot impersonate counsel of record by
-    claiming a real attorney's (public) bar number.
-    """
-    attacker = User(
-        email="attacker@test.com", first_name="A", last_name="ttacker",
-        user_type=UserType.ATTORNEY, bar_number="P888",  # bar_number_verified defaults False
+        party_name="Counsel", attorney_bar_number="P888", access_enabled=True,
     )
-    db_session.add(attacker)
-    court = Court(name="Unverified Bar Court", county="U", court_type=CourtType.CIRCUIT)
-    db_session.add(court)
+    db_session.add(record)
     await db_session.flush()
-    ct = CaseType(
-        court_id=court.id, code="C", name="Civil",
-        category=CaseCategory.CIVIL, filing_fee_cents=100,
-    )
-    db_session.add(ct)
+    # Matching a public bar number never links an account automatically.
+    assert not await access_service.user_may_read_case(db_session, counsel.id, case.id)
+    record.user_id = counsel.id
     await db_session.flush()
-    case = Case(
-        court_id=court.id, case_number="UB-1", case_type_id=ct.id,
-        title="Sealed", status=CaseStatus.OPEN, filed_date=datetime.now(UTC),
-        is_sealed=True,
-    )
-    db_session.add(case)
+    assert await access_service.user_may_read_case(db_session, counsel.id, case.id)
+    counsel.bar_number_verified = False
     await db_session.flush()
-    db_session.add(CaseParticipant(
-        case_id=case.id, role=ParticipantRole.ATTORNEY_DEFENDANT,
-        party_name="Real Counsel", attorney_bar_number="P888",
-    ))
+    assert not await access_service.user_may_read_case(db_session, counsel.id, case.id)
+    counsel.bar_number_verified = True
+    counsel.bar_number = "P999"
     await db_session.flush()
-    assert await access_service.user_may_read_case(db_session, attacker.id, case.id) is False
-
-
-@pytest.mark.asyncio
-async def test_sealed_counsel_of_record_by_user_id(db_session):
-    """Counsel linked to an attorney_* row by user_id may access the sealed case even
-    without a verified bar number (the account-linkage path)."""
-    counsel = User(
-        email="linked_counsel@test.com", first_name="L", last_name="inked",
-        user_type=UserType.ATTORNEY, bar_number="P555",  # unverified
-    )
-    db_session.add(counsel)
+    assert not await access_service.user_may_read_case(db_session, counsel.id, case.id)
+    counsel.bar_number = "P888"
+    record.is_active = False
     await db_session.flush()
-    court = Court(name="Linked Counsel Court", county="L", court_type=CourtType.CIRCUIT)
-    db_session.add(court)
-    await db_session.flush()
-    ct = CaseType(
-        court_id=court.id, code="C", name="Civil",
-        category=CaseCategory.CIVIL, filing_fee_cents=100,
-    )
-    db_session.add(ct)
-    await db_session.flush()
-    case = Case(
-        court_id=court.id, case_number="LC-1", case_type_id=ct.id,
-        title="Sealed", status=CaseStatus.OPEN, filed_date=datetime.now(UTC),
-        is_sealed=True,
-    )
-    db_session.add(case)
-    await db_session.flush()
-    db_session.add(CaseParticipant(
-        case_id=case.id, user_id=counsel.id, role=ParticipantRole.ATTORNEY_PLAINTIFF,
-        party_name="Linked Lawyer", attorney_bar_number="P555",
-    ))
-    await db_session.flush()
-    assert await access_service.user_may_read_case(db_session, counsel.id, case.id) is True
+    assert not await access_service.user_may_read_case(db_session, counsel.id, case.id)
 
 
 # ========== ANONYMOUS PUBLIC ACCESS (user_id=None) ==========

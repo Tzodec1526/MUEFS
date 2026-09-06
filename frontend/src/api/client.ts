@@ -78,7 +78,7 @@ apiClient.interceptors.response.use(
         return Promise.reject(error);
       }
       const path = window.location.pathname;
-      const onPublicPath = path.startsWith('/cases');
+      const onPublicPath = /^\/cases\/(search|\d+)\/?$/.test(path);
       const role = localStorage.getItem('demo_role');
       if (role && role !== 'public' && !onPublicPath && path !== '/login') {
         window.location.href = `/login?next=${encodeURIComponent(path + window.location.search + window.location.hash)}`;

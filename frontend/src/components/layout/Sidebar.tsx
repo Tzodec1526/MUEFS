@@ -26,6 +26,7 @@ function Sidebar() {
     { path: '/notifications', label: 'Notices', icon: Mail, roles: ['attorney', 'srl', 'clerk', 'admin'] },
     { path: '/cases/search', label: 'Case Search', icon: Search, roles: ['attorney', 'clerk', 'srl', 'public', 'admin'] },
     { path: '/favorites', label: 'Favorites', icon: Star, roles: ['attorney', 'srl'] },
+    { path: '/clerk/cases', label: 'Court Cases', icon: FolderOpen, roles: ['clerk', 'admin'], courtOnly: true },
     { path: '/clerk/queue', label: 'Review Queue', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
     { path: `/courts/${courtId}/calendar`, label: 'Court Calendar', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
   ];

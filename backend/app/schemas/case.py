@@ -8,9 +8,12 @@ from app.models.case import CaseStatus, ParticipantRole
 class CaseSearchParticipantPublic(BaseModel):
     """Public party/counsel identifiers only — no contact PII (court privacy)."""
 
+    id: int
     party_name: str
     role: ParticipantRole
     attorney_bar_number: str | None = None
+    represented_party_name: str | None = None
+    is_active: bool = True
 
     model_config = {"from_attributes": True}
 
@@ -31,6 +34,7 @@ class CaseDocketResponse(BaseModel):
     filing_date: date | None = None
     judge_id: int | None
     participants: list[CaseSearchParticipantPublic] = []
+    can_manage_participants: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}

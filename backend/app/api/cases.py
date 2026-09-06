@@ -68,7 +68,9 @@ async def get_case(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access this case",
         )
-    return case
+    profile = CaseDocketResponse.model_validate(case)
+    return profile.model_copy(update={"can_manage_participants":
+        await access_service.user_is_court_staff_for_court(db, user_id, case.court_id)})
 
 
 @router.get("/{case_id}/filings", response_model=list[CaseFilingResponse])

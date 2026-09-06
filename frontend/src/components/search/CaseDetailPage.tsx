@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Link2 } from 'lucide-react';
 import { apiClient } from '../../api/client';
+import { participantRoles } from '../../api/cases';
 import { addFavorite, removeFavorite, listFavorites } from '../../api/favorites';
 import { getCaseTypes } from '../../api/courts';
 import { formatBytes, formatCourtDate, formatShortDate, getDocumentLabel } from '../../utils/format';
@@ -16,6 +17,7 @@ interface CaseDetail {
   case_type_id: number;
   title: string;
   is_sealed?: boolean;
+  can_manage_participants: boolean;
   status: string;
   filed_date: string;
   filing_date: string | null;
@@ -25,6 +27,8 @@ interface CaseDetail {
     party_name: string;
     role: string;
     attorney_bar_number: string | null;
+    represented_party_name: string | null;
+    is_active: boolean;
   }>;
   created_at: string;
 }
@@ -53,7 +57,9 @@ function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const { pushToast } = useToast();
   // Read-only viewers: the signed-in 'public' role and anonymous guests (no role).
-  const isPublicViewer = getDemoRole() === 'public' || !getDemoRole();
+  const role = getDemoRole();
+  const isPublicViewer = role === 'public' || !role;
+  const isFiler = role === 'attorney' || role === 'srl';
   const [caseData, setCaseData] = useState<CaseDetail | null>(null);
   const [filings, setFilings] = useState<CaseFiling[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,7 +88,7 @@ function CaseDetailPage() {
         const [caseRes, filingsRes, favsRes] = await Promise.all([
           apiClient.get(`/cases/${caseId}`, { signal: controller.signal }),
           apiClient.get(`/cases/${caseId}/filings`, { signal: controller.signal }),
-          isPublicViewer
+          !isFiler
             ? Promise.resolve({ favorites: [] as { case_id: number }[] })
             : listFavorites().catch(() => ({ favorites: [] })),
         ]);
@@ -121,7 +127,7 @@ function CaseDetailPage() {
     }
     load();
     return () => controller.abort();
-  }, [caseId, isPublicViewer]);
+  }, [caseId, isFiler]);
 
   const loadMoreFilings = async () => {
     const signal = requestRef.current?.signal;
@@ -167,20 +173,6 @@ function CaseDetailPage() {
     finally { setTogglingFav(false); }
   };
 
-  const roleLabel = (role: string) => {
-    const map: Record<string, string> = {
-      plaintiff: 'Plaintiff',
-      defendant: 'Defendant',
-      petitioner: 'Petitioner',
-      respondent: 'Respondent',
-      attorney_plaintiff: 'Attorney (Plaintiff)',
-      attorney_defendant: 'Attorney (Defendant)',
-      guardian: 'Guardian',
-      intervenor: 'Intervenor',
-    };
-    return map[role] || role;
-  };
-
   // Public dockets show register-of-actions language, not the internal e-filing
   // review pipeline. Filers and court staff see the true status.
   const docketStatus = (status: string): { label: string; cls: string } => {
@@ -215,7 +207,8 @@ function CaseDetailPage() {
             <Link2 size={16} aria-hidden="true" />
             <span className="sr-only">Copy shareable case link</span>
           </button>
-          {!isPublicViewer && (
+          {caseData.can_manage_participants && <Link to={`/cases/${caseData.id}/participants`} className="btn btn-secondary">Manage participants</Link>}
+          {isFiler && (
             <button
               className={`fav-btn-large ${isFavorited ? 'favorited' : ''}`}
               onClick={toggleFavorite}
@@ -225,7 +218,7 @@ function CaseDetailPage() {
               {isFavorited ? '\u2605 Favorited' : '\u2606 Favorite'}
             </button>
           )}
-          {!isPublicViewer && (
+          {isFiler && (
             <>
               <Link
                 to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&case_title=${encodeURIComponent(caseData.title)}`}
@@ -260,19 +253,20 @@ function CaseDetailPage() {
 
         {/* Parties */}
         <div className="case-detail-card">
-          <h3>Parties ({caseData.participants.length})</h3>
+          <h3>Participants ({caseData.participants.length})</h3>
           <div className="parties-list">
             {caseData.participants.map((p) => (
               <div key={p.id} className="party-item">
-                <div className="party-role">{roleLabel(p.role)}</div>
+                <div className="party-role">{participantRoles[p.role] || p.role}{!p.is_active && ' · Former'}</div>
                 <div className="party-name">{p.party_name}</div>
+                {p.represented_party_name && <div className="party-meta">Represents {p.represented_party_name}</div>}
                 {p.attorney_bar_number && (
                   <div className="party-meta">Bar #: {p.attorney_bar_number}</div>
                 )}
               </div>
             ))}
             {caseData.participants.length === 0 && (
-              <p className="info-text">No parties on record.</p>
+              <p className="info-text">No participants on record.</p>
             )}
           </div>
         </div>
@@ -282,7 +276,7 @@ function CaseDetailPage() {
       <div className="case-detail-card">
         <div className="docket-header">
           <h3>Docket / Filing History ({filings.length})</h3>
-          {!isPublicViewer && (
+          {isFiler && (
             <Link
               to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&case_title=${encodeURIComponent(caseData.title)}`}
               className="btn btn-primary btn-small"

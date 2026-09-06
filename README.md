@@ -2,7 +2,9 @@
 
 Copyright (c) 2026 Thomas Cedoz. Licensed under [AGPL-3.0-or-later](LICENSE).
 
-A modern, open-source statewide e-filing platform for Michigan courts. Designed to unify filing across all of Michigan's courts into a single, standards-compliant portal.
+An open-source e-filing prototype for Michigan courts. The aim is one portal for filing,
+court review and public records, with the implementation evidence and remaining state
+requirements tracked in [State implementation evaluation](docs/STATE_READINESS.md).
 
 Live demo: https://webmcp.tomcedoz.com/agent · https://demo.tomcedoz.com · Agent tools: [docs/WEBMCP.md](docs/WEBMCP.md)
 
@@ -23,6 +25,7 @@ Live demo: https://webmcp.tomcedoz.com/agent · https://demo.tomcedoz.com · Age
 | **Service-only records** | Varies; often separate workflow | Record documents; arrange delivery outside the app |
 | **Draft autosave** | Vendor-dependent | Browser draft recovery |
 | **Clerk review tools** | Queue tools vary by court | Batch accept, age badges, quick reject reasons |
+| **Case participants and access** | Court-dependent | Assigned staff record roles, explicit access grants and retained changes |
 | **AI agent tools (WebMCP)** | Not available | 20 role-aware tools + `/agent` hub |
 | **Cost / licensing** | Per-transaction vendor fees | AGPL-3.0 (no license fee) |
 

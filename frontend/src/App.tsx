@@ -13,6 +13,8 @@ const FilingWizard = lazy(() => import('./components/filing/FilingWizard'));
 const MyFilings = lazy(() => import('./components/filing/MyFilings'));
 const FilingHistoryPage = lazy(() => import('./components/filing/FilingHistoryPage'));
 const ReviewQueue = lazy(() => import('./components/clerk/ReviewQueue'));
+const CourtCaseDirectory = lazy(() => import('./components/courts/CourtCaseDirectory'));
+const CaseParticipantsPage = lazy(() => import('./components/courts/CaseParticipantsPage'));
 const CourtCalendarPage = lazy(() => import('./components/courts/CourtCalendarPage'));
 const NotificationsPage = lazy(() => import('./components/notifications/NotificationsPage'));
 const AdministrationPage = lazy(() => import('./components/admin/AdministrationPage'));
@@ -26,7 +28,7 @@ function RequireRole({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   // Preserve private portal destinations while the visitor signs in.
   const isPublicPath =
-    location.pathname.startsWith('/cases') || location.pathname.startsWith('/agent')
+    /^\/cases\/(search|\d+)\/?$/.test(location.pathname) || location.pathname.startsWith('/agent')
     || location.pathname.startsWith('/courts/');
   if (!hasSession() && !isPublicPath && location.pathname !== '/login') {
     return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`} replace />;
@@ -224,6 +226,8 @@ function App() {
                         <Route path="/courts/:courtId/calendar" element={<CourtCalendarPage key={location.pathname} />} />
                         <Route path="/notifications" element={<NotificationsPage />} />
                         <Route path="/admin" element={<AdministrationPage />} />
+                        <Route path="/cases/:caseId/participants" element={<RequireClerk><CaseParticipantsPage /></RequireClerk>} />
+                        <Route path="/clerk/cases" element={<RequireClerk><CourtCaseDirectory /></RequireClerk>} />
                         <Route path="/cases/:caseId" element={<CaseDetailPage />} />
                         <Route path="/favorites" element={<RequireFiler><Favorites /></RequireFiler>} />
                         <Route path="/clerk/queue" element={<RequireClerk><ReviewQueue /></RequireClerk>} />

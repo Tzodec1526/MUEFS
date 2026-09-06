@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.admin import router as admin_router
 from app.api.auth import router as auth_router
+from app.api.case_participants import router as case_participants_router
 from app.api.cases import router as cases_router
 from app.api.clerk_review import router as clerk_router
 from app.api.court_calendars import router as court_calendars_router
@@ -22,6 +23,7 @@ api_router.include_router(courts_router)
 api_router.include_router(court_calendars_router)
 api_router.include_router(court_rules_router)
 api_router.include_router(cases_router)
+api_router.include_router(case_participants_router)
 api_router.include_router(filings_router)
 api_router.include_router(clerk_router)
 api_router.include_router(fee_waivers_router)

@@ -34,12 +34,17 @@ async def test_favorites_follow_current_case_access(db_session, api_client):
     assert denied.status_code == 404
     assert case.title not in denied.text
 
-    db_session.add(CaseParticipant(case_id=case.id, user_id=owner.id,
-                                  role=ParticipantRole.PLAINTIFF, party_name="Owner"))
+    participant = CaseParticipant(case_id=case.id, user_id=owner.id,
+                                  role=ParticipantRole.PLAINTIFF, access_enabled=True,
+                                  party_name="Owner")
+    db_session.add(participant)
     await db_session.flush()
     api_client.headers["X-Demo-User-Id"] = str(owner.id)
     permitted = await api_client.get("/api/v1/favorites")
     assert permitted.json()["favorites"][0]["case_title"] == case.title
+    participant.access_enabled = False
+    await db_session.flush()
+    assert (await api_client.get("/api/v1/favorites")).json() == {"favorites": [], "total": 0}
     owner.is_active = False
     await db_session.flush()
     assert (await api_client.get("/api/v1/favorites")).status_code == 401

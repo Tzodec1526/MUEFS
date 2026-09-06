@@ -59,6 +59,10 @@ class User(Base):
     favorite_cases: Mapped[list[FavoriteCase]] = relationship(back_populates="user")
     favorite_courts: Mapped[list[FavoriteCourt]] = relationship(back_populates="user")
 
+    # Legacy case variants remain distinct accounts; exact insensitive lookups must
+    # detect ambiguity rather than merging identities or choosing the first match.
+    __table_args__ = (Index("ix_users_email_lower", func.lower(email)),)
+
     @property
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"

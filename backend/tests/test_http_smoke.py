@@ -21,17 +21,23 @@ async def test_openapi_docs_available() -> None:
     assert r.status_code == 200
 
 
-async def test_submission_preflight_allows_idempotency_header() -> None:
+@pytest.mark.parametrize("method,path", [
+    ("POST", "/api/v1/filings/1/submit"),
+    ("PUT", "/api/v1/admin/users/1"),
+    ("PUT", "/api/v1/cases/1/participants/1"),
+])
+async def test_write_preflight_allows_method_and_idempotency_header(method, path) -> None:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.options(
-            "/api/v1/filings/1/submit",
+            path,
             headers={
                 "Origin": "http://localhost:3000",
-                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Method": method,
                 "Access-Control-Request-Headers": "content-type,idempotency-key,x-demo-user-id",
             },
         )
     assert response.status_code == 200
+    assert method in response.headers["access-control-allow-methods"]
     assert "idempotency-key" in response.headers["access-control-allow-headers"].lower()
 
 

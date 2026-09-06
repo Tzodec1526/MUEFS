@@ -59,6 +59,33 @@ def test_unversioned_demo_upgrade_preserves_filings(tmp_path):
                     ),
                 ),
                 (
+                    "cases",
+                    dict(
+                        id=1,
+                        court_id=1,
+                        case_type_id=1,
+                        case_number="LEGACY-1",
+                        title="Preserved case",
+                        status="OPEN",
+                        is_sealed=True,
+                        filed_date=datetime.now(UTC),
+                    ),
+                ),
+                (
+                    "case_participants",
+                    dict(
+                        id=1,
+                        case_id=1,
+                        user_id=1,
+                        role="ATTORNEY_PLAINTIFF",
+                        party_name="Legacy counsel",
+                        attorney_bar_number="P12345",
+                        contact_email="private@example.com",
+                        contact_phone="555-0100",
+                        contact_address="Original contact address",
+                    ),
+                ),
+                (
                     "filing_envelopes",
                     dict(
                         id=1,
@@ -140,9 +167,33 @@ def test_unversioned_demo_upgrade_preserves_filings(tmp_path):
             assert conn.scalar(text("SELECT verified_email FROM users")) is None
             assert conn.scalar(text("SELECT administration_version FROM users")) == 0
             assert conn.scalar(text("SELECT count(*) FROM user_court_roles")) == 1
-            duplicate = conn.execute(text("SELECT action, details FROM audit_log")).one()
+            duplicate = conn.execute(
+                text(
+                    "SELECT action, details FROM audit_log "
+                    "WHERE action='identity.duplicate_role_removed'"
+                )
+            ).one()
             assert duplicate.action == "identity.duplicate_role_removed"
             assert '"former_id": 2' in duplicate.details
+            participant = conn.execute(text("SELECT * FROM case_participants")).mappings().one()
+            assert participant["user_id"] == 1 and participant["role"] == "ATTORNEY_PLAINTIFF"
+            assert participant["party_name"] == "Legacy counsel"
+            assert participant["attorney_bar_number"] == "P12345"
+            assert participant["contact_email"] == "private@example.com"
+            assert participant["contact_phone"] == "555-0100"
+            assert participant["contact_address"] == "Original contact address"
+            assert participant["is_active"] == 1 and participant["access_enabled"] == 0
+            assert participant["reviewed_at"] is None
+            assert conn.scalar(text("SELECT participant_version FROM cases")) == 0
+            assert (
+                conn.scalar(
+                    text(
+                        "SELECT count(*) FROM audit_log "
+                        "WHERE action='case.participants_review_required'"
+                    )
+                )
+                == 1
+            )
             assert (
                 conn.scalar(text("SELECT delivery_status FROM notifications WHERE id=1"))
                 == "DISABLED"

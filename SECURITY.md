@@ -34,13 +34,19 @@ Opening the *front door* (who can get an account) does **not** open the *rooms i
 The following controls are enforced server-side and are exercised by the test suite
 regardless of demo mode:
 
-- **Sealed and confidential matters.** Sealed dockets and their filings are restricted to
-  the parties (accounts linked to the case), counsel of record, the filer, court staff for
-  that court, and system admins. Anonymous visitors never reach sealed matters. Counsel of
-  record is matched either by account linkage (`user_id`) or by a **verified** bar number —
-  a self-asserted bar number entered at registration is *not* trusted and cannot be used to
-  read another attorney's sealed cases. Documents individually marked confidential are
-  further restricted to the filer and court staff. See `backend/app/services/access_service.py`.
+- **Sealed and confidential matters.** Restricted docket access requires an explicit grant
+  on an active participant record, a staff assignment at that court, or system administrator
+  authority. Counsel grants require both the linked account and its matching verified bar
+  number. A matching bar number or an accepted filing alone never grants access to the rest
+  of a sealed case. Filers retain their own private envelopes, receipts and documents.
+  Individually confidential documents remain restricted to the filer and assigned court
+  staff. See `backend/app/services/access_service.py`.
+- **Participant administration.** Only assigned staff may change a case's participant
+  records, including for system administrators. Changes require a reason, recheck current
+  authority and reject stale versions. Staff cannot edit their own linked participant
+  record. Changes retain before/after values atomically in the audit log. Retiring one
+  grant does not revoke a different active grant or court role. Migration `e83f2c91a6d4`
+  preserves legacy records but disables inferred participant access until court review.
 - **Public records, scoped.** Anonymous case search and docket viewing are limited to
   non-sealed cases and non-confidential, non-draft filings.
 - **Authentication.** Keycloak access tokens are validated with RS256 against the realm

@@ -8,17 +8,17 @@ confidential, or draft check fails closed for it.
 Non-sealed matters: anyone (including anonymous) may view the case docket and non-confidential
 documents. Only accepted filings appear on the public docket. Draft, pending, rejected,
 returned, and service-only envelopes remain visible only to the filer and court staff.
-Sealed matters: litigants (party-linked accounts), counsel of record (attorney_* rows,
-matched by linked account or a verified bar number), filer-on-case (accepted envelopes
-only), court staff, and system admin — never anonymous.
+Sealed matters: accounts explicitly granted access through active participant records,
+court staff, and system admin — never anonymous. Counsel grants also require a matching
+verified bar number. Filing acceptance alone does not grant access to the rest of a case.
 """
 
 from __future__ import annotations
 
-from sqlalchemy import ColumnElement, and_, false, or_, select, true
+from sqlalchemy import ColumnElement, false, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.case import Case, CaseParticipant, ParticipantRole
+from app.models.case import COUNSEL_ROLES, Case, CaseParticipant
 from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.models.user import CourtRole, User, UserCourtRole, UserType
 
@@ -27,18 +27,6 @@ from app.models.user import CourtRole, User, UserCourtRole, UserType
 PUBLIC_DOCKET_FILING_STATUSES = frozenset({
     FilingStatus.ACCEPTED,
 })
-
-# Standing as "filer on this case" requires an accepted envelope, not a draft.
-_FILER_ON_CASE_STATUSES = frozenset({
-    FilingStatus.ACCEPTED,
-})
-
-# Sealed matters: bar-number match only for rows of counsel of record, not incidental bar fields.
-_ATTORNEY_OF_RECORD_ROLES = frozenset({
-    ParticipantRole.ATTORNEY_PLAINTIFF,
-    ParticipantRole.ATTORNEY_DEFENDANT,
-})
-
 
 async def user_is_court_staff_for_court(
     db: AsyncSession, user_id: int | None, court_id: int
@@ -62,42 +50,30 @@ def case_visibility_filter(user: User | None) -> ColumnElement[bool]:
         return false()
     if user.user_type == UserType.ADMIN:
         return true()
-    # Counsel of record only: attorney_* rows, matched by linked account or a *verified*
-    # bar number on that row. A self-asserted (unverified) bar number never grants sealed
-    # access — public self-registration leaves bar_number_verified False, so it cannot be
-    # used to impersonate counsel of record.
-    bar_match = (
-        and_(
-            CaseParticipant.attorney_bar_number.is_not(None),
-            CaseParticipant.attorney_bar_number == user.bar_number,
-        )
-        if user.bar_number is not None and user.bar_number_verified
+    counsel_eligible = (
+        CaseParticipant.attorney_bar_number == user.bar_number
+        if user.user_type == UserType.ATTORNEY and user.bar_number and user.bar_number_verified
         else false()
     )
     participant_grant = select(CaseParticipant.id).where(
         CaseParticipant.case_id == Case.id,
+        CaseParticipant.user_id == user.id,
+        CaseParticipant.is_active.is_(True),
+        CaseParticipant.access_enabled.is_(True),
         or_(
-            CaseParticipant.user_id == user.id,
-            and_(CaseParticipant.role.in_(_ATTORNEY_OF_RECORD_ROLES), bar_match),
+            CaseParticipant.role.not_in(COUNSEL_ROLES), counsel_eligible,
         ),
     ).correlate(Case).exists()
-    filer_grant = (
-        select(FilingEnvelope.id).where(
-            FilingEnvelope.case_id == Case.id,
-            FilingEnvelope.filer_id == user.id,
-            FilingEnvelope.status.in_(_FILER_ON_CASE_STATUSES),
-        ).correlate(Case).exists()
-    )
     staff_grant = select(UserCourtRole.id).where(
         UserCourtRole.court_id == Case.court_id,
         UserCourtRole.user_id == user.id,
         UserCourtRole.role.in_([CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]),
     ).correlate(Case).exists()
-    return or_(public, participant_grant, filer_grant, staff_grant)
+    return or_(public, participant_grant, staff_grant)
 
 
 async def user_may_read_sealed_case(db: AsyncSession, user_id: int | None, case_id: int) -> bool:
-    """Sealed docket: litigants, counsel of record, filer-on-case, court staff, admin."""
+    """Sealed docket: explicit participant grants, court staff and system administrators."""
     if user_id is None:
         return False
     user = await db.get(User, user_id)

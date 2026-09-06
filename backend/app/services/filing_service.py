@@ -7,10 +7,9 @@ from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
 from app.integrations.cms_adapter import submit_filing_to_cms
-from app.models.case import Case, CaseParticipant, CaseStatus, ParticipantRole
+from app.models.case import Case, CaseStatus
 from app.models.court import FilingRequirement
 from app.models.filing import FilingEnvelope, FilingStatus
-from app.models.user import User, UserType
 from app.schemas.filing import (
     FilingEnvelopeCreate,
     FilingValidationResult,
@@ -360,36 +359,6 @@ async def _case_for_accept(db: AsyncSession, filing: FilingEnvelope, now: dateti
     return case
 
 
-async def _ensure_filer_participant(
-    db: AsyncSession, filing: FilingEnvelope, case: Case
-) -> None:
-    existing = await db.execute(
-        select(CaseParticipant.id).where(
-            CaseParticipant.case_id == case.id,
-            CaseParticipant.user_id == filing.filer_id,
-        ).limit(1)
-    )
-    if existing.scalar_one_or_none() is not None:
-        return
-    filer_row = await db.execute(select(User).where(User.id == filing.filer_id))
-    filer = filer_row.scalar_one_or_none()
-    role = (
-        ParticipantRole.ATTORNEY_PLAINTIFF
-        if filer is not None and filer.user_type == UserType.ATTORNEY
-        else ParticipantRole.PLAINTIFF
-    )
-    db.add(
-        CaseParticipant(
-            case_id=case.id,
-            user_id=filing.filer_id,
-            role=role,
-            party_name=filer.full_name if filer else "Filer",
-            attorney_bar_number=filer.bar_number if filer else None,
-        )
-    )
-    await db.flush()
-
-
 async def review_filing(
     db: AsyncSession,
     filing_id: int,
@@ -437,7 +406,6 @@ async def review_filing(
             db.add(case)
             await db.flush()
             filing.case_id = case.id
-        await _ensure_filer_participant(db, filing, case)
         filing.status = FilingStatus.ACCEPTED
         filing.cms_filing_id = cms_result.cms_filing_id
         filing.cms_case_number = cms_result.cms_case_number

@@ -257,7 +257,8 @@ async def test_case_standing_does_not_expose_private_filing_material(
     filing.fee_waiver_reason = "Private financial hardship"
     db_session.add(
         CaseParticipant(
-            case_id=case.id, user_id=other, party_name="Other party", role=ParticipantRole.DEFENDANT
+            case_id=case.id, user_id=other, party_name="Other party",
+            access_enabled=True, role=ParticipantRole.DEFENDANT
         )
     )
     draft = FilingEnvelope(

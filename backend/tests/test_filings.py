@@ -122,7 +122,7 @@ async def test_filing_lifecycle(db_session):
         select(CaseParticipant).where(CaseParticipant.case_id == accepted.case_id)
     )
     parts = list(part_q.scalars().all())
-    assert any(p.user_id == user.id for p in parts)
+    assert parts == []  # Acceptance does not establish party roles or restricted-case access.
 
 
 @pytest.mark.asyncio

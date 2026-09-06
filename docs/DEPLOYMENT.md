@@ -180,7 +180,31 @@ Only verified account addresses receive email. Require the IdP's matching `email
 the email does not attach court documents or expose case details. Existing pending notices
 remain portal-only when upgrading; no backlog is sent automatically.
 
-## 8. Container images
+## 8. Participant access migration
+
+Migration `e83f2c91a6d4` preserves participant names, roles, account links and private contact
+fields. It adds reviewed participation and explicit access grants. **Every legacy record
+starts without a restricted-case grant**, because the old rows cannot distinguish a court
+decision from a role inferred by filing acceptance. A per-case audit event records that
+review is needed; the migration does not invent approval or delete the old records.
+
+Before opening an upgraded portal to users, assigned court staff must review the affected
+records through **Court Cases → Manage participants**, using the court's authorized source.
+Record the reason/reference, correct the role, link the intended existing account and
+explicitly grant access where authorized. Counsel grants also require a matching verified
+bar number. Ambiguous case-insensitive email matches must be resolved by identity
+administration before linking; the app never chooses between those accounts automatically.
+
+Test a grant and retirement using separate staff and filer accounts. Confirm that retired
+grants no longer open a sealed docket, while the filer can still read their own envelopes
+and receipts. Check for other active participant grants and court assignments when reviewing
+someone's remaining access. History is retained; automatic downgrade is refused.
+
+This rollout requires court approval of the access policy and record review. Participant
+records do not replace CMS appearance data, court orders governing access, withdrawal
+procedures, or electronic-service enrollment.
+
+## 9. Container images
 
 The root `Dockerfile` builds the hosted demo, including `app.demo.server` and isolated
 SQLite sessions. A court deployment must run `app.main:app` against its PostgreSQL database,

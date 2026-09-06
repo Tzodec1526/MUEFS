@@ -3829,3 +3829,23 @@ textarea:focus-visible {
 .admin-changes dt { font-weight: 600; }
 .admin-changes dd { margin-left: 0; }
 @media (max-width: 800px) { .admin-workspace, .admin-directory-filter, .admin-form-grid { grid-template-columns: 1fr; } }
+
+.court-cases-page > p, .case-participants-page > p { margin-bottom: 20px; }
+.court-case-filter { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: 16px; margin: 24px 0; }
+.court-case-filter .form-group { margin-bottom: 0; }
+.court-case-list { list-style: none; padding: 0; margin: 20px 0; }
+.court-case-list > li { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 0; border-bottom: 1px solid var(--gray-200); overflow-wrap: anywhere; }
+.court-case-list > li > div { min-width: 0; }
+.court-case-list p { margin: 5px 0 0; }
+.court-case-list .btn { flex-shrink: 0; }
+.participant-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.case-participants-page .admin-account-form { margin-top: 24px; padding: 24px; border: 1px solid var(--gray-200); border-radius: 8px; }
+.participant-list > li { flex-wrap: wrap; }
+.participant-list .admin-account-form { flex-basis: 100%; width: 100%; }
+.case-participants-page .checkbox-label { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0; }
+.case-participants-page .checkbox-label input { flex-shrink: 0; margin-top: 3px; }
+@media (max-width: 700px) {
+  .court-case-filter { grid-template-columns: 1fr; }
+  .court-case-list > li { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .case-participants-page .admin-account-form { padding: 16px; }
+}

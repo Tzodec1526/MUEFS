@@ -154,12 +154,13 @@ async def test_clerk_queue_applies_status_filter_and_pagination(db_session, dock
 
 
 @pytest.mark.parametrize("grant", ["participant", "accepted_filings", "court_roles"])
-async def test_sealed_access_with_multiple_matching_grants(db_session, docket, grant):
+async def test_sealed_access_uses_explicit_grants_not_accepted_filings(db_session, docket, grant):
     owner, _, _, court, case, _ = docket
     case.is_sealed = True
     if grant == "participant":
         db_session.add_all([
-            CaseParticipant(case_id=case.id, user_id=owner.id, role=role, party_name="Owner")
+            CaseParticipant(case_id=case.id, user_id=owner.id, role=role, party_name="Owner",
+                            access_enabled=True)
             for role in [ParticipantRole.PLAINTIFF, ParticipantRole.PETITIONER]
         ])
     elif grant == "court_roles":
@@ -168,7 +169,9 @@ async def test_sealed_access_with_multiple_matching_grants(db_session, docket, g
             for role in [CourtRole.CLERK, CourtRole.ADMIN]
         ])
     await db_session.flush()
-    assert await access_service.user_may_read_case(db_session, owner.id, case.id)
+    assert await access_service.user_may_read_case(db_session, owner.id, case.id) is (
+        grant != "accepted_filings"
+    )
 
 
 @pytest.mark.parametrize("literal", ["%", "_", "\\", "/"])
