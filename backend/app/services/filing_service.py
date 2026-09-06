@@ -1,8 +1,8 @@
 import hashlib
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
@@ -13,6 +13,7 @@ from app.models.case import Case, CaseStatus
 from app.models.court import CaseType, Court, FilingRequirement
 from app.models.filing import COURT_DOCUMENT_TYPES, FilingDocument, FilingEnvelope, FilingStatus
 from app.schemas.filing import (
+    ClerkQueueResponse,
     FilingEnvelopeCreate,
     FilingSummary,
     FilingValidationResult,
@@ -552,7 +553,11 @@ async def get_clerk_queue(
     page_size: int = 25,
     status: FilingStatus | None = None,
     fee_waivers: bool = False,
-) -> tuple[list[FilingSummary], int]:
+    search: str = "",
+    waiting_48h_only: bool = False,
+) -> ClerkQueueResponse:
+    as_of = datetime.now(UTC)
+    cutoff = as_of - timedelta(hours=48)
     filters = [
         FilingEnvelope.court_id == court_id,
         FilingEnvelope.status.in_([FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW]),
@@ -567,18 +572,46 @@ async def get_clerk_queue(
         ]
     if status is not None:
         filters.append(FilingEnvelope.status == status)
+    search = search.strip()
+    if search.startswith("#") and search[1:].isascii() and search[1:].isdigit():
+        filing_id = int(search[1:])
+        filters.append(FilingEnvelope.id == filing_id if filing_id <= 2_147_483_647 else false())
+    elif search:
+        filters.append(or_(
+            FilingEnvelope.case_title.icontains(search, autoescape=True),
+            select(Case.id).where(
+                Case.id == FilingEnvelope.case_id,
+                Case.case_number.icontains(search, autoescape=True),
+            ).exists(),
+        ))
+    if waiting_48h_only:
+        filters.append(FilingEnvelope.submitted_at <= cutoff)
     query = (
         _FILING_SUMMARIES
         .where(*filters)
         .order_by(FilingEnvelope.submitted_at.asc(), FilingEnvelope.id.asc())
     )
     count_query = (
-        select(func.count())
+        select(
+            func.count().label("total"),
+            func.count().filter(FilingEnvelope.status == FilingStatus.SUBMITTED)
+                .label("submitted_count"),
+            func.count().filter(FilingEnvelope.status == FilingStatus.UNDER_REVIEW)
+                .label("under_review_count"),
+            func.count().filter(FilingEnvelope.submitted_at <= cutoff).label("waiting_48h"),
+            func.min(FilingEnvelope.submitted_at).label("oldest_submitted_at"),
+        )
         .select_from(FilingEnvelope)
         .where(*filters)
     )
 
-    total = (await db.execute(count_query)).scalar() or 0
+    counts = (await db.execute(count_query)).one()
     query = query.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
-    return [FilingSummary.model_validate(row) for row in result], total
+    return ClerkQueueResponse(
+        filings=[FilingSummary.model_validate(row) for row in result],
+        total=counts.total, waiting_48h=counts.waiting_48h,
+        submitted_count=counts.submitted_count, under_review_count=counts.under_review_count,
+        oldest_submitted_at=counts.oldest_submitted_at, as_of=as_of,
+        page=page, page_size=page_size,
+    )

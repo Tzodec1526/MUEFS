@@ -1134,6 +1134,7 @@ tr.selected {
 
 .queue-controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
   align-items: flex-end;
   margin-bottom: 1rem;
@@ -1152,10 +1153,14 @@ tr.selected {
 
 .queue-webmcp-filter {
   display: flex;
+  width: 100%;
   flex-wrap: wrap;
   gap: 0.75rem;
   align-items: flex-end;
 }
+
+.queue-search { flex: 1 1 18rem; }
+.queue-age-filter { display: inline-flex; align-items: center; gap: 0.5rem; }
 
 .queue-count {
   font-size: 0.85rem;
@@ -1165,9 +1170,11 @@ tr.selected {
 
 .queue-layout {
   display: grid;
-  grid-template-columns: 1fr 400px;
+  grid-template-columns: 1fr;
   gap: 1rem;
 }
+
+.queue-layout.review-open { grid-template-columns: 1fr 400px; }
 
 .queue-list {
   background: var(--white);
@@ -1414,7 +1421,7 @@ tr.selected {
     padding: 1.25rem 1rem 2rem;
   }
 
-  .queue-layout {
+  .queue-layout.review-open {
     grid-template-columns: 1fr;
   }
 
@@ -1803,6 +1810,8 @@ tr.selected {
 /* Clerk Review Improvements */
 .clerk-header {
   display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1rem;
@@ -1876,9 +1885,6 @@ tr.selected {
 .age-badge.fresh { background: var(--success-tint); color: var(--success-deep); }
 .age-badge.normal { background: var(--gray-100); color: var(--gray-700); }
 .age-badge.aging { background: var(--warning-tint); color: #6d4a04; }
-.age-badge.overdue { background: var(--danger-tint); color: var(--danger-deep); }
-
-.row-overdue { background: #fff6f7 !important; }
 .th-checkbox, .td-checkbox { width: 30px; text-align: center; }
 .empty-queue { text-align: center; color: var(--gray-500); padding: 2rem !important; }
 .queue-meta {
@@ -1942,14 +1948,6 @@ tr.selected {
 .flag-badge { font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: 4px; font-weight: 700; }
 .flag-badge.warning { background: var(--warning-tint); color: #6d4a04; }
 .flag-badge.confidential { background: var(--success-tint); color: var(--success-deep); }
-
-.empty-detail {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--gray-500);
-  min-height: 200px;
-}
 
 /* ============================================
    My Filings Page
@@ -3490,13 +3488,6 @@ textarea:focus-visible {
   max-width: 52rem;
   margin: 0 auto;
   padding: 2rem 1.25rem 4rem;
-}
-
-.queue-webmcp-filter {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: flex-end;
 }
 
 .agent-hub-header {

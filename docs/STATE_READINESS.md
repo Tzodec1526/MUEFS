@@ -10,10 +10,11 @@ establish state approval or production readiness.
 | Requirement | Current evidence | Remaining work |
 |---|---|---|
 | Prove what was submitted | Each new submission has a retained transaction ID, UTC receipt time, filer name, document manifest and SHA-256 fingerprints, payment reference where present, and a downloadable receipt. A read-only recovery audit compares stored bytes and retained transaction references. | Court-approved retention schedules, trusted time monitoring, external archival controls and validation of the deployed storage/recovery configuration. |
-| Preserve draft work | Account saves, filing-specific recovery within a verified account/tab, explicit conflict comparison and cross-tab identity invalidation are implemented. PostgreSQL concurrent saves preserve the winning version. | Broader offline/device testing, reconciliation after an unconfirmed initial draft creation, and assistive-technology evaluation. |
+| Preserve draft work | Account saves, filing-specific recovery within a verified account/tab, explicit conflict comparison and cross-tab identity invalidation are implemented. Creation keys recover lost initial responses; PostgreSQL concurrent saves preserve the winning version. | Broader offline/device testing and assistive-technology evaluation. |
 | Preserve corrections and decisions | Corrections create another numbered submission. Earlier document bytes remain downloadable by the filer and court staff. Acceptance, return, rejection, CMS failure and signed filing-date orders are separate retained events. | Court procedures for deciding relief, certified/file-stamped copies and court-approved retention. |
 | Route filings to the correct court and case | Creation and submission validate the filing kind, court, case type, existing case and current filer access. Intake flags are enforced by the API. Acceptance checks legacy routing before a CMS call; valid received work remains reviewable after intake closes. | Court procedures for changing intake configuration, reconciling legacy assignments and correcting a filing's destination without losing its retained evidence. |
 | Survive retries and simultaneous actions | Database commits finish before HTTP success responses. Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Review decisions identify the numbered submission the reviewer saw; an intervening resubmission invalidates that decision. Batch review uses a savepoint per filing and reports each failed item. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
+| Locate and assess received work | Assigned staff search the review queue by case title/number or exact filing number and filter by status and elapsed receipt age. Counts cover all matching pages; oldest-first reads use an index for pending work. | Court-approved intake priorities, staffing procedures, representative load testing and independent accessibility evaluation. Elapsed age does not establish a deadline violation. |
 | Publish reviewed public copies | Assigned staff prepare and inspect a separate PDF and public title, explicitly publish it, and withdraw public access with retained authority/history. Originals and receipts stay intact; fee-waiver records cannot use this publication path. | Court-approved classification/redaction policy, approved review tools, storage immutability and retention schedules. |
 | Protect private material | Private envelopes and receipts require filer or court-staff access. Dockets exclude waiver application data, confidential document metadata, superseded documents and other filers' drafts. Fee-waiver documents are nonpublic even if the filer omits the checkbox. | Full classification/retention policy for every case and document type; independent security assessment. |
 | Control case participation and access | Assigned staff record participants, counsel representation and explicit restricted-case grants with retained reasons, before/after history, stale-edit checks and revocation. Filing acceptance no longer assigns party roles or grants case access. | Court-approved access rules, review of legacy records, CMS appearance/withdrawal synchronization, limited-scope representation and service enrollment. |
@@ -862,13 +863,50 @@ Each of those list requests now performs three SELECTs rather than four and mate
 no filing/document ORM objects, previously 25 envelopes plus 225 documents. PostgreSQL
 counts attachments for only the 25 returned filings. The replacement filer index removes
 the 33,333-row sort and covers status counts; it replaces the single-column filer index.
-No new queue index or cache was added. The fee-review response is unchanged in size;
+That profile covers the summary projection and filer index changes. The fee-review response is unchanged in size;
 its small measured latency difference (9.04 to 8.38 ms) is not treated as a performance win.
 
 Status totals still grow with a filer's record count, and deep offset pages still require
 skipping earlier matches. Concurrent filing activity can move records between pages.
 Representative concurrent-user, cold-storage and deployment-network load testing remains
 necessary before setting a court's capacity targets.
+
+## Clerk queue search and waiting time
+
+Assigned court staff can search `GET /api/v1/clerk/queue` by literal case title or linked
+case number using `search` (maximum 200 characters). A value such as `#123` selects that
+exact filing number. Searches retain the selected court, status and fee-waiver scope.
+`waiting_48h_only=true` restricts results to receipts at least 48 elapsed hours old.
+
+Each response includes `as_of`, `waiting_48h`, `oldest_submitted_at`, `submitted_count`
+and `under_review_count`. These describe all matching records before pagination. Pending
+waiver searches can include accepted filings. The browser uses the server's measurement
+time for row ages, labels the interval directly and applies filters on explicit submission.
+Elapsed age is separate from court deadline policy. Failed refreshes clear stale selections
+and counts, and retry preserves the applied search. Opening a result fetches the current
+authorized detail and focuses its review heading, including on small screens.
+
+Migration `c72d9fa083b1` replaces the redundant court/status prefix index with a partial
+index on court, receipt time, filing ID and status for submitted/under-review records.
+The existing court/status/receipt index covers general status queries. PostgreSQL builds
+the replacement concurrently, and reruns recover an invalid interrupted build. Upgrade,
+downgrade and recovery tests preserve filing records, creation keys, queue ordering and
+counts. SQLite uses an ordinary partial index.
+
+A separate PostgreSQL 16 service profile on 2026-09-06 used 50,000 synthetic filings,
+20,000 pending records and 600,000 document rows. The same vacuumed/analyzed dataset
+served both implementations; each run discarded one warm-up and measured nine calls.
+The 25-row queue page improved from 10.59 to 6.29 ms median. The clerk-triage tool improved
+from 6.52 to 5.93 ms, replacing two queue requests with one and four service SELECTs with
+two. It fetches five summaries instead of fifty and uses database receipt ordering,
+removing the client-side merge and sort. The old and new paths returned the same IDs.
+These service timings exclude HTTP/authentication and deployment network costs.
+
+The first combined implementation regressed because it sorted both pending statuses;
+the replacement index removed that sort. Substring searches, exact counts and deep
+offset pages still require representative load testing. Rendered verification exercised
+searches, all-page counts, status/age filters, accepted pending waivers, an empty search,
+refresh failure/retry and current-detail loading on desktop and mobile.
 
 ## Sources guiding the evaluation
 

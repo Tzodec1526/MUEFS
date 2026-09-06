@@ -47,6 +47,13 @@ block to run outside any deployment-wide transaction. SQLite uses ordinary index
 The migration changes no filing records and can be downgraded independently of earlier
 retention migrations.
 
+Migration `c72d9fa083b1` replaces the redundant court/status prefix index with a partial
+index for pending filings in receipt/ID order. It uses the same concurrent-build and
+interrupted-build recovery procedure on PostgreSQL; SQLite uses ordinary index DDL.
+The queue API adds bounded `search` and `waiting_48h_only` filters, all-match age/status
+counts and a server measurement time. Deploy the queue client with this API so its counts
+and elapsed-age display use those fields. See [clerk queue search and waiting time](STATE_READINESS.md#clerk-queue-search-and-waiting-time).
+
 ## 1. Configuration & secrets
 
 Copy `.env.example` to `.env` and change every demo value:

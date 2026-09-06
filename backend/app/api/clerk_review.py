@@ -7,9 +7,9 @@ from app.database import get_db
 from app.models.filing import FilingStatus
 from app.schemas.filing import (
     BatchReviewRequest,
+    ClerkQueueResponse,
     ClerkReviewRequest,
     FilingEnvelopeResponse,
-    FilingListResponse,
 )
 from app.services import access_service, audit_service, filing_service
 from app.utils.http_context import client_ip, client_user_agent
@@ -28,13 +28,15 @@ async def _require_clerk_role(
         )
 
 
-@router.get("/queue", response_model=FilingListResponse)
+@router.get("/queue", response_model=ClerkQueueResponse)
 async def get_review_queue(
     court_id: int = Query(...),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
     status_filter: FilingStatus | None = Query(None, alias="status"),
     fee_waivers: bool = Query(False),
+    search: str = Query("", max_length=200),
+    waiting_48h_only: bool = Query(False),
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -43,10 +45,10 @@ async def get_review_queue(
         raise HTTPException(
             status_code=400, detail="Queue status must be submitted or under_review"
         )
-    filings, total = await filing_service.get_clerk_queue(
+    return await filing_service.get_clerk_queue(
         db, court_id, page=page, page_size=page_size, status=status_filter, fee_waivers=fee_waivers,
+        search=search, waiting_48h_only=waiting_48h_only,
     )
-    return FilingListResponse(filings=filings, total=total, page=page, page_size=page_size)
 
 
 @router.post("/filings/{filing_id}/review", response_model=FilingEnvelopeResponse)

@@ -141,7 +141,7 @@ function ClerkDashboard() {
   const [pending, setPending] = useState<number | null>(null);
   useEffect(() => {
     const controller = new AbortController();
-    getClerkQueue(courtId, 1, 'all', controller.signal, 1).then((r) => {
+    getClerkQueue(courtId, { page_size: 1, signal: controller.signal }).then((r) => {
       if (!controller.signal.aborted) setPending(r.total);
     }).catch(() => {});
     return () => controller.abort();

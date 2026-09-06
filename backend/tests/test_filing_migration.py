@@ -481,3 +481,52 @@ async def test_creation_key_migration_recovers_partial_build_and_retains_keys(po
             command.downgrade(config, "9d34e6a81c72")
         with pytest.raises(RuntimeError, match="creation request keys"):
             await conn.run_sync(downgrade_with_keys)
+
+
+@pytest.mark.skipif(not os.getenv("MUEFS_TEST_POSTGRES_URL"), reason="PostgreSQL not configured")
+@pytest.mark.parametrize("postgres_sessions", ["b63c8e9204af"], indirect=True)
+async def test_pending_queue_index_recovers_failed_build_and_preserves_results(postgres_sessions):
+    from app.services.filing_service import get_clerk_queue
+
+    engine = postgres_sessions.kw["bind"]
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    config.set_main_option("script_location", str(Path(__file__).resolve().parents[1] / "alembic"))
+    async with engine.begin() as conn:
+        await conn.run_sync(seed_historical_filings, 80)
+        await conn.execute(text("""UPDATE filing_envelopes SET status = CASE
+            WHEN id % 3 = 0 THEN 'ACCEPTED'::filingstatus
+            WHEN id % 3 = 1 THEN 'SUBMITTED'::filingstatus ELSE 'UNDER_REVIEW'::filingstatus END,
+            submitted_at = updated_at"""))
+        await conn.execute(text("""UPDATE filing_envelopes SET
+            creation_key='12345678-1234-1234-1234-123456789012' WHERE id=1"""))
+    async with postgres_sessions() as db:
+        before = (await get_clerk_queue(db, 1, page=2)).model_dump(exclude={"as_of"})
+    async with engine.connect() as conn:
+        await conn.execution_options(isolation_level="AUTOCOMMIT")
+        with pytest.raises(DBAPIError, match="invalid input syntax for type integer"):
+            await conn.execute(text("""CREATE INDEX CONCURRENTLY ix_filing_pending_received
+                ON filing_envelopes ((case_title::integer))"""))
+    for upgrade in (True, False, True):
+        async with engine.connect() as conn:
+            def migrate(connection):
+                config.attributes["connection"] = connection
+                if upgrade:
+                    command.upgrade(config, "c72d9fa083b1")
+                else:
+                    command.downgrade(config, "b63c8e9204af")
+            await conn.run_sync(migrate)
+            indexes = (await conn.execute(text("""
+                SELECT c.relname, i.indisvalid FROM pg_index i
+                JOIN pg_class c ON c.oid=i.indexrelid
+                JOIN pg_namespace n ON n.oid=c.relnamespace
+                WHERE n.nspname=current_schema() AND c.relname IN
+                    ('ix_filing_court_status','ix_filing_pending_received')
+            """))).all()
+            expected = "ix_filing_pending_received" if upgrade else "ix_filing_court_status"
+            assert indexes == [(expected, True)]
+            assert await conn.scalar(text(
+                "SELECT creation_key FROM filing_envelopes WHERE id=1"
+            )) == "12345678-1234-1234-1234-123456789012"
+        async with postgres_sessions() as db:
+            after = (await get_clerk_queue(db, 1, page=2)).model_dump(exclude={"as_of"})
+            assert after == before

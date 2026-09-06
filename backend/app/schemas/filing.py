@@ -126,6 +126,14 @@ class FilingListResponse(BaseModel):
     page_size: int
 
 
+class ClerkQueueResponse(FilingListResponse):
+    submitted_count: int
+    under_review_count: int
+    waiting_48h: int
+    oldest_submitted_at: datetime | None
+    as_of: datetime
+
+
 class CaseDocumentResponse(FilingDocumentResponse):
     copy_id: int | None = None
 

@@ -261,18 +261,31 @@ export async function reviewFiling(
   return data;
 }
 
-export async function getClerkQueue(
-  courtId: number,
-  page: number = 1,
-  statusFilter?: string,
-  signal?: AbortSignal,
-  pageSize: number = 25,
-): Promise<{ filings: FilingSummary[]; total: number }> {
-  const params: Record<string, unknown> = { court_id: courtId, page, page_size: pageSize };
-  if (statusFilter === 'waivers') {
+export interface ClerkQueue {
+  filings: FilingSummary[];
+  total: number;
+  submitted_count: number;
+  under_review_count: number;
+  waiting_48h: number;
+  oldest_submitted_at: string | null;
+  as_of: string;
+}
+
+export interface ClerkQueueFilters {
+  status?: string;
+  search?: string;
+  waiting_48h_only?: boolean;
+}
+
+export async function getClerkQueue(courtId: number, options: ClerkQueueFilters & {
+  page?: number; page_size?: number; signal?: AbortSignal;
+} = {}): Promise<ClerkQueue> {
+  const { status, signal, ...filters } = options;
+  const params: Record<string, unknown> = { court_id: courtId, page: 1, page_size: 25, ...filters };
+  if (status === 'waivers') {
     params.fee_waivers = true;
-  } else if (statusFilter && statusFilter !== 'all') {
-    params.status = statusFilter;
+  } else if (status && status !== 'all') {
+    params.status = status;
   }
   const { data } = await apiClient.get('/clerk/queue', { params, signal });
   return data;

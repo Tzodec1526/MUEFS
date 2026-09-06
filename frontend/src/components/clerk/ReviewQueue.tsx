@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useContext } from 'react';
 import { Link } from 'react-router-dom';
-import { batchReview, getClerkQueue, getFiling, reviewFiling, FilingEnvelope, FilingSummary } from '../../api/filings';
+import { batchReview, getClerkQueue, getFiling, reviewFiling, FilingEnvelope, FilingSummary, ClerkQueue, ClerkQueueFilters } from '../../api/filings';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import DocumentDownload from '../common/DocumentDownload';
@@ -10,8 +10,9 @@ import { getErrorDetail } from '../../utils/errors';
 function ReviewQueue() {
   const { court } = useContext(CourtContext)!;
   const courtId = court!.court_id;
-  const [filings, setFilings] = useState<FilingSummary[]>([]);
-  const [total, setTotal] = useState(0);
+  const [queue, setQueue] = useState<ClerkQueue | null>(null);
+  const filings = queue?.filings ?? [];
+  const total = queue?.total ?? 0;
   const [review, setReview] = useState<{
     id: number; filing?: FilingEnvelope; error?: string;
   } | null>(null);
@@ -20,14 +21,18 @@ function ReviewQueue() {
   const [reviewReason, setReviewReason] = useState('');
   const [actionInProgress, setActionInProgress] = useState(false);
   const [selectedSubmissions, setSelectedSubmissions] = useState<Map<number, number>>(new Map());
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [filters, setFilters] = useState<ClerkQueueFilters>({ status: 'all', search: '', waiting_48h_only: false });
+  const [filterDraft, setFilterDraft] = useState(filters);
+  const statusFilter = filters.status;
+  const filtersChanged = filterDraft.status !== filters.status || filterDraft.search !== filters.search
+    || filterDraft.waiting_48h_only !== filters.waiting_48h_only;
   const canReview = selectedFiling
     && ['submitted', 'under_review'].includes(selectedFiling.status)
     && statusFilter !== 'waivers';
   const [page, setPage] = useState(1);
   const requestRef = useRef<AbortController | null>(null);
   const reviewRequestRef = useRef<AbortController | null>(null);
+  const reviewHeading = useRef<HTMLHeadingElement>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [queueError, setQueueError] = useState<string | null>(null);
 
@@ -38,26 +43,25 @@ function ReviewQueue() {
     setLoading(true);
     setQueueError(null);
     try {
-      const result = await getClerkQueue(courtId, page, statusFilter, controller.signal);
+      const result = await getClerkQueue(courtId, { ...filters, page, signal: controller.signal });
       if (controller.signal.aborted) return;
       if (page > 1 && result.filings.length === 0) {
         setPage(Math.max(1, Math.ceil(result.total / 25)));
         return;
       }
-      setFilings(result.filings);
-      setTotal(result.total);
+      setQueue(result);
       setSelectedSubmissions(previous => new Map(result.filings
         .filter(filing => previous.get(filing.id) === filing.submission_count)
         .map(filing => [filing.id, filing.submission_count])));
-      setLastRefresh(new Date());
     } catch {
       if (controller.signal.aborted) return;
       setQueueError("We couldn't load the review queue. Please retry.");
-      setFilings([]);
+      setQueue(null);
+      setSelectedSubmissions(new Map());
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
-  }, [courtId, page, statusFilter]);
+  }, [courtId, page, filters]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- existing pattern; fetchQueue performs the setState for loading/data
@@ -66,6 +70,9 @@ function ReviewQueue() {
   }, [fetchQueue]);
 
   useEffect(() => () => reviewRequestRef.current?.abort(), []);
+  useEffect(() => {
+    if (review?.filing || review?.error) reviewHeading.current?.focus();
+  }, [review]);
 
   // Auto-refresh every 30 seconds, but never while a filing is open for review or an
   // action is in flight -- a refresh mid-review would clobber the clerk's work.
@@ -126,7 +133,7 @@ function ReviewQueue() {
   }
 
   async function openReview(filingId: number) {
-    if (actionInProgress || selectedFiling?.id === filingId) return;
+    if (loading || actionInProgress || selectedFiling?.id === filingId) return;
     reviewRequestRef.current?.abort();
     const controller = new AbortController();
     reviewRequestRef.current = controller;
@@ -166,16 +173,15 @@ function ReviewQueue() {
     return parseServerDate(dateStr).toLocaleString();
   };
 
+  const ageAsOf = queue ? parseServerDate(queue.as_of).getTime() : 0;
   const getAge = (dateStr: string | null): { text: string; level: string } => {
     if (!dateStr) return { text: 'N/A', level: '' };
-    // eslint-disable-next-line react-hooks/purity -- age computation is intentionally live at render time for queue freshness display
-    const minutes = Math.max(0, (Date.now() - parseServerDate(dateStr).getTime()) / 60000);
-    if (minutes < 1) return { text: 'just now', level: 'fresh' };
-    if (minutes < 120) return { text: `${Math.round(minutes)}m`, level: 'fresh' };
-    const hours = minutes / 60;
-    if (hours < 24) return { text: `${Math.round(hours)}h`, level: 'normal' };
-    if (hours < 48) return { text: '1d', level: 'aging' };
-    return { text: `${Math.floor(hours / 24)}d`, level: 'overdue' };
+    const minutes = Math.max(0, (ageAsOf - parseServerDate(dateStr).getTime()) / 60000);
+    return {
+      text: minutes < 1 ? 'just now' : minutes < 60 ? `${Math.floor(minutes)}m`
+        : minutes < 1440 ? `${Math.floor(minutes / 60)}h` : `${Math.floor(minutes / 1440)}d`,
+      level: minutes >= 2880 ? 'aging' : minutes < 120 ? 'fresh' : 'normal',
+    };
   };
 
   // Common rejection reasons for quick selection
@@ -196,15 +202,12 @@ function ReviewQueue() {
         <h2>Clerk Review Queue</h2>
         <div className="clerk-header-stats">
           <div className="stat-card">
-            <span className="stat-number">{total}</span>
-            <span className="stat-label">Pending</span>
+            <span className="stat-number">{queue ? total : '—'}</span>
+            <span className="stat-label">Matching filings</span>
           </div>
           <div className="stat-card">
-            <span className="stat-number">{filings.filter(f => {
-              const age = getAge(f.submitted_at);
-              return age.level === 'overdue';
-            }).length}</span>
-            <span className="stat-label">Overdue on this page</span>
+            <span className="stat-number">{queue?.waiting_48h ?? '—'}</span>
+            <span className="stat-label">Waiting 48+ hours</span>
           </div>
         </div>
       </div>
@@ -213,10 +216,17 @@ function ReviewQueue() {
         <form
           className="queue-webmcp-filter"
           toolname="get_clerk_review_queue"
-          tooldescription="List filings pending clerk review, optionally filtered by status"
+          tooldescription="Search received filings by case title, case number or #filing number, with status and elapsed-time filters"
           onSubmit={(e) => {
             e.preventDefault();
-            void fetchQueue();
+            if (filtersChanged) {
+              setLoading(true);
+              setFilters({ ...filterDraft, search: filterDraft.search?.trim() });
+              setFilterDraft(previous => ({ ...previous, search: previous.search?.trim() }));
+              setPage(1);
+              setSelectedSubmissions(new Map());
+              closeReview();
+            } else void fetchQueue();
           }}
         >
           <div className="form-group">
@@ -225,8 +235,8 @@ function ReviewQueue() {
               id="statusFilter"
               name="status"
               toolparamdescription="Queue status filter: all, submitted, or under_review"
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); setSelectedSubmissions(new Map()); closeReview(); }}
+              value={filterDraft.status}
+              onChange={(e) => setFilterDraft(previous => ({ ...previous, status: e.target.value }))}
               disabled={actionInProgress}
             >
               <option value="all">All Pending</option>
@@ -235,13 +245,27 @@ function ReviewQueue() {
               <option value="waivers">Pending Fee Waivers</option>
             </select>
           </div>
-          <button type="submit" className="btn btn-secondary" disabled={loading}>
-            {loading ? 'Refreshing...' : 'Refresh'}
+          <div className="form-group queue-search">
+            <label htmlFor="queueSearch">Case title, case number or #filing number</label>
+            <input id="queueSearch" name="search" type="search" maxLength={200}
+              placeholder="Example: Smith or #123" value={filterDraft.search}
+              disabled={actionInProgress}
+              onChange={e => setFilterDraft(previous => ({ ...previous, search: e.target.value }))} />
+          </div>
+          <label className="queue-age-filter">
+            <input type="checkbox" name="waiting_48h_only" checked={filterDraft.waiting_48h_only}
+              disabled={actionInProgress}
+              onChange={e => setFilterDraft(previous => ({ ...previous, waiting_48h_only: e.target.checked }))} />
+            Waiting at least 48 hours
+          </label>
+          <button type="submit" className="btn btn-secondary" disabled={loading || actionInProgress}>
+            {loading ? 'Loading...' : filtersChanged ? 'Apply filters' : 'Refresh'}
           </button>
         </form>
-        <span className="queue-meta">
-          Last updated: {lastRefresh.toLocaleTimeString()}
-        </span>
+        {queue && <span className="queue-meta">
+          Measured: {formatDate(queue.as_of)}. {queue.oldest_submitted_at && <>Oldest matching receipt: {formatDate(queue.oldest_submitted_at)}. </>}
+          Ages are elapsed time since receipt.
+        </span>}
       </div>
 
       {reviewError && (
@@ -260,7 +284,7 @@ function ReviewQueue() {
           <button
             className="btn btn-success btn-small"
             onClick={handleBatchAccept}
-            disabled={actionInProgress}
+            disabled={loading || actionInProgress}
           >
             {actionInProgress ? 'Processing...' : `Accept ${selectedSubmissions.size} Filing(s)`}
           </button>
@@ -273,7 +297,7 @@ function ReviewQueue() {
         </div>
       )}
 
-      <div className="queue-layout">
+      <div className={`queue-layout${review ? ' review-open' : ''}`} aria-busy={loading}>
         {/* Filing List */}
         <div className="queue-list">
           <table>
@@ -285,7 +309,7 @@ function ReviewQueue() {
                     checked={selectedSubmissions.size === filings.length && filings.length > 0}
                     onChange={toggleSelectAll}
                     aria-label="Select all filings"
-                    disabled={actionInProgress || statusFilter === 'waivers'}
+                    disabled={loading || actionInProgress || statusFilter === 'waivers'}
                   />
                 </th>
                 <th>Filing #</th>
@@ -302,7 +326,8 @@ function ReviewQueue() {
                 return (
                   <tr
                     key={filing.id}
-                    className={`${review?.id === filing.id ? 'selected' : ''} ${age.level === 'overdue' ? 'row-overdue' : ''}`}
+                    id={`queue-filing-${filing.id}`}
+                    className={review?.id === filing.id ? 'selected' : ''}
                     onClick={() => openReview(filing.id)}
                     tabIndex={0}
                     onKeyDown={(e) => {
@@ -315,7 +340,7 @@ function ReviewQueue() {
                         checked={selectedSubmissions.has(filing.id)}
                         onChange={() => toggleSelect(filing)}
                         aria-label={`Select filing ${filing.id}`}
-                        disabled={actionInProgress || statusFilter === 'waivers'}
+                        disabled={loading || actionInProgress || statusFilter === 'waivers'}
                       />
                     </td>
                     <td className="filing-num">#{filing.id}</td>
@@ -336,7 +361,7 @@ function ReviewQueue() {
               {!loading && !queueError && filings.length === 0 && (
                 <tr>
                   <td colSpan={7} className="empty-queue">
-                    No pending filings for this court. Queue is clear.
+                    No filings match these filters in this court.
                   </td>
                 </tr>
               )}
@@ -345,12 +370,12 @@ function ReviewQueue() {
           {total > 25 && (
             <div className="pagination">
               <button className="btn btn-secondary btn-small" disabled={page <= 1 || loading || actionInProgress}
-                onClick={() => { setPage((p) => p - 1); setSelectedSubmissions(new Map()); closeReview(); }}>
+                onClick={() => { setLoading(true); setPage((p) => p - 1); setSelectedSubmissions(new Map()); closeReview(); }}>
                 Previous
               </button>
               <span>Page {page} of {Math.ceil(total / 25)}</span>
               <button className="btn btn-secondary btn-small" disabled={page >= Math.ceil(total / 25) || loading || actionInProgress}
-                onClick={() => { setPage((p) => p + 1); setSelectedSubmissions(new Map()); closeReview(); }}>
+                onClick={() => { setLoading(true); setPage((p) => p + 1); setSelectedSubmissions(new Map()); closeReview(); }}>
                 Next
               </button>
             </div>
@@ -361,12 +386,15 @@ function ReviewQueue() {
         {review && (
           <div className="filing-detail-panel">
             <div className="detail-panel-header">
-              <h3>Filing #{review.id}</h3>
+              <h3 ref={reviewHeading} tabIndex={-1}>Filing #{review.id}</h3>
               {selectedFiling && <span className={`status-badge ${selectedFiling.status}`}>
                 {selectedFiling.status.replace('_', ' ')}
               </span>}
               <button type="button" className="btn btn-secondary btn-small" disabled={actionInProgress}
-                onClick={closeReview}>
+                onClick={() => {
+                  closeReview();
+                  document.getElementById(`queue-filing-${review.id}`)?.focus();
+                }}>
                 Close review
               </button>
             </div>
@@ -486,11 +514,6 @@ function ReviewQueue() {
           </div>
         )}
 
-        {!review && filings.length > 0 && (
-          <div className="filing-detail-panel empty-detail">
-            <p>Select a filing from the queue to review it.</p>
-          </div>
-        )}
       </div>
     </div>
   );

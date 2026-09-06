@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { getCase, searchCases } from '../../api/cases';
 import { getFilingChecklists, getFilingRequirements } from '../../api/courts';
-import { getClerkQueue, getFilingStatusCounts } from '../../api/filings';
+import { getFilingStatusCounts } from '../../api/filings';
 import { getDemoRole } from '../../components/auth/LoginScreen';
 import type { ModelContextTool } from '../types';
 import { registerWorkflowTools } from './workflows';
@@ -56,15 +56,4 @@ it('builds the plan for the explicitly chosen case without searching again', asy
   expect(result.filing_wizard_path).toContain('case_id=2&court_id=4&case_type_id=7');
   expect(searchCases).not.toHaveBeenCalled();
   expect(getFilingRequirements).toHaveBeenCalledWith(4, 7, 'subsequent');
-});
-
-it('prioritizes the oldest filings across both clerk statuses', async () => {
-  vi.mocked(getDemoRole).mockReturnValue('clerk');
-  const pending = { id: 20, submitted_at: '2026-09-04', status: 'submitted' };
-  const older = { id: 10, submitted_at: '2026-09-01', status: 'under_review' };
-  // Only ordering fields matter here; real queue records have additional display fields.
-  vi.mocked(getClerkQueue).mockResolvedValueOnce({ total: 1, filings: [pending] } as Awaited<ReturnType<typeof getClerkQueue>>);
-  vi.mocked(getClerkQueue).mockResolvedValueOnce({ total: 1, filings: [older] } as Awaited<ReturnType<typeof getClerkQueue>>);
-  const result = JSON.parse(await registered.get('clerk_triage_workflow')!.execute({}) as string);
-  expect(result.priority_filings.map((f: { id: number }) => f.id)).toEqual([10, 20]);
 });

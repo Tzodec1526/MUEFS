@@ -117,20 +117,16 @@ export async function registerWorkflowTools(mc: ModelContext, signal?: AbortSign
         }
         const courtId = getDemoCourtId();
         if (courtId == null) return toolOk({ needs_court_assignment: true, next_url: '/clerk/queue' });
-        const [submitted, review] = await Promise.all([
-          getClerkQueue(courtId, 1, 'submitted'),
-          getClerkQueue(courtId, 1, 'under_review'),
-        ]);
-        const combined = [...submitted.filings, ...review.filings]
-          .sort((a, b) => (a.submitted_at || '').localeCompare(b.submitted_at || '') || a.id - b.id)
-          .slice(0, 5);
+        const queue = await getClerkQueue(courtId, { page_size: 5 });
 
         return toolOk({
           workflow: 'clerk_triage',
           court_id: courtId,
-          submitted_count: submitted.total,
-          under_review_count: review.total,
-          priority_filings: combined.map((f) => ({
+          submitted_count: queue.submitted_count,
+          under_review_count: queue.under_review_count,
+          waiting_48h: queue.waiting_48h,
+          as_of: queue.as_of,
+          priority_filings: queue.filings.map((f) => ({
             id: f.id,
             title: f.case_title ? sanitizeAgentText(f.case_title) : null,
             status: f.status,

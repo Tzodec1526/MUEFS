@@ -97,7 +97,9 @@ class FilingEnvelope(Base):
               sqlite_where=text('creation_key IS NOT NULL')),
         # Status is covered for counters; updated_at/id support stable page ordering.
         Index('ix_filing_filer_updated', 'filer_id', 'updated_at', 'id', 'status'),
-        Index('ix_filing_court_status', 'court_id', 'status'),
+        Index('ix_filing_pending_received', 'court_id', 'submitted_at', 'id', 'status',
+              postgresql_where=text("status IN ('SUBMITTED', 'UNDER_REVIEW')"),
+              sqlite_where=text("status IN ('SUBMITTED', 'UNDER_REVIEW')")),
         Index('ix_filing_court_status_submitted', 'court_id', 'status', 'submitted_at'),
         Index('ix_filing_court_waiver', 'court_id', 'fee_waiver_requested',
               'fee_waiver_granted', 'submitted_at'),

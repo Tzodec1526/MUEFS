@@ -21,6 +21,8 @@ export async function registerClerkTools(mc: ModelContext, signal?: AbortSignal)
             enum: ['all', 'submitted', 'under_review'],
             description: 'Queue filter status',
           },
+          search: { type: 'string', maxLength: 200, description: 'Case title, case number, or #filing number' },
+          waiting_48h_only: { type: 'boolean', description: 'Only filings received at least 48 hours ago' },
         },
       },
       annotations: READ_ONLY,
@@ -31,11 +33,17 @@ export async function registerClerkTools(mc: ModelContext, signal?: AbortSignal)
         const courtId = getDemoCourtId();
         if (courtId == null) return toolError('Select an assigned court in the review queue first.');
         const status = (input.status as string) || 'all';
-        const data = await getClerkQueue(courtId, (input.page as number) || 1, status);
+        const data = await getClerkQueue(courtId, {
+          page: (input.page as number) || 1, status, search: input.search as string | undefined,
+          waiting_48h_only: input.waiting_48h_only as boolean | undefined,
+        });
         return toolOk({
           court_id: courtId,
           status,
           total: data.total,
+          waiting_48h: data.waiting_48h,
+          oldest_submitted_at: data.oldest_submitted_at,
+          as_of: data.as_of,
           filings: data.filings.map((f) => ({
             id: f.id,
             status: f.status,
