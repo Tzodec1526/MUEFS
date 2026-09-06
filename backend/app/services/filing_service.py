@@ -148,7 +148,7 @@ async def validate_filing_destination(
     # Read current scalar values, even if a caller previously loaded these records.
     # Shared locks keep configuration and case access stable until the receipt commits.
     target = (await db.execute(
-        select(Court.is_efiling_enabled, CaseType.court_id, CaseType.is_active)
+        select(Court.is_efiling_enabled, Court.intake_notice, CaseType.court_id, CaseType.is_active)
         .select_from(Court).join(CaseType, CaseType.id == data.case_type_id)
         .where(Court.id == data.court_id)
         .with_for_update(read=True, of=(Court, CaseType))
@@ -160,12 +160,12 @@ async def validate_filing_destination(
     if filer_id is not None and not target.is_efiling_enabled:
         raise FilingDestinationError(
             409, "This court is not accepting electronic filings. "
-            "Contact the court for filing options.",
+            + (target.intake_notice or "Contact the court for filing options."),
         )
     if filer_id is not None and not target.is_active:
         raise FilingDestinationError(
             409, "This case type is not accepting electronic filings. "
-            "Contact the court for guidance.",
+            + (target.intake_notice or "Contact the court for guidance."),
         )
     case = None
     if data.case_id is not None:

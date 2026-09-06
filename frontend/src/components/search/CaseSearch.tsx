@@ -216,6 +216,7 @@ function CaseSearch() {
                 <option key={court.id} value={court.id}>{court.county} — {court.name}</option>
               ))}
             </select>
+            {courtId && <Link to={`/courts/${courtId}/intake`}>Court intake status and instructions</Link>}
           </div>
           <button className="btn btn-primary" type="submit" disabled={searching}>
             {searching ? 'Searching...' : 'Search'}

@@ -12,7 +12,7 @@ establish state approval or production readiness.
 | Prove what was submitted | Each new submission has a retained transaction ID, UTC receipt time, filer name, document manifest and SHA-256 fingerprints, payment reference where present, and a downloadable receipt. A read-only recovery audit compares stored bytes and retained transaction references. | Court-approved retention schedules, trusted time monitoring, external archival controls and validation of the deployed storage/recovery configuration. |
 | Preserve draft work | Account saves, filing-specific recovery within a verified account/tab, explicit conflict comparison and cross-tab identity invalidation are implemented. Creation keys recover lost initial responses; PostgreSQL concurrent saves preserve the winning version. | Broader offline/device testing and assistive-technology evaluation. |
 | Preserve corrections and decisions | Corrections create another numbered submission. Earlier document bytes remain downloadable by the filer and court staff. Acceptance, return, rejection, CMS failure and signed filing-date orders are separate retained events. | Court procedures for deciding relief, certified/file-stamped copies and court-approved retention. |
-| Route filings to the correct court and case | Creation and submission validate the filing kind, court, case type, existing case and current filer access. Intake flags are enforced by the API. Acceptance checks legacy routing before a CMS call; valid received work remains reviewable after intake closes. | Court procedures for changing intake configuration, reconciling legacy assignments and correcting a filing's destination without losing its retained evidence. |
+| Route filings to the correct court and case | Creation and submission validate the filing kind, court, case type, existing case and current filer access. Court administrators publish intake availability and public instructions with retained reasons, authority and version conflicts. Valid received work remains reviewable after intake closes. | Court-approved closure and reopening procedures, reconciling legacy assignments and correcting a filing's destination without losing its retained evidence. |
 | Survive retries and simultaneous actions | Database commits finish before HTTP success responses. Submission requires the version of the details, active documents and fee state the filer reviewed. Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Review decisions identify the numbered submission the reviewer saw; an intervening resubmission invalidates that decision. Batch review uses a savepoint per filing and reports each failed item. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
 | Locate and assess received work | Assigned staff search the review queue by case title/number or exact filing number and filter by status and elapsed receipt age. Counts cover all matching pages; oldest-first reads use an index for pending work. | Court-approved intake priorities, staffing procedures, representative load testing and independent accessibility evaluation. Elapsed age does not establish a deadline violation. |
 | Publish reviewed public copies | Assigned staff prepare and inspect a separate PDF and public title, explicitly publish it, and withdraw public access with retained authority/history. Originals and receipts stay intact; fee-waiver records cannot use this publication path. | Court-approved classification/redaction policy, approved review tools, storage immutability and retention schedules. |
@@ -161,6 +161,23 @@ unchanged. This status must not be used as evidence that documents reached recip
 
 ## Filing destinations and intake
 
+Each court has a public `/courts/{courtId}/intake` page showing current availability,
+instructions and case-type restrictions. An active administrator assigned to that court,
+or a system administrator, can publish changes there. Clerk assignment alone does not
+grant this power. The court flag, complete case-type selection and public notice publish
+atomically with a required reason and authority reference. Closures require public
+instructions for filers. Reasons, authority, actor and before/after snapshots are retained
+in administrator-only history, loaded on demand in pages of 25 changes.
+
+Publication requires the version the administrator reviewed. Stale versions and changed
+case-type lists return HTTP 409 without overwriting another publication. Identical settings
+create no revision. Account and court authority are rechecked under a shared user lock;
+court and case-type locks serialize publications with filing receipts. A failed audit
+commit rolls back the settings, and the API reports success only after commit. If a
+response is lost, the editor requires reloading the current settings and reviewing history
+before another change. This workflow changes intake immediately; it does not schedule
+closures, alter calendars or determine filing deadlines.
+
 New-case requests must explicitly use `filing_type: "initial"` and omit `case_id`.
 `subsequent` (the API default) and `service_only` require an existing case. New requests
 accept only those three filing kinds. Legacy `motion` records remain readable and
@@ -185,6 +202,12 @@ Saved filings keep their case-type label when that type is disabled. New filing 
 still list active types only. API, PostgreSQL concurrency and rendered browser checks
 cover these boundaries, including configuration changes after validation, stale database
 reads, receipt replay, case restrictions and partial batch failure.
+
+Additional PostgreSQL checks cover simultaneous intake publications, authority revocation,
+audit commit failure and a closure waiting for a receipt commit. Browser checks cover
+public/staff separation, lost-response recovery, conflicting edits and mobile layouts.
+These use synthetic courts; real closure procedures and accessibility remain subjects for
+independent court evaluation.
 
 ## Public search measurements
 

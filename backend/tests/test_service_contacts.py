@@ -224,34 +224,51 @@ async def test_legacy_upgrade_and_simultaneous_court_edits(postgres_sessions):
     from alembic import command
     from app.database import get_db
     from app.main import app
+    from app.models.case import Case
+    from app.models.court import CaseCategory, CaseType
     from app.models.user import CourtRole, User, UserCourtRole, UserType
-    from tests.test_motions_and_search import create_court_with_case
 
     async with postgres_sessions.begin() as db:
-        party, clerk, court, _kind, _other, case = await create_court_with_case(db)
-        party.verified_email, party.keycloak_id = party.email, "synthetic-service-recipient"
-        party.bar_number_verified = True
+        party = User(
+            email="service-party@example.com", first_name="Service", last_name="Recipient",
+            user_type=UserType.ATTORNEY, bar_number="P77777", bar_number_verified=True,
+            verified_email="service-party@example.com", keycloak_id="synthetic-service-recipient",
+        )
+        clerk = User(email="first-service-clerk@example.com", first_name="First", last_name="Clerk",
+                     user_type=UserType.CLERK)
         second = User(
             email="second-service-clerk@example.com",
             first_name="Second",
             last_name="Clerk",
             user_type=UserType.CLERK,
         )
-        db.add(second)
+        db.add_all([party, clerk, second])
+        await db.flush()
+        # Seed only columns present in the legacy schema being upgraded.
+        court_id = await db.scalar(text(
+            "INSERT INTO courts (name, county, court_type, state, is_efiling_enabled) "
+            "VALUES ('Service Court', 'Wayne', 'CIRCUIT', 'MI', true) RETURNING id"
+        ))
+        kind = CaseType(court_id=court_id, code="CIV", name="Civil", category=CaseCategory.CIVIL)
+        db.add(kind)
+        await db.flush()
+        case = Case(court_id=court_id, case_type_id=kind.id, case_number="SERVICE-CASE-1",
+                    title="Synthetic service matter", filed_date=datetime.now(UTC))
+        db.add(case)
         await db.flush()
         db.add_all(
             [
-                UserCourtRole(user_id=actor.id, court_id=court.id, role=CourtRole.CLERK)
+                UserCourtRole(user_id=actor.id, court_id=court_id, role=CourtRole.CLERK)
                 for actor in [clerk, second]
             ]
         )
-        participant = await db.scalar(
-            select(CaseParticipant).where(
-                CaseParticipant.case_id == case.id,
-                CaseParticipant.user_id == party.id,
-            )
+        participant = CaseParticipant(
+            case_id=case.id, user_id=party.id, role=ParticipantRole.ATTORNEY_PLAINTIFF,
+            party_name="Service Recipient", attorney_bar_number=party.bar_number,
+            reviewed_at=datetime.now(UTC),
         )
-        participant.reviewed_at = datetime.now(UTC)
+        db.add(participant)
+        await db.flush()
         await db.execute(
             text("""INSERT INTO service_contacts (case_id, user_id, name, email, method)
             VALUES (:case, :user, 'Legacy contact', 'old-service@example.com', 'ELECTRONIC')"""),

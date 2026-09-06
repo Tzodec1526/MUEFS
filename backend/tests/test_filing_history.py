@@ -10,7 +10,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import DBAPIError
 
 from app.models.case import Case
-from app.models.court import CaseCategory, CaseType, Court, CourtType
+from app.models.court import CaseCategory, CaseType
 from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.models.filing_transaction import FilingTransaction
 from app.models.notification import Notification
@@ -32,21 +32,25 @@ async def filing_fixture(db):
     other = User(
         email="other@test.com", first_name="Other", last_name="Filer", user_type=UserType.ATTORNEY
     )
-    court = Court(name="Records Court", county="Wayne", court_type=CourtType.CIRCUIT)
-    db.add_all([filer, clerk, other, court])
+    db.add_all([filer, clerk, other])
     await db.flush()
+    # Migration tests also seed this fixture before newer court columns exist.
+    court_id = await db.scalar(text(
+        "INSERT INTO courts (name, county, court_type, state, is_efiling_enabled) "
+        "VALUES ('Records Court', 'Wayne', 'CIRCUIT', 'MI', true) RETURNING id"
+    ))
     case_type = CaseType(
-        court_id=court.id,
+        court_id=court_id,
         name="No-fee matter",
         code="FREE",
         category=CaseCategory.CIVIL,
         filing_fee_cents=0,
     )
     db.add(case_type)
-    db.add(UserCourtRole(user_id=clerk.id, court_id=court.id, role=CourtRole.CLERK))
+    db.add(UserCourtRole(user_id=clerk.id, court_id=court_id, role=CourtRole.CLERK))
     await db.flush()
     filing = FilingEnvelope(
-        court_id=court.id,
+        court_id=court_id,
         case_type_id=case_type.id,
         filer_id=filer.id,
         case_title="Original title",

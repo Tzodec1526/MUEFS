@@ -1,0 +1,60 @@
+.court-intake-page {
+  max-width: 1000px;
+  overflow-wrap: anywhere;
+}
+
+.court-intake-page .page-header {
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.court-intake-page .page-header > div {
+  flex: 1 1 20rem;
+}
+
+.court-intake-page .page-header > .btn {
+  flex: none;
+}
+
+.intake-notice {
+  white-space: pre-line;
+}
+
+.intake-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.intake-table th,
+.intake-table td {
+  padding: .75rem .5rem;
+  border-bottom: 1px solid var(--navy-100);
+  text-align: left;
+  vertical-align: top;
+}
+
+.intake-table th:last-child {
+  width: 38%;
+}
+
+.intake-editor fieldset {
+  min-width: 0;
+  padding: 1rem;
+  margin: 1rem 0;
+  border: 1px solid var(--navy-100);
+  border-radius: .4rem;
+}
+
+.intake-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: .65rem;
+  margin: .8rem 0;
+}
+
+.intake-checkbox input {
+  flex: none;
+  margin-top: .25rem;
+}

@@ -19,7 +19,7 @@ from tests.test_filing_concurrency import postgres_sessions as postgres_sessions
 @pytest.mark.parametrize("postgres_sessions", ["d4e7a12b93f0"], indirect=True)
 async def test_search_index_upgrade_recovers_failed_build_and_preserves_records(postgres_sessions):
     from app.models.case import Case, CaseParticipant, ParticipantRole
-    from app.models.court import CaseCategory, CaseType, Court, CourtType
+    from app.models.court import CaseCategory, CaseType
     from app.services.search_service import search_cases
 
     engine = postgres_sessions.kw["bind"]
@@ -32,14 +32,16 @@ async def test_search_index_upgrade_recovers_failed_build_and_preserves_records(
         await conn.run_sync(downgrade)
 
     async with postgres_sessions.begin() as db:
-        court = Court(name="Search Court", county="Wayne", court_type=CourtType.CIRCUIT)
-        db.add(court)
-        await db.flush()
-        case_type = CaseType(court_id=court.id, code="CIV", name="Civil",
+        # This revision predates the current Court model's intake fields.
+        court_id = await db.scalar(text(
+            "INSERT INTO courts (name, county, court_type, state, is_efiling_enabled) "
+            "VALUES ('Search Court', 'Wayne', 'CIRCUIT', 'MI', true) RETURNING id"
+        ))
+        case_type = CaseType(court_id=court_id, code="CIV", name="Civil",
                              category=CaseCategory.CIVIL, filing_fee_cents=0)
         db.add(case_type)
         await db.flush()
-        case = Case(court_id=court.id, case_type_id=case_type.id, case_number="2026-100%_A",
+        case = Case(court_id=court_id, case_type_id=case_type.id, case_number="2026-100%_A",
                     title="Retained public matter", filed_date=datetime.now(UTC))
         db.add(case)
         await db.flush()

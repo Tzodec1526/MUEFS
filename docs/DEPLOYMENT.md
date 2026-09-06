@@ -1,5 +1,23 @@
 # Deployment Guide
 
+Court intake management requires migration `f06c31a8b7d2`. It adds the intake revision and
+public notice while preserving existing court and case-type availability. Apply it before
+starting the updated API, and deploy the intake client with that API. Readiness requires
+an exact schema revision match, so coordinate this rollout with routing and worker startup.
+The migration can be downgraded while no intake publication exists; it refuses to discard
+published revisions or notices. Recover an erroneous publication by publishing corrected
+settings with a reason, preserving the history.
+
+Authorized administrators use `/courts/{courtId}/intake` to close or reopen electronic
+intake, restrict case types and publish filer instructions. Assign `CourtRole.ADMIN` only
+to staff authorized to make those changes; `CourtRole.CLERK` alone is insufficient.
+External clients use `GET` and `PUT /api/v1/courts/{courtId}/intake`, preserving the reviewed
+`expected_version` and complete case-type list, plus a reason and authority reference.
+History is restricted to the same administrators. After an uncertain response or HTTP 409,
+read current settings and history before preparing another publication. Confirm the public
+notice and available case types after each change, including reopening. Existing received
+filings remain reviewable; calendars, filing-date orders and outage procedures are separate.
+
 Document removal now requires migration `e95b20d7a6f1` and a supervised
 `python -m app.storage_cleanup` process. Apply migrations before starting the updated API
 and worker; Docker Compose includes `storage-worker`. Share the API's database and storage

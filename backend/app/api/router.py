@@ -6,6 +6,7 @@ from app.api.case_participants import router as case_participants_router
 from app.api.cases import router as cases_router
 from app.api.clerk_review import router as clerk_router
 from app.api.court_calendars import router as court_calendars_router
+from app.api.court_intake import router as court_intake_router
 from app.api.court_rules import router as court_rules_router
 from app.api.courts import router as courts_router
 from app.api.document_publication import router as document_publication_router
@@ -26,6 +27,7 @@ api_router = APIRouter()
 api_router.include_router(auth_router)
 api_router.include_router(courts_router)
 api_router.include_router(court_calendars_router)
+api_router.include_router(court_intake_router)
 api_router.include_router(court_rules_router)
 api_router.include_router(cases_router)
 api_router.include_router(case_participants_router)

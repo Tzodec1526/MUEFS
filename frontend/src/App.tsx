@@ -25,6 +25,7 @@ const DeliveriesPage = lazy(() => import('./components/service/DeliveriesPage'))
 const DeliveryComposePage = lazy(() => import('./components/service/DeliveryComposePage'));
 const DeliveryDetailPage = lazy(() => import('./components/service/DeliveryDetailPage'));
 const CourtCalendarPage = lazy(() => import('./components/courts/CourtCalendarPage'));
+const CourtIntakePage = lazy(() => import('./components/courts/CourtIntakePage'));
 const NotificationsPage = lazy(() => import('./components/notifications/NotificationsPage'));
 const AdministrationPage = lazy(() => import('./components/admin/AdministrationPage'));
 const CaseSearch = lazy(() => import('./components/search/CaseSearch'));
@@ -240,6 +241,7 @@ function App() {
                         <Route path="/filings/:filingId/filing-date" element={<CourtWorkspace><FilingDateOrderPage key={location.pathname} /></CourtWorkspace>} />
                         <Route path="/cases/search" element={<CaseSearch />} />
                         <Route path="/courts/:courtId/calendar" element={<CourtCalendarPage key={location.pathname} />} />
+                        <Route path="/courts/:courtId/intake" element={<CourtIntakePage key={location.pathname} />} />
                         <Route path="/notifications" element={<NotificationsPage />} />
                         <Route path="/service/deliveries" element={<DeliveriesPage key={location.pathname} />} />
                         <Route path="/service/deliveries/:deliveryId" element={<DeliveryDetailPage key={location.pathname} />} />

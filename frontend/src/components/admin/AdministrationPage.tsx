@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { getErrorDetail } from '../../utils/errors';
 import { parseServerDate } from '../../utils/format';
@@ -236,6 +237,7 @@ function AccountDirectory({ access }: { access: Access }) {
         <input id="directory-email" name="email" type="email" maxLength={255} /></div>
       <button className="btn btn-secondary">Find accounts</button>
     </form>
+    {court > 0 && <p><Link to={`/courts/${court}/intake`}>Manage this court&apos;s filing intake</Link></p>}
     {!access.system_admin && <p>Search the exact email of a known staff member to assign access. A system administrator must provision their identity first.</p>}
     {message && <p className="alert alert-success" role="status">{message}</p>}
     <div className="admin-workspace">

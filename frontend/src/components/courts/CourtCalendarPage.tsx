@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { getCourt } from '../../api/courts';
 import type { FilingDateAssessment } from '../../api/filings';
@@ -86,7 +86,8 @@ export default function CourtCalendarPage() {
 
   return <section className="court-calendar-page">
     <div className="page-header"><div><h2>{courtName}: filing calendar</h2>
-      <p>Published timezones, legal holidays and court-ordered closures.</p></div></div>
+      <p>Published timezones, legal holidays and court-ordered closures.</p></div>
+      <Link className="btn btn-secondary" to={`/courts/${courtId}/intake`}>Electronic intake status</Link></div>
     <p>Electronic submissions can arrive at any time. Under MCR 1.109(G)(5)(b), weekend and closed-day
       submissions are assigned to the next business day. This calendar does not calculate deadlines or decide requests for relief.</p>
     {loading && <p role="status">Loading calendars…</p>}

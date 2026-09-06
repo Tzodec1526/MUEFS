@@ -31,6 +31,7 @@ function Sidebar() {
     { path: '/clerk/queue', label: 'Review Queue', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
     { path: '/clerk/fee-reviews', label: 'Fee Reviews', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
     { path: `/courts/${courtId}/calendar`, label: 'Court Calendar', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
+    { path: `/courts/${courtId}/intake`, label: 'Filing Intake', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
   ];
 
   const links = allLinks.filter((link) => {
