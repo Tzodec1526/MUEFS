@@ -34,10 +34,9 @@ def validate_security_config() -> None:
         issues.append("ALLOW_PUBLIC_REGISTRATION should be false outside DEBUG")
     if not settings.debug and settings.enable_api_docs:
         issues.append("ENABLE_API_DOCS should be false outside DEBUG")
-    if settings.malware_scan_clamav_enabled and not settings.malware_scan_fail_closed:
-        issues.append(
-            "MALWARE_SCAN_FAIL_CLOSED should be true when ClamAV is enabled"
-        )
+    if (not settings.debug and not settings.allow_demo_mode
+            and not settings.malware_scan_clamav_enabled):
+        issues.append("MALWARE_SCAN_CLAMAV_ENABLED must be true outside demo/debug mode")
 
     if not settings.debug:
         for name, value in (

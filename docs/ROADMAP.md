@@ -19,8 +19,9 @@ correction history and PostgreSQL concurrency checks now form part of the core w
 - **Demo auth is open by configuration.** The hosted demo enables `ALLOW_DEMO_MODE` and
   `ALLOW_PUBLIC_REGISTRATION` so anyone can explore it without an identity provider.
   Production runs Keycloak-only with no self-registration. See [SECURITY.md](../SECURITY.md).
-- **Malware scanning defaults to the built-in heuristic.** Real signature-based scanning
-  requires enabling the optional ClamAV backend.
+- **The demo uses built-in heuristic screening.** Strict production startup requires ClamAV.
+  Enabled ClamAV screening has a total deadline and rejects incomplete/error responses;
+  deployment still requires current signatures, monitored limits and representative load testing.
 - **Document validation is advisory.** MCR 1.109 checks (text-searchability, PII) produce
   warnings, and PII detection samples at most five pages using heuristics. Those upload
   results are retained and reused; legacy documents without results carry an explicit

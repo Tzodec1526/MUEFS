@@ -182,15 +182,37 @@ The built-in heuristic scan is always on. For production, also enable ClamAV:
 ```bash
 # In .env:
 MALWARE_SCAN_CLAMAV_ENABLED=true
-MALWARE_SCAN_FAIL_CLOSED=true
+CLAMAV_TIMEOUT_SECONDS=30
 
 # Bring up the scanner alongside the stack:
 docker compose --profile security up -d
 ```
 
 ClamAV downloads its signature database on first boot (a few minutes; it persists in the
-`clamav_data` volume). `MALWARE_SCAN_FAIL_CLOSED=true` rejects uploads if the scanner is
-unreachable.
+`clamav_data` volume). Once enabled, ClamAV failures always reject the upload with a
+retryable `503`; there is no fallback to heuristics. The deadline covers connection,
+transfer and response. Detected threats return `422`. Strict startup requires the scanner
+outside demo/debug mode. Retire the obsolete `MALWARE_SCAN_ENABLED` and
+`MALWARE_SCAN_FAIL_CLOSED` environment variables.
+
+The scanner's TCP port stays inside the Compose network. The mounted
+[`clamd.conf`](../clamav/clamd.conf) sets a 100 MiB stream limit, a 101 MiB per-file scan
+limit (including the application's exact 100 MiB boundary), a 400 MiB aggregate scan
+limit and a 25-second engine limit. PCRE matching uses the same per-file cap.
+`AlertExceedsMax` enables engine limit detections. The mounted
+[`muefs-limits.cdb`](../clamav/muefs-limits.cdb) additionally rejects container members at or
+above 101 MiB: the real-daemon regression reproduced the highly compressed archive gap
+reported in [ClamAV issue 633](https://github.com/Cisco-Talos/clamav/issues/633), even with
+`AlertExceedsMax` enabled. Keep this policy file mounted alongside the official databases. Its mount must allow writes
+because the official image changes database-file ownership at startup; the configuration
+mount stays read-only. Keep these limits aligned with `MAX_FILE_SIZE_MB` when changing upload policy;
+load-test time and memory with the court's actual documents. Do not disable limit alerts
+to turn an incomplete scan into a clean verdict.
+
+Verify clean uploads, a harmless antivirus test file, scanner downtime and recovery before
+accepting filings. Monitor daemon health, signature freshness, scan-limit detections and
+`503` rates separately from API liveness. Maintain supported ClamAV patches and signature
+updates. The client protocol follows the [ClamAV INSTREAM specification](https://docs.clamav.net/manual/Usage/ClamdProtocol.html).
 
 ## 6. Monitoring & operations
 

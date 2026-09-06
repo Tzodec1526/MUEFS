@@ -126,9 +126,11 @@ services:
       # Optional ClamAV scanning. Off by default; enable with the `security` profile and
       # MALWARE_SCAN_CLAMAV_ENABLED=true (see the clamav service below). Built-in heuristic
       # screening runs regardless.
+      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-100}
       MALWARE_SCAN_CLAMAV_ENABLED: ${MALWARE_SCAN_CLAMAV_ENABLED:-false}
       CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
       CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+      CLAMAV_TIMEOUT_SECONDS: ${CLAMAV_TIMEOUT_SECONDS:-30}
     ports:
       - "8000:8000"
     volumes:
@@ -185,10 +187,11 @@ services:
   clamav:
     image: clamav/clamav:1.4
     profiles: ["security"]
-    ports:
-      - "3310:3310"
     volumes:
       - clamav_data:/var/lib/clamav
+      - ./clamav/clamd.conf:/etc/clamav/clamd.conf:ro
+      # The official entrypoint chowns database files, so this mount must allow it.
+      - ./clamav/muefs-limits.cdb:/var/lib/clamav/muefs-limits.cdb
 
 volumes:
   postgres_data:

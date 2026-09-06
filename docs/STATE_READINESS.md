@@ -16,6 +16,7 @@ establish state approval or production readiness.
 | Survive retries and simultaneous actions | Database commits finish before HTTP success responses. Submission requires the version of the details, active documents and fee state the filer reviewed. Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Review decisions identify the numbered submission the reviewer saw; an intervening resubmission invalidates that decision. Batch review uses a savepoint per filing and reports each failed item. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
 | Locate and assess received work | Assigned staff search the review queue by case title/number or exact filing number and filter by status and elapsed receipt age. Counts cover all matching pages; oldest-first reads use an index for pending work. | Court-approved intake priorities, staffing procedures, representative load testing and independent accessibility evaluation. Elapsed age does not establish a deadline violation. |
 | Publish reviewed public copies | Assigned staff prepare and inspect a separate PDF and public title, explicitly publish it, and withdraw public access with retained authority/history. Originals and receipts stay intact; fee-waiver records cannot use this publication path. | Court-approved classification/redaction policy, approved review tools, storage immutability and retention schedules. |
+| Screen incoming documents | Every upload uses the shared inspected path. Enabled ClamAV scanning requires a complete verdict within one deadline; failures/cancellation cannot store a document. Production startup, private scanner networking, explicit limits and a guard against oversized compressed members are implemented and tested against ClamAV 1.4.6. | Court-approved file/complexity policy, current signature operations, legacy-document review, representative load and independent security validation. A clean verdict does not certify a document safe. |
 | Protect private material | Private envelopes and receipts require filer or court-staff access. Dockets exclude waiver application data, confidential document metadata, superseded documents and other filers' drafts. Fee-waiver documents are nonpublic even if the filer omits the checkbox. | Full classification/retention policy for every case and document type; independent security assessment. |
 | Control case participation and access | Assigned staff record participants, counsel representation and explicit restricted-case grants with retained reasons, before/after history, stale-edit checks and revocation. Filing acceptance no longer assigns party roles or grants case access. | Court-approved access rules, review of legacy records, CMS appearance/withdrawal synchronization, limited-scope representation and service enrollment. |
 | Record the correct legal filing date | Receipt instants and filing dates are separate. Published calendars establish business dates. Assigned staff can record a signed order establishing a different date, with retained before/after evidence and explicit case opening date changes. Acceptance honors the order without rewriting the receipt. | Court verification of calendars and signed orders, motion/adjudication procedures, downstream CMS synchronization and review of closures published after acceptance. Correcting a document does not automatically preserve its legal filing date. |
@@ -940,6 +941,35 @@ documents, court fee assessments and a published synthetic calendar; they cover
 correction, retries, downloads, fee refresh, load failure, service-only recording and
 mobile rendering. Court policy, real payment/CMS integration and deployed verification
 remain separate readiness requirements.
+
+## Bounded upload screening and scanner outages
+
+Enabled ClamAV screening no longer falls back to heuristic acceptance after a daemon
+error. The former `clamd` dependency, fail-open branch, unused content-type argument and
+screening-disable switches are removed. A standard-library asynchronous INSTREAM client
+uses one deadline across connection, transfer and verdict, bounded response size and
+socket cleanup on success, failure or cancellation. Network waits do not occupy upload
+worker threads. Detected threats/limit breaches return 422; incomplete screening returns
+503 with a retry interval and leaves no stored document. Strict production startup requires
+ClamAV, and Compose forwards the deadline without publishing the scanner's TCP port.
+
+The supplied daemon config bounds scanning and retains the application's exact 100 MiB
+upload boundary. Real ClamAV 1.4.6 returned a clean verdict for a compressed 110 MiB member
+even with `AlertExceedsMax` enabled, consistent with [upstream issue 633](https://github.com/Cisco-Talos/clamav/issues/633).
+An explicit container metadata signature now rejects members at or above the 101 MiB
+per-file scan cap. The configuration and policy files use LF line endings so the same
+checked-out files load on Windows Docker hosts. These controls supplement the scanner;
+its verdict does not certify complete inspection of every possible embedded format.
+
+A controlled latency experiment compared the previous and current scanner paths using
+12 simultaneous 64 KiB inputs, two worker threads and a local daemon model with a fixed
+150 ms response delay. With one warmup and five measurements per path, median batch time
+fell from 974.41 ms to 169.63 ms. An unrelated worker task's median wait fell from 930.45 ms
+to 0.41 ms. This models scanner latency and worker contention; it does not measure real antivirus
+throughput or end-to-end request latency.
+Actual-daemon checks separately cover clean data, the upload-size boundary, compressed
+antivirus test data and archive-limit enforcement. API tests cover error/truncated/oversize
+responses, timeouts, backpressure, cancellation and safe retries without stored artifacts.
 
 ## Sources guiding the evaluation
 

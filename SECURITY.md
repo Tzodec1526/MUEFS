@@ -118,10 +118,22 @@ on top of the MIME-type allowlist:
   client spoofs the `Content-Type`. This is what keeps the public demo self-contained.
 - An optional **ClamAV** backend (`MALWARE_SCAN_CLAMAV_ENABLED=true`, talking to a `clamd`
   daemon at `CLAMAV_HOST:CLAMAV_PORT` or `CLAMAV_SOCKET`) adds real signature-based
-  detection for production. Set `MALWARE_SCAN_FAIL_CLOSED=true` to reject uploads when the
-  scanner is enabled but unreachable.
+  detection for production. Once enabled, every upload requires a complete clean verdict.
+  A timeout, disconnect, malformed reply or daemon error cannot fall back to heuristics.
+  Strict startup requires ClamAV outside demo/debug mode.
 
-A rejected upload returns `422 Unprocessable Entity` and is never persisted.
+Detected threats return `422`; unavailable or incomplete screening returns `503` with
+`Retry-After`. Neither result stores the document. `CLAMAV_TIMEOUT_SECONDS` bounds the
+whole scanner exchange, including connection, transfer and verdict (default 30 seconds).
+Cancellation closes the connection and discards buffered bytes. Scanner network waits do
+not occupy the upload worker pool.
+
+The supplied daemon configuration bounds scan work and enables limit alerts. An explicit
+container metadata signature rejects members at or above the 101 MiB per-file scan limit,
+including the highly compressed archive case that ClamAV's built-in limit alert can miss. Its TCP endpoint
+is private to the Compose network; ClamAV's protocol has no application authentication.
+The former `MALWARE_SCAN_ENABLED` and `MALWARE_SCAN_FAIL_CLOSED` switches are removed:
+built-in screening always runs, and configured ClamAV screening always rejects failures.
 
 ## Hardening checklist for a real deployment
 
@@ -145,7 +157,7 @@ Configuration:
 - Configure Keycloak to require **verified email** before issuing tokens; provision
   privileged accounts (admin/clerk/judge) by binding their `keycloak_id` explicitly rather
   than relying on first-login auto-provisioning.
-- Enable ClamAV (`MALWARE_SCAN_CLAMAV_ENABLED=true`) with `MALWARE_SCAN_FAIL_CLOSED=true`.
+- Enable ClamAV (`MALWARE_SCAN_CLAMAV_ENABLED=true`) and verify its deadline, scan limits and current signatures.
 - Integrate a real payment processor and set `PAYMENTS_ARE_SIMULATED=false`.
 - Serve over TLS, restrict `ALLOWED_ORIGINS`, and run the rate limiter against Redis.
 

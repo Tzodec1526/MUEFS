@@ -1,0 +1,2 @@
+clamav/*.conf text eol=lf
+clamav/*.cdb text eol=lf

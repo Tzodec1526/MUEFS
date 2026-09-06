@@ -49,10 +49,18 @@ async def inspect_upload(
 
     # Malware screening (defense in depth): reject executables / known-bad signatures
     # regardless of the declared MIME type.
-    scan = await run_in_threadpool(malware_scan.scan_upload, file_data, content_type)
+    try:
+        scan = await malware_scan.scan_upload(file_data)
+    except malware_scan.ScannerUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Malware screening is temporarily unavailable. "
+                   "Your document was not uploaded. Please retry shortly.",
+            headers={"Retry-After": "30"},
+        ) from exc
     if not scan.is_clean:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=scan.reason or "File rejected by malware screening",
         )
 

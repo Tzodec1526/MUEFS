@@ -24,7 +24,6 @@ dependencies = [
     "python-magic>=0.4.27",
     "pypdf>=4.0.0",
     "tzdata>=2025.2",
-    "clamd>=1.0.2",
 ]
 
 [project.optional-dependencies]
