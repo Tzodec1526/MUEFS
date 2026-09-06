@@ -35,6 +35,7 @@ from app.models.filing import (
     FilingStatus,
 )
 from app.models.filing_transaction import FilingTransaction
+from app.models.storage_deletion import StorageDeletion
 from app.models.user import User
 from app.schemas.document import DocumentUploadResponse
 from app.schemas.filing import (
@@ -435,10 +436,11 @@ async def remove_document(
         await db.execute(update(DocumentUploadRequest).where(
             DocumentUploadRequest.document_id == doc.id,
         ).values(document_id=None))
-        file_key = doc.file_key
+        db.add(StorageDeletion(
+            document_id=doc.id, envelope_id=filing_id, file_key=doc.file_key,
+        ))
         await db.delete(doc)
         await db.flush()
-        await run_in_threadpool(document_service.delete_document, file_key)
 
     await audit_service.log_action(
         db,

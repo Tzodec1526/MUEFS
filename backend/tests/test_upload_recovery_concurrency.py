@@ -13,6 +13,7 @@ from app.main import app
 from app.models.audit import AuditLog
 from app.models.filing import DocumentUploadRequest, FilingDocument, FilingEnvelope
 from app.services import document_service, filing_service
+from app.storage_cleanup import cleanup_next
 from app.utils import malware_scan
 from tests.test_filing_concurrency import POSTGRES_URL, prepare_filing
 from tests.test_filing_concurrency import postgres_sessions as postgres_sessions
@@ -147,6 +148,7 @@ async def test_upload_request_migration_preserves_legacy_documents_and_retry_key
         request = await db.get(DocumentUploadRequest, (fid, key))
         assert request.document_id is None  # PostgreSQL preserves the key on document deletion.
         assert (await db.get(FilingDocument, original_id)).sha256_hash == digest
+    assert await cleanup_next(postgres_sessions) == "deleted"
     with pytest.raises(RuntimeError, match="Cannot discard retained document upload requests"):
         async with postgres_sessions.begin() as db:
             connection = await db.connection()

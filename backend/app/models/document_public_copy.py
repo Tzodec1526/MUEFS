@@ -16,7 +16,7 @@ class DocumentPublicCopy(Base):
     document_id: Mapped[int] = mapped_column(ForeignKey("filing_documents.id"))
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
     title: Mapped[str] = mapped_column(String(500))
-    file_key: Mapped[str] = mapped_column(String(500))
+    file_key: Mapped[str] = mapped_column(String(500), index=True)
     file_size_bytes: Mapped[int]
     mime_type: Mapped[str] = mapped_column(String(100), default="application/pdf")
     page_count: Mapped[int]

@@ -131,7 +131,7 @@ class FilingDocument(Base):
     envelope_id: Mapped[int] = mapped_column(ForeignKey("filing_envelopes.id"), index=True)
     document_type_code: Mapped[str] = mapped_column(String(50))
     title: Mapped[str] = mapped_column(String(500))
-    file_key: Mapped[str] = mapped_column(String(500))  # S3 path
+    file_key: Mapped[str] = mapped_column(String(500), index=True)  # S3 path
     file_size_bytes: Mapped[int] = mapped_column(Integer)
     mime_type: Mapped[str] = mapped_column(String(100))
     page_count: Mapped[int | None] = mapped_column(Integer)

@@ -6,13 +6,16 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.api.auth import require_user_may_manage_efilings
 from app.main import app
 from app.models.audit import AuditLog
 from app.models.filing import DocumentUploadRequest, FilingDocument, FilingEnvelope, FilingStatus
+from app.models.storage_deletion import StorageDeletion
 from app.models.user import User
 from app.services import document_service
+from app.storage_cleanup import cleanup_next
 from tests.test_document_http import filing_client as filing_client
 from tests.test_malware_scan import scanner as scanner
 
@@ -108,12 +111,24 @@ async def test_retry_does_not_resurrect_a_removed_document(filing_client, db_ses
     assert replay.status_code == 409, replay.text
     assert "later removed" in replay.json()["detail"]
     assert filing.fee_version == version
-    assert len(list(storage.rglob("*.txt"))) == int(retained)
+    assert len(list(storage.rglob("*.txt"))) == 1  # Removal has not yet deleted storage.
+    assert await db_session.scalar(select(func.count()).select_from(StorageDeletion)) == (
+        0 if retained else 1
+    )
     replacement = await client.post(url, headers={"Idempotency-Key": str(uuid4())},
                                     data=data, files=file)
     assert replacement.status_code == 200, replacement.text
     old_retry = await client.post(url, headers=headers, data=data, files=file)
     assert old_retry.status_code == 409, old_retry.text
+    await db_session.commit()
+    sessions = async_sessionmaker(db_session.bind, expire_on_commit=False)
+    assert await cleanup_next(sessions) == (None if retained else "deleted")
+    assert len(list(storage.rglob("*.txt"))) == 1 + int(retained)
+    async with sessions() as db:
+        new_doc = await db.get(FilingDocument, replacement.json()["id"])
+        assert document_service.stored_integrity(new_doc.file_key) == (
+            new_doc.sha256_hash, new_doc.file_size_bytes,
+        )
 
 
 async def test_replay_after_submission_and_keys_are_scoped_to_the_filing(filing_client, db_session):

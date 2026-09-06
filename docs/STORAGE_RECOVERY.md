@@ -1,4 +1,44 @@
-# Verify a restored filing collection
+# Document storage lifecycle and recovery
+
+## Discarded draft cleanup
+
+Removing an attachment from a never-submitted draft commits its metadata removal, audit
+entry and `storage_deletions` job in one database transaction. The request does not contact
+object storage. A failed commit leaves both the document record and its bytes intact.
+Removing a previously received attachment from a returned filing retains its bytes and
+history; it does not create a deletion job.
+
+Apply migration `e95b20d7a6f1` before running the new API and storage worker. Run
+`python -m app.storage_cleanup` as a supervised process with the **same database and file
+collection as the API**. Docker Compose includes `storage-worker` with shared database/S3
+configuration. Standalone SQLite deployments must also share `LOCAL_STORAGE_PATH`.
+The worker refuses isolated demo databases, whose seeded file references can be shared
+across visitors. Do not run it on a restore being audited or on one isolated demo database.
+
+The worker checks indexed references in both original documents and public copies before
+deleting a queued key. PostgreSQL workers skip jobs locked by another worker; SQLite
+serializes cleanup transactions. Storage errors and remaining references leave the job
+pending, with retry delays from 30 seconds to one hour. A crash or failed database commit
+after the storage operation leaves the job retryable. Completed jobs become
+`purge_draft_document` audit entries and leave the queue. No queue age alone authorizes
+deletion; the committed removal and absence of references are both required.
+
+For an operator run, `python -m app.storage_cleanup --once` processes currently due jobs
+and exits: 0 means that run encountered no deferred jobs, 1 means at least one job was
+deferred. A job scheduled for later is not attempted, so exit 0 does not prove the queue
+is empty. Monitor backlog count, oldest `queued_at`, `next_attempt_at`, `attempt_count`
+and `last_error` in `storage_deletions`; investigate increasing age or repeated errors.
+Downgrading this migration requires an empty queue. Preserve the matching queue when
+backing up or restoring the database.
+
+Cleanup handles only committed draft removals. It does not inventory orphan uploads,
+delete received records, or remove backup copies. It calls S3 `DeleteObject` without a
+version ID; a versioned bucket can retain older bytes behind a delete marker. A completed
+job therefore records deletion of the current object key, not proof that all historical
+versions were erased. Manage versions and backup retention through the court's storage
+policy. See [AWS DeleteObject semantics](https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObject.html).
+
+## Verify a restored filing collection
 
 `python -m app.storage_audit` checks stored bytes and retained file references without
 changing database records or objects. Run it against a **quiescent restored database and

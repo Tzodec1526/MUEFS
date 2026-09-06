@@ -133,9 +133,7 @@ def stored_integrity(file_key: str) -> tuple[str, int]:
 
 def delete_document(file_key: str) -> None:
     if _is_demo_mode():
-        local_path = _safe_local_path(file_key)
-        if local_path.exists():
-            local_path.unlink()
+        _safe_local_path(file_key).unlink(missing_ok=True)
         return
 
     client = get_s3_client()

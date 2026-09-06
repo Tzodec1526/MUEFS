@@ -1,5 +1,13 @@
 # Deployment Guide
 
+Document removal now requires migration `e95b20d7a6f1` and a supervised
+`python -m app.storage_cleanup` process. Apply migrations before starting the updated API
+and worker; Docker Compose includes `storage-worker`. Share the API's database and storage
+configuration. The API commits removal immediately, while physical draft cleanup retries
+storage outages in the worker. Monitor the pending queue and follow the
+[storage lifecycle and recovery procedure](STORAGE_RECOVERY.md) for retention boundaries,
+operator runs and backups.
+
 This is the operational companion to [SECURITY.md](../SECURITY.md) — how to run MUEFS as a
 real (non-demo) deployment. SECURITY.md explains *why* each setting matters; this document
 explains *how* to configure it.

@@ -8,6 +8,7 @@ from app.models.filing_transaction import FilingTransaction
 from app.models.notification import Notification, NotificationDeliveryEvent, ServiceContact
 from app.models.payment import Payment
 from app.models.service_delivery import ServiceEvent, ServicePacket, ServiceRecipient
+from app.models.storage_deletion import StorageDeletion
 from app.models.user import FavoriteCase, FavoriteCourt, User, UserCourtRole
 
 __all__ = [
@@ -36,4 +37,5 @@ __all__ = [
     "Notification",
     "NotificationDeliveryEvent",
     "AuditLog",
+    "StorageDeletion",
 ]
