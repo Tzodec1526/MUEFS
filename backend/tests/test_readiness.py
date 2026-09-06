@@ -137,7 +137,7 @@ async def test_postgres_probe_times_out_on_a_schema_lock_and_recovers(
 
 @pytest.mark.skipif(not POSTGRES_URL, reason="MUEFS_TEST_POSTGRES_URL not configured")
 @pytest.mark.parametrize("postgres_sessions", ["d84a19f2c6b0"], indirect=True)
-async def test_postgres_becomes_ready_only_after_the_migration_commits(
+async def test_postgres_readiness_observes_only_committed_schema_revisions(
     postgres_sessions, monkeypatch,
 ):
     from alembic.config import Config
@@ -157,8 +157,19 @@ async def test_postgres_becomes_ready_only_after_the_migration_commits(
 
     async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
         assert (await client.get("/ready")).status_code == 503
-        async with engine.begin() as connection:
+        # Alembic must own transactions for concurrent index builds.
+        async with engine.connect() as connection:
             await connection.run_sync(migrate)
+            head = await connection.scalar(text("SELECT version_num FROM alembic_version"))
+        assert (await client.get("/ready")).status_code == 200
+        async with engine.begin() as connection:
+            await connection.execute(text(
+                "UPDATE alembic_version SET version_num = 'd84a19f2c6b0'",
+            ))
+        assert (await client.get("/ready")).status_code == 503
+        async with engine.begin() as connection:
+            await connection.execute(text("UPDATE alembic_version SET version_num = :head"),
+                                     {"head": head})
             assert (await client.get("/ready")).status_code == 503
         response = await client.get("/ready")
         assert response.status_code == 200, response.text

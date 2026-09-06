@@ -335,6 +335,20 @@ Only verified account addresses receive email. Require the IdP's matching `email
 the email does not attach court documents or expose case details. Existing pending notices
 remain portal-only when upgrading; no backlog is sent automatically.
 
+Staff can investigate a receipt's filing number from **Notices** while keeping the selected
+court and email status. `GET /api/v1/notifications?filing_id=123` applies the exact filing filter
+inside the existing recipient scope, or the assigned court scope when `court_id` is also
+provided. The same filters apply to the total and every page.
+
+Apply migration `a17d42b9c8e3` before deploying this API version. It replaces the notice
+recipient index with `(recipient_id, created_at, id)`. PostgreSQL builds the replacement
+concurrently and keeps the old index until the replacement is ready. Run Alembic through
+its normal connection, without an enclosing application transaction. If a build is
+interrupted, resolve the cause and rerun the upgrade; it removes an invalid partial index
+before rebuilding. A downgrade restores the old index and leaves notices unchanged.
+Budget disk space for both indexes during the build. See the measured read improvement
+and storage tradeoff in [State readiness](STATE_READINESS.md#filing-notice-email).
+
 ## 8. Participant access migration
 
 Migration `e83f2c91a6d4` preserves participant names, roles, account links and private contact

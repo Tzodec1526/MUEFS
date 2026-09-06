@@ -127,10 +127,11 @@ async def test_upload_request_migration_preserves_legacy_documents_and_retry_key
     async with postgres_sessions.begin() as db:
         original = (await db.scalars(select(FilingDocument))).one()
         original_id, digest = original.id, original.sha256_hash
-        connection = await db.connection()
-        await connection.run_sync(migrate, "upgrade", "head")
-        await connection.run_sync(migrate, "downgrade", "c72d9fa083b1")
-        await connection.run_sync(migrate, "upgrade", "head")
+    for operation, revision in [
+        ("upgrade", "head"), ("downgrade", "c72d9fa083b1"), ("upgrade", "head"),
+    ]:
+        async with postgres_sessions.kw["bind"].connect() as connection:
+            await connection.run_sync(migrate, operation, revision)
 
     async with AsyncClient(transport=ASGITransport(app), base_url="http://test",
                            headers={"X-Demo-User-Id": str(filer)}) as client:
@@ -150,6 +151,5 @@ async def test_upload_request_migration_preserves_legacy_documents_and_retry_key
         assert (await db.get(FilingDocument, original_id)).sha256_hash == digest
     assert await cleanup_next(postgres_sessions) == "deleted"
     with pytest.raises(RuntimeError, match="Cannot discard retained document upload requests"):
-        async with postgres_sessions.begin() as db:
-            connection = await db.connection()
+        async with postgres_sessions.kw["bind"].connect() as connection:
             await connection.run_sync(migrate, "downgrade", "c72d9fa083b1")

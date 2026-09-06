@@ -52,10 +52,12 @@ async def test_intake_migration_preserves_existing_flags_and_retained_publicatio
                          {"id": court_id})
         await db.execute(text("UPDATE case_types SET is_active = false WHERE id = :id"),
                          {"id": case_type_id})
-        connection = await db.connection()
-        await connection.run_sync(migrate, "upgrade", "head")
-        await connection.run_sync(migrate, "downgrade", "e95b20d7a6f1")
-        await connection.run_sync(migrate, "upgrade", "head")
+    for operation, revision in [
+        ("upgrade", "head"), ("downgrade", "e95b20d7a6f1"), ("upgrade", "head"),
+    ]:
+        async with postgres_sessions.kw["bind"].connect() as connection:
+            await connection.run_sync(migrate, operation, revision)
+    async with postgres_sessions.begin() as db:
         court = await db.get(Court, court_id)
         assert not court.is_efiling_enabled and court.intake_version == 0
         assert court.intake_notice is None
@@ -71,8 +73,8 @@ async def test_intake_migration_preserves_existing_flags_and_retained_publicatio
         })
         assert response.status_code == 200, response.text
     with pytest.raises(RuntimeError, match="Cannot discard retained intake publications"):
-        async with postgres_sessions.begin() as db:
-            await (await db.connection()).run_sync(migrate, "downgrade", "e95b20d7a6f1")
+        async with postgres_sessions.kw["bind"].connect() as connection:
+            await connection.run_sync(migrate, "downgrade", "e95b20d7a6f1")
     async with postgres_sessions() as db:
         court = await db.get(Court, court_id)
         assert court.is_efiling_enabled and court.intake_version == 1

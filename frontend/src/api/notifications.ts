@@ -23,7 +23,7 @@ export const deliveryLabels: Record<string, string> = {
 };
 
 export async function listNotifications(page = 1, filters: {
-  court_id?: number; delivery_status?: string;
+  court_id?: number; delivery_status?: string; filing_id?: number;
 } = {}, signal?: AbortSignal): Promise<{
   notifications: NotificationItem[];
   total: number;

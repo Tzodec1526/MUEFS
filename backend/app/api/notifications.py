@@ -36,6 +36,7 @@ async def list_notifications(
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
     court_id: int | None = None,
+    filing_id: int | None = Query(None, ge=1, le=2_147_483_647),
     delivery_status: DeliveryStatus | None = None,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
@@ -49,6 +50,8 @@ async def list_notifications(
             select(FilingEnvelope.id).where(FilingEnvelope.court_id == court_id)
         )
     filters = [scope]
+    if filing_id is not None:
+        filters.append(Notification.filing_envelope_id == filing_id)
     if delivery_status is not None:
         filters.append(Notification.delivery_status == delivery_status)
     total = await db.scalar(select(func.count()).select_from(Notification).where(*filters)) or 0

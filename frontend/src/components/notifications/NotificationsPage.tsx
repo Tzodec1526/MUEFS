@@ -78,12 +78,13 @@ export default function NotificationsPage() {
   const [scopeChoice, setScope] = useState('court');
   const scope = staff ? scopeChoice : 'mine';
   const [status, setStatus] = useState('');
+  const [filingId, setFilingId] = useState<number>();
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{ key: string; data?: Awaited<ReturnType<typeof listNotifications>>; error?: string }>();
   const [selected, setSelected] = useState<number | null>(null);
   const [message, setMessage] = useState('');
-  const requestKey = `${page}:${scope}:${courtId}:${status}:${attempt}`;
+  const requestKey = `${page}:${scope}:${courtId}:${status}:${filingId}:${attempt}`;
   const current = result?.key === requestKey ? result : undefined;
   const data = current?.data;
   const error = current?.error;
@@ -92,11 +93,11 @@ export default function NotificationsPage() {
     if (assignmentsLoading) return;
     const controller = new AbortController();
     listNotifications(page, { court_id: scope === 'court' && courtId ? courtId : undefined,
-      delivery_status: status || undefined }, controller.signal)
+      delivery_status: status || undefined, filing_id: filingId }, controller.signal)
       .then(data => { if (!controller.signal.aborted) setResult({ key: requestKey, data }); })
       .catch(err => { if (!controller.signal.aborted) setResult({ key: requestKey, error: getErrorDetail(err) || 'Could not load notices.' }); });
     return () => controller.abort();
-  }, [page, scope, courtId, status, requestKey, assignmentsLoading]);
+  }, [page, scope, courtId, status, filingId, requestKey, assignmentsLoading]);
 
   return <section className="notices-page">
     {staff && scope === 'court' && <StaffCourtSelect disabled={selected != null} onChange={() => {
@@ -117,6 +118,21 @@ export default function NotificationsPage() {
           {Object.entries(deliveryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></div>
     </div>
+    <form className="calendar-range notice-filing-filter" onSubmit={event => {
+      event.preventDefault();
+      const value = String(new FormData(event.currentTarget).get('filing_id') || '').trim();
+      setFilingId(value ? Number(value) : undefined); setPage(1); setSelected(null); setMessage('');
+    }}>
+      <div className="form-group"><label htmlFor="notice-filing">Filing number</label>
+        <input id="notice-filing" name="filing_id" type="number" min="1" max="2147483647" step="1"
+          placeholder="For example, 123" aria-describedby="notice-filing-help" /></div>
+      <button className="btn btn-primary" type="submit">Find notices</button>
+      <button className="btn btn-secondary" type="reset" onClick={() => {
+        setFilingId(undefined); setPage(1); setSelected(null); setMessage('');
+      }}>Clear filing filter</button>
+    </form>
+    <p id="notice-filing-help">Search by the filing number shown on a receipt. Scope and email status filters still apply.</p>
+    {filingId != null && <p role="status">Showing notices for filing #{filingId}.</p>}
     {message && <p role="status" className="alert alert-success">{message}</p>}
     {loading && <p role="status">Loading notices…</p>}
     {error && <LoadError message={error} onRetry={() => setAttempt(n => n + 1)} />}

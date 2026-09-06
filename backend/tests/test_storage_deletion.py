@@ -282,17 +282,19 @@ async def test_cleanup_migration_preserves_documents_and_pending_deletions(postg
     async with postgres_sessions.begin() as db:
         original = (await db.scalars(select(FilingDocument))).one()
         original_id, digest = original.id, original.sha256_hash
-        connection = await db.connection()
-        await connection.run_sync(migrate, "upgrade", "head")
-        await connection.run_sync(migrate, "downgrade", "d84a19f2c6b0")
-        await connection.run_sync(migrate, "upgrade", "head")
+    for operation, revision in [
+        ("upgrade", "head"), ("downgrade", "d84a19f2c6b0"), ("upgrade", "head"),
+    ]:
+        async with postgres_sessions.kw["bind"].connect() as connection:
+            await connection.run_sync(migrate, operation, revision)
+    async with postgres_sessions.kw["bind"].connect() as connection:
         for table in ["filing_documents", "document_public_copies"]:
             indexes = await connection.run_sync(lambda conn: inspect(conn).get_indexes(table))
             assert any(index["column_names"] == ["file_key"] for index in indexes)
+    async with postgres_sessions.begin() as db:
         db.add(StorageDeletion(document_id=999, envelope_id=fid, file_key="discarded.txt"))
     with pytest.raises(RuntimeError, match="Drain pending storage deletions"):
-        async with postgres_sessions.begin() as db:
-            connection = await db.connection()
+        async with postgres_sessions.kw["bind"].connect() as connection:
             await connection.run_sync(migrate, "downgrade", "d84a19f2c6b0")
     async with postgres_sessions() as db:
         assert (await db.get(FilingDocument, original_id)).sha256_hash == digest

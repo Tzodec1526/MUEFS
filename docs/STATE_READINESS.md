@@ -554,11 +554,33 @@ delivery where SMTP and a database cannot provide it. Late workers cannot overwr
 newer retry. Recipients can retry confirmed failures; they cannot resend accepted or
 uncertain messages themselves.
 
-`/notifications` provides paginated personal and court-scoped notice lists, status filters
-and private delivery history. Retry requests are serialized and logged with the operator's
+`/notifications` provides paginated personal and court-scoped notice lists, email status
+filters, exact filing-number lookup and private delivery history. A filing filter intersects
+the recipient or assigned-court scope; it cannot expose another recipient's private inbox
+or another court's notices. Unknown or inaccessible filings return an empty list. Search
+starts at page one, and clearing the filing filter preserves the scope and email status.
+Retry requests are serialized and logged with the operator's
 reason. Queued events preserve the exact message; attempt events retain times and SMTP
 response codes. SQLite and PostgreSQL triggers reject event updates and deletion. This
 archive still requires production database privilege controls and protected backups.
+
+Migration `a17d42b9c8e3` replaces the recipient-only index with
+`(recipient_id, created_at, id)`, letting the newest-notice page avoid sorting an entire
+inbox. A local PostgreSQL benchmark used 250,000 synthetic notices, a 50,000-notice inbox,
+two warmups and seven measured executions of each actual list/count query:
+
+| Query | Before median | After median |
+| --- | ---: | ---: |
+| Newest 25 recipient notices | 15.540 ms | 0.022 ms |
+| Exact recipient notice count | 4.546 ms | 4.760 ms |
+
+The sum of these query medians fell from 20.086 ms to 4.782 ms; this is database query
+time, not measured API latency. Page-query shared buffer hits fell from 2,422 to 5. The
+replacement adds about 8.14 MiB of index storage for this dataset; production write cost
+and workload still need measurement. Exact counts remain available for status triage.
+The existing filing index stays: an exact filing page already took about 0.23 ms, so a
+second composite index was omitted. An interrupted concurrent-build regression verifies
+upgrade recovery, downgrade and preservation of pending notices and retained messages.
 
 Migration `b51d804a3e62` adds verification, outbox fields and delivery events. It leaves old
 pending notices portal-only and archives earlier sent/delivered/failed claims as unverified

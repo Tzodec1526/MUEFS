@@ -64,7 +64,7 @@ class Notification(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     notification_type: Mapped[NotificationType] = mapped_column(Enum(NotificationType))
-    recipient_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    recipient_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     filing_envelope_id: Mapped[int | None] = mapped_column(
         ForeignKey("filing_envelopes.id"), index=True
     )
@@ -85,6 +85,7 @@ class Notification(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
+        Index("ix_notification_recipient_newest", "recipient_id", "created_at", "id"),
         Index("ix_notification_outbox", "delivery_status", "next_attempt_at", "id"),
         Index("ix_notification_message_id", "email_message_id", unique=True),
     )
