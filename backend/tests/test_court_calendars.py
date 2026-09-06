@@ -168,7 +168,9 @@ async def test_acceptance_uses_receipt_date_and_preserves_old_calendar_evidence(
     db_session.add(newer)
     await db_session.flush()
     monkeypatch.setattr(filing_service, "datetime", datetime)
-    accepted = await filing_service.review_filing(db_session, fid, clerk, "accept")
+    accepted = await filing_service.review_filing(
+        db_session, fid, clerk, "accept", expected_submission_count=1
+    )
     case = await db_session.get(Case, accepted.case_id)
     assert accepted.filing_date == case.filing_date == date(2026, 9, 8)
     assert case.filed_date.replace(tzinfo=UTC) == received
@@ -192,4 +194,6 @@ async def test_production_acceptance_requires_calendar_coverage(
     assert filing.filing_date is None and filing.filing_date_basis["error"]
     monkeypatch.setattr(settings, "allow_demo_mode", False)
     with pytest.raises(filing_service.FilingDateUnavailableError, match="calendar"):
-        await filing_service.review_filing(db_session, fid, clerk, "accept")
+        await filing_service.review_filing(
+            db_session, fid, clerk, "accept", expected_submission_count=1
+        )

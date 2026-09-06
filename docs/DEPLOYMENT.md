@@ -7,6 +7,13 @@ explains *how* to configure it.
 > The hosted demo (`render.yaml`, the root `Dockerfile`, `run_demo.py`) is intentionally
 > open and single-instance. A production court deployment differs in the ways below.
 
+Deploy the review client and API together. Single review requests now require
+`expected_submission_count`; batch requests require a `filings` list containing each
+`filing_id` and `expected_submission_count`. Older unversioned requests receive HTTP 422.
+External clients must retain the submission number the reviewer saw and require a fresh
+review after HTTP 409; retrying with a newly fetched number without review is unsafe.
+See the [review request contract](STATE_READINESS.md#implemented-receipt-workflow).
+
 ## 1. Configuration & secrets
 
 Copy `.env.example` to `.env` and change every demo value:

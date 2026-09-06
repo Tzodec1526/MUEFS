@@ -88,7 +88,7 @@ async def test_cms_failure_persists_after_http_502(cms_fail_app):
     client, ids, factory = cms_fail_app
     r = await client.post(
         f"/api/v1/clerk/filings/{ids['filing']}/review",
-        json={"action": "accept"},
+        json={"expected_submission_count": 1, "action": "accept"},
         headers={"X-Demo-User-Id": str(ids["clerk"])},
     )
     assert r.status_code == 502

@@ -81,14 +81,23 @@ async def review_filing(
 
     try:
         filing = await filing_service.review_filing(
-            db, filing_id, reviewer_id=user_id, action=data.action, reason=reason
+            db,
+            filing_id,
+            reviewer_id=user_id,
+            action=data.action,
+            reason=reason,
+            expected_submission_count=data.expected_submission_count,
         )
     except filing_service.CmsSubmissionError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Court CMS rejected the filing: {exc.detail}",
         ) from exc
-    except (filing_service.FilingDateUnavailableError, filing_service.FilingDocumentError) as exc:
+    except (
+        filing_service.StaleFilingReviewError,
+        filing_service.FilingDateUnavailableError,
+        filing_service.FilingDocumentError,
+    ) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not filing:
         raise HTTPException(
@@ -143,25 +152,39 @@ async def batch_review_filings(
         )
 
     await lock_current_user(db, user_id)
-    results: dict[str, list[int]] = {"succeeded": [], "failed": []}
+    succeeded: list[int] = []
+    failed: list[int] = []
+    errors: dict[int, str] = {}
     # Different reviewers must acquire envelope locks in the same order.
-    for fid in sorted(set(data.filing_ids)):
+    for item in sorted(data.filings, key=lambda item: item.filing_id):
+        fid = item.filing_id
+        failure = "The filing is no longer awaiting review. Refresh the queue."
         try:
             # One failure must roll back that filing's case, receipt, and notices,
             # without poisoning the transaction for the rest of the batch.
             async with db.begin_nested():
                 filing_check = await filing_service.get_filing(db, fid)
-                if not filing_check:
-                    results["failed"].append(fid)
-                    continue
-                await _require_clerk_role(db, user_id, filing_check.court_id)
-                f = await filing_service.review_filing(
-                    db, fid, reviewer_id=user_id, action=data.action
-                )
-                succeeded = f is not None and f.status == FilingStatus.ACCEPTED
-            results["succeeded" if succeeded else "failed"].append(fid)
+                f = None
+                if filing_check:
+                    await _require_clerk_role(db, user_id, filing_check.court_id)
+                    f = await filing_service.review_filing(
+                        db,
+                        fid,
+                        reviewer_id=user_id,
+                        action=data.action,
+                        expected_submission_count=item.expected_submission_count,
+                    )
+            if f is not None and f.status == FilingStatus.ACCEPTED:
+                succeeded.append(fid)
+                continue
+            if f is not None and f.cms_error:
+                failure = "Court CMS submission failed. Open the filing to inspect its history."
+        except filing_service.StaleFilingReviewError as exc:
+            failure = str(exc)
         except Exception:
-            results["failed"].append(fid)
+            failure = "Could not accept this filing. Open it for review."
+        failed.append(fid)
+        errors[fid] = failure
 
     await audit_service.log_action(
         db,
@@ -169,8 +192,8 @@ async def batch_review_filings(
         action="batch_review_accept",
         entity_type="filing_envelope",
         entity_id=0,
-        details={"succeeded": len(results["succeeded"]), "failed": len(results["failed"])},
+        details={"succeeded": len(succeeded), "failed": len(failed)},
         ip_address=client_ip(request),
         user_agent=client_user_agent(request),
     )
-    return results
+    return {"succeeded": succeeded, "failed": failed, "errors": errors}

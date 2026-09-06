@@ -59,7 +59,8 @@ async def public_record(db_session, api_client, monkeypatch, tmp_path):
     receipt = (await api_client.get(f"/api/v1/filings/{fid}/history")).json()["transactions"][0]
     api_client.headers["X-Demo-User-Id"] = str(clerk)
     accepted = await api_client.post(
-        f"/api/v1/clerk/filings/{fid}/review", json={"action": "accept"}
+        f"/api/v1/clerk/filings/{fid}/review",
+        json={"expected_submission_count": 1, "action": "accept"},
     )
     assert accepted.status_code == 200, accepted.text
     return dict(

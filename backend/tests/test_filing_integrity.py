@@ -77,7 +77,11 @@ async def test_missing_or_changed_bytes_cannot_be_submitted_or_accepted(
         f"/api/v1/filings/{fid}/submit"
         if action == "submit"
         else f"/api/v1/clerk/filings/{fid}/review",
-        **({"json": {"action": "accept"}} if action == "accept" else {}),
+        **(
+            {"json": {"action": "accept", "expected_submission_count": 1}}
+            if action == "accept"
+            else {}
+        ),
     )
     assert response.status_code == 409
     assert doc.title in response.json()["detail"]
@@ -220,10 +224,18 @@ async def test_batch_acceptance_preserves_healthy_filing_when_another_file_is_mi
     api_client.headers["X-Demo-User-Id"] = str(clerk)
     response = await api_client.post(
         "/api/v1/clerk/queue/batch-review",
-        json={"action": "accept", "filing_ids": [second.id, fid]},
+        json={
+            "action": "accept",
+            "filings": [
+                {"filing_id": target_id, "expected_submission_count": 1}
+                for target_id in [second.id, fid]
+            ],
+        },
     )
     assert response.status_code == 200
-    assert response.json() == {"succeeded": [second.id], "failed": [fid]}
+    assert response.json()["succeeded"] == [second.id]
+    assert response.json()["failed"] == [fid]
+    assert set(response.json()["errors"]) == {str(fid)}
     first = await filing_service.get_filing(db_session, fid)
     assert first.status == FilingStatus.SUBMITTED and first.reviewer_id is None
     assert (await db_session.get(FilingEnvelope, second.id)).status == FilingStatus.ACCEPTED

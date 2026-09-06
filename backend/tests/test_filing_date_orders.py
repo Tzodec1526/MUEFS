@@ -87,15 +87,21 @@ async def test_order_preserves_receipt_and_acceptance_honors_it_without_calendar
     monkeypatch.setattr(filing_service, "filing_date_for_receipt", no_calendar)
     document_service.upload_document(b"corrupt order", doc.file_key, "application/pdf")
     with pytest.raises(filing_service.FilingDocumentError, match="fingerprint"):
-        await filing_service.review_filing(db_session, fid, clerk, "accept")
+        await filing_service.review_filing(
+            db_session, fid, clerk, "accept", expected_submission_count=1
+        )
     document_service.upload_document(ORDER, doc.file_key, "application/pdf")
     # A date order does not bypass the real CMS integration boundary.
     monkeypatch.setattr(settings, "allow_demo_mode", False)
-    failed = await filing_service.review_filing(db_session, fid, clerk, "accept")
+    failed = await filing_service.review_filing(
+        db_session, fid, clerk, "accept", expected_submission_count=1
+    )
     assert failed.status == FilingStatus.UNDER_REVIEW and failed.case_id is None
     assert "not configured" in failed.cms_error
     monkeypatch.setattr(settings, "allow_demo_mode", True)
-    accepted = await filing_service.review_filing(db_session, fid, clerk, "accept")
+    accepted = await filing_service.review_filing(
+        db_session, fid, clerk, "accept", expected_submission_count=1
+    )
     case = await db_session.get(Case, accepted.case_id)
     assert case.filing_date == accepted.filing_date == date(2026, 9, 3)
     assert case.filed_date.replace(tzinfo=UTC) == accepted.submitted_at.replace(tzinfo=UTC)
@@ -109,7 +115,9 @@ async def test_case_date_is_explicit_and_old_orders_remain_publishable(
     api_client,
 ):
     fid, filer, clerk, other = date_record
-    accepted = await filing_service.review_filing(db_session, fid, clerk, "accept")
+    accepted = await filing_service.review_filing(
+        db_session, fid, clerk, "accept", expected_submission_count=1
+    )
     cid = accepted.case_id
     case = await db_session.get(Case, cid)
     old_date, old_instant = case.filing_date, case.filed_date
@@ -198,7 +206,9 @@ async def test_return_and_resubmission_reset_date_without_rewriting_prior_order(
     ).status_code == 201
     old_state = (await api_client.get(url)).json()
     did = old_state["filing_date_basis"]["order_document_id"]
-    await filing_service.review_filing(db_session, fid, clerk, "return", "Correct attachment")
+    await filing_service.review_filing(
+        db_session, fid, clerk, "return", "Correct attachment", expected_submission_count=1
+    )
     owner = {"X-Demo-User-Id": str(filer)}
     assert (
         await api_client.delete(f"/api/v1/filings/{fid}/documents/{did}", headers=owner)
@@ -304,7 +314,9 @@ async def test_audit_failure_rolls_back_case_filing_order_and_notice(
     tmp_path,
 ):
     fid, _, clerk, _ = date_record
-    await filing_service.review_filing(db_session, fid, clerk, "accept")
+    await filing_service.review_filing(
+        db_session, fid, clerk, "accept", expected_submission_count=1
+    )
     url = f"/api/v1/clerk/filings/{fid}/filing-date"
     before = (await api_client.get(url)).json()
     count = await db_session.scalar(select(func.count()).select_from(Notification))

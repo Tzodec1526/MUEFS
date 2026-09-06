@@ -1,6 +1,6 @@
 from datetime import UTC, date, datetime
 
-from pydantic import BaseModel, Field, field_serializer
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from app.models.filing import FilingStatus
 
@@ -110,13 +110,26 @@ class MyFilingsResponse(FilingListResponse):
 
 class ClerkReviewRequest(BaseModel):
     action: str  # "accept", "reject", "return"
+    expected_submission_count: int = Field(..., ge=0, strict=True)
     reason: str | None = Field(None, max_length=5000)
+
+
+class BatchReviewItem(BaseModel):
+    filing_id: int = Field(..., ge=1, strict=True)
+    expected_submission_count: int = Field(..., ge=0, strict=True)
 
 
 class BatchReviewRequest(BaseModel):
     """Batch accept support (reject/return require per-filing reasons so are single only)."""
-    filing_ids: list[int] = Field(..., min_length=1, max_length=100)
+    filings: list[BatchReviewItem] = Field(..., min_length=1, max_length=100)
     action: str  # currently only "accept" supported for batch
+
+    @field_validator("filings")
+    @classmethod
+    def unique_filings(cls, filings: list[BatchReviewItem]) -> list[BatchReviewItem]:
+        if len({item.filing_id for item in filings}) != len(filings):
+            raise ValueError("A filing may appear only once per review batch")
+        return filings
 
 
 class FilingValidationResult(BaseModel):

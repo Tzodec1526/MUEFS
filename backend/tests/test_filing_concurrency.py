@@ -335,7 +335,9 @@ async def test_concurrent_review_refreshes_previously_read_status(postgres_sessi
             assert before.status == FilingStatus.SUBMITTED
             await ready.put(True)
             await start.wait()
-            result = await filing_service.review_filing(db, fid, clerk, "accept")
+            result = await filing_service.review_filing(
+                db, fid, clerk, "accept", expected_submission_count=1
+            )
             return result is not None
 
     tasks = [asyncio.create_task(review()) for _ in range(2)]
@@ -347,6 +349,41 @@ async def test_concurrent_review_refreshes_previously_read_status(postgres_sessi
         assert await db.scalar(select(func.count()).select_from(Case)) == 1
         assert await db.scalar(select(func.count()).select_from(FilingTransaction)) == 2
         assert await db.scalar(select(func.count()).select_from(Notification)) == 2
+
+
+@pytest.mark.parametrize("postgres_sessions", [False, True], indirect=True)
+async def test_review_rejects_a_new_submission_even_when_status_matches_its_old_read(
+    postgres_sessions, monkeypatch,
+):
+    fid, _filer, clerk = await prepare_filing(postgres_sessions)
+    async with postgres_sessions.begin() as db:
+        await filing_service.submit_filing(db, fid)
+    async with postgres_sessions.begin() as reviewer:
+        before = await filing_service.get_filing(reviewer, fid)
+        assert before.submission_count == 1 and before.status == FilingStatus.SUBMITTED
+        async with postgres_sessions.begin() as correction:
+            await filing_service.review_filing(
+                correction, fid, clerk, "return", "Correction needed", expected_submission_count=1
+            )
+            after = await filing_service.submit_filing(correction, fid)
+            assert after.submission_count == 2 and after.status == before.status
+
+        async def unexpected_verification(*args):
+            pytest.fail("An outdated decision must stop before storage or CMS work")
+
+        monkeypatch.setattr(filing_service, "verify_filing_documents", unexpected_verification)
+        monkeypatch.setattr(filing_service, "submit_filing_to_cms", unexpected_verification)
+        with pytest.raises(filing_service.StaleFilingReviewError, match="resubmitted"):
+            await filing_service.review_filing(
+                reviewer, fid, clerk, "accept", expected_submission_count=before.submission_count
+            )
+    async with postgres_sessions() as db:
+        filing = await filing_service.get_filing(db, fid)
+        assert filing.status == FilingStatus.SUBMITTED and filing.submission_count == 2
+        assert filing.case_id is None and filing.reviewer_id is None
+        assert await db.scalar(select(func.count()).select_from(Case)) == 0
+        assert await db.scalar(select(func.count()).select_from(FilingTransaction)) == 3
+        assert await db.scalar(select(func.count()).select_from(Notification)) == 3
 
 
 async def test_concurrent_submission_retries_create_one_receipt(postgres_sessions):

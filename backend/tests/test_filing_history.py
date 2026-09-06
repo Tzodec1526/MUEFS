@@ -105,12 +105,13 @@ async def test_receipts_keep_original_documents_through_correction(
 
     api_client.headers["X-Demo-User-Id"] = str(clerk)
     blank = await api_client.post(
-        f"/api/v1/clerk/filings/{fid}/review", json={"action": "return", "reason": "   "}
+        f"/api/v1/clerk/filings/{fid}/review",
+        json={"expected_submission_count": 1, "action": "return", "reason": "   "},
     )
     assert blank.status_code == 400
     returned = await api_client.post(
         f"/api/v1/clerk/filings/{fid}/review",
-        json={"action": "return", "reason": "Correct the caption"},
+        json={"expected_submission_count": 1, "action": "return", "reason": "Correct the caption"},
     )
     assert returned.status_code == 200
     api_client.headers["X-Demo-User-Id"] = str(filer)
@@ -128,8 +129,26 @@ async def test_receipts_keep_original_documents_through_correction(
     assert submitted.json()["submission_count"] == 2
     assert [d["id"] for d in submitted.json()["documents"]] == [corrected]
     api_client.headers["X-Demo-User-Id"] = str(clerk)
-    accepted = await api_client.post(
+    # Another review window still holds the first submission's receipt and documents.
+    for action in ("accept", "reject", "return"):
+        stale = await api_client.post(
+            f"/api/v1/clerk/filings/{fid}/review",
+            json={
+                "action": action,
+                "reason": "Decision from the original review",
+                "expected_submission_count": first.json()["submission_count"],
+            },
+        )
+        assert stale.status_code == 409, stale.text
+    assert await db_session.scalar(select(func.count()).select_from(Notification)) == 3
+    assert await db_session.scalar(select(func.count()).select_from(FilingTransaction)) == 3
+    unversioned = await api_client.post(
         f"/api/v1/clerk/filings/{fid}/review", json={"action": "accept"}
+    )
+    assert unversioned.status_code == 422
+    accepted = await api_client.post(
+        f"/api/v1/clerk/filings/{fid}/review",
+        json={"expected_submission_count": 2, "action": "accept"},
     )
     assert accepted.status_code == 200, accepted.text
     case_id = accepted.json()["case_id"]
@@ -178,11 +197,13 @@ async def test_transaction_retention_blocks_direct_sql(
     assert await db_session.scalar(select(func.count()).select_from(FilingTransaction)) == 1
 
 
+@pytest.mark.parametrize("failure", ["after_acceptance", "stale_submission"])
 async def test_failed_batch_item_rolls_back_its_records_only(
     db_session,
     api_client,
     record_filing,
     monkeypatch,
+    failure,
 ):
     fid, filer, clerk, _other = record_filing
     await upload(api_client, fid, b"Complaint")
@@ -199,31 +220,61 @@ async def test_failed_batch_item_rolls_back_its_records_only(
     second_id = second.id
     await upload(api_client, second_id, b"Second complaint")
     await filing_service.submit_filing(db_session, second_id)
+    if failure == "stale_submission":
+        await filing_service.review_filing(
+            db_session, fid, clerk, "return", "Correct the filing", expected_submission_count=1
+        )
+        corrected = await filing_service.submit_filing(db_session, fid)
+        assert corrected.submission_count == 2
     real_review = filing_service.review_filing
 
     async def interrupted_review(db, filing_id, **kwargs):
         result = await real_review(db, filing_id, **kwargs)
-        if filing_id == fid:
+        if filing_id == fid and failure == "after_acceptance":
             raise RuntimeError("Failure after acceptance writes")
         return result
 
     monkeypatch.setattr(filing_service, "review_filing", interrupted_review)
     api_client.headers["X-Demo-User-Id"] = str(clerk)
+    if failure == "after_acceptance":
+        for body in (
+            {"action": "accept", "filing_ids": [fid, second_id]},
+            {"action": "accept", "filings": [
+                {"filing_id": fid, "expected_submission_count": 1},
+                {"filing_id": fid, "expected_submission_count": 2},
+            ]},
+        ):
+            invalid = await api_client.post("/api/v1/clerk/queue/batch-review", json=body)
+            assert invalid.status_code == 422
     batch = await api_client.post(
         "/api/v1/clerk/queue/batch-review",
         json={
             "action": "accept",
-            "filing_ids": [fid, second_id, second_id],
+            "filings": [
+                {"filing_id": target_id, "expected_submission_count": 1}
+                for target_id in [fid, second_id]
+            ],
         },
     )
     assert batch.status_code == 200, batch.text
-    assert batch.json() == {"succeeded": [second_id], "failed": [fid]}
+    assert batch.json()["succeeded"] == [second_id]
+    assert batch.json()["failed"] == [fid]
+    assert set(batch.json()["errors"]) == {str(fid)}
+    assert "Failure after acceptance writes" not in batch.text
+    if failure == "stale_submission":
+        assert "resubmitted" in batch.json()["errors"][str(fid)]
     first = await filing_service.get_filing(db_session, fid)
     assert first.status == FilingStatus.SUBMITTED
     assert first.case_id is None
     assert await db_session.scalar(select(func.count()).select_from(Case)) == 1
-    assert await db_session.scalar(select(func.count()).select_from(FilingTransaction)) == 3
-    assert await db_session.scalar(select(func.count()).select_from(Notification)) == 3
+    expected_events = 5 if failure == "stale_submission" else 3
+    assert (
+        await db_session.scalar(select(func.count()).select_from(FilingTransaction))
+        == expected_events
+    )
+    assert (
+        await db_session.scalar(select(func.count()).select_from(Notification)) == expected_events
+    )
 
 
 @pytest.mark.parametrize("sealed", [False, True])

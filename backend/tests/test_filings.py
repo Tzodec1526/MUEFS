@@ -101,7 +101,7 @@ async def test_filing_lifecycle(db_session, stored_document):
     await db_session.flush()
 
     accepted = await filing_service.review_filing(
-        db_session, filing.id, reviewer_id=clerk.id, action="accept"
+        db_session, filing.id, reviewer_id=clerk.id, action="accept", expected_submission_count=1
     )
     assert accepted is not None
     assert accepted.status == FilingStatus.ACCEPTED
@@ -143,8 +143,12 @@ async def test_reject_filing(db_session, stored_document):
     await db_session.flush()
 
     rejected = await filing_service.review_filing(
-        db_session, filing.id, reviewer_id=clerk.id,
-        action="reject", reason="Missing required documents",
+        db_session,
+        filing.id,
+        reviewer_id=clerk.id,
+        action="reject",
+        reason="Missing required documents",
+        expected_submission_count=1,
     )
     assert rejected is not None
     assert rejected.status == FilingStatus.REJECTED
@@ -295,7 +299,7 @@ async def test_accept_does_not_mark_accepted_when_cms_fails(
     db_session.add(clerk)
     await db_session.flush()
     reviewed = await filing_service.review_filing(
-        db_session, filing.id, reviewer_id=clerk.id, action="accept"
+        db_session, filing.id, reviewer_id=clerk.id, action="accept", expected_submission_count=1
     )
     assert reviewed is not None
     assert reviewed.status != FilingStatus.ACCEPTED
@@ -325,7 +329,7 @@ async def test_accept_does_not_decide_requested_fee_waiver(db_session, stored_do
     db_session.add(clerk)
     await db_session.flush()
     accepted = await filing_service.review_filing(
-        db_session, filing.id, reviewer_id=clerk.id, action="accept"
+        db_session, filing.id, reviewer_id=clerk.id, action="accept", expected_submission_count=1
     )
     assert accepted is not None
     assert accepted.fee_waiver_granted is None

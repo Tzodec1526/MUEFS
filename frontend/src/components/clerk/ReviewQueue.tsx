@@ -16,7 +16,7 @@ function ReviewQueue() {
   const [loading, setLoading] = useState(false);
   const [reviewReason, setReviewReason] = useState('');
   const [actionInProgress, setActionInProgress] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [selectedSubmissions, setSelectedSubmissions] = useState<Map<number, number>>(new Map());
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
@@ -39,7 +39,9 @@ function ReviewQueue() {
       }
       setFilings(result.filings);
       setTotal(result.total);
-      setSelectedIds((previous) => new Set(result.filings.filter((f) => previous.has(f.id)).map((f) => f.id)));
+      setSelectedSubmissions(previous => new Map(result.filings
+        .filter(filing => previous.get(filing.id) === filing.submission_count)
+        .map(filing => [filing.id, filing.submission_count])));
       setLastRefresh(new Date());
     } catch {
       if (controller.signal.aborted) return;
@@ -65,7 +67,7 @@ function ReviewQueue() {
     return () => clearInterval(interval);
   }, [fetchQueue, selectedFiling, actionInProgress]);
 
-  async function handleReview(filingId: number, action: 'accept' | 'reject' | 'return') {
+  async function handleReview(filing: FilingEnvelope, action: 'accept' | 'reject' | 'return') {
     if (action === 'reject' && !window.confirm(
       'Reject is final — the filer cannot resubmit under this envelope. If they should fix and re-file, use "Return for Correction" instead. Reject this filing?'
     )) {
@@ -74,51 +76,62 @@ function ReviewQueue() {
     setActionInProgress(true);
     setReviewError(null);
     try {
-      await reviewFiling(filingId, action, action !== 'accept' ? reviewReason : undefined);
+      await reviewFiling(filing, action, action !== 'accept' ? reviewReason : undefined);
       setSelectedFiling(null);
       setReviewReason('');
       await fetchQueue();
     } catch (err) {
       const msg = getErrorDetail(err) || (err instanceof Error ? err.message : 'Review failed');
-      setReviewError(`Failed to ${action} filing #${filingId}: ${msg}`);
+      setReviewError(`Failed to ${action} filing #${filing.id}: ${msg}`);
     } finally {
       setActionInProgress(false);
     }
   }
 
   async function handleBatchAccept() {
-    if (selectedIds.size === 0) return;
+    if (selectedSubmissions.size === 0) return;
     setActionInProgress(true);
     setReviewError(null);
     try {
-      const res = await batchReview(Array.from(selectedIds), 'accept');
-      if (res.failed && res.failed.length > 0) {
-        setReviewError(`Failed to accept filing(s): ${res.failed.map((id: number) => `#${id}`).join(', ')}`);
+      const res = await batchReview(
+        Array.from(selectedSubmissions, ([id, submission_count]) => ({ id, submission_count })),
+        'accept',
+      );
+      if (res.failed.length > 0) {
+        setReviewError(res.failed.map(id => `Filing #${id}: ${res.errors[id]}`).join(' '));
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Batch accept failed';
       setReviewError(msg);
     } finally {
-      setSelectedIds(new Set());
+      setSelectedSubmissions(new Map());
       setActionInProgress(false);
       await fetchQueue();
     }
   }
 
-  const toggleSelect = (id: number) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+  function openReview(filing: FilingEnvelope) {
+    if (actionInProgress || (selectedFiling?.id === filing.id
+      && selectedFiling.submission_count === filing.submission_count)) return;
+    setSelectedFiling(filing);
+    setReviewReason('');
+    setReviewError(null);
+  }
+
+  const toggleSelect = (filing: FilingEnvelope) => {
+    setSelectedSubmissions(prev => {
+      const next = new Map(prev);
+      if (next.has(filing.id)) next.delete(filing.id);
+      else next.set(filing.id, filing.submission_count);
       return next;
     });
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === filings.length) {
-      setSelectedIds(new Set());
+    if (selectedSubmissions.size === filings.length) {
+      setSelectedSubmissions(new Map());
     } else {
-      setSelectedIds(new Set(filings.map(f => f.id)));
+      setSelectedSubmissions(new Map(filings.map(f => [f.id, f.submission_count])));
     }
   };
 
@@ -187,7 +200,7 @@ function ReviewQueue() {
               name="status"
               toolparamdescription="Queue status filter: all, submitted, or under_review"
               value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); setSelectedIds(new Set()); setSelectedFiling(null); }}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); setSelectedSubmissions(new Map()); setSelectedFiling(null); }}
               disabled={actionInProgress}
             >
               <option value="all">All Pending</option>
@@ -215,19 +228,19 @@ function ReviewQueue() {
       {queueError && <LoadError message={queueError} onRetry={fetchQueue} />}
 
       {/* Batch actions */}
-      {selectedIds.size > 0 && statusFilter !== 'waivers' && (
+      {selectedSubmissions.size > 0 && statusFilter !== 'waivers' && (
         <div className="batch-actions">
-          <span>{selectedIds.size} filing(s) selected</span>
+          <span>{selectedSubmissions.size} filing(s) selected</span>
           <button
             className="btn btn-success btn-small"
             onClick={handleBatchAccept}
             disabled={actionInProgress}
           >
-            {actionInProgress ? 'Processing...' : `Accept ${selectedIds.size} Filing(s)`}
+            {actionInProgress ? 'Processing...' : `Accept ${selectedSubmissions.size} Filing(s)`}
           </button>
           <button
             className="btn btn-secondary btn-small"
-            onClick={() => setSelectedIds(new Set())}
+            onClick={() => setSelectedSubmissions(new Map())}
           >
             Clear Selection
           </button>
@@ -243,10 +256,10 @@ function ReviewQueue() {
                 <th className="th-checkbox">
                   <input
                     type="checkbox"
-                    checked={selectedIds.size === filings.length && filings.length > 0}
+                    checked={selectedSubmissions.size === filings.length && filings.length > 0}
                     onChange={toggleSelectAll}
                     aria-label="Select all filings"
-                    disabled={statusFilter === 'waivers'}
+                    disabled={actionInProgress || statusFilter === 'waivers'}
                   />
                 </th>
                 <th>Filing #</th>
@@ -264,17 +277,19 @@ function ReviewQueue() {
                   <tr
                     key={filing.id}
                     className={`${selectedFiling?.id === filing.id ? 'selected' : ''} ${age.level === 'overdue' ? 'row-overdue' : ''}`}
-                    onClick={() => setSelectedFiling(filing)}
+                    onClick={() => openReview(filing)}
                     tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === 'Enter') setSelectedFiling(filing); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && e.target === e.currentTarget) openReview(filing);
+                    }}
                   >
                     <td className="td-checkbox" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
-                        checked={selectedIds.has(filing.id)}
-                        onChange={() => toggleSelect(filing.id)}
+                        checked={selectedSubmissions.has(filing.id)}
+                        onChange={() => toggleSelect(filing)}
                         aria-label={`Select filing ${filing.id}`}
-                        disabled={statusFilter === 'waivers'}
+                        disabled={actionInProgress || statusFilter === 'waivers'}
                       />
                     </td>
                     <td className="filing-num">#{filing.id}</td>
@@ -304,12 +319,12 @@ function ReviewQueue() {
           {total > 25 && (
             <div className="pagination">
               <button className="btn btn-secondary btn-small" disabled={page <= 1 || loading || actionInProgress}
-                onClick={() => { setPage((p) => p - 1); setSelectedIds(new Set()); setSelectedFiling(null); }}>
+                onClick={() => { setPage((p) => p - 1); setSelectedSubmissions(new Map()); setSelectedFiling(null); }}>
                 Previous
               </button>
               <span>Page {page} of {Math.ceil(total / 25)}</span>
               <button className="btn btn-secondary btn-small" disabled={page >= Math.ceil(total / 25) || loading || actionInProgress}
-                onClick={() => { setPage((p) => p + 1); setSelectedIds(new Set()); setSelectedFiling(null); }}>
+                onClick={() => { setPage((p) => p + 1); setSelectedSubmissions(new Map()); setSelectedFiling(null); }}>
                 Next
               </button>
             </div>
@@ -332,6 +347,7 @@ function ReviewQueue() {
 
             <div className="detail-section">
               <h4>Case Information</h4>
+              <p>{selectedFiling.submission_count ? `Reviewing submission ${selectedFiling.submission_count}` : 'Reviewing a legacy submission without a recorded submission number'}</p>
               <Link to={`/filings/${selectedFiling.id}/history`} className="btn btn-secondary btn-small">Receipts &amp; history</Link>
               {selectedFiling.fee_waiver_requested && <p>
                 Fee waiver: {selectedFiling.fee_waiver_granted === true ? 'granted'
@@ -408,14 +424,14 @@ function ReviewQueue() {
               <div className="review-buttons">
                 <button
                   className="btn btn-success"
-                  onClick={() => handleReview(selectedFiling.id, 'accept')}
+                  onClick={() => handleReview(selectedFiling, 'accept')}
                   disabled={actionInProgress || statusFilter === 'waivers'}
                 >
                   {actionInProgress ? 'Processing...' : 'Accept'}
                 </button>
                 <button
                   className="btn btn-warning"
-                  onClick={() => handleReview(selectedFiling.id, 'return')}
+                  onClick={() => handleReview(selectedFiling, 'return')}
                   disabled={actionInProgress || !reviewReason.trim() || statusFilter === 'waivers'}
                   title={!reviewReason.trim() ? 'Reason required' : ''}
                 >
@@ -423,7 +439,7 @@ function ReviewQueue() {
                 </button>
                 <button
                   className="btn btn-danger"
-                  onClick={() => handleReview(selectedFiling.id, 'reject')}
+                  onClick={() => handleReview(selectedFiling, 'reject')}
                   disabled={actionInProgress || !reviewReason.trim() || statusFilter === 'waivers'}
                   title={!reviewReason.trim() ? 'Reason required' : ''}
                 >

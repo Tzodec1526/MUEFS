@@ -240,13 +240,14 @@ export async function removeDocument(
 }
 
 export async function reviewFiling(
-  filingId: number,
+  filing: Pick<FilingEnvelope, 'id' | 'submission_count'>,
   action: 'accept' | 'reject' | 'return',
   reason?: string,
 ): Promise<FilingEnvelope> {
-  const { data } = await apiClient.post(`/clerk/filings/${filingId}/review`, {
+  const { data } = await apiClient.post(`/clerk/filings/${filing.id}/review`, {
     action,
     reason,
+    expected_submission_count: filing.submission_count,
   });
   return data;
 }
@@ -269,11 +270,14 @@ export async function getClerkQueue(
 }
 
 export async function batchReview(
-  filingIds: number[],
+  filings: Pick<FilingEnvelope, 'id' | 'submission_count'>[],
   action: 'accept',
-): Promise<{ succeeded: number[]; failed: number[] }> {
+): Promise<{ succeeded: number[]; failed: number[]; errors: Record<number, string> }> {
   const { data } = await apiClient.post('/clerk/queue/batch-review', {
-    filing_ids: filingIds,
+    filings: filings.map(filing => ({
+      filing_id: filing.id,
+      expected_submission_count: filing.submission_count,
+    })),
     action,
   });
   return data;

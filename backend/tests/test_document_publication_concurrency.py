@@ -51,7 +51,10 @@ async def court_document(postgres_sessions, monkeypatch, tmp_path):
             assert (await client.post(f"/api/v1/filings/{fid}/submit")).status_code == 200
             client.headers["X-Demo-User-Id"] = str(clerk)
             assert (
-                await client.post(f"/api/v1/clerk/filings/{fid}/review", json={"action": "accept"})
+                await client.post(
+                    f"/api/v1/clerk/filings/{fid}/review",
+                    json={"expected_submission_count": 1, "action": "accept"},
+                )
             ).status_code == 200
             copy, _ = await prepare_copy(client, did)
             yield client, did, clerk, second_id, copy

@@ -124,7 +124,9 @@ async def test_application_required_and_clerk_referral_has_no_filing_decision(
     api_client.headers["X-Demo-User-Id"] = str(users[2].id)
     history = (await api_client.get(f"/api/v1/filings/{filing.id}/history")).json()
     assert set(history["fee_waiver"]["allowed_actions"]) == {"grant_judicial", "deny_judicial"}
-    await filing_service.review_filing(db_session, filing.id, users[1].id, "accept")
+    await filing_service.review_filing(
+        db_session, filing.id, users[1].id, "accept", expected_submission_count=1
+    )
     queue = await api_client.get(
         "/api/v1/clerk/queue",
         params={
@@ -192,7 +194,7 @@ async def test_signed_grants_are_private_retained_and_independent(
     download = await api_client.get(f"/api/v1/documents/{order.id}/download")
     assert download.status_code == 200 and download.content == decision_pdf()
     await filing_service.review_filing(
-        db_session, filing.id, users[1].id, "return", "Correct title"
+        db_session, filing.id, users[1].id, "return", "Correct title", expected_submission_count=1
     )
     cannot_remove = await api_client.delete(f"/api/v1/filings/{filing.id}/documents/{order.id}")
     assert cannot_remove.status_code == 404
@@ -238,7 +240,7 @@ async def test_denial_can_be_paid_without_resubmission_or_fee_recalculation(
     await db_session.flush()
     assert not (await fee_state(db_session, filing)).obligation_met
     await filing_service.review_filing(
-        db_session, filing.id, users[1].id, "return", "Correct title"
+        db_session, filing.id, users[1].id, "return", "Correct title", expected_submission_count=1
     )
     api_client.headers["X-Demo-User-Id"] = str(users[0].id)
     assert (
@@ -253,7 +255,9 @@ async def test_denial_can_be_paid_without_resubmission_or_fee_recalculation(
     # Acceptance does not override denial; payment can be received afterward, too.
     filing.status = FilingStatus.SUBMITTED
     await db_session.flush()
-    await filing_service.review_filing(db_session, filing.id, users[1].id, "accept")
+    await filing_service.review_filing(
+        db_session, filing.id, users[1].id, "accept", expected_submission_count=1
+    )
     assert filing.fee_waiver_granted is False
     case_type.filing_fee_cents = 99000
     await db_session.flush()

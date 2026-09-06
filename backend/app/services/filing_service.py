@@ -40,6 +40,10 @@ class FilingDocumentError(Exception):
     pass
 
 
+class StaleFilingReviewError(Exception):
+    pass
+
+
 async def verify_filing_documents(
     filing: FilingEnvelope, court_order: FilingDocument | None = None,
 ) -> None:
@@ -372,9 +376,18 @@ async def review_filing(
     reviewer_id: int,
     action: str,
     reason: str | None = None,
+    *,
+    expected_submission_count: int,
 ) -> FilingEnvelope | None:
     filing = await get_filing(db, filing_id, for_update=True)
-    if not filing or filing.status not in (FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW):
+    if not filing:
+        return None
+    if filing.submission_count != expected_submission_count:
+        raise StaleFilingReviewError(
+            "The filing was resubmitted after this review was opened. Close the review, "
+            "refresh the queue and review the new submission before deciding."
+        )
+    if filing.status not in (FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW):
         return None
 
     ordered_date = (filing.filing_date_basis or {}).get("source") == "court_order"

@@ -11,7 +11,7 @@ establish state approval or production readiness.
 |---|---|---|
 | Prove what was submitted | Each new submission has a retained transaction ID, UTC receipt time, filer name, document manifest and SHA-256 fingerprints, payment reference where present, and a downloadable receipt. A read-only recovery audit compares stored bytes and retained transaction references. | Court-approved retention schedules, trusted time monitoring, external archival controls and validation of the deployed storage/recovery configuration. |
 | Preserve corrections and decisions | Corrections create another numbered submission. Earlier document bytes remain downloadable by the filer and court staff. Acceptance, return, rejection, CMS failure and signed filing-date orders are separate retained events. | Court procedures for deciding relief, certified/file-stamped copies and court-approved retention. |
-| Survive retries and simultaneous actions | Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Batch review uses a savepoint per filing. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
+| Survive retries and simultaneous actions | Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Review decisions identify the numbered submission the reviewer saw; an intervening resubmission invalidates that decision. Batch review uses a savepoint per filing and reports each failed item. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
 | Publish reviewed public copies | Assigned staff prepare and inspect a separate PDF and public title, explicitly publish it, and withdraw public access with retained authority/history. Originals and receipts stay intact; fee-waiver records cannot use this publication path. | Court-approved classification/redaction policy, approved review tools, storage immutability and retention schedules. |
 | Protect private material | Private envelopes and receipts require filer or court-staff access. Dockets exclude waiver application data, confidential document metadata, superseded documents and other filers' drafts. Fee-waiver documents are nonpublic even if the filer omits the checkbox. | Full classification/retention policy for every case and document type; independent security assessment. |
 | Control case participation and access | Assigned staff record participants, counsel representation and explicit restricted-case grants with retained reasons, before/after history, stale-edit checks and revocation. Filing acceptance no longer assigns party roles or grants case access. | Court-approved access rules, review of legacy records, CMS appearance/withdrawal synchronization, limited-scope representation and service enrollment. |
@@ -48,14 +48,46 @@ that key returns the current envelope without making a new submission. A correct
 use a new key. Clients must inspect the returned status; replaying an old key does not
 submit changes made since its original use.
 
+Review decisions must include the `submission_count` shown when the reviewer opened or
+selected the filing. `POST /api/v1/clerk/filings/{id}/review` requires
+`expected_submission_count` alongside `action` and any required `reason`. For example:
+
+```json
+{"action": "accept", "expected_submission_count": 2}
+```
+
+The service compares that number with the refreshed envelope while holding its row lock,
+before document verification, CMS submission, or decision records. If another reviewer
+returned the filing and the filer resubmitted it, the stale decision receives HTTP 409
+even though the envelope is again pending. Close the old review, refresh the queue, and
+inspect the corrected submission before deciding. Accept, return, and reject all use this
+check. The interface displays the submission number and removes a batch selection when
+refresh reveals a different submission for that envelope. Opening a different filing
+clears the previous filing's review reason and error; clicking the same submission
+preserves the reviewer's text.
+
+`POST /api/v1/clerk/queue/batch-review` requires a `filings` list of explicit targets:
+
+```json
+{"action": "accept", "filings": [{"filing_id": 123, "expected_submission_count": 2}]}
+```
+
+Batch results contain `succeeded` and `failed` ID lists, plus an `errors` object mapping
+each failed ID to a message. One stale item does not discard another item's successful
+acceptance. Duplicate envelope IDs and missing submission numbers receive HTTP 422.
+Legacy envelopes with no numbered submission use their recorded count of zero; clients
+must still send it explicitly. Older bare `filing_ids` batch requests are refused.
+
 ## Verification and deployment
 
 Behavioral coverage lives in:
 
 - `backend/tests/test_filing_history.py`: receipts, corrections, private access, historical
-  downloads, stable paging, SQL retention guards and rollback of a failed batch item.
+  downloads, stable paging, SQL retention guards, stale decisions after correction, and
+  rollback of a failed batch item.
 - `backend/tests/test_filing_concurrency.py`: simultaneous reviews and submission retries
-  on PostgreSQL, plus retention guards on both model-created and Alembic-migrated schemas.
+  on PostgreSQL, stale reviews after resubmission, and retention guards on both
+  model-created and Alembic-migrated schemas.
 - `backend/tests/test_filing_migration.py`: upgrades preserve legacy filings and documents
   without fabricating old receipts. Repeated startup does not duplicate the migration.
 

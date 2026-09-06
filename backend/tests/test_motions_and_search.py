@@ -127,7 +127,11 @@ async def test_file_motion_to_existing_case(db_session, stored_document):
 
     # Accept the motion
     accepted = await filing_service.review_filing(
-        db_session, motion_filing.id, reviewer_id=clerk.id, action="accept"
+        db_session,
+        motion_filing.id,
+        reviewer_id=clerk.id,
+        action="accept",
+        expected_submission_count=1,
     )
     assert accepted is not None
     assert accepted.status == FilingStatus.ACCEPTED
@@ -181,8 +185,12 @@ async def test_motion_rejected_and_refiled(db_session, stored_document):
 
     # Clerk returns for correction
     returned = await filing_service.review_filing(
-        db_session, filing.id, reviewer_id=clerk.id,
-        action="return", reason="Missing brief in support per MCR 2.119(A)(2)",
+        db_session,
+        filing.id,
+        reviewer_id=clerk.id,
+        action="return",
+        reason="Missing brief in support per MCR 2.119(A)(2)",
+        expected_submission_count=1,
     )
     assert returned.status == FilingStatus.RETURNED
     assert "MCR 2.119" in returned.rejection_reason
@@ -215,7 +223,7 @@ async def test_domesticating_subpoena_filing(db_session, stored_document):
     # Submit and accept
     await filing_service.submit_filing(db_session, filing.id)
     accepted = await filing_service.review_filing(
-        db_session, filing.id, reviewer_id=clerk.id, action="accept"
+        db_session, filing.id, reviewer_id=clerk.id, action="accept", expected_submission_count=1
     )
     assert accepted.status == FilingStatus.ACCEPTED
     assert accepted.case_id is not None  # New case created for the subpoena

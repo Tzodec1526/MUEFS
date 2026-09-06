@@ -26,7 +26,9 @@ async def test_competing_orders_commit_once(postgres_sessions, stored_document, 
     fid, filer, clerk = await prepare_filing(postgres_sessions)
     async with postgres_sessions.begin() as db:
         await filing_service.submit_filing(db, fid)
-        first = await filing_service.review_filing(db, fid, clerk, "accept")
+        first = await filing_service.review_filing(
+            db, fid, clerk, "accept", expected_submission_count=1
+        )
         second_id = fid
         if shared == "case":
             second = FilingEnvelope(
@@ -40,7 +42,9 @@ async def test_competing_orders_commit_once(postgres_sessions, stored_document, 
             db.add(stored_document(second.id))
             await db.flush()
             await filing_service.submit_filing(db, second.id)
-            await filing_service.review_filing(db, second.id, clerk, "accept")
+            await filing_service.review_filing(
+                db, second.id, clerk, "accept", expected_submission_count=1
+            )
             second_id = second.id
 
     async def database():
@@ -146,9 +150,13 @@ async def test_change_during_inspection_blocks_stale_order(
                                 delete(UserCourtRole).where(UserCourtRole.user_id == clerk)
                             )
                     elif change == "acceptance":
-                        await filing_service.review_filing(db, fid, clerk, "accept")
+                        await filing_service.review_filing(
+                            db, fid, clerk, "accept", expected_submission_count=1
+                        )
                     else:
-                        await filing_service.review_filing(db, fid, clerk, "return", "Correction")
+                        await filing_service.review_filing(
+                            db, fid, clerk, "return", "Correction", expected_submission_count=1
+                        )
                         await filing_service.submit_filing(db, fid)
                 proceed.set()
                 response = await asyncio.wait_for(pending, 10)

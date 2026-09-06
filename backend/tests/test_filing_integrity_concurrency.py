@@ -49,7 +49,11 @@ async def test_deactivation_after_authentication_blocks_filing_transition(
                     f"/api/v1/filings/{fid}/submit"
                     if action == "submit"
                     else f"/api/v1/clerk/filings/{fid}/review",
-                    **({"json": {"action": "accept"}} if action == "accept" else {}),
+                    **(
+                        {"json": {"action": "accept", "expected_submission_count": 1}}
+                        if action == "accept"
+                        else {}
+                    ),
                 )
             )
             try:
@@ -116,12 +120,24 @@ async def test_competing_reverse_order_batches_finish_without_duplicate_acceptan
                     client.post(
                         "/api/v1/clerk/queue/batch-review",
                         headers={"X-Demo-User-Id": str(clerk)},
-                        json={"action": "accept", "filing_ids": [first, second_id]},
+                        json={
+                            "action": "accept",
+                            "filings": [
+                                {"filing_id": target_id, "expected_submission_count": 1}
+                                for target_id in [first, second_id]
+                            ],
+                        },
                     ),
                     client.post(
                         "/api/v1/clerk/queue/batch-review",
                         headers={"X-Demo-User-Id": str(other_id)},
-                        json={"action": "accept", "filing_ids": [second_id, first]},
+                        json={
+                            "action": "accept",
+                            "filings": [
+                                {"filing_id": target_id, "expected_submission_count": 1}
+                                for target_id in [second_id, first]
+                            ],
+                        },
                     ),
                 ),
                 10,

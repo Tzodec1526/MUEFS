@@ -58,14 +58,22 @@ async def test_clerk_accept_notifies_filer_in_both_review_paths(
     await filing_service.submit_filing(db_session, filing.id)
     api_client.headers["X-Demo-User-Id"] = str(clerk.id)
     if batch:
-        response = await api_client.post("/api/v1/clerk/queue/batch-review", json={
-            "action": "accept", "filing_ids": [filing.id],
-        })
+        response = await api_client.post(
+            "/api/v1/clerk/queue/batch-review",
+            json={
+                "action": "accept",
+                "filings": [{"filing_id": filing.id, "expected_submission_count": 1}],
+            },
+        )
         assert response.json()["succeeded"] == [filing.id]
     else:
-        response = await api_client.post(f"/api/v1/clerk/filings/{filing.id}/review", json={
-            "action": "accept",
-        })
+        response = await api_client.post(
+            f"/api/v1/clerk/filings/{filing.id}/review",
+            json={
+                "expected_submission_count": 1,
+                "action": "accept",
+            },
+        )
     assert response.status_code == 200
     api_client.headers["X-Demo-User-Id"] = str(filer.id)
     notices = (await api_client.get("/api/v1/notifications")).json()
