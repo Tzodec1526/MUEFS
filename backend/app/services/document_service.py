@@ -1,3 +1,4 @@
+import hashlib
 import io
 import logging
 from contextlib import closing
@@ -105,9 +106,24 @@ def download_document(file_key: str) -> BinaryIO:
         local_path = _safe_local_path(file_key)
         return local_path.open("rb")
 
+    from botocore.exceptions import ClientError
+
     client = get_s3_client()
-    response = client.get_object(Bucket=settings.s3_bucket_name, Key=file_key)
+    try:
+        response = client.get_object(Bucket=settings.s3_bucket_name, Key=file_key)
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") in {"NoSuchKey", "404", "NotFound"}:
+            raise FileNotFoundError("Document file is unavailable") from exc
+        raise
     return response["Body"]
+
+
+def stored_sha256(file_key: str) -> str:
+    with closing(download_document(file_key)) as stream:
+        digest = hashlib.sha256()
+        while chunk := stream.read(64 * 1024):
+            digest.update(chunk)
+        return digest.hexdigest()
 
 
 def delete_document(file_key: str) -> None:

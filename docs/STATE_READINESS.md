@@ -12,6 +12,7 @@ establish state approval or production readiness.
 | Prove what was submitted | Each new submission has a retained transaction ID, UTC receipt time, filer name, document manifest and SHA-256 fingerprints, payment reference where present, and a downloadable receipt. | Court-approved retention schedules, trusted time monitoring, external archival controls and production storage verification. |
 | Preserve corrections and decisions | Corrections create another numbered submission. Earlier document bytes remain downloadable by the filer and court staff. Acceptance, return, rejection and CMS failure are separate retained events. | Effective filing-date decisions, judicial relief for transmission failures, and certified/file-stamped copies. |
 | Survive retries and simultaneous actions | Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Batch review uses a savepoint per filing. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
+| Publish reviewed public copies | Assigned staff prepare and inspect a separate PDF and public title, explicitly publish it, and withdraw public access with retained authority/history. Originals and receipts stay intact; fee-waiver records cannot use this publication path. | Court-approved classification/redaction policy, approved review tools, storage immutability and retention schedules. |
 | Protect private material | Private envelopes and receipts require filer or court-staff access. Dockets exclude waiver application data, confidential document metadata, superseded documents and other filers' drafts. Fee-waiver documents are nonpublic even if the filer omits the checkbox. | Full classification/retention policy for every case and document type; independent security assessment. |
 | Control case participation and access | Assigned staff record participants, counsel representation and explicit restricted-case grants with retained reasons, before/after history, stale-edit checks and revocation. Filing acceptance no longer assigns party roles or grants case access. | Court-approved access rules, review of legacy records, CMS appearance/withdrawal synchronization, limited-scope representation and service enrollment. |
 | Record the correct legal filing date | Receipt instants and filing dates are separate. Published court calendar revisions specify timezone, coverage, holidays and closures. Submissions retain their date assessment; acceptance records any revised assessment without rewriting the original receipt. | Court verification of calendar completeness, authorized date adjustments, relief for transmission failures and review of closures published after acceptance. Correcting a document does not automatically preserve its legal filing date. |
@@ -314,6 +315,58 @@ Chromium exercises the staff workflow, public-search boundary and desktop/mobile
 These administrative records do not establish legal appearance, approve withdrawal,
 replace the court's system of record, or enroll anyone in electronic service. A court
 must approve the access policy and migration review before operational use.
+
+## Court-reviewed public copies
+
+Assigned staff open **Manage public access** from a docket document or a filing receipt.
+They can withhold public access immediately with a recorded reason/authority, prepare a
+separate PDF with its approved public title, and download that exact candidate for review.
+Preparation alone grants no public or filer access to the candidate. Publishing requires
+an explicit review confirmation and reason/authority; the service rechecks the stored
+candidate's SHA-256 before changing access. Only a current document on an accepted filing
+linked to a case can receive a public copy. Fee-waiver applications and orders are excluded.
+
+Publication atomically restricts the original and selects the reviewed copy. The public
+case docket returns only the derivative's title, size, page count and hash. Neither
+publication nor withdrawal rewrites the original's bytes, title, fingerprint or retained
+receipt. Withholding clears the active copy and keeps the original restricted. It never
+automatically restores access to an unreviewed original. The filer retains access to copies
+that were actually published, including after withdrawal; only assigned court staff can
+inspect never-published candidates. Sealed-case restrictions still govern other viewers.
+
+Actor, filing and document locks recheck current staff authority after slow file inspection.
+A per-document version rejects stale edits. Publication and withholding commit their audit
+event, filing transaction and notice together; a failed record write rolls back the access
+change. Audit history snapshots the staff member's name and retains reasons, UTC times and
+before/after access. Migration `f94c81e2b7d5` adds retained public-copy records with
+append-only PostgreSQL/SQLite guards. It does not rewrite existing originals or infer
+publication approval. An automatic destructive downgrade is refused.
+
+The docket loads copies in one query for the displayed page, with no extra copy query for
+staff/filer original views or pages without copies. Regression checks at 3 and 25 documents
+verify a single copy query and no off-page copy materialization. The publication screen
+loads as a separate bundle, and its access history loads only when expanded. Upload
+inspection and streaming downloads share the existing bounded paths; integrity checks read
+64 KiB chunks. Missing local/S3 objects now return unavailable-file responses instead of a
+fabricated simulated document page. API responses prevent storage in HTTP caches; a
+withdrawal affects subsequent requests and cannot recall an already downloaded file.
+
+Verification covers preparation warnings, exact public bytes and metadata, unchanged
+receipts, original access, withdrawal, wrong-document copy IDs, missing storage, malformed
+PDFs, audit rollback, retained actor names, pagination and sealed-case restrictions.
+PostgreSQL checks on model-created and migrated schemas cover competing publish/withhold
+decisions, append-only records and revocation while integrity inspection is pending.
+Local Chromium exercises staff preparation/review, public and filer downloads, stale
+edit rejection, history loading and desktop/mobile layouts using synthetic records.
+
+Michigan's [Trial Court Records Management Standards](https://www.courts.michigan.gov/4a81cf/siteassets/court-administration/standardsguidelines/casefile/cf_stds.pdf)
+distinguish protected records from public copies and require attention to restricted
+information. This workflow supplies a review mechanism; it does not determine whether a
+specific record may legally be released. Staff must review the complete PDF, hidden text,
+annotations and metadata using approved tools. The existing PII check samples text from
+at most five pages and cannot prove that redaction is complete. A complete classification
+matrix, court-authorized release policy, file-stamped derivatives, retention/disposition
+procedures and storage/recovery validation remain outside this implementation.
 
 ## Sources guiding the evaluation
 

@@ -49,6 +49,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Content-Security-Policy"] = (
             _API_CSP if request.url.path.startswith("/api/") else self.spa_csp
         )
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "private, no-store"
         if not request.url.path.startswith("/api/"):
             response.headers["Cross-Origin-Embedder-Policy"] = "credentialless"
         return response

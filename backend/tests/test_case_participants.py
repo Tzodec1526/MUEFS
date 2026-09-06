@@ -170,7 +170,7 @@ async def test_private_management_requires_this_courts_assignment(participants_c
     )
     assert self_change.status_code == 409
     capability = (await api_client.get(f"/api/v1/cases/{cases[0].id}")).json()
-    assert capability["can_manage_participants"] is True
+    assert capability["can_manage_records"] is True
 
 
 @pytest.mark.parametrize(
@@ -237,7 +237,7 @@ async def test_independent_grants_and_public_records_do_not_expose_private_field
     await db_session.flush()
     api_client.headers.pop("X-Demo-User-Id")
     response = await api_client.get(f"/api/v1/cases/{case.id}")
-    assert response.status_code == 200 and not response.json()["can_manage_participants"]
+    assert response.status_code == 200 and not response.json()["can_manage_records"]
     public = response.json()["participants"]
     assert {row["id"] for row in public} == {row.id for row in rows}
     assert all(

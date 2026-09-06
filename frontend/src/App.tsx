@@ -14,6 +14,7 @@ const MyFilings = lazy(() => import('./components/filing/MyFilings'));
 const FilingHistoryPage = lazy(() => import('./components/filing/FilingHistoryPage'));
 const ReviewQueue = lazy(() => import('./components/clerk/ReviewQueue'));
 const CourtCaseDirectory = lazy(() => import('./components/courts/CourtCaseDirectory'));
+const DocumentPublicationPage = lazy(() => import('./components/courts/DocumentPublicationPage'));
 const CaseParticipantsPage = lazy(() => import('./components/courts/CaseParticipantsPage'));
 const CourtCalendarPage = lazy(() => import('./components/courts/CourtCalendarPage'));
 const NotificationsPage = lazy(() => import('./components/notifications/NotificationsPage'));
@@ -228,6 +229,7 @@ function App() {
                         <Route path="/admin" element={<AdministrationPage />} />
                         <Route path="/cases/:caseId/participants" element={<RequireClerk><CaseParticipantsPage /></RequireClerk>} />
                         <Route path="/clerk/cases" element={<RequireClerk><CourtCaseDirectory /></RequireClerk>} />
+                        <Route path="/documents/:documentId/publication" element={<RequireClerk><DocumentPublicationPage /></RequireClerk>} />
                         <Route path="/cases/:caseId" element={<CaseDetailPage />} />
                         <Route path="/favorites" element={<RequireFiler><Favorites /></RequireFiler>} />
                         <Route path="/clerk/queue" element={<RequireClerk><ReviewQueue /></RequireClerk>} />

@@ -222,3 +222,28 @@ digest in the production build pipeline; `render.yaml` is a demo deployment exam
 - [ ] ClamAV enabled and fail-closed
 - [ ] Health checks and audit-log export wired up
 - [ ] `pip-audit`, `trivy fs .`, and `npm --prefix frontend audit --omit=dev` reviewed
+
+## 9. Reviewed public-copy rollout
+
+Run migration `f94c81e2b7d5` before enabling the new document access screen. It creates
+retained copy records and a versioned active-copy pointer without modifying original files,
+titles or receipts. Existing documents keep their current visibility. The database rejects
+updates/deletes of copy metadata; automatic downgrade is refused to preserve evidence.
+
+Authorize the court's classification and release policy before staff use **Manage public
+access**. Verify preparation with a safe synthetic PDF, inspect the downloaded candidate,
+publish with a reason/authority and check its docket/download as an anonymous user. Confirm
+that the original is now restricted, then withhold the copy and confirm both public URLs
+are denied. Check that the filer can still retrieve the original and prior published copy,
+that unassigned staff cannot change access, and that the retained history records each
+operator and decision. Review hidden text, annotations and metadata using approved tools;
+the five-page sampled PII scan is advisory and performs no redaction.
+
+Keep originals and every prepared copy in private storage. Back up and restore the database
+and objects together, validate hashes and configure storage permissions/versioning for the
+court's retention policy. A database append-only trigger does not make object storage
+immutable. A failed request cleans up a newly uploaded candidate when it can, but a process
+crash or commit failure can leave an unreferenced private object. Reconcile these objects
+under an approved retention procedure; never infer permission to delete a referenced copy.
+Preserve `private, no-store` on API responses through any proxy/CDN. Withdrawal controls
+subsequent downloads; files already downloaded cannot be recalled.

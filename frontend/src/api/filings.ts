@@ -128,6 +128,8 @@ export interface FilingTransaction {
     amount_due_cents?: number;
     filing_date_basis?: FilingDateAssessment | null;
     documents?: FilingDocument[];
+    document_id?: number;
+    public_copy?: { id: number; title: string; sha256_hash: string; file_size_bytes: number };
     cms_case_number?: string | null;
     cms_filing_id?: string | null;
   };
@@ -145,6 +147,7 @@ export interface FilingHistory {
   filing_date: string | null;
   filing_date_basis: FilingDateAssessment | null;
   court_id: number;
+  can_manage_documents: boolean;
 }
 
 export interface FilingDateAssessment {

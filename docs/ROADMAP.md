@@ -34,14 +34,19 @@ correction history and PostgreSQL concurrency checks now form part of the core w
   explicit restricted-case grants with retained authority and history. The portal does not
   determine legal appearance, approve withdrawal or enroll a service contact. Legacy
   participant links require review after migration; accepting a filing grants no case role.
+- **Public copies require human review.** Assigned staff can prepare a separate PDF,
+  inspect it, publish its approved title and later withdraw public access while retaining
+  originals, copies and history. Redactions are prepared using the court's approved tools;
+  the sampled PII scan does not certify them. Case/document classification policy, records
+  retention schedules and protected storage still require court approval and validation.
 
 ## Roadmap (illustrative)
 
 - Live JIS / Tyler Odyssey adapter implementations: document-type mapping, real submission,
   and status sync against each court's Electronic Filing Manager.
 - Payment-processor integration (PCI-scoped) replacing the simulated flow.
-- Deeper MCR 1.109 processing: server-side OCR / PDF-A conversion and structured PII
-  redaction (not just warnings).
+- Deeper MCR 1.109 processing: server-side OCR / PDF-A conversion and redaction tooling
+  to support the existing court-reviewed public-copy workflow.
 - Broaden container hardening to the dev images and pin base images by digest (the
   production image already runs non-root with a healthcheck; CI security scanning and a
   [deployment guide](DEPLOYMENT.md) now exist).

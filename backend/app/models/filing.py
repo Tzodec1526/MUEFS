@@ -6,6 +6,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
+PRIVATE_DOCUMENT_TYPES = frozenset({"FEE_WAIVER", "FEE_WAIVER_ORDER"})
+
 
 class FilingStatus(enum.StrEnum):
     DRAFT = "draft"
@@ -96,5 +98,9 @@ class FilingDocument(Base):
     )
     retained_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    access_version: Mapped[int] = mapped_column(default=0, server_default="0")
+    public_copy_id: Mapped[int | None] = mapped_column(ForeignKey(
+        "document_public_copies.id", use_alter=True, name="fk_document_public_copy",
+    ))
 
     envelope: Mapped["FilingEnvelope"] = relationship(back_populates="documents")

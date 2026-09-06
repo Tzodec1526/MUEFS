@@ -2,6 +2,7 @@ from app.models.audit import AuditLog
 from app.models.case import Case, CaseParticipant
 from app.models.court import CaseType, Court, FeeSchedule, FilingChecklist, FilingRequirement
 from app.models.court_calendar import CourtCalendar
+from app.models.document_public_copy import DocumentPublicCopy
 from app.models.filing import FilingDocument, FilingEnvelope
 from app.models.filing_transaction import FilingTransaction
 from app.models.notification import Notification, NotificationDeliveryEvent, ServiceContact
@@ -23,6 +24,7 @@ __all__ = [
     "CaseParticipant",
     "FilingEnvelope",
     "FilingDocument",
+    "DocumentPublicCopy",
     "FilingTransaction",
     "Payment",
     "ServiceContact",

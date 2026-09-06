@@ -10,19 +10,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
-from app.models.filing import FilingDocument
+from app.models.filing import PRIVATE_DOCUMENT_TYPES, FilingDocument
 from app.services import document_service
 from app.utils import malware_scan
 
 
-async def store_document_upload(
-    db: AsyncSession,
-    filing_id: int,
+async def inspect_upload(
     file: UploadFile,
-    document_type_code: str,
-    title: str,
-    is_confidential: bool = False,
-) -> tuple[FilingDocument, list[str]]:
+    *, require_pdf: bool = False,
+) -> tuple[bytes, str, str, document_service.PdfInspection]:
     # Bound the read without retaining both a chunk list and a joined copy.
     max_bytes = settings.max_file_size_mb * 1024 * 1024
     file_data = await file.read(max_bytes + 1)
@@ -48,8 +44,8 @@ async def store_document_upload(
             detail="Unsupported file type. Accepted: PDF, Word, TXT, RTF, TIFF, JPG, PNG",
         )
 
-    if document_type_code == "FEE_WAIVER_ORDER" and content_type != "application/pdf":
-        raise HTTPException(status_code=415, detail="A signed fee waiver decision must be a PDF")
+    if require_pdf and content_type != "application/pdf":
+        raise HTTPException(status_code=415, detail="This document must be a PDF")
 
     # Malware screening (defense in depth): reject executables / known-bad signatures
     # regardless of the declared MIME type.
@@ -61,20 +57,27 @@ async def store_document_upload(
         )
 
     sha256 = (await run_in_threadpool(hashlib.sha256, file_data)).hexdigest()
-    safe_name = re.sub(r"[^\w\s\-.]", "", file.filename or "document") or "document"
-    file_key = f"filings/{filing_id}/{uuid.uuid4()}/{safe_name}"
-
-    page_count = None
-    is_searchable = False
-    pii_warnings: list[str] = []
+    inspection = document_service.PdfInspection()
     if content_type == "application/pdf":
         inspection = await run_in_threadpool(document_service.inspect_pdf, file_data)
-        page_count = inspection.page_count
-        is_searchable = inspection.is_text_searchable
-        pii_warnings = inspection.pii_warnings
-        if document_type_code == "FEE_WAIVER_ORDER" and not page_count:
-            raise HTTPException(status_code=422, detail="The decision must be a readable PDF")
+        if require_pdf and not inspection.page_count:
+            raise HTTPException(status_code=422, detail="The document must be a readable PDF")
+    return file_data, content_type, sha256, inspection
 
+
+async def store_document_upload(
+    db: AsyncSession,
+    filing_id: int,
+    file: UploadFile,
+    document_type_code: str,
+    title: str,
+    is_confidential: bool = False,
+) -> tuple[FilingDocument, list[str]]:
+    file_data, content_type, sha256, inspection = await inspect_upload(
+        file, require_pdf=document_type_code == "FEE_WAIVER_ORDER",
+    )
+    safe_name = re.sub(r"[^\w\s\-.]", "", file.filename or "document") or "document"
+    file_key = f"filings/{filing_id}/{uuid.uuid4()}/{safe_name}"
     await run_in_threadpool(document_service.upload_document, file_data, file_key, content_type)
 
     try:
@@ -85,13 +88,13 @@ async def store_document_upload(
             file_key=file_key,
             file_size_bytes=len(file_data),
             mime_type=content_type,
-            page_count=page_count,
+            page_count=inspection.page_count,
             sha256_hash=sha256,
             is_confidential=(
-                is_confidential or document_type_code in {"FEE_WAIVER", "FEE_WAIVER_ORDER"}
+                is_confidential or document_type_code in PRIVATE_DOCUMENT_TYPES
             ),
             retained_at=datetime.now(UTC) if document_type_code == "FEE_WAIVER_ORDER" else None,
-            is_text_searchable=is_searchable,
+            is_text_searchable=inspection.is_text_searchable,
         )
         db.add(doc)
         await db.flush()
@@ -99,4 +102,4 @@ async def store_document_upload(
     except Exception:
         await run_in_threadpool(document_service.delete_document, file_key)
         raise
-    return doc, pii_warnings
+    return doc, inspection.pii_warnings

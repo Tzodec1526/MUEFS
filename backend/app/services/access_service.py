@@ -19,7 +19,7 @@ from sqlalchemy import ColumnElement, false, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.case import COUNSEL_ROLES, Case, CaseParticipant
-from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
+from app.models.filing import PRIVATE_DOCUMENT_TYPES, FilingDocument, FilingEnvelope, FilingStatus
 from app.models.user import CourtRole, User, UserCourtRole, UserType
 
 # Filings that may appear on a public (non-sealed) docket to non-parties.
@@ -129,7 +129,8 @@ async def user_may_read_document(
 
     # Superseded documents remain available to their filer and court staff, even
     # after a corrected filing is accepted. They must never enter the public docket.
-    if doc.is_confidential or doc.removed_at is not None:
+    if (doc.is_confidential or doc.document_type_code in PRIVATE_DOCUMENT_TYPES
+            or doc.removed_at is not None):
         if envelope.filer_id == user_id:
             return True
         return await user_is_court_staff_for_court(db, user_id, envelope.court_id)

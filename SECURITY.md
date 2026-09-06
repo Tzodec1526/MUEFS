@@ -47,8 +47,20 @@ regardless of demo mode:
   record. Changes retain before/after values atomically in the audit log. Retiring one
   grant does not revoke a different active grant or court role. Migration `e83f2c91a6d4`
   preserves legacy records but disables inferred participant access until court review.
-- **Public records, scoped.** Anonymous case search and docket viewing are limited to
-  non-sealed cases and non-confidential, non-draft filings.
+- **Public records, scoped.** Anonymous case search is limited to non-sealed cases. Public
+  docket documents come from accepted filings and exclude restricted originals. An active
+  reviewed copy exposes its own title, size and hash instead of the original's metadata.
+- **Document publication.** Assigned staff prepare and inspect a separate PDF before
+  explicitly publishing it with a reason and authority. Publication restricts the original;
+  withdrawal removes the active public copy without restoring the original. Candidate
+  metadata and earlier copies are retained with append-only database guards. Staff may
+  inspect candidates; filers may read formerly published copies; public users may read
+  only the current copy when case access permits. Fee-waiver records cannot be published
+  through this workflow. Actor/filing/document locks recheck authority, versions reject
+  stale changes, and audit/receipt failures roll back access changes. API responses use
+  `private, no-store`; access changes apply to subsequent requests and cannot recall files
+  already downloaded. Storage immutability and the completeness of a court's redactions
+  require operational controls beyond these application checks.
 - **Authentication.** Keycloak access tokens are validated with RS256 against the realm
   JWKS, with the issuer and expiry checked; the `none` algorithm is never accepted. OIDC
   auto-provisioning acts only on a **verified** email claim and refuses to auto-adopt a

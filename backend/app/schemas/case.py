@@ -34,7 +34,7 @@ class CaseDocketResponse(BaseModel):
     filing_date: date | None = None
     judge_id: int | None
     participants: list[CaseSearchParticipantPublic] = []
-    can_manage_participants: bool = False
+    can_manage_records: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}

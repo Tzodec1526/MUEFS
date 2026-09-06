@@ -26,6 +26,7 @@ Live demo: https://webmcp.tomcedoz.com/agent · https://demo.tomcedoz.com · Age
 | **Draft autosave** | Vendor-dependent | Browser draft recovery |
 | **Clerk review tools** | Queue tools vary by court | Batch accept, age badges, quick reject reasons |
 | **Case participants and access** | Court-dependent | Assigned staff record roles, explicit access grants and retained changes |
+| **Reviewed public copies** | Court-dependent | Prepare, inspect, publish and withdraw a separate PDF; retain the filed original |
 | **AI agent tools (WebMCP)** | Not available | 20 role-aware tools + `/agent` hub |
 | **Cost / licensing** | Per-transaction vendor fees | AGPL-3.0 (no license fee) |
 
@@ -140,8 +141,8 @@ MUEFS/
 
 ### For the Public & Press
 - **Open docket search** — look up any non-sealed case by number or party name, no account required
-- **Public document access** — view dockets and download non-confidential filings; sealed cases and confidential documents stay restricted to parties and court staff
-- **Transparency by default** — court records are open by default, protected where the rules require
+- **Public document access** — download public documents on accepted filings and court-reviewed public copies, subject to case restrictions
+- **Controlled publication** — assigned staff can withdraw public access without deleting the original, earlier copies or transaction history
 
 ## Development
 
@@ -193,7 +194,8 @@ security is enforced server-side and covered by the test suite. See **[SECURITY.
 for the full security model, threat boundaries, and hardening guide.
 
 **Security**
-- **Sealed & confidential access control** — restricted to parties, counsel of record, the filer, and court staff; counsel is matched by account linkage or a *verified* bar number, never a self-asserted one.
+- **Sealed case access** — requires an explicit participant grant or authorized court/system role. Counsel grants require a linked account and matching verified bar number. Individually restricted originals remain available only to the filer and assigned court staff.
+- **Reviewed public copies** — staff inspect a separate PDF and approved title before publishing. Publication restricts the original; withdrawal removes the active copy without restoring the original. The court supplies redactions and authority; automated scanning does not certify a safe release.
 - **Upload malware screening** — every upload is screened (built-in executable/EICAR heuristic, optional ClamAV) and rejected before storage.
 - **MCR 1.109 PII warnings at upload** — likely SSNs, dates of birth, and account numbers are flagged for redaction.
 - **Hardened authentication** — Keycloak RS256 JWTs (signature, issuer, expiry verified; no `none` algorithm); OIDC auto-provisioning requires a verified email and won't adopt privileged accounts.

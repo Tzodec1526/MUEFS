@@ -189,3 +189,56 @@ async def test_case_search_treats_wildcards_as_literal_text(db_session, docket, 
         cases, total = await search_service.search_cases(db_session, **params)
         assert total == 1
         assert [match.id for match in cases] == [case.id]
+
+
+async def test_public_copy_docket_loads_only_page_copies_in_one_query(
+    db_session, docket, api_client,
+):
+    from sqlalchemy import select
+
+    from app.models.document_public_copy import DocumentPublicCopy
+
+    owner, _, clerk, _, case, _ = docket
+    case_id = case.id
+    docs = list(await db_session.scalars(select(FilingDocument)))
+    for doc in docs:
+        copy = DocumentPublicCopy(
+            document_id=doc.id, created_by=clerk.id, title=f"Public {doc.id}",
+            file_key=f"copies/{doc.id}.pdf", mime_type="application/pdf", file_size_bytes=10,
+            sha256_hash="a" * 64, page_count=1, is_text_searchable=True, pii_warnings=[],
+        )
+        db_session.add(copy)
+        await db_session.flush()
+        doc.public_copy_id = copy.id
+        doc.is_confidential = True
+    await db_session.flush()
+    app.dependency_overrides[get_optional_user_id] = lambda: None
+    queries, loaded = [], []
+
+    def query(_conn, _cursor, statement, *_args):
+        if statement.lstrip().upper().startswith("SELECT"):
+            queries.append(statement)
+
+    def load(_session, instance):
+        if isinstance(instance, DocumentPublicCopy):
+            loaded.append(instance.id)
+
+    engine = db_session.bind.sync_engine
+    event.listen(engine, "before_cursor_execute", query)
+    event.listen(db_session.sync_session, "loaded_as_persistent", load)
+    try:
+        for size in [3, 25]:
+            db_session.expunge_all()
+            queries.clear()
+            loaded.clear()
+            response = await api_client.get(f"/api/v1/cases/{case_id}/filings?page_size={size}")
+            assert response.status_code == 200
+            documents = [doc for entry in response.json() for doc in entry["documents"]]
+            assert len(documents) == size and len(loaded) == size
+            assert all(doc["copy_id"] and doc["title"].startswith("Public ") for doc in documents)
+            assert len(queries) <= 7, f"Docket grew to {len(queries)} queries for {size} copies"
+            assert sum("FROM document_public_copies" in sql for sql in queries) == 1
+    finally:
+        event.remove(engine, "before_cursor_execute", query)
+        event.remove(db_session.sync_session, "loaded_as_persistent", load)
+        app.dependency_overrides.pop(get_optional_user_id, None)

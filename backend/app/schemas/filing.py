@@ -83,6 +83,10 @@ class FilingListResponse(BaseModel):
     page_size: int
 
 
+class CaseDocumentResponse(FilingDocumentResponse):
+    copy_id: int | None = None
+
+
 class CaseFilingResponse(BaseModel):
     """Docket fields only; payment references and waiver applications are private."""
 
@@ -93,7 +97,7 @@ class CaseFilingResponse(BaseModel):
     submitted_at: datetime | None
     reviewed_at: datetime | None
     rejection_reason: str | None
-    documents: list[FilingDocumentResponse]
+    documents: list[CaseDocumentResponse]
     created_at: datetime
     filing_date: date | None = None
 
@@ -160,3 +164,4 @@ class FilingHistoryResponse(BaseModel):
     filing_date: date | None = None
     filing_date_basis: dict | None = None
     court_id: int
+    can_manage_documents: bool = False

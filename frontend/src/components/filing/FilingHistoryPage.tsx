@@ -14,6 +14,8 @@ const eventLabels: Record<string, string> = {
   waiver_referred: 'Fee waiver referred for judicial review', waiver_granted: 'Fee waiver granted',
   waiver_denied: 'Fee waiver denied', payment_recorded: 'Payment recorded',
   filing_date_assessed: 'Filing date assessed using court calendar',
+  public_copy_published: 'Reviewed public copy published',
+  document_withheld: 'Document withheld from public access',
 };
 
 function saveReceipt(filingId: number, transaction: FilingTransaction) {
@@ -123,10 +125,23 @@ export default function FilingHistoryPage() {
               : transaction.details.fee_waiver_requested ? 'Fee waiver requested' : 'No payment recorded'}</dd></div>
           </dl>}
           {transaction.details.cms_case_number && <p>Court case number: <strong>{transaction.details.cms_case_number}</strong></p>}
+          {transaction.details.public_copy && transaction.details.document_id && <div className="receipt-documents">
+            <h4>Public copy recorded at this transaction</h4>
+            <p>{transaction.details.public_copy.title} · {formatBytes(transaction.details.public_copy.file_size_bytes)}</p>
+            <DocumentDownload id={transaction.details.document_id} copyId={transaction.details.public_copy.id} title={transaction.details.public_copy.title} />
+            <details><summary>Public copy fingerprint (SHA-256)</summary><code>{transaction.details.public_copy.sha256_hash}</code></details>
+          </div>}
+          {history.can_manage_documents && transaction.details.document_id && <p>
+            <Link to={`/documents/${transaction.details.document_id}/publication`}>Manage document public access</Link>
+          </p>}
           {transaction.details.documents && <>
             <h4>Documents received ({transaction.details.documents.length})</h4>
             <ul className="receipt-documents">{transaction.details.documents.map(doc => <li key={doc.id}>
-              <div className="receipt-document-heading"><strong>{doc.title}</strong><DocumentDownload id={doc.id} title={doc.title} /></div>
+              <div className="receipt-document-heading"><strong>{doc.title}</strong>
+                <div className="participant-actions"><DocumentDownload id={doc.id} title={doc.title} />
+                  {history.can_manage_documents && <Link to={`/documents/${doc.id}/publication`}>Manage public access</Link>}
+                </div>
+              </div>
               <p>{getDocumentLabel(doc.document_type_code)} · {formatBytes(doc.file_size_bytes)}{doc.is_confidential ? ' · Confidential' : ''}</p>
               <details><summary>Document fingerprint (SHA-256)</summary><code>{doc.sha256_hash}</code></details>
             </li>)}</ul>

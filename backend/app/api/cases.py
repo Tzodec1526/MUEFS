@@ -6,13 +6,14 @@ from sqlalchemy.orm import selectinload
 from app.api.auth import get_optional_user_id
 from app.database import get_db
 from app.models.case import Case, CaseStatus
-from app.models.filing import FilingEnvelope
+from app.models.document_public_copy import DocumentPublicCopy
+from app.models.filing import PRIVATE_DOCUMENT_TYPES, FilingEnvelope
 from app.models.user import CourtRole, UserCourtRole
 from app.schemas.case import (
     CaseDocketResponse,
     CaseSearchResponse,
 )
-from app.schemas.filing import CaseFilingResponse
+from app.schemas.filing import CaseDocumentResponse, CaseFilingResponse
 from app.services import access_service, search_service
 
 router = APIRouter(prefix="/cases", tags=["Cases"])
@@ -69,7 +70,7 @@ async def get_case(
             detail="Not authorized to access this case",
         )
     profile = CaseDocketResponse.model_validate(case)
-    return profile.model_copy(update={"can_manage_participants":
+    return profile.model_copy(update={"can_manage_records":
         await access_service.user_is_court_staff_for_court(db, user_id, case.court_id)})
 
 
@@ -109,10 +110,36 @@ async def get_case_filings(
     query = query.where(visible)
     result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
     staff = await access_service.user_is_court_staff_for_court(db, user_id, case.court_id)
+    filings = list(result.scalars())
+    copy_ids = {
+        doc.public_copy_id for filing in filings for doc in filing.documents
+        if doc.public_copy_id and not staff and filing.filer_id != user_id
+    }
+    copies = {copy.id: copy for copy in await db.scalars(
+        select(DocumentPublicCopy).where(DocumentPublicCopy.id.in_(copy_ids))
+    )} if copy_ids else {}
     entries = []
-    for filing in result.scalars():
+    for filing in filings:
         entry = CaseFilingResponse.model_validate(filing)
         if not staff and filing.filer_id != user_id:
-            entry.documents = [doc for doc in entry.documents if not doc.is_confidential]
+            visible_documents = []
+            for doc, response in zip(filing.documents, entry.documents, strict=True):
+                if doc.document_type_code in PRIVATE_DOCUMENT_TYPES:
+                    continue
+                copy = copies.get(doc.public_copy_id) if doc.public_copy_id else None
+                if copy and copy.document_id == doc.id:
+                    # Never copy the original title, hash, size or private flags into
+                    # the public derivative's response. Only its reviewed metadata is public.
+                    visible_documents.append(CaseDocumentResponse(
+                        id=doc.id, copy_id=copy.id, document_type_code="PUBLIC_COPY",
+                        title=copy.title,
+                        file_size_bytes=copy.file_size_bytes, mime_type=copy.mime_type,
+                        page_count=copy.page_count, sha256_hash=copy.sha256_hash,
+                        is_confidential=False, is_text_searchable=copy.is_text_searchable,
+                        uploaded_at=copy.created_at,
+                    ))
+                elif not doc.is_confidential:
+                    visible_documents.append(response)
+            entry.documents = visible_documents
         entries.append(entry)
     return entries

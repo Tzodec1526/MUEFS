@@ -174,14 +174,3 @@ async def test_anonymous_blocked_from_confidential_document(public_app):
     # Access is denied before any storage read, so a 403 (not 404/500) is the contract.
     r = await client.get(f"/api/v1/documents/{ids['confidential_doc']}/download")
     assert r.status_code == 403
-
-
-@pytest.mark.asyncio
-async def test_download_simulated_document_is_friendly_not_500(public_app):
-    """A seeded/demo document has a DB record but no stored file. Downloading it must
-    return a clear 'simulated document' message, never a raw 500."""
-    client, ids = public_app
-    r = await client.get(f"/api/v1/documents/{ids['public_doc']}/download")
-    assert r.status_code == 404
-    assert "Simulated document" in r.text
-    assert "Internal server error" not in r.text

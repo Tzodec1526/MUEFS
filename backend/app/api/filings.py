@@ -362,9 +362,8 @@ async def filing_history(
         raise HTTPException(status_code=404, detail="Filing not found")
     # Receipts include rejected submissions, private document metadata, and payment
     # references. Standing on the public/sealed case alone does not grant this access.
-    if filing.filer_id != user_id and not await access_service.user_is_court_staff_for_court(
-        db, user_id, filing.court_id,
-    ):
+    staff = await access_service.user_is_court_staff_for_court(db, user_id, filing.court_id)
+    if filing.filer_id != user_id and not staff:
         raise HTTPException(
             status_code=403, detail="Only the filer and court staff can view receipts",
         )
@@ -382,4 +381,5 @@ async def filing_history(
         fee_waiver=await waiver_state(db, filing, user_id) if filing.fee_waiver_requested else None,
         filing_date=filing.filing_date, filing_date_basis=filing.filing_date_basis,
         court_id=filing.court_id,
+        can_manage_documents=staff,
     )

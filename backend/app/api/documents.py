@@ -1,11 +1,10 @@
-import hashlib
 import mimetypes
 import re
 from contextlib import closing
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.background import BackgroundTask
@@ -13,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.api.auth import get_optional_user_id
 from app.database import get_db
+from app.models.document_public_copy import DocumentPublicCopy
 from app.models.filing import FilingDocument
 from app.schemas.document import DocumentVerifyResponse
 from app.services import access_service, audit_service, document_service
@@ -28,6 +28,31 @@ def sanitize_filename(filename: str) -> str:
     return filename or "document"
 
 
+async def document_response(doc: FilingDocument | DocumentPublicCopy):
+    try:
+        file_stream = await run_in_threadpool(document_service.download_document, doc.file_key)
+    except OSError as exc:
+        raise HTTPException(404, "Document file is unavailable") from exc
+    safe_filename = sanitize_filename(doc.title)
+    extension = mimetypes.guess_extension(doc.mime_type) or ""
+    if extension and not safe_filename.lower().endswith(extension):
+        safe_filename += extension
+
+    def chunks():
+        with closing(file_stream):
+            while chunk := file_stream.read(64 * 1024):
+                yield chunk
+
+    return StreamingResponse(
+        chunks(), media_type=doc.mime_type,
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(safe_filename)}",
+            "Cache-Control": "private, no-store",
+        },
+        background=BackgroundTask(file_stream.close),
+    )
+
+
 @router.get("/{document_id}/download")
 async def download_document(
     request: Request,
@@ -35,7 +60,7 @@ async def download_document(
     db: AsyncSession = Depends(get_db),
     user_id: int | None = Depends(get_optional_user_id),
 ):
-    """Public download for non-confidential documents on non-sealed, accepted/served
+    """Public download for non-confidential documents on non-sealed, accepted
     filings. Confidential documents and sealed matters require an authorized account."""
     result = await db.execute(
         select(FilingDocument).where(FilingDocument.id == document_id)
@@ -61,36 +86,7 @@ async def download_document(
         user_agent=client_user_agent(request),
     )
 
-    try:
-        file_stream = await run_in_threadpool(document_service.download_document, doc.file_key)
-    except (FileNotFoundError, OSError):
-        # Seeded demo filings have a document record but no stored file behind it.
-        # Show a clear message instead of a generic 500.
-        return HTMLResponse(
-            "<!doctype html><meta charset=\"utf-8\"><title>Simulated document</title>"
-            "<div style=\"font-family:system-ui,-apple-system,sans-serif;max-width:30rem;"
-            "margin:4rem auto;padding:2rem;text-align:center;color:#334155\">"
-            "<h2 style=\"color:#1e3a5f;margin-bottom:0.5rem\">Simulated document</h2>"
-            "<p>This is a demonstration filing &mdash; the document is simulated and is "
-            "not available for download in the demo.</p></div>",
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
-    safe_filename = sanitize_filename(doc.title)
-    extension = mimetypes.guess_extension(doc.mime_type) or ""
-    if extension and not safe_filename.lower().endswith(extension):
-        safe_filename += extension
-
-    def chunks():
-        with closing(file_stream):
-            while chunk := file_stream.read(64 * 1024):
-                yield chunk
-
-    return StreamingResponse(
-        chunks(),
-        media_type=doc.mime_type,
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(safe_filename)}"},
-        background=BackgroundTask(file_stream.close),
-    )
+    return await document_response(doc)
 
 
 @router.get("/{document_id}/verify", response_model=DocumentVerifyResponse)
@@ -112,15 +108,8 @@ async def verify_document(
             detail="Not authorized to access this document",
         )
 
-    def stored_hash():
-        with closing(document_service.download_document(doc.file_key)) as file_stream:
-            digest = hashlib.sha256()
-            while chunk := file_stream.read(64 * 1024):
-                digest.update(chunk)
-            return digest.hexdigest()
-
     try:
-        current_hash = await run_in_threadpool(stored_hash)
+        current_hash = await run_in_threadpool(document_service.stored_sha256, doc.file_key)
         is_valid = current_hash == doc.sha256_hash
     except OSError:
         return DocumentVerifyResponse(

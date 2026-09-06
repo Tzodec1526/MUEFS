@@ -17,7 +17,7 @@ interface CaseDetail {
   case_type_id: number;
   title: string;
   is_sealed?: boolean;
-  can_manage_participants: boolean;
+  can_manage_records: boolean;
   status: string;
   filed_date: string;
   filing_date: string | null;
@@ -44,6 +44,7 @@ interface CaseFiling {
   rejection_reason: string | null;
   documents: Array<{
     id: number;
+    copy_id?: number | null;
     document_type_code: string;
     title: string;
     file_size_bytes: number;
@@ -207,7 +208,7 @@ function CaseDetailPage() {
             <Link2 size={16} aria-hidden="true" />
             <span className="sr-only">Copy shareable case link</span>
           </button>
-          {caseData.can_manage_participants && <Link to={`/cases/${caseData.id}/participants`} className="btn btn-secondary">Manage participants</Link>}
+          {caseData.can_manage_records && <Link to={`/cases/${caseData.id}/participants`} className="btn btn-secondary">Manage participants</Link>}
           {isFiler && (
             <button
               className={`fav-btn-large ${isFavorited ? 'favorited' : ''}`}
@@ -292,6 +293,7 @@ function CaseDetailPage() {
               <div key={f.id} className="docket-entry">
                 <div className="docket-entry-header">
                   <span className="docket-entry-id">#{f.id}</span>
+                  {caseData.can_manage_records && <Link to={`/filings/${f.id}/history`}>Receipts &amp; history</Link>}
                   <span className={`status-badge ${docketStatus(f.status).cls}`}>{docketStatus(f.status).label}</span>
                   <span className="docket-entry-date">{f.filing_date
                     ? `Filing date: ${formatCourtDate(f.filing_date)}`
@@ -314,7 +316,8 @@ function CaseDetailPage() {
                     >
                       {doc.title} ({getDocumentLabel(doc.document_type_code)}, {formatBytes(doc.file_size_bytes)}
                       {doc.page_count ? `, ${doc.page_count}p` : ''})
-                      <DocumentDownload id={doc.id} title={doc.title} />
+                      <DocumentDownload id={doc.id} copyId={doc.copy_id ?? undefined} title={doc.title} />
+                      {caseData.can_manage_records && <Link to={`/documents/${doc.id}/publication`}>Manage public access</Link>}
                     </div>
                   ))}
                 </div>

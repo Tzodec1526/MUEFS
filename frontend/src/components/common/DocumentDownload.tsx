@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { apiClient } from '../../api/client';
 
-export default function DocumentDownload({ id, title }: { id: number; title: string }) {
+export default function DocumentDownload({ id, title, copyId }: { id: number; title: string; copyId?: number | null }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
 
@@ -10,7 +10,8 @@ export default function DocumentDownload({ id, title }: { id: number; title: str
     setError(false);
     try {
       // Use the authenticated client: ordinary links cannot carry an OIDC bearer token.
-      const { data, headers } = await apiClient.get<Blob>(`/documents/${id}/download`, { responseType: 'blob' });
+      const path = copyId ? `/document-public-copies/${copyId}/download` : `/documents/${id}/download`;
+      const { data, headers } = await apiClient.get<Blob>(path, { responseType: 'blob' });
       const url = URL.createObjectURL(data);
       const link = document.createElement('a');
       link.href = url;
