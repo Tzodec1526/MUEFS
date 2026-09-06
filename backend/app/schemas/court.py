@@ -31,6 +31,12 @@ class CourtListResponse(BaseModel):
     total: int
 
 
+class CourtDirectoryEntry(BaseModel):
+    id: int
+    name: str
+    county: str
+
+
 class CaseTypeBase(BaseModel):
     code: str
     name: str

@@ -9,13 +9,15 @@ export async function registerSearchTools(mc: ModelContext, signal?: AbortSignal
       name: 'search_cases',
       title: 'Search Michigan public court records',
       description:
-        'Search the statewide public docket by party name and/or case number. ' +
-        'Sealed matters are excluded. Returns case id, number, title, status, and parties.',
+        'Search the statewide public docket by party name and/or case number, optionally within a court. ' +
+        'Sealed matters are excluded. Returns case id, number, court, title, status, and parties.',
       inputSchema: {
         type: 'object',
         properties: {
           party_name: { type: 'string', description: 'Party or litigant name (partial match)' },
           case_number: { type: 'string', description: 'Case number (partial match)' },
+          court_id: { type: 'integer', minimum: 1, maximum: 2_147_483_647,
+            description: 'Limit results to this court' },
           page: { type: 'integer', minimum: 1, default: 1 },
         },
       },
@@ -24,34 +26,26 @@ export async function registerSearchTools(mc: ModelContext, signal?: AbortSignal
         const data = await searchCases({
           party_name: (input.party_name as string) || undefined,
           case_number: (input.case_number as string) || undefined,
+          court_id: input.court_id as number | undefined,
           page: (input.page as number) || 1,
         });
         return toolOk({
           total: data.total,
           page: data.page,
-          cases: data.cases.map(
-            (c: {
-              id: number;
-              case_number: string;
-              title: string;
-              status: string;
-              filed_date: string;
-              court_id: number;
-              case_type_id: number;
-              participants?: Array<{ party_name: string; role: string }>;
-            }) => ({
-              id: c.id,
-              case_number: c.case_number,
-              title: sanitizeAgentText(c.title),
-              status: c.status,
-              filed_date: c.filed_date,
-              court_id: c.court_id,
-              case_type_id: c.case_type_id,
-              parties: (c.participants || []).map(
-                (p) => `${sanitizeAgentText(p.party_name)} (${p.role})`,
-              ),
-            }),
-          ),
+          cases: data.cases.map((c) => ({
+            id: c.id,
+            case_number: c.case_number,
+            title: sanitizeAgentText(c.title),
+            status: c.status,
+            filed_date: c.filed_date,
+            court_id: c.court_id,
+            court_name: sanitizeAgentText(c.court_name),
+            court_county: sanitizeAgentText(c.court_county),
+            case_type_id: c.case_type_id,
+            parties: c.participants.map(
+              (p) => `${sanitizeAgentText(p.party_name)} (${p.role})`,
+            ),
+          })),
         });
       },
     },

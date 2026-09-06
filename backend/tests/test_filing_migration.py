@@ -1,5 +1,6 @@
 """Upgrade real historical schemas without coupling the fixture to today's models."""
 
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -7,9 +8,84 @@ import pytest
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy import MetaData, Table, create_engine, text
+from sqlalchemy.exc import DBAPIError
 
 from alembic import command
 from app.demo.schema import prepare_demo_schema
+from tests.test_filing_concurrency import postgres_sessions as postgres_sessions
+
+
+@pytest.mark.skipif(not os.getenv("MUEFS_TEST_POSTGRES_URL"), reason="PostgreSQL not configured")
+@pytest.mark.parametrize("postgres_sessions", [True], indirect=True)
+async def test_search_index_upgrade_recovers_failed_build_and_preserves_records(postgres_sessions):
+    from app.models.case import Case, CaseParticipant, ParticipantRole
+    from app.models.court import CaseCategory, CaseType, Court, CourtType
+    from app.services.search_service import search_cases
+
+    engine = postgres_sessions.kw["bind"]
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    config.set_main_option("script_location", str(Path(__file__).resolve().parents[1] / "alembic"))
+    async with engine.connect() as conn:
+        def downgrade(connection):
+            config.attributes["connection"] = connection
+            command.downgrade(config, "c3d9f06a21b8")
+        await conn.run_sync(downgrade)
+
+    async with postgres_sessions.begin() as db:
+        court = Court(name="Search Court", county="Wayne", court_type=CourtType.CIRCUIT)
+        db.add(court)
+        await db.flush()
+        case_type = CaseType(court_id=court.id, code="CIV", name="Civil",
+                             category=CaseCategory.CIVIL, filing_fee_cents=0)
+        db.add(case_type)
+        await db.flush()
+        case = Case(court_id=court.id, case_type_id=case_type.id, case_number="2026-100%_A",
+                    title="Retained public matter", filed_date=datetime.now(UTC))
+        db.add(case)
+        await db.flush()
+        db.add(CaseParticipant(case_id=case.id, party_name="Jane Public",
+                               role=ParticipantRole.PLAINTIFF))
+
+    async with engine.connect() as conn:
+        await conn.execution_options(isolation_level="AUTOCOMMIT")
+        # Emulate a partial migration: one completed build and one real failed build.
+        await conn.execute(text("""CREATE INDEX CONCURRENTLY ix_cases_case_number_trgm
+            ON cases USING gin (case_number public.gin_trgm_ops)"""))
+        with pytest.raises(DBAPIError, match="invalid input syntax for type integer"):
+            await conn.execute(text("""
+                CREATE INDEX CONCURRENTLY ix_case_participants_party_name_trgm
+                ON case_participants ((party_name::integer))"""))
+        assert await conn.scalar(text("""SELECT indisvalid FROM pg_index
+            WHERE indexrelid = 'ix_case_participants_party_name_trgm'::regclass""")) is False
+
+    for target, kind in [("head", "gin"), ("c3d9f06a21b8", "btree"), ("head", "gin")]:
+        async with engine.connect() as conn:
+            def migrate(connection):
+                config.attributes["connection"] = connection
+                (command.upgrade if target == "head" else command.downgrade)(config, target)
+            await conn.run_sync(migrate)
+            indexes = (await conn.execute(text("""
+                SELECT c.relname, i.indisvalid, a.amname FROM pg_index i
+                JOIN pg_class c ON c.oid = i.indexrelid
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                JOIN pg_am a ON a.oid = c.relam
+                WHERE n.nspname = current_schema() AND c.relname IN (
+                    'ix_cases_case_number', 'ix_cases_case_number_trgm',
+                    'ix_case_participants_party_name', 'ix_case_participants_party_name_trgm')
+                ORDER BY c.relname
+            """))).all()
+            suffix = "_trgm" if kind == "gin" else ""
+            assert indexes == [
+                (f"ix_case_participants_party_name{suffix}", True, kind),
+                (f"ix_cases_case_number{suffix}", True, kind),
+            ]
+            assert await conn.scalar(text(
+                "SELECT count(*) FROM pg_extension WHERE extname='pg_trgm'"
+            )) == 1
+        async with postgres_sessions() as db:
+            found, total = await search_cases(db, case_number="%_", party_name="jane")
+            assert total == 1
+            assert [record.id for record in found] == [case.id]
 
 
 def test_unversioned_demo_upgrade_preserves_filings(tmp_path):

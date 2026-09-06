@@ -64,6 +64,20 @@ async def public_app():
         s.add_all([open_case, sealed_case])
         await s.flush()
 
+        closed_intake = Court(name="Retained Records Court", county="Alcona",
+                              court_type=CourtType.CIRCUIT, is_efiling_enabled=False)
+        s.add(closed_intake)
+        await s.flush()
+        other_type = CaseType(court_id=closed_intake.id, code="CIV", name="Civil",
+                              category=CaseCategory.CIVIL, filing_fee_cents=0)
+        s.add(other_type)
+        await s.flush()
+        same_number = Case(court_id=closed_intake.id, case_type_id=other_type.id,
+                           case_number=open_case.case_number, title="Another public matter",
+                           status=CaseStatus.OPEN, filed_date=datetime.now(UTC))
+        s.add(same_number)
+        await s.flush()
+
         # Litigant with contact PII — must NOT surface on the public docket.
         s.add(CaseParticipant(
             case_id=open_case.id, role=ParticipantRole.PLAINTIFF,
@@ -99,6 +113,9 @@ async def public_app():
             "sealed_case": sealed_case.id,
             "public_doc": public_doc.id,
             "confidential_doc": confidential_doc.id,
+            "court": court.id,
+            "closed_intake": closed_intake.id,
+            "same_number": same_number.id,
         }
 
     async def _override_get_db():
@@ -128,6 +145,34 @@ async def test_anonymous_search_returns_open_not_sealed(public_app):
     assert "MI-PUB-OPEN-1" in numbers
     assert "MI-PUB-SEAL-1" not in numbers
     assert all(c["filed_date"].endswith("+00:00") for c in body["cases"])
+
+
+async def test_anonymous_search_distinguishes_courts_without_exposing_contacts(public_app):
+    client, ids = public_app
+    response = await client.get("/api/v1/cases/search", params={"case_number": "MI-PUB-OPEN-1"})
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == 2
+    cases = {case["id"]: case for case in response.json()["cases"]}
+    assert cases[ids["open_case"]]["court_name"] == "Public Docket Court"
+    assert cases[ids["open_case"]]["court_county"] == "Wayne"
+    assert cases[ids["same_number"]]["court_name"] == "Retained Records Court"
+    assert cases[ids["same_number"]]["court_county"] == "Alcona"
+    assert cases[ids["open_case"]]["participants"][0]["party_name"] == "Jane Public"
+    assert "contact_" not in response.text
+    for court, case in [("court", "open_case"), ("closed_intake", "same_number")]:
+        filtered = await client.get("/api/v1/cases/search", params={
+            "case_number": "MI-PUB-OPEN-1", "court_id": ids[court],
+        })
+        assert filtered.status_code == 200, filtered.text
+        assert filtered.json()["total"] == 1
+        assert [item["id"] for item in filtered.json()["cases"]] == [ids[case]]
+    sealed = await client.get("/api/v1/cases/search", params={
+        "case_number": "MI-PUB-SEAL-1", "court_id": ids["court"],
+    })
+    assert sealed.json()["total"] == 0
+    assert sealed.json()["cases"] == []
+    invalid = await client.get("/api/v1/cases/search", params={"court_id": 2**31})
+    assert invalid.status_code == 422  # Reject IDs that PostgreSQL cannot represent.
 
 
 @pytest.mark.asyncio

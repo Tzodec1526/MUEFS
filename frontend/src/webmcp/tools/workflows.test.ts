@@ -23,9 +23,15 @@ beforeEach(async () => {
 it('returns choices without building a filing plan for an ambiguous search', async () => {
   vi.mocked(searchCases).mockResolvedValue({
     total: 40,
+    page: 1,
+    page_size: 25,
     cases: [
-      { id: 1, title: 'Smith A', case_number: 'A', court_id: 3 },
-      { id: 2, title: 'Smith B', case_number: 'B', court_id: 4 },
+      { id: 1, title: 'Smith A', case_number: 'A', court_id: 3, case_type_id: 7,
+        court_name: 'Court A', court_county: 'Wayne', status: 'open',
+        filed_date: '2026-09-01T12:00:00Z', filing_date: null, participants: [] },
+      { id: 2, title: 'Smith B', case_number: 'B', court_id: 4, case_type_id: 7,
+        court_name: 'Court B', court_county: 'Alcona', status: 'open',
+        filed_date: '2026-09-01T12:00:00Z', filing_date: null, participants: [] },
     ],
   });
   const result = JSON.parse(await registered.get('attorney_motion_workflow')!.execute({

@@ -1,8 +1,9 @@
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import ColumnElement, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.case import Case, CaseParticipant, CaseStatus
+from app.models.court import Court
 
 
 async def search_cases(
@@ -16,6 +17,10 @@ async def search_cases(
     page: int = 1,
     page_size: int = 25,
 ) -> tuple[list[Case], int]:
+    if (case_number or party_name) and db.get_bind().dialect.name == "postgresql":
+        # A rare name and a statewide match need different plans. Cached generic
+        # plans can make broad searches slower after adding trigram indexes.
+        await db.execute(text("SET LOCAL plan_cache_mode = force_custom_plan"))
     filters: list[ColumnElement[bool]] = [Case.is_sealed.is_(False)]
 
     if case_number:
@@ -45,7 +50,15 @@ async def search_cases(
         return [], 0
     query = (
         select(Case)
-        .options(selectinload(Case.participants))
+        .options(
+            selectinload(Case.court).load_only(Court.name, Court.county),
+            selectinload(Case.participants).load_only(
+                CaseParticipant.id, CaseParticipant.case_id, CaseParticipant.party_name,
+                CaseParticipant.role, CaseParticipant.attorney_bar_number,
+                CaseParticipant.represented_party_name, CaseParticipant.is_active,
+                raiseload=True,
+            ),
+        )
         .where(*filters)
         .order_by(Case.filed_date.desc(), Case.id.desc())
         .offset((page - 1) * page_size)

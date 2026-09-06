@@ -63,9 +63,10 @@ async def case_records(request, tmp_path, monkeypatch, stored_document):
     # Object storage is independent of the database dialect during these snapshot tests.
     monkeypatch.setattr(document_service, "_is_demo_mode", lambda: True)
     try:
-        async with engine.begin() as connection:
+        async with engine.connect() as connection:
             if connection.dialect.name == "sqlite":
                 await connection.exec_driver_sql("PRAGMA journal_mode=WAL")
+                await connection.commit()
 
             def migrate(sync_connection):
                 config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))

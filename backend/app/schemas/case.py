@@ -1,6 +1,6 @@
 from datetime import UTC, date, datetime
 
-from pydantic import BaseModel, field_serializer
+from pydantic import AliasPath, BaseModel, Field, field_serializer
 
 from app.models.case import CaseStatus, ParticipantRole
 
@@ -44,8 +44,13 @@ class CaseDocketResponse(BaseModel):
         return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
 
 
+class CaseSearchResult(CaseDocketResponse):
+    court_name: str = Field(validation_alias=AliasPath("court", "name"))
+    court_county: str = Field(validation_alias=AliasPath("court", "county"))
+
+
 class CaseSearchResponse(BaseModel):
-    cases: list[CaseDocketResponse]
+    cases: list[CaseSearchResult]
     total: int
     page: int
     page_size: int

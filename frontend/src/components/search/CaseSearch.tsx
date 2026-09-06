@@ -1,28 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Link2 } from 'lucide-react';
-import { searchCases } from '../../api/cases';
+import { CaseSearchResult, searchCases } from '../../api/cases';
+import { CourtDirectoryEntry, listCourtDirectory } from '../../api/courts';
 import { listFavorites, addFavorite, removeFavorite } from '../../api/favorites';
 import { getDemoRole } from '../auth/LoginScreen';
 import LoadError from '../common/LoadError';
 import { useToast } from '../common/Toast';
 import { formatCourtDate, parseServerDate } from '../../utils/format';
 import { logAgentActivity } from '../../webmcp/activity';
-
-interface CaseResult {
-  id: number;
-  case_number: string;
-  title: string;
-  status: string;
-  court_id: number;
-  filed_date: string;
-  filing_date: string | null;
-  participants: Array<{
-    party_name: string;
-    role: string;
-    attorney_bar_number?: string | null;
-  }>;
-}
 
 function CaseSearch() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -32,18 +18,38 @@ function CaseSearch() {
 
   const submittedPartyName = searchParams.get('party') || '';
   const submittedCaseNumber = searchParams.get('case') || '';
+  const submittedCourt = searchParams.get('court') || '';
+  const invalidCourt = Boolean(submittedCourt) && (!/^\d+$/.test(submittedCourt)
+    || Number(submittedCourt) < 1 || Number(submittedCourt) > 2_147_483_647);
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
-  const hasSearched = Boolean(submittedPartyName || submittedCaseNumber);
+  const hasSearched = Boolean(submittedPartyName || submittedCaseNumber || submittedCourt);
 
   const [caseNumber, setCaseNumber] = useState(submittedCaseNumber);
   const [partyName, setPartyName] = useState(submittedPartyName);
-  const [results, setResults] = useState<CaseResult[]>([]);
+  const [courtId, setCourtId] = useState(submittedCourt);
+  const [courts, setCourts] = useState<CourtDirectoryEntry[]>([]);
+  const [courtError, setCourtError] = useState(false);
+  const [courtReloadKey, setCourtReloadKey] = useState(0);
+  const [results, setResults] = useState<CaseSearchResult[]>([]);
   const [total, setTotal] = useState(0);
   const [searching, setSearching] = useState(false);
   const [favoritedIds, setFavoritedIds] = useState<Set<number>>(new Set());
   const [togglingFav, setTogglingFav] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    listCourtDirectory(controller.signal).then(data => {
+      if (!controller.signal.aborted) {
+        setCourts(data);
+        setCourtError(false);
+      }
+    }).catch(() => {
+      if (!controller.signal.aborted) setCourtError(true);
+    });
+    return () => controller.abort();
+  }, [courtReloadKey]);
 
   useEffect(() => {
     if (!showFavorites) return;
@@ -65,10 +71,19 @@ function CaseSearch() {
       setError(null);
       setCaseNumber(submittedCaseNumber);
       setPartyName(submittedPartyName);
+      setCourtId(submittedCourt && !invalidCourt ? String(Number(submittedCourt)) : submittedCourt);
+      if (invalidCourt) {
+        setError('The court filter in this link is invalid. Choose a court and search again.');
+        setResults([]);
+        setTotal(0);
+        setSearching(false);
+        return;
+      }
       try {
         const data = await searchCases({
           case_number: submittedCaseNumber || undefined,
           party_name: submittedPartyName || undefined,
+          court_id: submittedCourt ? Number(submittedCourt) : undefined,
           page: page,
         }, controller.signal);
         if (controller.signal.aborted) return;
@@ -85,12 +100,13 @@ function CaseSearch() {
     }
     load();
     return () => controller.abort();
-  }, [submittedCaseNumber, submittedPartyName, page, reloadKey]);
+  }, [submittedCaseNumber, submittedPartyName, submittedCourt, invalidCourt, page, reloadKey]);
 
   const handleSearch = () => {
     const next = new URLSearchParams();
     if (caseNumber.trim()) next.set('case', caseNumber.trim());
     if (partyName.trim()) next.set('party', partyName.trim());
+    if (courtId) next.set('court', courtId);
     if (next.toString() === searchParams.toString()) setReloadKey((key) => key + 1);
     else setSearchParams(next);
   };
@@ -150,12 +166,12 @@ function CaseSearch() {
       <form
         className="search-form"
         toolname="search_cases"
-        tooldescription="Search Michigan public court records by party name and case number"
+        tooldescription="Search Michigan public court records by party name, case number and court"
         onSubmit={(e) => {
           e.preventDefault();
           logAgentActivity(
             'search_cases',
-            { case_number: caseNumber, party_name: partyName, via: 'declarative_form' },
+            { case_number: caseNumber, party_name: partyName, court_id: courtId, via: 'declarative_form' },
             true,
             0,
           );
@@ -187,70 +203,92 @@ function CaseSearch() {
               toolparamdescription="Party or litigant name"
             />
           </div>
+          <div className="form-group">
+            <label htmlFor="searchCourt">Court</label>
+            <select id="searchCourt" name="court_id" value={courtId}
+              onChange={e => setCourtId(e.target.value)}
+              toolparamdescription="Optional court ID; leave blank to search all courts">
+              <option value="">All courts</option>
+              {courtId && !courts.some(court => String(court.id) === courtId) && (
+                <option value={courtId}>Selected court ({courtId})</option>
+              )}
+              {courts.map(court => (
+                <option key={court.id} value={court.id}>{court.county} — {court.name}</option>
+              ))}
+            </select>
+          </div>
           <button className="btn btn-primary" type="submit" disabled={searching}>
             {searching ? 'Searching...' : 'Search'}
           </button>
-          {(hasSearched || partyName || caseNumber) && (
+          {(hasSearched || page > 1) && (
             <button
               type="button"
               className="btn btn-secondary btn-icon"
               onClick={copyShareLink}
-              title="Copy shareable link"
+              title="Copy results link"
             >
               <Link2 size={16} aria-hidden="true" />
-              <span className="sr-only">Copy shareable link</span>
+              <span className="sr-only">Copy results link</span>
             </button>
           )}
         </div>
       </form>
 
+      {courtError && <LoadError message="We couldn't load the court list. Please retry."
+        onRetry={() => setCourtReloadKey(key => key + 1)} />}
+
       {error ? (
-        <LoadError message={error} onRetry={() => setReloadKey((key) => key + 1)} />
+        <LoadError message={error}
+          onRetry={invalidCourt ? undefined : () => setReloadKey((key) => key + 1)} />
       ) : (
         <div className="search-results">
           <h3>{hasSearched ? `Results (${total})` : 'Recent public filings'}</h3>
           {results.length > 0 ? (
-            <table>
-              <thead>
-                <tr>
-                  {showFavorites && <th className="th-fav"></th>}
-                  <th>Case Number</th>
-                  <th>Title</th>
-                  <th>Status</th>
-                  <th>Filed Date</th>
-                  <th>Parties</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((c) => (
-                  <tr key={c.id}>
-                    {showFavorites && (
-                      <td className="td-fav">
-                        <button
-                          className={`fav-btn ${favoritedIds.has(c.id) ? 'favorited' : ''}`}
-                          onClick={() => toggleFavorite(c.id)}
-                          disabled={togglingFav === c.id}
-                          title={favoritedIds.has(c.id) ? 'Remove from favorites' : 'Add to favorites'}
-                          aria-label={favoritedIds.has(c.id) ? 'Remove from favorites' : 'Add to favorites'}
-                        >
-                          {favoritedIds.has(c.id) ? '\u2605' : '\u2606'}
-                        </button>
-                      </td>
-                    )}
-                    <td><Link to={`/cases/${c.id}`}>{c.case_number}</Link></td>
-                    <td>{c.title}</td>
-                    <td>
-                      <span className={`status-badge ${c.status}`}>{c.status}</span>
-                    </td>
-                    <td>{c.filing_date ? formatCourtDate(c.filing_date)
-                      : `${parseServerDate(c.filed_date).toLocaleDateString()} (unverified)`}</td>
-                    <td>
-                      {c.participants.map((p) => `${p.party_name} (${p.role})`).join(', ')}
-                    </td>
+            <div className="case-search-table" role="region" aria-label="Case search results" tabIndex={0}>
+              <table>
+                <thead>
+                  <tr>
+                    {showFavorites && <th className="th-fav"></th>}
+                    <th>Case Number</th>
+                    <th>Court</th>
+                    <th>Title</th>
+                    <th>Status</th>
+                    <th>Filed Date</th>
+                    <th>Parties</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {results.map((c) => (
+                    <tr key={c.id}>
+                      {showFavorites && (
+                        <td className="td-fav">
+                          <button
+                            className={`fav-btn ${favoritedIds.has(c.id) ? 'favorited' : ''}`}
+                            onClick={() => toggleFavorite(c.id)}
+                            disabled={togglingFav === c.id}
+                            title={favoritedIds.has(c.id) ? 'Remove from favorites' : 'Add to favorites'}
+                            aria-label={favoritedIds.has(c.id) ? 'Remove from favorites' : 'Add to favorites'}
+                          >
+                            {favoritedIds.has(c.id) ? '\u2605' : '\u2606'}
+                          </button>
+                        </td>
+                      )}
+                      <td><Link to={`/cases/${c.id}`}>{c.case_number}</Link></td>
+                      <td>{c.court_name}<br /><small>{c.court_county}</small></td>
+                      <td>{c.title}</td>
+                      <td>
+                        <span className={`status-badge ${c.status}`}>{c.status}</span>
+                      </td>
+                      <td>{c.filing_date ? formatCourtDate(c.filing_date)
+                        : `${parseServerDate(c.filed_date).toLocaleDateString()} (unverified)`}</td>
+                      <td>
+                        {c.participants.map((p) => `${p.party_name} (${p.role})`).join(', ')}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
             <p className="info-text">
               {searching

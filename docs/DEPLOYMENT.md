@@ -58,6 +58,10 @@ and `email` client scopes: current Keycloak versions obtain the subject through 
 authentication disabled; it does not validate a state federation or its production policy.
 See [Keycloak's subject-mapper guidance](https://www.keycloak.org/docs/latest/upgrading/index.html).
 
+The PostgreSQL search migration requires `pg_trgm` in the `public` schema. The migration
+role needs database `CREATE` privilege to install it, or a database administrator must
+preinstall it. See the search migration notes below for concurrent builds and recovery.
+
 Apply migrations, then have an authorized database operator bind the first administrator
 from `backend`, using the deployment's database configuration and the exact IdP subject:
 
@@ -305,3 +309,39 @@ object store. Advisory validation performs no document reads, while submission/a
 read all current attachments in 64 KiB chunks off the event loop. Keep storage private,
 apply the court's retention/versioning policy and exercise recovery. A successful integrity
 check cannot prevent an out-of-band object replacement after the check.
+
+## 12. Public case search indexes
+
+Migration `d4e7a12b93f0` replaces the single-column case-number and party-name B-tree
+indexes with PostgreSQL GIN trigram indexes for the application's literal substring
+searches. The unique `(court_id, case_number)` constraint remains. SQLite drops the
+unused indexes and keeps the same search behavior without a PostgreSQL extension.
+
+Install `pg_trgm` in `public` before upgrading if the migration role lacks database
+`CREATE` privilege. The migration installs the extension when permitted and refuses to
+move an existing installation from another schema. Resolve that prerequisite with the
+database administrator before rollout. PostgreSQL documents the extension's
+[installation privileges and LIKE/ILIKE support](https://www.postgresql.org/docs/16/pgtrgm.html).
+
+Run `alembic upgrade head` through the normal migration connection. Indexes build
+concurrently so filing writes can continue, although the build consumes CPU, I/O and
+disk and can wait for existing transactions. Alembic now commits each migration
+separately; the concurrent index operations also commit individually. Do not wrap the
+upgrade in an external transaction. If a build fails or is interrupted, resolve its
+cause and rerun the upgrade. It retains valid completed indexes and replaces invalid
+partial builds before removing the old indexes. Downgrading this revision rebuilds the
+old indexes and leaves the shared extension installed. See
+[PostgreSQL concurrent index recovery](https://www.postgresql.org/docs/16/sql-createindex.html#SQL-CREATEINDEX-CONCURRENTLY)
+and [Alembic autocommit transactions](https://alembic.sqlalchemy.org/en/latest/api/runtime.html#alembic.runtime.migration.MigrationContext.autocommit_block).
+
+Substring searches use transaction-local custom plans: a rare surname and a name
+matching most records need different access paths. This prevents a cached generic plan
+from slowing broad searches after selective ones; the setting resets when the request
+transaction ends. Court metadata is fetched once for the displayed results, and search
+does not load participant email, telephone, address or account IDs. Broad and very short
+terms can still require substantial scanning. Measure the deployed workload, index size,
+write overhead and query plans; the synthetic measurements in `STATE_READINESS.md` are
+not a statewide capacity test.
+
+See [PostgreSQL's prepared-plan selection](https://www.postgresql.org/docs/16/sql-prepare.html)
+for the distinction between generic and parameter-specific plans.

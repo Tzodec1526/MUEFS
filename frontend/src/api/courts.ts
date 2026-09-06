@@ -15,6 +15,13 @@ export interface Court {
   is_efiling_enabled: boolean;
 }
 
+export type CourtDirectoryEntry = Pick<Court, 'id' | 'name' | 'county'>;
+
+export async function listCourtDirectory(signal?: AbortSignal): Promise<CourtDirectoryEntry[]> {
+  const { data } = await apiClient.get('/courts/directory', { signal });
+  return data;
+}
+
 export interface CaseType {
   id: number;
   court_id: number;

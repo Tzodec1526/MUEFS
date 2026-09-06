@@ -22,8 +22,41 @@ establish state approval or production readiness.
 | Send filing alerts reliably | An opt-in SMTP outbox commits with filing changes, checks verified recipients, retains messages and attempts, retries temporary failures and exposes uncertain outcomes to assigned court staff. | A court-approved relay and sender domain, bounce/delivery feedback, operational alerting and court approval of legally sufficient notice content and procedures. Generic email alerts do not establish legal service. |
 | Connect to the court's system of record | Acceptance is explicitly blocked outside demo mode when CMS integration is absent. | A documented court/vendor contract, credentialed sandbox, document/code mapping, idempotent delivery, status callbacks, error recovery and reconciliation. |
 | Operate statewide | Explicit identity provisioning, delegated court administration, immediate checks on subsequent requests after revocation, retained changes, PostgreSQL migrations and deployment guidance exist. | State federation and lifecycle integration, access recertification, availability targets, incident response, backup restoration drills, disaster recovery and migration from incumbent systems. |
+| Find public records across courts | Anonymous search filters by court and identifies each result's court and county. Shared links preserve filters and pages; courts with closed intake remain searchable. PostgreSQL substring indexes and batched court metadata improve selective searches while excluding sealed cases and participant contact fields. | Representative concurrency, data-distribution and write-load testing; independent accessibility evaluation and court-approved public-index policy. |
 | Transfer a case's retained records | A private case archive includes linked metadata, transaction history, original versions, orders, public copies, payments and notice evidence. A read-only snapshot and file fingerprints protect export consistency; offline verification detects altered or incomplete packages. | Court-controlled custody/signing, source inventory reconciliation, receiving-system mapping, approved retention and an evaluated import/restore procedure. |
 | Serve the whole public | Responsive filing and history pages, keyboard controls and guided filing exist. | Independent accessibility testing, assistive-technology testing, language access, paper-filing accommodations and usability evaluation with self-represented filers. |
+
+## Public search measurements
+
+A local PostgreSQL 16 evaluation used 250,000 synthetic cases, 500,000 participants and
+20 courts, including sealed records. Each measurement is the median of five warm runs
+after one warmup through the actual search service. These are database/service timings,
+not browser latency or a production capacity claim.
+
+| Search | Before | After | Matches |
+|---|---:|---:|---:|
+| Partial case number | 50.49 ms | 4.70 ms | 1 |
+| Selective party name | 121.21 ms | 8.67 ms | 496 |
+| Party name within one court | 82.12 ms | 7.82 ms | 25 |
+| Broad party name | 117.73 ms | 114.09 ms | 247,423 |
+| Recent public cases | 18.93 ms | 21.30 ms | 247,423 |
+| One court, no text filter | 10.20 ms | 11.96 ms | 12,371 |
+
+The final queries return the same case IDs, totals and ordering. Court metadata adds one
+batched query per populated page. Search reads only the public participant fields.
+Query plans confirm trigram index scans for selective text searches. Broad searches
+remain scan-intensive; a separate repeated-query check confirmed that transaction-local
+custom planning avoids a cached generic plan that roughly doubled their cost. The
+setting does not persist into the next transaction. Extra indexes for recent-case
+ordering showed no benefit and were not retained.
+
+Verification includes anonymous HTTP requests with duplicate case numbers across courts,
+literal wildcard searches, sealed-case exclusion, a complete directory beyond 100 courts,
+recovery from a real failed concurrent index build, and migration downgrade/re-upgrade
+with records intact. The production frontend bundle was exercised in Chromium for
+court selection, pagination, copied links, history/reload, invalid-link recovery and
+desktop/mobile layouts. None of these checks establishes statewide load capacity or
+independent accessibility conformance.
 
 ## Implemented receipt workflow
 
@@ -305,8 +338,7 @@ The order documents and append-only transaction tables are reused. An automatic 
 is refused to prevent a previous application version from ignoring retained court orders.
 Twelve workflow and PostgreSQL concurrency cases cover receipt preservation, date/version
 conflicts, publication, legacy records, resubmission, corruption, rollback and authority
-changes. The full local backend suite passes 274 tests with PostgreSQL and S3-compatible
-storage enabled. Five browser checks exercise the form, download fingerprints, acceptance,
+changes. Five browser checks exercise the form, download fingerprints, acceptance,
 stale edits, case dates and the public docket at desktop and mobile sizes.
 
 ## Filing notice email

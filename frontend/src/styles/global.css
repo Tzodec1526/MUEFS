@@ -1324,6 +1324,22 @@ tr.selected {
   box-shadow: var(--shadow-sm);
 }
 
+.search-form .form-row {
+  flex-wrap: wrap;
+}
+
+.search-form .form-group {
+  min-width: 12rem;
+}
+
+.case-search-table {
+  overflow-x: auto;
+}
+
+.case-search-table table {
+  min-width: 50rem;
+}
+
 .search-results {
   background: var(--white);
   border: 1px solid var(--gray-200);

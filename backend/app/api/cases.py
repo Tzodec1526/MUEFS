@@ -12,6 +12,7 @@ from app.models.user import CourtRole, UserCourtRole
 from app.schemas.case import (
     CaseDocketResponse,
     CaseSearchResponse,
+    CaseSearchResult,
 )
 from app.schemas.filing import CaseDocumentResponse, CaseFilingResponse
 from app.services import access_service, search_service
@@ -24,7 +25,7 @@ async def search_cases(
     case_number: str | None = None,
     party_name: str | None = None,
     attorney_bar_number: str | None = None,
-    court_id: int | None = None,
+    court_id: int | None = Query(None, ge=1, le=2_147_483_647),
     case_status: CaseStatus | None = Query(None, alias="status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
@@ -44,7 +45,7 @@ async def search_cases(
         page_size=page_size,
     )
     return CaseSearchResponse(
-        cases=[CaseDocketResponse.model_validate(c) for c in cases],
+        cases=[CaseSearchResult.model_validate(c) for c in cases],
         total=total,
         page=page,
         page_size=page_size,

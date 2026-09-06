@@ -148,7 +148,7 @@ MUEFS/
 - **Open source** — no vendor lock-in, transparent, community-driven
 
 ### For the Public & Press
-- **Open docket search** — look up any non-sealed case by number or party name, no account required
+- **Open docket search** — find non-sealed cases by partial number or party name, filter by court, and share the filtered results without an account. Results identify the court and county when numbers overlap across courts.
 - **Public document access** — download public documents on accepted filings and court-reviewed public copies, subject to case restrictions
 - **Controlled publication** — assigned staff can withdraw public access without deleting the original, earlier copies or transaction history
 

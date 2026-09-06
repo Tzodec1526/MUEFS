@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models.court import CaseType, Court, CourtType, FeeSchedule
 from app.schemas.court import (
     CaseTypeResponse,
+    CourtDirectoryEntry,
     CourtListResponse,
     CourtResponse,
     FeeScheduleResponse,
@@ -57,6 +58,15 @@ async def list_courts(
     result = await db.execute(query)
 
     return CourtListResponse(courts=list(result.scalars().all()), total=total)  # type: ignore[arg-type]
+
+
+@router.get("/directory", response_model=list[CourtDirectoryEntry])
+async def court_directory(db: AsyncSession = Depends(get_db, scope="function")):
+    # Closed efiling intake does not remove a court's existing public records.
+    result = await db.execute(
+        select(Court.id, Court.name, Court.county).order_by(Court.county, Court.name, Court.id)
+    )
+    return result.mappings().all()
 
 
 @router.get("/{court_id}", response_model=CourtResponse)

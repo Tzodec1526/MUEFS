@@ -89,12 +89,13 @@ async def postgres_sessions(request, stored_document):
     schema = f"filing_test_{uuid4().hex}"
     admin = create_async_engine(POSTGRES_URL)
     async with admin.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public"))
         await conn.execute(text(f'CREATE SCHEMA "{schema}"'))
     engine = create_async_engine(
         POSTGRES_URL, connect_args={"server_settings": {"search_path": schema}}
     )
     try:
-        async with engine.begin() as conn:
+        async with engine.connect() as conn:
             if getattr(request, "param", False):
                 from alembic.config import Config
 
@@ -110,7 +111,8 @@ async def postgres_sessions(request, stored_document):
 
                 await conn.run_sync(migrate)
             else:
-                await conn.run_sync(Base.metadata.create_all)
+                async with conn.begin():
+                    await conn.run_sync(Base.metadata.create_all)
         yield async_sessionmaker(engine, expire_on_commit=False)
     finally:
         await engine.dispose()
