@@ -1,17 +1,15 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { batchReview, getClerkQueue, reviewFiling, FilingEnvelope } from '../../api/filings';
-import { getDemoCourtName } from '../auth/LoginScreen';
+import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import DocumentDownload from '../common/DocumentDownload';
 import { formatBytes, getDocumentLabel, parseServerDate } from '../../utils/format';
 import { getErrorDetail } from '../../utils/errors';
 
 function ReviewQueue() {
-  const clerkCourtId = parseInt(localStorage.getItem('demo_court_id') || '3', 10);
-  const clerkCourtName = getDemoCourtName() || '3rd Circuit Court - Wayne County';
-
-  const [courtId] = useState(clerkCourtId);
+  const { court } = useContext(CourtContext)!;
+  const courtId = court!.court_id;
   const [filings, setFilings] = useState<FilingEnvelope[]>([]);
   const [total, setTotal] = useState(0);
   const [selectedFiling, setSelectedFiling] = useState<FilingEnvelope | null>(null);
@@ -154,6 +152,7 @@ function ReviewQueue() {
 
   return (
     <div className="clerk-review">
+      <StaffCourtSelect disabled={!!selectedFiling || actionInProgress} />
       <div className="clerk-header">
         <h2>Clerk Review Queue</h2>
         <div className="clerk-header-stats">
@@ -172,10 +171,6 @@ function ReviewQueue() {
       </div>
 
       <div className="queue-controls">
-        <div className="form-group">
-          <label>Court</label>
-          <span className="clerk-court-label">{clerkCourtName}</span>
-        </div>
         <form
           className="queue-webmcp-filter"
           toolname="get_clerk_review_queue"
@@ -329,6 +324,10 @@ function ReviewQueue() {
               <span className={`status-badge ${selectedFiling.status}`}>
                 {selectedFiling.status.replace('_', ' ')}
               </span>
+              <button type="button" className="btn btn-secondary btn-small" disabled={actionInProgress}
+                onClick={() => { setSelectedFiling(null); setReviewReason(''); setReviewError(null); }}>
+                Close review
+              </button>
             </div>
 
             <div className="detail-section">

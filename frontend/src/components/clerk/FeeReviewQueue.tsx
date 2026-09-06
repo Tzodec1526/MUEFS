@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
-import { getDemoCourtId, getDemoCourtName } from '../auth/LoginScreen';
+import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import { parseServerDate } from '../../utils/format';
 import { getErrorDetail } from '../../utils/errors';
 import LoadError from '../common/LoadError';
@@ -9,7 +9,8 @@ import LoadError from '../common/LoadError';
 interface Queue { total: number; page: number; filings: { id: number; case_title: string | null; filer_name: string; status: string; requested_at: string }[] }
 
 export default function FeeReviewQueue() {
-  const courtId = getDemoCourtId();
+  const { court } = useContext(CourtContext)!;
+  const courtId = court!.court_id;
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{ key: string; data?: Queue; error?: string }>();
@@ -23,7 +24,8 @@ export default function FeeReviewQueue() {
     return () => controller.abort();
   }, [courtId, page, key]);
   return <section>
-    <div className="page-header"><div><h2>Court fee reviews</h2><p>{getDemoCourtName()} · Requests awaiting an itemized assessment.</p></div>
+    <StaffCourtSelect />
+    <div className="page-header"><div><h2>Court fee reviews</h2><p>Requests awaiting an itemized assessment.</p></div>
       <button className="btn btn-secondary" onClick={() => setAttempt(n => n + 1)}>Refresh requests</button></div>
     <p>Reviewing fees does not submit or accept a filing. Fee waiver applications follow their separate court procedure.</p>
     {!current && <p role="status">Loading fee review requests…</p>}

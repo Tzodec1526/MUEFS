@@ -1,0 +1,82 @@
+import { createContext, Fragment, useContext, useEffect, useState, type ReactNode } from 'react';
+import { apiClient } from '../../api/client';
+import { getErrorDetail } from '../../utils/errors';
+import LoadError from '../common/LoadError';
+import {
+  applySessionFromProfile, getDemoCourtId, getDemoRole, hasSession, notifyDemoRoleChanged,
+  type CourtAssignment, type SessionProfile,
+} from './LoginScreen';
+
+interface CourtSessionState {
+  role: string | null;
+  courts: CourtAssignment[];
+  court: CourtAssignment | undefined;
+  loading: boolean;
+  error?: string;
+  selectCourt: (id: number) => void;
+  refresh: () => void;
+}
+
+export const CourtContext = createContext<CourtSessionState | null>(null);
+
+export function CourtSession({ children }: { children: ReactNode }) {
+  const signedIn = hasSession();
+  const [attempt, setAttempt] = useState(0);
+  const [selectedId, setSelectedId] = useState(getDemoCourtId);
+  const [result, setResult] = useState<{ attempt: number; courts: CourtAssignment[]; error?: string }>();
+  const current = result?.attempt === attempt ? result : undefined;
+  const courts = signedIn ? current?.courts ?? [] : [];
+  const court = courts.find(item => item.court_id === selectedId) ?? courts[0];
+
+  useEffect(() => {
+    if (!signedIn) return;
+    const controller = new AbortController();
+    apiClient.get<SessionProfile>('/auth/me', { signal: controller.signal }).then(({ data }) => {
+      if (controller.signal.aborted) return;
+      const courts = applySessionFromProfile(data);
+      setSelectedId(getDemoCourtId());
+      setResult({ attempt, courts });
+    }).catch(err => {
+      if (!controller.signal.aborted) setResult({ attempt, courts: [], error: getErrorDetail(err) || 'Could not verify court assignments.' });
+    });
+    return () => controller.abort();
+  }, [signedIn, attempt]);
+
+  function selectCourt(id: number) {
+    if (!courts.some(item => item.court_id === id)) return;
+    localStorage.setItem('demo_court_id', String(id));
+    setSelectedId(id);
+    notifyDemoRoleChanged();
+  }
+
+  return <CourtContext.Provider value={{ role: getDemoRole(), courts, court, loading: signedIn && !current,
+    error: current?.error, selectCourt, refresh: () => setAttempt(n => n + 1) }}>
+    {children}
+  </CourtContext.Provider>;
+}
+
+export function CourtWorkspace({ children }: { children: ReactNode }) {
+  const { court, loading, error, refresh } = useContext(CourtContext)!;
+  if (loading) return <p role="status">Loading court assignments…</p>;
+  if (error) return <LoadError message={error} onRetry={refresh} />;
+  if (!court) return <div className="empty-state">
+    <h2>Court assignment needed</h2>
+    <p>A clerk, judge or administrator assignment is required to use this court workspace.</p>
+    <button className="btn btn-secondary" onClick={refresh}>Refresh assignments</button>
+  </div>;
+  // Changing courts discards selections, pagination and pending reads from the prior court.
+  return <Fragment key={court.court_id}>{children}</Fragment>;
+}
+
+export function StaffCourtSelect({ disabled = false, onChange }: { disabled?: boolean; onChange?: () => void }) {
+  const { court, courts, selectCourt, refresh } = useContext(CourtContext)!;
+  return <div className="staff-court-select">
+    <div className="form-group"><label htmlFor="working-court">Working court</label>
+      <select id="working-court" value={court?.court_id ?? ''} disabled={disabled || !court}
+        onChange={event => { selectCourt(Number(event.target.value)); onChange?.(); }}>
+        {courts.map(item => <option key={item.court_id} value={item.court_id}>{item.court_name || `Court ${item.court_id}`}</option>)}
+      </select></div>
+    <button type="button" className="btn btn-secondary" disabled={disabled} onClick={refresh}>Refresh assignments</button>
+    {disabled && <p>Close the open review and wait for any action to finish before changing courts.</p>}
+  </div>;
+}

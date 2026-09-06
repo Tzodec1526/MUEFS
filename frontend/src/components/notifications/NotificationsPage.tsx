@@ -1,8 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useContext, useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { deliveryLabels, listNotifications, type NotificationItem } from '../../api/notifications';
-import { getDemoCourtId, getDemoRole } from '../auth/LoginScreen';
+import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import { getErrorDetail } from '../../utils/errors';
 import { parseServerDate } from '../../utils/format';
 import LoadError from '../common/LoadError';
@@ -72,9 +72,11 @@ function DeliveryDetails({ notice, onRetry }: { notice: NotificationItem; onRetr
 }
 
 export default function NotificationsPage() {
-  const courtId = getDemoCourtId();
-  const staff = ['clerk', 'admin'].includes(getDemoRole() || '') && courtId != null;
-  const [scope, setScope] = useState(staff ? 'court' : 'mine');
+  const { court, loading: assignmentsLoading } = useContext(CourtContext)!;
+  const courtId = court?.court_id;
+  const staff = courtId != null;
+  const [scopeChoice, setScope] = useState('court');
+  const scope = staff ? scopeChoice : 'mine';
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
@@ -87,15 +89,19 @@ export default function NotificationsPage() {
   const error = current?.error;
   const loading = !current;
   useEffect(() => {
+    if (assignmentsLoading) return;
     const controller = new AbortController();
     listNotifications(page, { court_id: scope === 'court' && courtId ? courtId : undefined,
       delivery_status: status || undefined }, controller.signal)
       .then(data => { if (!controller.signal.aborted) setResult({ key: requestKey, data }); })
       .catch(err => { if (!controller.signal.aborted) setResult({ key: requestKey, error: getErrorDetail(err) || 'Could not load notices.' }); });
     return () => controller.abort();
-  }, [page, scope, courtId, status, requestKey]);
+  }, [page, scope, courtId, status, requestKey, assignmentsLoading]);
 
   return <section className="notices-page">
+    {staff && scope === 'court' && <StaffCourtSelect disabled={selected != null} onChange={() => {
+      setPage(1); setSelected(null); setMessage('');
+    }} />}
     <div className="page-header"><div><h2>Notices &amp; email status</h2>
       <p>Read filing updates and track email attempts.</p></div>
       <button className="btn btn-secondary" onClick={() => setAttempt(n => n + 1)}>Refresh notices</button></div>

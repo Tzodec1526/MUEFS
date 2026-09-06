@@ -21,10 +21,6 @@ export function getDemoCourtId(): number | null {
   return id ? parseInt(id, 10) : null;
 }
 
-export function getDemoCourtName(): string | null {
-  return localStorage.getItem('demo_court_name');
-}
-
 interface RoleOption {
   role: string;
   label: string;
@@ -72,17 +68,16 @@ export function applyDemoRole(role: string): void {
   localStorage.setItem('administration_access', String(role === 'admin'));
   if (role === 'clerk') {
     localStorage.setItem('demo_court_id', '3');
-    localStorage.setItem('demo_court_name', '3rd Circuit Court - Wayne County');
   } else {
     localStorage.removeItem('demo_court_id');
-    localStorage.removeItem('demo_court_name');
   }
   notifyDemoRoleChanged();
 }
 
+export type CourtAssignment = { court_id: number; role: string; court_name?: string | null };
 export type SessionProfile = {
   user_type: string;
-  court_assignments?: { court_id: number; role: string; court_name?: string | null }[];
+  court_assignments?: CourtAssignment[];
 };
 
 const SHELL_ROLE_BY_USER_TYPE: Record<string, string> = {
@@ -94,22 +89,24 @@ const SHELL_ROLE_BY_USER_TYPE: Record<string, string> = {
   public: 'public',
 };
 
-export function applySessionFromProfile(profile: SessionProfile): void {
+export function applySessionFromProfile(profile: SessionProfile): CourtAssignment[] {
+  const previousCourt = getDemoCourtId();
   const role = SHELL_ROLE_BY_USER_TYPE[profile.user_type] ?? 'srl';
   localStorage.setItem('demo_role', role);
   localStorage.removeItem('demo_court_id');
-  localStorage.removeItem('demo_court_name');
   const assignments = profile.court_assignments ?? [];
   localStorage.setItem('administration_access', String(
     role === 'admin' || assignments.some(assignment => assignment.role === 'admin'),
   ));
-  const staff =
-    assignments.find((a) => a.role === 'clerk' || a.role === 'judge' || a.role === 'admin');
+  const staffCourts = [...new Map(assignments
+    .filter(a => ['clerk', 'judge', 'admin'].includes(a.role))
+    .map(a => [a.court_id, a])).values()];
+  const staff = staffCourts.find(a => a.court_id === previousCourt) ?? staffCourts[0];
   if (staff) {
     localStorage.setItem('demo_court_id', String(staff.court_id));
-    if (staff.court_name) localStorage.setItem('demo_court_name', staff.court_name);
   }
   notifyDemoRoleChanged();
+  return staffCourts;
 }
 
 function LoginScreen() {

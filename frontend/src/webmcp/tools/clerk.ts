@@ -28,7 +28,8 @@ export async function registerClerkTools(mc: ModelContext, signal?: AbortSignal)
         if (getDemoRole() !== 'clerk') {
           return toolError('Clerk role required. Use sign_in_demo_role with role clerk.');
         }
-        const courtId = getDemoCourtId() || 3;
+        const courtId = getDemoCourtId();
+        if (courtId == null) return toolError('Select an assigned court in the review queue first.');
         const status = (input.status as string) || 'all';
         const data = await getClerkQueue(courtId, (input.page as number) || 1, status);
         return toolOk({

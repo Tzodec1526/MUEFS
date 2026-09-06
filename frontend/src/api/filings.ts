@@ -256,8 +256,9 @@ export async function getClerkQueue(
   page: number = 1,
   statusFilter?: string,
   signal?: AbortSignal,
+  pageSize: number = 25,
 ): Promise<{ filings: FilingEnvelope[]; total: number }> {
-  const params: Record<string, unknown> = { court_id: courtId, page };
+  const params: Record<string, unknown> = { court_id: courtId, page, page_size: pageSize };
   if (statusFilter === 'waivers') {
     params.fee_waivers = true;
   } else if (statusFilter && statusFilter !== 'all') {

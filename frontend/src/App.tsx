@@ -1,10 +1,11 @@
-import { lazy, Suspense, useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect, useContext } from 'react';
 import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { FilePlus2, FolderOpen, Search, ClipboardCheck } from 'lucide-react';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Footer from './components/layout/Footer';
-import LoginScreen, { getDemoRole, getDemoCourtId, getDemoCourtName, hasSession } from './components/auth/LoginScreen';
+import LoginScreen, { hasSession } from './components/auth/LoginScreen';
+import { CourtContext, CourtSession, CourtWorkspace, StaffCourtSelect } from './components/auth/CourtSession';
 import PlatformStats from './components/marketing/PlatformStats';
 import MifileComparison from './components/marketing/MifileComparison';
 import { getFilingStatusCounts, getClerkQueue } from './api/filings';
@@ -40,15 +41,8 @@ function RequireRole({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function RequireClerk({ children }: { children: React.ReactNode }) {
-  if (!['clerk', 'admin'].includes(getDemoRole() || '') || getDemoCourtId() == null) {
-    return <Navigate to="/" replace />;
-  }
-  return <>{children}</>;
-}
-
 function RequireFiler({ children }: { children: React.ReactNode }) {
-  const r = getDemoRole();
+  const { role: r } = useContext(CourtContext)!;
   if (r === 'clerk' || r === 'admin' || r === 'public') {
     return <Navigate to="/" replace />;
   }
@@ -138,17 +132,22 @@ function PublicDashboard() {
 }
 
 function ClerkDashboard() {
-  const courtName = getDemoCourtName() || 'Assigned court';
-  const courtId = parseInt(localStorage.getItem('demo_court_id') || '3', 10);
+  const { court } = useContext(CourtContext)!;
+  const courtId = court!.court_id;
   const [pending, setPending] = useState<number | null>(null);
   useEffect(() => {
-    getClerkQueue(courtId, 1, 'all').then((r) => setPending(r.total)).catch(() => {});
+    const controller = new AbortController();
+    getClerkQueue(courtId, 1, 'all', controller.signal, 1).then((r) => {
+      if (!controller.signal.aborted) setPending(r.total);
+    }).catch(() => {});
+    return () => controller.abort();
   }, [courtId]);
 
   return (
     <div className="dashboard">
+      <StaffCourtSelect />
       <div className="dashboard-welcome">
-        <h2>{courtName}</h2>
+        <h2>{court!.court_name || `Court ${courtId}`}</h2>
         <p>
           Clerk Review Dashboard
           {pending !== null ? ` — ${pending} filing${pending === 1 ? '' : 's'} pending review` : ''}
@@ -175,15 +174,10 @@ function ClerkDashboard() {
 }
 
 function Dashboard() {
-  const role = getDemoRole();
+  const { role } = useContext(CourtContext)!;
   if (role === 'admin') return <Navigate to="/admin" replace />;
   if (role === 'clerk') {
-    if (getDemoCourtId() == null) return <div className="empty-state">
-      <h2>Court assignment needed</h2>
-      <p>Your account is provisioned. A court administrator must assign access before you can review filings.</p>
-      <p>Sign in again after your assignment is recorded.</p>
-    </div>;
-    return <ClerkDashboard />;
+    return <CourtWorkspace><ClerkDashboard /></CourtWorkspace>;
   }
   if (role === 'public') {
     return <PublicDashboard />;
@@ -214,6 +208,7 @@ function App() {
           path="*"
           element={
             <RequireRole>
+              <CourtSession>
               <div className="app-layout">
                 <a className="skip-link" href="#main-content">Skip to main content</a>
                 <Header />
@@ -227,18 +222,18 @@ function App() {
                         <Route path="/filings" element={<RequireFiler><MyFilings /></RequireFiler>} />
                         <Route path="/filings/:filingId/history" element={<FilingHistoryPage key={location.pathname} />} />
                         <Route path="/filings/:filingId/fees" element={<FilingFeesPage key={location.pathname} />} />
-                        <Route path="/filings/:filingId/filing-date" element={<RequireClerk><FilingDateOrderPage key={location.pathname} /></RequireClerk>} />
+                        <Route path="/filings/:filingId/filing-date" element={<CourtWorkspace><FilingDateOrderPage key={location.pathname} /></CourtWorkspace>} />
                         <Route path="/cases/search" element={<CaseSearch />} />
                         <Route path="/courts/:courtId/calendar" element={<CourtCalendarPage key={location.pathname} />} />
                         <Route path="/notifications" element={<NotificationsPage />} />
                         <Route path="/admin" element={<AdministrationPage />} />
-                        <Route path="/cases/:caseId/participants" element={<RequireClerk><CaseParticipantsPage /></RequireClerk>} />
-                        <Route path="/clerk/cases" element={<RequireClerk><CourtCaseDirectory /></RequireClerk>} />
-                        <Route path="/documents/:documentId/publication" element={<RequireClerk><DocumentPublicationPage /></RequireClerk>} />
+                        <Route path="/cases/:caseId/participants" element={<CourtWorkspace><CaseParticipantsPage /></CourtWorkspace>} />
+                        <Route path="/clerk/cases" element={<CourtWorkspace><CourtCaseDirectory /></CourtWorkspace>} />
+                        <Route path="/documents/:documentId/publication" element={<CourtWorkspace><DocumentPublicationPage /></CourtWorkspace>} />
                         <Route path="/cases/:caseId" element={<CaseDetailPage />} />
                         <Route path="/favorites" element={<RequireFiler><Favorites /></RequireFiler>} />
-                        <Route path="/clerk/queue" element={<RequireClerk><ReviewQueue /></RequireClerk>} />
-                        <Route path="/clerk/fee-reviews" element={<RequireClerk><FeeReviewQueue /></RequireClerk>} />
+                        <Route path="/clerk/queue" element={<CourtWorkspace><ReviewQueue /></CourtWorkspace>} />
+                        <Route path="/clerk/fee-reviews" element={<CourtWorkspace><FeeReviewQueue /></CourtWorkspace>} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </Suspense>
@@ -246,6 +241,7 @@ function App() {
                 </div>
                 <Footer />
               </div>
+              </CourtSession>
             </RequireRole>
           }
         />

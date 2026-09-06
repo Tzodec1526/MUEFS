@@ -3,7 +3,6 @@ import {
   applyDemoRole,
   applySessionFromProfile,
   getDemoCourtId,
-  getDemoCourtName,
   getDemoRole,
   hasSession,
 } from './LoginScreen';
@@ -37,16 +36,22 @@ describe('identity session boundaries', () => {
     expect(hasSession()).toBe(true);
   });
 
-  it('applySessionFromProfile maps clerk user_type and court assignment', () => {
+  it('keeps a selected assigned court across profile refresh and falls back after revocation', () => {
+    localStorage.setItem('demo_court_id', '9');
     applySessionFromProfile({
       user_type: 'clerk',
       court_assignments: [
+        { court_id: 3, role: 'clerk', court_name: 'Wayne Circuit' },
         { court_id: 9, role: 'clerk', court_name: 'Washtenaw Circuit' },
       ],
     });
     expect(getDemoRole()).toBe('clerk');
     expect(getDemoCourtId()).toBe(9);
-    expect(getDemoCourtName()).toBe('Washtenaw Circuit');
+    applySessionFromProfile({ user_type: 'clerk', court_assignments: [
+      { court_id: 3, role: 'clerk', court_name: 'Wayne Circuit' },
+      { court_id: 9, role: 'filer', court_name: 'Washtenaw Circuit' },
+    ] });
+    expect(getDemoCourtId()).toBe(3);
   });
 
   it('does not invent a court for real staff and removes a previous assignment', () => {
@@ -54,7 +59,6 @@ describe('identity session boundaries', () => {
     expect(getDemoCourtId()).toBe(3);
     applySessionFromProfile({ user_type: 'clerk', court_assignments: [] });
     expect(getDemoCourtId()).toBeNull();
-    expect(getDemoCourtName()).toBeNull();
     expect(localStorage.getItem('administration_access')).toBe('false');
   });
 

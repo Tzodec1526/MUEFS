@@ -1,19 +1,20 @@
+import { useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { isDemoBuild } from '../../config/demoMode';
-import { getDemoCourtId, getDemoRole, notifyDemoRoleChanged } from '../auth/LoginScreen';
+import { notifyDemoRoleChanged } from '../auth/LoginScreen';
+import { CourtContext } from '../auth/CourtSession';
 import MichiganMark from '../common/MichiganMark';
 import NotificationBell from './NotificationBell';
 import WebMcpHeaderLink from './WebMcpHeaderLink';
 
 function Header() {
   const navigate = useNavigate();
-  const role = getDemoRole();
+  const { court, role } = useContext(CourtContext)!;
 
   const handleSwitchRole = () => {
     localStorage.removeItem('demo_role');
     localStorage.removeItem('demo_user_name');
     localStorage.removeItem('demo_court_id');
-    localStorage.removeItem('demo_court_name');
     localStorage.removeItem('muefs_filing_draft');
     localStorage.removeItem('auth_token');
     localStorage.removeItem('administration_access');
@@ -56,7 +57,7 @@ function Header() {
         {role && <Link to="/">Dashboard</Link>}
         {(role === 'attorney' || role === 'srl') && <Link to="/filing/new">New Filing</Link>}
         <Link to="/cases/search">Case Search</Link>
-        {(role === 'clerk' || role === 'admin') && getDemoCourtId() != null && <Link to="/clerk/queue">Review Queue</Link>}
+        {court && <Link to="/clerk/queue">Review Queue</Link>}
       </nav>
       <div className="header-user">
         <NotificationBell />

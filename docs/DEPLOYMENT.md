@@ -76,8 +76,10 @@ to counsel's private case records.
 Every change requires a reason or authority reference. Account type changes require
 revoking existing staff assignments first. An administrator cannot change their own
 system access or court grants. A stale form must be refreshed before saving. Deactivation
-and revocation are checked by subsequent API requests; users sign in again to refresh the
-court choices displayed in their browser. These operations do not revoke already downloaded
+and revocation are checked by subsequent API requests. The court workspace's **Refresh
+assignments** control reloads authorized court choices without signing out. A removed
+selection falls back to a remaining staff court or displays the assignment-needed screen.
+These operations do not revoke already downloaded
 documents or cancel an operation that already passed authorization.
 
 ## 3. TLS & reverse proxy

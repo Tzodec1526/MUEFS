@@ -115,7 +115,8 @@ export async function registerWorkflowTools(mc: ModelContext, signal?: AbortSign
             action: { tool: 'sign_in_demo_role', role: 'clerk' },
           });
         }
-        const courtId = getDemoCourtId() || 3;
+        const courtId = getDemoCourtId();
+        if (courtId == null) return toolOk({ needs_court_assignment: true, next_url: '/clerk/queue' });
         const [submitted, review] = await Promise.all([
           getClerkQueue(courtId, 1, 'submitted'),
           getClerkQueue(courtId, 1, 'under_review'),

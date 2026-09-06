@@ -128,6 +128,8 @@ MUEFS/
 - **Step-by-step process** — no legal knowledge of e-filing procedures required
 
 ### For Court Clerks
+- **Assigned court workspace**: switch between authorized courts for filing review, fees,
+  case records and notices; refresh assignments without signing out
 - **Fee assessment queue**: inspect the filer's documents and review reason, record
   itemized charges and authority, and preserve earlier assessments and payment history
 - **Review queue** with batch accept, age tracking, and common rejection reasons

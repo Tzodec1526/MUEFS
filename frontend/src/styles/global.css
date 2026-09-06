@@ -3185,17 +3185,6 @@ textarea:focus-visible {
   .problem-comparison { grid-template-columns: 1fr; }
 }
 
-/* Clerk court label (replaces dropdown) — padding mirrors the adjacent
-   select's border + padding so both texts sit on the same line. */
-.clerk-court-label {
-  font-weight: 600;
-  color: var(--navy-800);
-  font-size: 0.95rem;
-  line-height: 1.5;
-  padding: calc(0.55rem + 1px) 0;
-  display: inline-block;
-}
-
 .michigan-outline {
   opacity: 0.95;
 }
@@ -3831,7 +3820,11 @@ textarea:focus-visible {
 @media (max-width: 800px) { .admin-workspace, .admin-directory-filter, .admin-form-grid { grid-template-columns: 1fr; } }
 
 .court-cases-page > p, .case-participants-page > p { margin-bottom: 20px; }
-.court-case-filter { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: 16px; margin: 24px 0; }
+.staff-court-select { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-bottom: 24px; }
+.staff-court-select .form-group { flex: 1 1 260px; min-width: 0; max-width: 560px; margin-bottom: 0; }
+.staff-court-select select { width: 100%; }
+.staff-court-select p { flex-basis: 100%; margin: 0; }
+.court-case-filter { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 16px; margin: 24px 0; }
 .court-case-filter .form-group { margin-bottom: 0; }
 .court-case-list { list-style: none; padding: 0; margin: 20px 0; }
 .court-case-list > li { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 0; border-bottom: 1px solid var(--gray-200); overflow-wrap: anywhere; }

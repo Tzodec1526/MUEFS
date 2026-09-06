@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { LayoutDashboard, FilePlus2, FolderOpen, Search, Star, ClipboardCheck, Bot, Mail, ShieldCheck } from 'lucide-react';
 import { webMcpStatus } from '../../webmcp';
-import { getDemoCourtId, getDemoRole } from '../auth/LoginScreen';
+import { CourtContext } from '../auth/CourtSession';
 
 function Sidebar() {
   const location = useLocation();
-  const role = getDemoRole();
-  const courtId = getDemoCourtId();
+  const { court, role } = useContext(CourtContext)!;
+  const courtId = court?.court_id;
   const [webMcpOn, setWebMcpOn] = useState(() => webMcpStatus().available);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ function Sidebar() {
   const links = allLinks.filter((link) => {
     if (link.agentOnly && !webMcpOn) return false;
     if (link.adminOnly && role !== 'admin' && localStorage.getItem('administration_access') !== 'true') return false;
-    if (link.courtOnly && courtId == null) return false;
+    if (link.courtOnly) return courtId != null;
     if (!role) return link.path === '/cases/search';
     return link.roles.includes(role);
   });

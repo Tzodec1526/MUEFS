@@ -377,6 +377,35 @@ The current frontend keeps bearer tokens in browser storage; the production iden
 must address that session design and XSS exposure. An IdP cookie does not itself establish
 an application session for this API.
 
+## Staff working across courts
+
+The dashboard, filing review queue, fee review queue, case directory and court notices
+share a working-court selection drawn from the signed-in account's verified assignments.
+Clerk, judge and court administrator grants enable the workspace, independently of the
+account's general type, including legacy grants. New appointments still require the
+existing staff provisioning checks. Multiple roles at one court produce one choice. A remembered
+court is used only while it remains assigned; no queue defaults to Wayne County.
+
+The selected court persists across navigation and reload, including calendar links.
+**Refresh assignments** reloads the profile without another sign-in. Revoked courts
+disappear, and accounts with no staff assignments get an explicit empty state. Each API
+request still checks the account's current authority for the actual record or court.
+Changing the working court does not grant access or move a filing between courts.
+
+Switching courts clears queue selections, pagination and pending reads. An open filing
+review must be closed before switching; **Close review** discards its unsaved reason.
+Selection remains disabled until an in-flight review action finishes. The dashboard
+requests one envelope when it only needs the total pending count, and court screens
+reuse the session's assignment lookup instead of fetching their own copies.
+
+Browser verification used a production frontend build, actual API authorization and
+RS256 tokens from an isolated synthetic issuer with demo authentication disabled. It
+covered two staff courts, duplicate roles, a nonstaff grant, stale responses, a court
+decision, revocation, an account with a different general type, persistence, notices,
+sealed case records and desktop/mobile layouts. The synthetic 29-item queue response
+was 25,015 bytes with 25 envelopes and 1,046 bytes with one; the total stayed 29. This
+measures response size, not production latency or statewide load capacity.
+
 ## Court-managed participants and restricted-case access
 
 **Court Cases** lists public and sealed matters only for a staff member's assigned court,
