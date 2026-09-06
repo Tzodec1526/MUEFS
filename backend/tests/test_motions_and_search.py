@@ -202,6 +202,7 @@ async def test_domesticating_subpoena_filing(db_session, stored_document):
     user, clerk, court, _, subp_type, _ = await create_court_with_case(db_session)
 
     data = FilingEnvelopeCreate(
+        filing_type="initial",
         court_id=court.id,
         case_type_id=subp_type.id,
         case_title="In re: Subpoena from State of Ohio, Case No. OH-2024-12345",
@@ -258,37 +259,6 @@ async def test_service_only_filing(db_session, stored_document):
     assert submitted is not None
     assert submitted.status == FilingStatus.SERVED
     assert submitted.submitted_at is not None
-
-
-@pytest.mark.asyncio
-async def test_service_only_requires_existing_case(db_session):
-    """Test that service-only filing requires an existing case."""
-    user, _, court, case_type, _, _ = await create_court_with_case(db_session)
-
-    data = FilingEnvelopeCreate(
-        court_id=court.id,
-        case_id=None,  # No case - should fail validation
-        case_type_id=case_type.id,
-        filing_type="service_only",
-        filing_description="Interrogatories with no case",
-    )
-    filing = await filing_service.create_filing(db_session, user.id, data)
-    doc = FilingDocument(
-        envelope_id=filing.id,
-        document_type_code="DISC_INTERROG",
-        title="Interrogatories",
-        file_key="test/interrog.pdf",
-        file_size_bytes=1024,
-        mime_type="application/pdf",
-        sha256_hash="no_case_hash",
-        is_text_searchable=True,
-    )
-    db_session.add(doc)
-    await db_session.flush()
-
-    validation = await filing_service.validate_filing(db_session, filing.id)
-    assert validation.is_valid is False
-    assert any("existing case" in e.lower() for e in validation.errors)
 
 
 # ========== CASE SEARCH TESTS ==========

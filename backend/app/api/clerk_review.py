@@ -88,12 +88,8 @@ async def review_filing(
             reason=reason,
             expected_submission_count=data.expected_submission_count,
         )
-    except filing_service.CmsSubmissionError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Court CMS rejected the filing: {exc.detail}",
-        ) from exc
     except (
+        filing_service.FilingDestinationError,
         filing_service.StaleFilingReviewError,
         filing_service.FilingDateUnavailableError,
         filing_service.FilingDocumentError,
@@ -179,7 +175,9 @@ async def batch_review_filings(
                 continue
             if f is not None and f.cms_error:
                 failure = "Court CMS submission failed. Open the filing to inspect its history."
-        except filing_service.StaleFilingReviewError as exc:
+        except (
+            filing_service.StaleFilingReviewError, filing_service.FilingDestinationError,
+        ) as exc:
             failure = str(exc)
         except Exception:
             failure = "Could not accept this filing. Open it for review."

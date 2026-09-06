@@ -55,7 +55,7 @@ async def cms_fail_app(monkeypatch, stored_document):
         await s.flush()
         env = FilingEnvelope(
             court_id=court.id, case_type_id=ct.id, filer_id=filer.id,
-            status=FilingStatus.DRAFT, case_title="CMS HTTP",
+            filing_type="initial", status=FilingStatus.DRAFT, case_title="CMS HTTP",
         )
         s.add(env)
         await s.flush()

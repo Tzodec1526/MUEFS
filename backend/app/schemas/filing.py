@@ -1,8 +1,9 @@
 from datetime import UTC, date, datetime
+from typing import Self
 
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
-from app.models.filing import FilingStatus
+from app.models.filing import FilingStatus, FilingType
 
 
 class FilingDocumentResponse(BaseModel):
@@ -25,14 +26,24 @@ class FilingDocumentResponse(BaseModel):
 
 
 class FilingEnvelopeCreate(BaseModel):
-    court_id: int
-    case_id: int | None = None  # None for new case initiation
-    case_type_id: int
-    filing_type: str = Field("subsequent", max_length=20)  # "initial", "subsequent", "service_only"
+    court_id: int = Field(ge=1, le=2_147_483_647)
+    case_id: int | None = Field(None, ge=1, le=2_147_483_647)
+    case_type_id: int = Field(ge=1, le=2_147_483_647)
+    filing_type: FilingType = FilingType.SUBSEQUENT
     case_title: str | None = Field(None, max_length=500)
     filing_description: str | None = Field(None, max_length=5000)
     fee_waiver_requested: bool = False
     fee_waiver_reason: str | None = Field(None, max_length=2000)
+
+    @model_validator(mode="after")
+    def require_matching_case_reference(self) -> Self:
+        if self.filing_type == FilingType.INITIAL and self.case_id is not None:
+            raise ValueError(
+                "An initial filing opens a new case and cannot reference an existing case"
+            )
+        if self.filing_type != FilingType.INITIAL and self.case_id is None:
+            raise ValueError("A subsequent or service-only filing must reference an existing case")
+        return self
 
 
 class FilingEnvelopeUpdate(BaseModel):

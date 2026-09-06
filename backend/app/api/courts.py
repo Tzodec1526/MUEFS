@@ -79,10 +79,14 @@ async def get_court(court_id: int, db: AsyncSession = Depends(get_db, scope="fun
 
 
 @router.get("/{court_id}/case-types", response_model=list[CaseTypeResponse])
-async def list_case_types(court_id: int, db: AsyncSession = Depends(get_db, scope="function")):
-    result = await db.execute(
-        select(CaseType).where(CaseType.court_id == court_id, CaseType.is_active == True)  # noqa: E712
-    )
+async def list_case_types(
+    court_id: int, include_inactive: bool = False,
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    query = select(CaseType).where(CaseType.court_id == court_id)
+    if not include_inactive:
+        query = query.where(CaseType.is_active.is_(True))
+    result = await db.execute(query)
     return list(result.scalars().all())
 
 

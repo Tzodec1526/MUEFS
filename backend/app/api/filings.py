@@ -51,7 +51,7 @@ async def create_filing(
     user_id = current_user.id
     try:
         envelope = await filing_service.create_filing(db, user_id, data)
-    except filing_service.FilingCreateError as exc:
+    except filing_service.FilingDestinationError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     await audit_service.log_action(
         db,
@@ -180,6 +180,10 @@ async def validate_filing(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access this filing",
         )
+    try:
+        await filing_service.validate_filing_destination(db, filing, filer_id=user_id)
+    except filing_service.FilingDestinationError as exc:
+        return FilingValidationResult(is_valid=False, errors=[exc.detail])
     return await filing_service.validate_filing(db, filing_id)
 
 
@@ -238,6 +242,8 @@ async def submit_filing(
         filing = await filing_service.submit_filing(
             db, filing_id, idempotency_key=str(idempotency_key) if idempotency_key else None,
         )
+    except filing_service.FilingDestinationError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except filing_service.FilingDocumentError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not filing:
@@ -245,10 +251,6 @@ async def submit_filing(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only draft or returned filings can be submitted",
         )
-    # Full refresh to get updated_at, then load documents relationship
-    await db.refresh(filing)
-    await db.refresh(filing, ["documents"])
-
     await audit_service.log_action(
         db,
         user_id=user_id,

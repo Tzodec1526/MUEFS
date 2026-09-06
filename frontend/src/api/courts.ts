@@ -61,8 +61,10 @@ export async function getCourt(courtId: number): Promise<Court> {
   return data;
 }
 
-export async function getCaseTypes(courtId: number): Promise<CaseType[]> {
-  const { data } = await apiClient.get(`/courts/${courtId}/case-types`);
+export async function getCaseTypes(courtId: number, includeInactive = false): Promise<CaseType[]> {
+  const { data } = await apiClient.get(`/courts/${courtId}/case-types`, {
+    params: includeInactive ? { include_inactive: true } : undefined,
+  });
   return data;
 }
 

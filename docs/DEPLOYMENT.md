@@ -345,3 +345,28 @@ not a statewide capacity test.
 
 See [PostgreSQL's prepared-plan selection](https://www.postgresql.org/docs/16/sql-prepare.html)
 for the distinction between generic and parameter-specific plans.
+
+## 13. Filing intake and destination validation
+
+The API enforces `courts.is_efiling_enabled` and `case_types.is_active` for new drafts
+and submissions. Treat changes to these flags as intake changes, with a court-approved
+process and filing alternatives communicated to users. An in-flight PostgreSQL
+submission holds shared locks until its receipt commits; a concurrent configuration
+change waits, then applies to subsequent attempts. Previously committed receipts remain
+available and idempotent retries remain valid. Closing intake does not block staff from
+finishing valid filings already received.
+
+Clients opening a new case must send `filing_type: "initial"` without a `case_id`.
+The default `subsequent` type requires a case; service-only records also require a case.
+Unknown types and inconsistent new-case/existing-case combinations return HTTP 422.
+Court, case-type and case relationships are checked independently of frontend selections.
+Saved-record displays may use `GET /api/v1/courts/{id}/case-types?include_inactive=true`
+to resolve disabled type labels; this does not enable filing into those types.
+
+No data migration is needed for these controls, and existing records are not rewritten.
+Reconcile incorrect legacy court/case/type assignments before acceptance. A rejected
+acceptance attempt sends nothing to the CMS, while return/rejection and unaffected batch
+items remain available. An inconsistent draft must be replaced with a correctly addressed
+draft or resolved through a court-approved correction process; preserve its documents
+and any earlier receipts. Exercise these paths with representative imported records
+before rollout.

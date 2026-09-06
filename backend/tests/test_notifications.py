@@ -50,7 +50,7 @@ async def test_clerk_accept_notifies_filer_in_both_review_paths(
     db_session.add(UserCourtRole(user_id=clerk.id, court_id=court.id, role=CourtRole.CLERK))
     await db_session.flush()
     filing = FilingEnvelope(court_id=court.id, case_type_id=case_type.id, filer_id=filer.id,
-                            case_title="Notification test")
+                            filing_type="initial", case_title="Notification test")
     db_session.add(filing)
     await db_session.flush()
     db_session.add(stored_document(filing.id))

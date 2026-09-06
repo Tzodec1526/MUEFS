@@ -159,7 +159,7 @@ function FilingWizard() {
           const envelope = await getFiling(Number(filingId), controller.signal);
           const [court, types] = await Promise.all([
             getCourt(envelope.court_id),
-            getCaseTypes(envelope.court_id),
+            getCaseTypes(envelope.court_id, true), // Preserve disabled case-type labels on saved records.
           ]);
           if (controller.signal.aborted) return;
           const caseType = types.find((type) => type.id === envelope.case_type_id);

@@ -1494,6 +1494,7 @@ def seed_database(reset: bool = False):
             filing5 = FilingEnvelope(
                 court_id=wayne_circuit.id,
                 case_type_id=wayne_civil.id,
+                filing_type="initial",
                 filer_id=attorney.id,
                 case_title="Anderson v. Metro Health Systems",
                 filing_description="Complaint for medical malpractice",

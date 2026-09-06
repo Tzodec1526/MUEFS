@@ -8,7 +8,7 @@ from starlette.concurrency import run_in_threadpool
 from app.config import settings
 from app.integrations.cms_adapter import submit_filing_to_cms
 from app.models.case import Case, CaseStatus
-from app.models.court import FilingRequirement
+from app.models.court import CaseType, Court, FilingRequirement
 from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.schemas.filing import (
     FilingEnvelopeCreate,
@@ -19,15 +19,9 @@ from app.services.court_calendar_service import filing_date_for_receipt
 from app.services.filing_record_service import record_transaction
 
 
-class FilingCreateError(Exception):
+class FilingDestinationError(Exception):
     def __init__(self, status_code: int, detail: str):
         self.status_code = status_code
-        self.detail = detail
-        super().__init__(detail)
-
-
-class CmsSubmissionError(Exception):
-    def __init__(self, detail: str):
         self.detail = detail
         super().__init__(detail)
 
@@ -131,20 +125,70 @@ def requirements_for_filing_type(
     return list(requirements)
 
 
+async def validate_filing_destination(
+    db: AsyncSession, data: FilingEnvelopeCreate | FilingEnvelope, *, filer_id: int | None,
+) -> Case | None:
+    """Court review checks routing; intake also checks availability and filer access."""
+    if data.filing_type not in ("initial", "subsequent", "motion", "service_only"):
+        raise FilingDestinationError(
+            409, "This record has an unsupported filing type and needs correction.",
+        )
+    if filer_id is None and data.filing_type == "service_only":
+        raise FilingDestinationError(
+            409, "A service-only record cannot be accepted as a court filing",
+        )
+    if filer_id is not None and (data.filing_type == "initial") != (data.case_id is None):
+        raise FilingDestinationError(
+            409, "The filing type does not match its case reference. Start a new draft.",
+        )
+    # Read current scalar values, even if a caller previously loaded these records.
+    # Shared locks keep configuration and case access stable until the receipt commits.
+    target = (await db.execute(
+        select(Court.is_efiling_enabled, CaseType.court_id, CaseType.is_active)
+        .select_from(Court).join(CaseType, CaseType.id == data.case_type_id)
+        .where(Court.id == data.court_id)
+        .with_for_update(read=True, of=(Court, CaseType))
+    )).one_or_none()
+    if target is None:
+        raise FilingDestinationError(404, "The selected court or case type was not found")
+    if target.court_id != data.court_id:
+        raise FilingDestinationError(400, "Case type does not belong to the selected court")
+    if filer_id is not None and not target.is_efiling_enabled:
+        raise FilingDestinationError(
+            409, "This court is not accepting electronic filings. "
+            "Contact the court for filing options.",
+        )
+    if filer_id is not None and not target.is_active:
+        raise FilingDestinationError(
+            409, "This case type is not accepting electronic filings. "
+            "Contact the court for guidance.",
+        )
+    case = None
+    if data.case_id is not None:
+        case = await db.scalar(
+            select(Case).where(Case.id == data.case_id)
+            .with_for_update(read=True)
+            .execution_options(populate_existing=True)
+        )
+        if case is None:
+            raise FilingDestinationError(404, "Case not found")
+        if filer_id is not None and not await access_service.user_may_read_case(
+            db, filer_id, data.case_id,
+        ):
+            raise FilingDestinationError(403, "Not authorized to file on this case")
+        if case.court_id != data.court_id:
+            raise FilingDestinationError(400, "Case does not belong to the selected court")
+        if case.case_type_id != data.case_type_id:
+            raise FilingDestinationError(400, "Case type does not match the selected case")
+    return case
+
+
 async def create_filing(
     db: AsyncSession,
     filer_id: int,
     data: FilingEnvelopeCreate,
 ) -> FilingEnvelope:
-    if data.case_id is not None:
-        case_row = await db.execute(select(Case).where(Case.id == data.case_id))
-        case = case_row.scalar_one_or_none()
-        if case is None:
-            raise FilingCreateError(404, "Case not found")
-        if case.court_id != data.court_id:
-            raise FilingCreateError(400, "Case does not belong to the selected court")
-        if not await access_service.user_may_read_case(db, filer_id, case.id):
-            raise FilingCreateError(403, "Not authorized to file on this case")
+    await validate_filing_destination(db, data, filer_id=filer_id)
 
     envelope = FilingEnvelope(
         court_id=data.court_id,
@@ -320,6 +364,7 @@ async def submit_filing(
     if not filing or filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
         return None
 
+    await validate_filing_destination(db, filing, filer_id=filing.filer_id)
     await verify_filing_documents(filing)
     now = datetime.now(UTC)
     filing.submitted_at = now
@@ -351,25 +396,6 @@ async def submit_filing(
     return filing
 
 
-async def _case_for_accept(db: AsyncSession, filing: FilingEnvelope, now: datetime) -> Case:
-    if filing.case_id:
-        case_row = await db.execute(select(Case).where(Case.id == filing.case_id))
-        case = case_row.scalar_one_or_none()
-        if case is None:
-            raise CmsSubmissionError("Accepted filing references a missing case")
-        return case
-    case = Case(
-        court_id=filing.court_id,
-        case_number=f"MI-{filing.court_id}-{now.strftime('%Y')}-{filing.id:06d}",
-        case_type_id=filing.case_type_id,
-        title=filing.case_title or "Untitled Case",
-        status=CaseStatus.OPEN,
-        filed_date=filing.submitted_at,
-        filing_date=filing.filing_date,
-    )
-    return case
-
-
 async def review_filing(
     db: AsyncSession,
     filing_id: int,
@@ -392,6 +418,9 @@ async def review_filing(
 
     ordered_date = (filing.filing_date_basis or {}).get("source") == "court_order"
     if action == "accept":
+        # Received filings remain reviewable after intake closes or filer access ends.
+        # Legacy/imported routing still needs checking before any CMS transmission.
+        case = await validate_filing_destination(db, filing, filer_id=None)
         court_order = None
         if ordered_date:
             basis = filing.filing_date_basis or {}
@@ -429,7 +458,16 @@ async def review_filing(
         # Acceptance can create the case. An already-open date form must be refreshed.
         filing.filing_date_version += 1
         filing.status = FilingStatus.UNDER_REVIEW
-        case = await _case_for_accept(db, filing, now)
+        if case is None:
+            case = Case(
+                court_id=filing.court_id,
+                case_number=f"MI-{filing.court_id}-{now.strftime('%Y')}-{filing.id:06d}",
+                case_type_id=filing.case_type_id,
+                title=filing.case_title or "Untitled Case",
+                status=CaseStatus.OPEN,
+                filed_date=filing.submitted_at,
+                filing_date=filing.filing_date,
+            )
         cms_result = await submit_filing_to_cms(case.case_number, filing.id)
         if not cms_result.success:
             filing.cms_error = cms_result.error_message or "CMS submission failed"

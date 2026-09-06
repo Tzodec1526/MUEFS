@@ -11,6 +11,7 @@ establish state approval or production readiness.
 |---|---|---|
 | Prove what was submitted | Each new submission has a retained transaction ID, UTC receipt time, filer name, document manifest and SHA-256 fingerprints, payment reference where present, and a downloadable receipt. A read-only recovery audit compares stored bytes and retained transaction references. | Court-approved retention schedules, trusted time monitoring, external archival controls and validation of the deployed storage/recovery configuration. |
 | Preserve corrections and decisions | Corrections create another numbered submission. Earlier document bytes remain downloadable by the filer and court staff. Acceptance, return, rejection, CMS failure and signed filing-date orders are separate retained events. | Court procedures for deciding relief, certified/file-stamped copies and court-approved retention. |
+| Route filings to the correct court and case | Creation and submission validate the filing kind, court, case type, existing case and current filer access. Intake flags are enforced by the API. Acceptance checks legacy routing before a CMS call; valid received work remains reviewable after intake closes. | Court procedures for changing intake configuration, reconciling legacy assignments and correcting a filing's destination without losing its retained evidence. |
 | Survive retries and simultaneous actions | Database commits finish before HTTP success responses. Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Review decisions identify the numbered submission the reviewer saw; an intervening resubmission invalidates that decision. Batch review uses a savepoint per filing and reports each failed item. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
 | Publish reviewed public copies | Assigned staff prepare and inspect a separate PDF and public title, explicitly publish it, and withdraw public access with retained authority/history. Originals and receipts stay intact; fee-waiver records cannot use this publication path. | Court-approved classification/redaction policy, approved review tools, storage immutability and retention schedules. |
 | Protect private material | Private envelopes and receipts require filer or court-staff access. Dockets exclude waiver application data, confidential document metadata, superseded documents and other filers' drafts. Fee-waiver documents are nonpublic even if the filer omits the checkbox. | Full classification/retention policy for every case and document type; independent security assessment. |
@@ -25,6 +26,33 @@ establish state approval or production readiness.
 | Find public records across courts | Anonymous search filters by court and identifies each result's court and county. Shared links preserve filters and pages; courts with closed intake remain searchable. PostgreSQL substring indexes and batched court metadata improve selective searches while excluding sealed cases and participant contact fields. | Representative concurrency, data-distribution and write-load testing; independent accessibility evaluation and court-approved public-index policy. |
 | Transfer a case's retained records | A private case archive includes linked metadata, transaction history, original versions, orders, public copies, payments and notice evidence. A read-only snapshot and file fingerprints protect export consistency; offline verification detects altered or incomplete packages. | Court-controlled custody/signing, source inventory reconciliation, receiving-system mapping, approved retention and an evaluated import/restore procedure. |
 | Serve the whole public | Responsive filing and history pages, keyboard controls and guided filing exist. | Independent accessibility testing, assistive-technology testing, language access, paper-filing accommodations and usability evaluation with self-represented filers. |
+
+## Filing destinations and intake
+
+New-case requests must explicitly use `filing_type: "initial"` and omit `case_id`.
+`subsequent` (the API default) and `service_only` require an existing case. New requests
+accept only those three filing kinds. Legacy `motion` records remain readable and
+reviewable; new motions use a subsequent filing with the appropriate document type.
+The selected case type must belong to the selected court and match an existing case.
+
+Creation, advisory validation and submission check the court's `is_efiling_enabled`
+and case type's `is_active` flags. Submission rechecks current routing and case access
+even if an earlier validation passed. PostgreSQL shared row locks prevent intake changes
+from crossing the receipt commit. Invalid submissions leave the draft, documents and
+submission count intact; retries of an already committed idempotency key replay the
+existing receipt even after intake closes.
+
+Acceptance rechecks court/case/type consistency for older or imported records before
+reading stored documents or calling the CMS. It does not require intake to remain open
+or the original filer to retain access. A service-only record cannot be accepted as a
+court filing. Invalid destinations produce an actionable single-review or batch error;
+return and rejection remain available, and valid batch items can complete. These checks
+do not silently repair existing records or change their retained receipts.
+
+Saved filings keep their case-type label when that type is disabled. New filing choices
+still list active types only. API, PostgreSQL concurrency and rendered browser checks
+cover these boundaries, including configuration changes after validation, stale database
+reads, receipt replay, case restrictions and partial batch failure.
 
 ## Public search measurements
 

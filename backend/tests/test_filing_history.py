@@ -214,6 +214,7 @@ async def test_failed_batch_item_rolls_back_its_records_only(
         case_type_id=original.case_type_id,
         filer_id=filer,
         case_title="Second",
+        filing_type="initial",
     )
     db_session.add(second)
     await db_session.flush()

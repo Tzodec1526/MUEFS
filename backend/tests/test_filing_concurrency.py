@@ -142,6 +142,107 @@ async def prepare_filing(factory):
     return fid, filer, clerk
 
 
+async def test_submission_refreshes_previously_read_intake_configuration(postgres_sessions):
+    from app.models.court import Court
+    from app.models.filing import FilingEnvelope
+
+    fid, _filer, _clerk = await prepare_filing(postgres_sessions)
+    async with postgres_sessions.begin() as db:
+        filing = await db.get(FilingEnvelope, fid)
+        old_court = await db.get(Court, filing.court_id)
+        assert old_court.is_efiling_enabled
+        async with postgres_sessions.begin() as operator:
+            await operator.execute(text("UPDATE courts SET is_efiling_enabled=false WHERE id=:id"),
+                                   {"id": old_court.id})
+        with pytest.raises(filing_service.FilingDestinationError, match="not accepting"):
+            await filing_service.submit_filing(db, fid)
+        assert filing.submitted_at is None
+        assert filing.submission_count == 0
+        assert await db.scalar(select(func.count()).select_from(FilingTransaction)) == 0
+
+
+@pytest.mark.parametrize("postgres_sessions", [True], indirect=True)
+@pytest.mark.parametrize("configuration", ["court", "case_type"])
+async def test_intake_change_waits_for_submission_to_commit(
+    postgres_sessions, monkeypatch, configuration,
+):
+    from httpx import ASGITransport, AsyncClient
+
+    from app.models.filing import FilingEnvelope
+
+    fid, filer, _clerk = await prepare_filing(postgres_sessions)
+    async with postgres_sessions() as db:
+        filing = await db.get(FilingEnvelope, fid)
+        court_id, case_type_id = filing.court_id, filing.case_type_id
+    reached_storage, release, changing = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    verify = filing_service.verify_filing_documents
+
+    async def pause_after_intake(filing):
+        await verify(filing)
+        reached_storage.set()
+        await release.wait()
+
+    monkeypatch.setattr(filing_service, "verify_filing_documents", pause_after_intake)
+
+    async def database():
+        async with postgres_sessions.begin() as db:
+            yield db
+
+    changing_pid = None
+
+    async def close_intake():
+        nonlocal changing_pid
+        async with postgres_sessions.begin() as db:
+            changing_pid = await db.scalar(text("SELECT pg_backend_pid()"))
+            changing.set()
+            sql, target = (
+                ("UPDATE courts SET is_efiling_enabled=false WHERE id=:id", court_id)
+                if configuration == "court" else
+                ("UPDATE case_types SET is_active=false WHERE id=:id", case_type_id)
+            )
+            await db.execute(text(sql), {"id": target})
+
+    app.dependency_overrides[get_db] = database
+    pending = []
+    try:
+        async with AsyncClient(transport=ASGITransport(app), base_url="http://test",
+                               headers={"X-Demo-User-Id": str(filer)}) as client:
+            key = {"Idempotency-Key": str(uuid4())}
+            submission = asyncio.create_task(
+                client.post(f"/api/v1/filings/{fid}/submit", headers=key)
+            )
+            pending.append(submission)
+            await asyncio.wait_for(reached_storage.wait(), 5)
+            closure = asyncio.create_task(close_intake())
+            pending.append(closure)
+            await asyncio.wait_for(changing.wait(), 5)
+            async with asyncio.timeout(5), postgres_sessions() as observer:
+                while not await observer.scalar(text("SELECT cardinality(pg_blocking_pids(:pid))"),
+                                                {"pid": changing_pid}):
+                    await asyncio.sleep(0.01)
+            assert not closure.done()
+            release.set()
+            response, _ = await asyncio.wait_for(asyncio.gather(submission, closure), 10)
+            assert response.status_code == 200, response.text
+            replay = await client.post(f"/api/v1/filings/{fid}/submit", headers=key)
+            assert replay.status_code == 200, replay.text
+            assert replay.json() == response.json()
+            new_draft = await client.post("/api/v1/filings", json={
+                "court_id": court_id, "case_type_id": case_type_id,
+                "filing_type": "initial", "case_title": "After intake closure",
+            })
+            assert new_draft.status_code == 409, new_draft.text
+        async with postgres_sessions() as db:
+            assert await db.scalar(select(func.count()).select_from(FilingTransaction)) == 1
+    finally:
+        release.set()
+        for task in pending:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+        app.dependency_overrides.pop(get_db, None)
+
+
 @pytest.mark.parametrize("postgres_sessions", [True], indirect=True)
 @pytest.mark.parametrize("operation", ["request", "assess", "pay"])
 async def test_concurrent_fee_actions_record_once(postgres_sessions, operation):

@@ -52,6 +52,7 @@ async def test_create_filing(db_session):
     user, court, case_type = await create_test_fixtures(db_session)
 
     data = FilingEnvelopeCreate(
+        filing_type="initial",
         court_id=court.id,
         case_type_id=case_type.id,
         case_title="Smith v. Jones",
@@ -73,6 +74,7 @@ async def test_filing_lifecycle(db_session, stored_document):
 
     # Create
     data = FilingEnvelopeCreate(
+        filing_type="initial",
         court_id=court.id,
         case_type_id=case_type.id,
         case_title="Test Case",
@@ -120,6 +122,7 @@ async def test_reject_filing(db_session, stored_document):
     user, court, case_type = await create_test_fixtures(db_session)
 
     data = FilingEnvelopeCreate(
+        filing_type="initial",
         court_id=court.id,
         case_type_id=case_type.id,
         case_title="Test Rejection",
@@ -162,6 +165,7 @@ async def test_list_filings(db_session):
     # Create multiple filings
     for i in range(3):
         data = FilingEnvelopeCreate(
+            filing_type="initial",
             court_id=court.id,
             case_type_id=case_type.id,
             case_title=f"Case {i}",
@@ -179,6 +183,7 @@ async def test_validate_filing_no_documents(db_session):
     user, court, case_type = await create_test_fixtures(db_session)
 
     data = FilingEnvelopeCreate(
+        filing_type="initial",
         court_id=court.id,
         case_type_id=case_type.id,
         case_title="No Docs Case",
@@ -263,7 +268,7 @@ async def test_create_filing_on_sealed_case_denied_to_stranger(db_session):
         case_id=case.id,
         case_title="Should not attach",
     )
-    with pytest.raises(filing_service.FilingCreateError) as exc:
+    with pytest.raises(filing_service.FilingDestinationError) as exc:
         await filing_service.create_filing(db_session, stranger.id, data)
     assert exc.value.status_code == 403
     assert await db_session.get(Case, case.id)
@@ -277,6 +282,7 @@ async def test_accept_does_not_mark_accepted_when_cms_fails(
 ):
     user, court, case_type = await create_test_fixtures(db_session)
     data = FilingEnvelopeCreate(
+        filing_type="initial",
         court_id=court.id,
         case_type_id=case_type.id,
         case_title="CMS Fail",
@@ -310,6 +316,7 @@ async def test_accept_does_not_mark_accepted_when_cms_fails(
 async def test_accept_does_not_decide_requested_fee_waiver(db_session, stored_document):
     user, court, case_type = await create_test_fixtures(db_session)
     data = FilingEnvelopeCreate(
+        filing_type="initial",
         court_id=court.id,
         case_type_id=case_type.id,
         case_title="IFP",
