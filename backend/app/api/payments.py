@@ -20,7 +20,7 @@ router = APIRouter(prefix="/payments", tags=["Payments"])
 async def process_payment(
     request: Request,
     data: PaymentProcessRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id

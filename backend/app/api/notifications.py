@@ -31,7 +31,7 @@ async def list_notifications(
     page_size: int = Query(25, ge=1, le=100),
     court_id: int | None = None,
     delivery_status: DeliveryStatus | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     if court_id is None:
@@ -105,7 +105,7 @@ async def _notice_for_viewer(
 async def delivery_history(
     notice_id: int,
     page: int = Query(1, ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     notice, staff = await _notice_for_viewer(db, notice_id, user_id)
@@ -153,7 +153,7 @@ async def delivery_history(
 async def retry_delivery(
     notice_id: int,
     data: RetryRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     notice, staff = await _notice_for_viewer(db, notice_id, user_id, lock=True)

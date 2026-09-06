@@ -24,7 +24,7 @@ async def court_cases(
     court_id: int,
     case_number: str | None = Query(default=None, max_length=50),
     before_id: int | None = Query(default=None, ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(get_current_user),
 ):
     if not await access_service.user_is_court_staff_for_court(db, actor.id, court_id):
@@ -54,7 +54,7 @@ async def court_cases(
 async def participant_records(
     case_id: int,
     page: int = Query(1, ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(get_current_user),
 ):
     case = await participants.require_case_staff(db, actor, case_id)
@@ -104,7 +104,7 @@ async def add_participant(
     case_id: int,
     data: ParticipantChange,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(get_current_user),
 ):
     async with db.begin_nested():
@@ -125,7 +125,7 @@ async def update_participant(
     participant_id: int,
     data: ParticipantChange,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(get_current_user),
 ):
     async with db.begin_nested():
@@ -144,7 +144,7 @@ async def update_participant(
 async def participant_history(
     case_id: int,
     page: int = Query(1, ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(get_current_user),
 ):
     await participants.require_case_staff(db, actor, case_id)

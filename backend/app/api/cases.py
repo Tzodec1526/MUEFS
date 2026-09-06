@@ -28,7 +28,7 @@ async def search_cases(
     case_status: CaseStatus | None = Query(None, alias="status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _user_id: int | None = Depends(get_optional_user_id),
 ):
     """Public court-records search — no account required. Sealed matters are excluded
@@ -54,7 +54,7 @@ async def search_cases(
 @router.get("/{case_id}", response_model=CaseDocketResponse)
 async def get_case(
     case_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int | None = Depends(get_optional_user_id),
 ):
     """Public docket for a single case. Non-sealed: open to anyone; sealed: restricted."""
@@ -79,7 +79,7 @@ async def get_case_filings(
     case_id: int,
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int | None = Depends(get_optional_user_id),
 ):
     if not await access_service.user_may_read_case(db, user_id, case_id):

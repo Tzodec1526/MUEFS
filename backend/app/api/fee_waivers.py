@@ -31,7 +31,7 @@ async def decide_fee_waiver(
     reason: str = Form("", max_length=5000),
     amount_due_cents: int | None = Form(None, ge=0, le=100_000_000),
     file: UploadFile | None = File(None),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     filing = await filing_service.get_filing(db, filing_id, for_update=True)

@@ -24,6 +24,7 @@ class Base(DeclarativeBase):
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """Use function scope so commit failures can prevent a successful HTTP response."""
     async with async_session() as session:
         try:
             yield session

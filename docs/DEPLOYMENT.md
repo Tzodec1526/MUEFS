@@ -109,6 +109,22 @@ verify the deployed callback in a browser. See
 - **Object storage:** MinIO or S3 with scoped credentials. Enable bucket versioning and a
   backup/lifecycle policy for filed documents.
 
+The API requires FastAPI **0.121.1 or newer**. Its database dependencies explicitly use
+`Depends(get_db, scope="function")`, including authentication, so the shared transaction
+commits and releases its connection before response delivery. Keep that scope when adding
+routes or overriding the dependency; the default request scope finalizes after the response.
+See [FastAPI's dependency lifecycle](https://fastapi.tiangolo.com/advanced/advanced-dependencies/#dependencies-with-yield-and-scope).
+
+A commit failure produces an error response rather than a provisional success. A timeout
+or connection loss can still leave the client unsure whether a commit completed; reuse
+the original submission `Idempotency-Key` and inspect its retained history when retrying.
+This local database guarantee does not establish atomic delivery to a downstream CMS.
+
+Downloads open storage after the authorization/audit transaction commits, read in 64 KiB
+chunks, and close the stream on completion or disconnect. A slow client therefore does
+not retain a database connection. The committed download audit records an authorized
+access attempt; it does not prove that the client received every byte.
+
 Use the [storage recovery audit](STORAGE_RECOVERY.md) on a quiescent restored database and
 matching objects. It checks archived originals, private decisions, all prepared public
 copies and retained transaction fingerprints with read-only credentials. Require a complete

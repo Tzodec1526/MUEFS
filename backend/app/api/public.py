@@ -14,7 +14,7 @@ router = APIRouter(prefix="/public", tags=["Public"])
 
 
 @router.get("/stats")
-async def get_public_platform_stats(db: AsyncSession = Depends(get_db)):
+async def get_public_platform_stats(db: AsyncSession = Depends(get_db, scope="function")):
     """Aggregate counts for the demo landing — no auth, no PII."""
     total_courts = (
         await db.execute(

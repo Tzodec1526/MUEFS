@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Michigan Unified E-Filing System - Backend API"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi>=0.115.0",
+    "fastapi>=0.121.1",
     "uvicorn[standard]>=0.30.0",
     "sqlalchemy[asyncio]>=2.0.30",
     "asyncpg>=0.29.0",

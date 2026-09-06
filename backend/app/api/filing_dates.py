@@ -48,7 +48,7 @@ def _order_block(filing: FilingEnvelope) -> str | None:
 @router.get("/{filing_id}/filing-date")
 async def filing_date_state(
     filing_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     filing = await _date_filing(db, user_id, filing_id)
@@ -86,7 +86,7 @@ async def record_filing_date_order(
     update_case_date: bool = Form(False),
     expected_case_version: int | None = Form(None, ge=0),
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     authority_reference, reason = authority_reference.strip(), reason.strip()

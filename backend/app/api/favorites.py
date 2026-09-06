@@ -55,7 +55,7 @@ class FavoriteCourtListResponse(BaseModel):
 
 @router.get("", response_model=FavoriteCaseListResponse)
 async def list_favorites(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
@@ -85,7 +85,7 @@ async def list_favorites(
 @router.post("", response_model=FavoriteCaseResponse, status_code=status.HTTP_201_CREATED)
 async def add_favorite(
     data: FavoriteCaseCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
@@ -125,7 +125,7 @@ async def add_favorite(
 @router.delete("/{case_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_favorite(
     case_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
@@ -147,7 +147,7 @@ async def remove_favorite(
 
 @router.get("/courts", response_model=FavoriteCourtListResponse)
 async def list_favorite_courts(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     result = await db.execute(
@@ -177,7 +177,7 @@ async def list_favorite_courts(
 @router.post("/courts", response_model=FavoriteCourtResponse, status_code=status.HTTP_201_CREATED)
 async def add_favorite_court(
     data: FavoriteCourtCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
@@ -217,7 +217,7 @@ async def add_favorite_court(
 @router.delete("/courts/{court_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_favorite_court(
     court_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id

@@ -11,7 +11,7 @@ establish state approval or production readiness.
 |---|---|---|
 | Prove what was submitted | Each new submission has a retained transaction ID, UTC receipt time, filer name, document manifest and SHA-256 fingerprints, payment reference where present, and a downloadable receipt. A read-only recovery audit compares stored bytes and retained transaction references. | Court-approved retention schedules, trusted time monitoring, external archival controls and validation of the deployed storage/recovery configuration. |
 | Preserve corrections and decisions | Corrections create another numbered submission. Earlier document bytes remain downloadable by the filer and court staff. Acceptance, return, rejection, CMS failure and signed filing-date orders are separate retained events. | Court procedures for deciding relief, certified/file-stamped copies and court-approved retention. |
-| Survive retries and simultaneous actions | Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Review decisions identify the numbered submission the reviewer saw; an intervening resubmission invalidates that decision. Batch review uses a savepoint per filing and reports each failed item. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
+| Survive retries and simultaneous actions | Database commits finish before HTTP success responses. Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Review decisions identify the numbered submission the reviewer saw; an intervening resubmission invalidates that decision. Batch review uses a savepoint per filing and reports each failed item. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
 | Publish reviewed public copies | Assigned staff prepare and inspect a separate PDF and public title, explicitly publish it, and withdraw public access with retained authority/history. Originals and receipts stay intact; fee-waiver records cannot use this publication path. | Court-approved classification/redaction policy, approved review tools, storage immutability and retention schedules. |
 | Protect private material | Private envelopes and receipts require filer or court-staff access. Dockets exclude waiver application data, confidential document metadata, superseded documents and other filers' drafts. Fee-waiver documents are nonpublic even if the filer omits the checkbox. | Full classification/retention policy for every case and document type; independent security assessment. |
 | Control case participation and access | Assigned staff record participants, counsel representation and explicit restricted-case grants with retained reasons, before/after history, stale-edit checks and revocation. Filing acceptance no longer assigns party roles or grants case access. | Court-approved access rules, review of legacy records, CMS appearance/withdrawal synchronization, limited-scope representation and service enrollment. |
@@ -28,8 +28,9 @@ establish state approval or production readiness.
 ## Implemented receipt workflow
 
 1. The filer submits an envelope. The application commits its status, receipt and in-app
-   notice together. The receipt preserves the submitted document metadata and payment
-   reference rather than reading those fields from the subsequently edited envelope.
+   notice together before sending a successful HTTP response. The receipt preserves the
+   submitted document metadata and payment reference rather than reading those fields
+   from the subsequently edited envelope.
 2. The filer opens **Receipts & history** from My Filings, the submission confirmation or
    a notification. Court staff can open the same history from the review queue.
 3. A returned filing can be corrected. Removing a previously submitted document removes
@@ -90,6 +91,12 @@ Behavioral coverage lives in:
   model-created and Alembic-migrated schemas.
 - `backend/tests/test_filing_migration.py`: upgrades preserve legacy filings and documents
   without fabricating old receipts. Repeated startup does not duplicate the migration.
+- `backend/tests/test_request_transactions.py`: real PostgreSQL deferred commit failures,
+  receipt visibility when HTTP headers are sent, idempotent retries, a paused transfer
+  sharing a one-connection pool, and cleanup when its client disconnects. These tests use
+  the application's transaction dependency instead of replacing its commit behavior.
+- `backend/tests/test_demo_isolation.py`: real API requests use the demo database override,
+  commit to the visitor's copy, and keep another visitor and the template unchanged.
 
 Run `pytest tests/` from `backend`. Set `MUEFS_TEST_POSTGRES_URL` to a disposable PostgreSQL
 database to include concurrency checks; each test creates and removes its own schema. CI

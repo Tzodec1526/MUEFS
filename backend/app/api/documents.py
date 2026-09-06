@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.background import BackgroundTask
-from starlette.concurrency import run_in_threadpool
+from starlette.concurrency import iterate_in_threadpool, run_in_threadpool
+from starlette.types import Receive, Scope, Send
 
 from app.api.auth import get_optional_user_id
 from app.database import get_db
@@ -28,36 +28,43 @@ def sanitize_filename(filename: str) -> str:
     return filename or "document"
 
 
-async def document_response(doc: FilingDocument | DocumentPublicCopy):
-    try:
-        file_stream = await run_in_threadpool(document_service.download_document, doc.file_key)
-    except OSError as exc:
-        raise HTTPException(404, "Document file is unavailable") from exc
-    safe_filename = sanitize_filename(doc.title)
-    extension = mimetypes.guess_extension(doc.mime_type) or ""
-    if extension and not safe_filename.lower().endswith(extension):
-        safe_filename += extension
+class DocumentResponse(StreamingResponse):
+    """Open storage after the request transaction commits, and close it on disconnect."""
 
-    def chunks():
-        with closing(file_stream):
+    def __init__(self, doc: FilingDocument | DocumentPublicCopy):
+        self.file_key = doc.file_key
+        safe_filename = sanitize_filename(doc.title)
+        extension = mimetypes.guess_extension(doc.mime_type) or ""
+        if extension and not safe_filename.lower().endswith(extension):
+            safe_filename += extension
+        super().__init__(
+            content=(), media_type=doc.mime_type,
+            headers={
+                "Content-Disposition": f"attachment; filename*=UTF-8''{quote(safe_filename)}",
+                "Cache-Control": "private, no-store",
+            },
+        )
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        try:
+            file_stream = await run_in_threadpool(document_service.download_document, self.file_key)
+        except OSError as exc:
+            raise HTTPException(404, "Document file is unavailable") from exc
+
+        def chunks():
             while chunk := file_stream.read(64 * 1024):
                 yield chunk
 
-    return StreamingResponse(
-        chunks(), media_type=doc.mime_type,
-        headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(safe_filename)}",
-            "Cache-Control": "private, no-store",
-        },
-        background=BackgroundTask(file_stream.close),
-    )
+        with closing(file_stream):
+            self.body_iterator = iterate_in_threadpool(chunks())
+            await super().__call__(scope, receive, send)
 
 
 @router.get("/{document_id}/download")
 async def download_document(
     request: Request,
     document_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int | None = Depends(get_optional_user_id),
 ):
     """Public download for non-confidential documents on non-sealed, accepted
@@ -86,13 +93,13 @@ async def download_document(
         user_agent=client_user_agent(request),
     )
 
-    return await document_response(doc)
+    return DocumentResponse(doc)
 
 
 @router.get("/{document_id}/verify", response_model=DocumentVerifyResponse)
 async def verify_document(
     document_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int | None = Depends(get_optional_user_id),
 ):
     result = await db.execute(

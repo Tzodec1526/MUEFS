@@ -50,7 +50,7 @@ async def _require_admin(
 
 @router.get("/stats")
 async def get_system_stats(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(_require_admin),
 ):
     totals = await db.execute(
@@ -81,7 +81,7 @@ async def get_audit_log(
     user_id: int | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(_require_admin),
 ):
     query = select(AuditLog).order_by(AuditLog.timestamp.desc(), AuditLog.id.desc())
@@ -119,7 +119,7 @@ async def get_audit_log(
 
 @router.get("/access")
 async def administration_access(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     system_admin = current_user.user_type == UserType.ADMIN
@@ -201,7 +201,7 @@ async def list_accounts(
     court_id: int | None = None,
     email: str | None = Query(default=None, max_length=255),
     page: int = Query(1, ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     if court_id is None:
@@ -242,7 +242,7 @@ async def list_accounts(
 async def provision_account(
     data: AccountChange,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     async with _administration_transaction(db):
@@ -263,7 +263,7 @@ async def change_account(
     user_id: int,
     data: AccountUpdate,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     async with _administration_transaction(db):
@@ -286,7 +286,7 @@ async def change_role(
     user_id: int,
     data: CourtRoleChange,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     async with _administration_transaction(db):
@@ -313,7 +313,7 @@ async def account_history(
     user_id: int,
     court_id: int | None = None,
     page: int = Query(1, ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
     if court_id is None:

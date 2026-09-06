@@ -45,7 +45,7 @@ router = APIRouter(prefix="/filings", tags=["Filings"])
 async def create_filing(
     request: Request,
     data: FilingEnvelopeCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
@@ -70,7 +70,7 @@ async def list_filings(
     status_filter: FilingStatus | None = Query(None, alias="status"),
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     filings, total, status_counts = await filing_service.list_filings(
@@ -91,7 +91,7 @@ async def list_filings(
 
 @router.get("/summary", response_model=dict[FilingStatus, int])
 async def filing_summary(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     return await filing_service.get_filing_status_counts(db, user_id)
@@ -100,7 +100,7 @@ async def filing_summary(
 @router.get("/{filing_id}", response_model=FilingEnvelopeResponse)
 async def get_filing(
     filing_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     filing = await filing_service.get_filing(db, filing_id)
@@ -122,7 +122,7 @@ async def get_filing(
 async def update_filing(
     filing_id: int,
     data: FilingEnvelopeUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
@@ -168,7 +168,7 @@ async def update_filing(
 @router.post("/{filing_id}/validate", response_model=FilingValidationResult)
 async def validate_filing(
     filing_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
@@ -187,7 +187,7 @@ async def validate_filing(
 async def submit_filing(
     request: Request,
     filing_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
     idempotency_key: uuid.UUID | None = Header(None),
 ):
@@ -269,7 +269,7 @@ async def upload_document(
     document_type_code: str = Form(...),
     title: str = Form(...),
     is_confidential: bool = Form(False),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
@@ -314,7 +314,7 @@ async def remove_document(
     request: Request,
     filing_id: int,
     document_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
@@ -364,7 +364,7 @@ async def filing_history(
     filing_id: int,
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     filing = await db.get(FilingEnvelope, filing_id)

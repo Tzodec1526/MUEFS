@@ -36,7 +36,7 @@ async def _resolve_demo_user_id(db: AsyncSession, x_demo_user_id: int) -> int:
 
 
 async def get_current_user_id(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     authorization: str | None = Header(None),
     x_demo_user_id: int | None = Header(default=None, alias="X-Demo-User-Id"),
     x_demo_auth_secret: str | None = Header(default=None, alias="X-Demo-Auth-Secret"),
@@ -101,7 +101,7 @@ async def get_current_user_id(
 
 
 async def get_optional_user_id(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     authorization: str | None = Header(None),
     x_demo_user_id: int | None = Header(default=None, alias="X-Demo-User-Id"),
     x_demo_auth_secret: str | None = Header(default=None, alias="X-Demo-Auth-Secret"),
@@ -147,7 +147,7 @@ async def get_optional_user_id(
 
 
 async def get_current_user(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ) -> User:
     result = await db.execute(select(User).where(User.id == user_id))
@@ -181,7 +181,7 @@ async def lock_current_user(db: AsyncSession, user_id: int) -> User:
 @router.get("/me", response_model=UserProfile)
 async def get_profile(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(UserCourtRole, Court.name)
@@ -199,7 +199,7 @@ async def get_profile(
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register_user(
     data: UserCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     # Court production: self-registration off; identities come from IdP or admin invite.
     if not settings.allow_public_registration and not settings.allow_demo_mode:

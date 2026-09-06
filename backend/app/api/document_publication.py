@@ -10,7 +10,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.api.auth import get_current_user, get_optional_user_id
 from app.api.document_upload import inspect_upload
-from app.api.documents import document_response
+from app.api.documents import DocumentResponse
 from app.database import get_db
 from app.models.audit import AuditLog
 from app.models.document_public_copy import DocumentPublicCopy
@@ -28,7 +28,7 @@ router = APIRouter(tags=["Document publication"])
 async def publication_state(
     document_id: int,
     page: int = Query(1, ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(get_current_user),
 ):
     doc, filing = await publication.document_context(db, actor, document_id)
@@ -65,7 +65,7 @@ async def prepare_copy(
     request: Request,
     title: str = Form(..., min_length=1, max_length=500),
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(get_current_user),
 ):
     title = title.strip()
@@ -124,7 +124,7 @@ async def publish_copy(
     document_id: int,
     data: PublishCopy,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(get_current_user),
 ):
     async with db.begin_nested():
@@ -143,7 +143,7 @@ async def withhold_document(
     document_id: int,
     data: WithholdDocument,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(get_current_user),
 ):
     async with db.begin_nested():
@@ -161,7 +161,7 @@ async def withhold_document(
 async def publication_history(
     document_id: int,
     page: int = Query(1, ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(get_current_user),
 ):
     await publication.document_context(db, actor, document_id)
@@ -203,7 +203,7 @@ async def publication_history(
 async def download_public_copy(
     copy_id: int,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int | None = Depends(get_optional_user_id),
 ):
     copy = await db.get(DocumentPublicCopy, copy_id)
@@ -220,4 +220,4 @@ async def download_public_copy(
         ip_address=client_ip(request),
         user_agent=client_user_agent(request),
     )
-    return await document_response(copy)
+    return DocumentResponse(copy)

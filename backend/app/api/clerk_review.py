@@ -35,7 +35,7 @@ async def get_review_queue(
     page_size: int = Query(25, ge=1, le=100),
     status_filter: FilingStatus | None = Query(None, alias="status"),
     fee_waivers: bool = Query(False),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     await _require_clerk_role(db, user_id, court_id)
@@ -54,7 +54,7 @@ async def review_filing(
     request: Request,
     filing_id: int,
     data: ClerkReviewRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     if data.action not in ("accept", "reject", "return"):
@@ -136,7 +136,7 @@ async def review_filing(
 async def batch_review_filings(
     request: Request,
     data: BatchReviewRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     """Batch accept filings (UI multi-select).

@@ -23,7 +23,7 @@ async def list_courts(
     efiling_only: bool = True,
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     filters = []
     if county:
@@ -60,7 +60,7 @@ async def list_courts(
 
 
 @router.get("/{court_id}", response_model=CourtResponse)
-async def get_court(court_id: int, db: AsyncSession = Depends(get_db)):
+async def get_court(court_id: int, db: AsyncSession = Depends(get_db, scope="function")):
     result = await db.execute(select(Court).where(Court.id == court_id))
     court = result.scalar_one_or_none()
     if not court:
@@ -69,7 +69,7 @@ async def get_court(court_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{court_id}/case-types", response_model=list[CaseTypeResponse])
-async def list_case_types(court_id: int, db: AsyncSession = Depends(get_db)):
+async def list_case_types(court_id: int, db: AsyncSession = Depends(get_db, scope="function")):
     result = await db.execute(
         select(CaseType).where(CaseType.court_id == court_id, CaseType.is_active == True)  # noqa: E712
     )
@@ -77,7 +77,7 @@ async def list_case_types(court_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{court_id}/fee-schedules", response_model=list[FeeScheduleResponse])
-async def list_fee_schedules(court_id: int, db: AsyncSession = Depends(get_db)):
+async def list_fee_schedules(court_id: int, db: AsyncSession = Depends(get_db, scope="function")):
     result = await db.execute(
         select(FeeSchedule).where(
             FeeSchedule.court_id == court_id, FeeSchedule.is_active == True  # noqa: E712

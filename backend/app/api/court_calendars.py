@@ -25,7 +25,7 @@ router = APIRouter(prefix="/courts", tags=["Court Calendars"])
 async def calendars(
     court_id: int,
     page: int = Query(1, ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int | None = Depends(get_optional_user_id),
 ):
     if not await db.get(Court, court_id):
@@ -59,7 +59,7 @@ async def publish_calendar(
     request: Request,
     court_id: int,
     data: CourtCalendarCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     if not await may_publish_calendar(db, user_id, court_id):
@@ -92,7 +92,7 @@ async def publish_calendar(
 async def preview_filing_date(
     court_id: int,
     received_at: datetime,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     if received_at.tzinfo is None:
         raise HTTPException(

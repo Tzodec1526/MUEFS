@@ -25,7 +25,7 @@ async def get_filing_requirements(
             " validator so the panel shows exactly what will be enforced."
         ),
     ),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(FilingRequirement).where(
@@ -46,7 +46,7 @@ async def get_filing_requirements(
 async def get_filing_checklist(
     court_id: int,
     case_type_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(FilingChecklist).where(

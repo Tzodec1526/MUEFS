@@ -29,7 +29,7 @@ router = APIRouter(tags=["Fee assessments"])
 @router.get("/filings/{filing_id}/fees", response_model=FilingFeeDetails)
 async def current_fees(
     filing_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     # Document edits, assessments and payments all lock the envelope. Keep this
@@ -60,7 +60,7 @@ async def request_fee_review(
     filing_id: int,
     data: FeeReviewRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(require_user_may_manage_efilings),
 ):
     if not data.reason.strip():
@@ -124,7 +124,7 @@ async def assess_fees(
     filing_id: int,
     data: FeeAssessmentRequest,
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     total = sum(item.amount_cents for item in data.items)
@@ -203,7 +203,7 @@ async def assess_fees(
 async def fee_review_queue(
     court_id: int = Query(...),
     page: int = Query(1, ge=1),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
     if not await access_service.user_is_court_staff_for_court(db, user_id, court_id):
