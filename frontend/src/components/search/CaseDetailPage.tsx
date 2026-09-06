@@ -180,7 +180,7 @@ function CaseDetailPage() {
     if (!isPublicViewer) return { label: status.replace('_', ' '), cls: status };
     switch (status) {
       case 'accepted': return { label: 'Filed', cls: 'accepted' };
-      case 'served': return { label: 'Served', cls: 'accepted' };
+      case 'served': return { label: 'Service documents recorded', cls: 'pending' };
       case 'returned':
       case 'rejected': return { label: 'Returned for correction', cls: 'returned' };
       default: return { label: 'Submitted', cls: 'submitted' };

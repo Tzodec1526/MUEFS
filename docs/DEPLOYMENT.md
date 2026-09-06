@@ -370,3 +370,22 @@ items remain available. An inconsistent draft must be replaced with a correctly 
 draft or resolved through a court-approved correction process; preserve its documents
 and any earlier receipts. Exercise these paths with representative imported records
 before rollout.
+
+## 14. Court service instructions
+
+Run `alembic upgrade head` before deploying the service-instruction API. Migration
+`a63b29d5e104` adds reviewed participant links, authority and versioning to the existing
+contact table. Schedule the schema change with normal database migration controls.
+Legacy contact rows remain intact, inactive and unlinked. Reconcile them against court
+records before entering current instructions; no address is automatically enrolled.
+
+Assigned staff use **Case participants → Service instructions**. Establish procedures
+for reviewing registrations, exemptions, agreements, recipient identity and changes.
+The current workflow supports one primary destination per participant. Service contacts
+and their before/after history are included in private case archives; access and retention
+controls must cover those addresses and source references.
+
+This workflow sends no documents or invitations. Do not enable a delivery integration
+by treating the legacy `served` filing status, an active contact or a generic email alert
+as completed service. Actual service needs recipient selection, secure document delivery,
+recorded transactions and failed-delivery handling under the applicable court rules.

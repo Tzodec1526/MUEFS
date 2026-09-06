@@ -17,13 +17,13 @@ class FilingStatus(enum.StrEnum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     RETURNED = "returned"
-    SERVED = "served"  # Service-only filings go straight to served
+    SERVED = "served"  # Legacy API/storage value: documents recorded, not proof of delivery.
 
 
 class FilingType(enum.StrEnum):
     INITIAL = "initial"          # New case initiation
     SUBSEQUENT = "subsequent"    # Filing to existing case
-    SERVICE_ONLY = "service_only"  # Serve on parties, not filed with court
+    SERVICE_ONLY = "service_only"  # Record documents for service outside clerk intake.
 
 
 class FilingEnvelope(Base):

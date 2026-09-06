@@ -19,13 +19,45 @@ establish state approval or production readiness.
 | Record the correct legal filing date | Receipt instants and filing dates are separate. Published calendars establish business dates. Assigned staff can record a signed order establishing a different date, with retained before/after evidence and explicit case opening date changes. Acceptance honors the order without rewriting the receipt. | Court verification of calendars and signed orders, motion/adjudication procedures, downstream CMS synchronization and review of closures published after acceptance. Correcting a document does not automatically preserve its legal filing date. |
 | Resolve fee waivers correctly | A completed application accompanies the filing. Clerk waivers, referral and judicial decisions are separate court-scoped actions. Signed decision PDFs and denial amounts remain in private history; a filer can pay after denial without resubmitting. | Actual notice delivery, de novo review and judicial assignment, deadline calculation, case-wide continuation and reinstatement, court verification of signed forms and prisoner-specific procedures. |
 | Establish fees and account for payments | Assigned court staff record itemized assessments with authority, reasons and retained documents. Balances use completed payments allocated to that filing; revised assessments preserve earlier credits and expose overpayments. | Court validation of assessments and fee schedules, a real hosted payment processor, signed webhooks, reconciliation, refunds and accounting exports. |
-| Deliver electronic service | Service-only documents can be recorded. | Verified service contacts, consent/eligibility, real transmission, failures/retries, non-electronic alternatives and retained proof. A recorded document or in-app notice is not proof of service. |
+| Deliver electronic service | Assigned court staff record service instructions for reviewed participants, with verified electronic addresses, mail/hand-delivery destinations, deactivation and retained history. Service-only documents can be recorded with accurate labels. | Court-approved enrollment and consent policies, additional/delegated recipients, recipient selection, real document transmission, failures/retries, non-electronic service evidence and retained proof. A recorded document or in-app notice is not proof of service. |
 | Send filing alerts reliably | An opt-in SMTP outbox commits with filing changes, checks verified recipients, retains messages and attempts, retries temporary failures and exposes uncertain outcomes to assigned court staff. | A court-approved relay and sender domain, bounce/delivery feedback, operational alerting and court approval of legally sufficient notice content and procedures. Generic email alerts do not establish legal service. |
 | Connect to the court's system of record | Acceptance is explicitly blocked outside demo mode when CMS integration is absent. | A documented court/vendor contract, credentialed sandbox, document/code mapping, idempotent delivery, status callbacks, error recovery and reconciliation. |
 | Operate statewide | Explicit identity provisioning, delegated court administration, immediate checks on subsequent requests after revocation, retained changes, PostgreSQL migrations and deployment guidance exist. | State federation and lifecycle integration, access recertification, availability targets, incident response, backup restoration drills, disaster recovery and migration from incumbent systems. |
 | Find public records across courts | Anonymous search filters by court and identifies each result's court and county. Shared links preserve filters and pages; courts with closed intake remain searchable. PostgreSQL substring indexes and batched court metadata improve selective searches while excluding sealed cases and participant contact fields. | Representative concurrency, data-distribution and write-load testing; independent accessibility evaluation and court-approved public-index policy. |
 | Transfer a case's retained records | A private case archive includes linked metadata, transaction history, original versions, orders, public copies, payments and notice evidence. A read-only snapshot and file fingerprints protect export consistency; offline verification detects altered or incomplete packages. | Court-controlled custody/signing, source inventory reconciliation, receiving-system mapping, approved retention and an evaluated import/restore procedure. |
 | Serve the whole public | Responsive filing and history pages, keyboard controls and guided filing exist. | Independent accessibility testing, assistive-technology testing, language access, paper-filing accommodations and usability evaluation with self-represented filers. |
+
+## Court service instructions
+
+Assigned court staff open **Case participants → Service instructions** to record one
+current destination and method for a reviewed participant. An electronic instruction
+requires the linked account's current verified email and active identity. Counsel also
+need a matching verified bar number; restricted cases require the participant's access
+grant. Mail and hand-delivery instructions support people without portal accounts.
+Staff record the reviewed authority or source record and a reason for every change.
+
+Contact and participant versions prevent stale editors from overwriting reviewed work.
+Changed participant details or electronic identity/access prerequisites appear as review
+issues. Deactivation remains available when an address loses verification. Changes retain
+their actor, time, authority, participant snapshot and prior destination in case history
+and private case exports. Staff cannot edit their own service instructions. These records
+are private to assigned court staff and do not grant portal access or send messages.
+
+Migration `a63b29d5e104` preserves legacy contacts as inactive, unlinked and unreviewed;
+it does not infer eligibility from an existing address. The interface currently supports
+one primary destination per participant. Additional/delegated recipients, operational
+enrollment procedures, delivery and failed-service remedies remain required work.
+
+The design keeps instructions, transmission and proof separate. [MCR 1.109(G)(6)–(7)](https://www.courts.michigan.gov/siteassets/rules-instructions-administrative-orders/michigan-court-rules/court-rules-book-ch-1-responsive-html5.zip/Court_Rules_Book_Ch_1/Court_Rules_Chapter_1/Court_Rules_Chapter_1.htm)
+addresses authorized recipients, service transactions and undeliverable transmissions.
+[AO 2026-3](https://www.courts.michigan.gov/siteassets/rules-instructions-administrative-orders/administrative-orders/aos-responsive-html5.zip/AOs/Administrative_Orders/AO_No._2026-3_%E2%80%94_Establishing_Pilot_Project_for_Implementing_Expanded_Electronic_Service.htm)
+applies revised rules to participating pilot courts; this application does not presume
+that a court participates or infer legal consent from a portal login.
+
+For compatibility, the existing API/storage status `served` still denotes service-only
+document recording. New recordings no longer fabricate a clerk-review timestamp, and
+the interface labels them **Service documents recorded**. Historical receipts remain
+unchanged. This status must not be used as evidence that documents reached recipients.
 
 ## Filing destinations and intake
 

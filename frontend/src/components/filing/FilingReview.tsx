@@ -78,7 +78,7 @@ function FilingReview({ filingData, submission, onFeesChange, onSubmitSuccess, r
     return (
       <div className="form-section success-section">
         <div className="success-icon">&#10003;</div>
-        <h3>Filing Submitted Successfully</h3>
+        <h3>{submission.status === 'served' ? 'Service Documents Recorded' : 'Filing Submitted Successfully'}</h3>
         <p>
           {submission.status === 'served'
             ? 'This service-only filing has been recorded. It does not enter clerk review or deliver documents to other parties.'

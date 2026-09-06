@@ -107,7 +107,8 @@ async def postgres_sessions(request, stored_document):
                         "script_location", str(Path(__file__).resolve().parents[1] / "alembic"),
                     )
                     config.attributes["connection"] = connection
-                    command.upgrade(config, "head")
+                    target = request.param if isinstance(request.param, str) else "head"
+                    command.upgrade(config, target)
 
                 await conn.run_sync(migrate)
             else:

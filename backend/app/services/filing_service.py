@@ -382,7 +382,6 @@ async def submit_filing(
     # Service-only filings skip clerk review entirely
     if filing.filing_type == "service_only":
         filing.status = FilingStatus.SERVED
-        filing.reviewed_at = now
     else:
         filing.status = FilingStatus.SUBMITTED
 

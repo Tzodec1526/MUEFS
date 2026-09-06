@@ -174,6 +174,8 @@ export default function CaseParticipantsPage() {
         {item.user_id === current.data?.actor_id ? <span>Another staff member must edit your record.</span>
           : <button className="btn btn-secondary btn-small" onClick={() => { setSelection(item.id); setNotice(''); }}
             aria-label={`Edit ${item.party_name}`}>Edit</button>}
+        <Link className="btn btn-secondary btn-small" to={`/cases/${caseId}/participants/${item.id}/service-contact`}
+          aria-label={`Service instructions for ${item.party_name}`}>Service instructions</Link>
         {selection === item.id && editor}
       </li>)}</ul>
       {!current.data.total && <p>No participants recorded.</p>}

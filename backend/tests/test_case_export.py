@@ -266,6 +266,63 @@ async def case_records(request, tmp_path, monkeypatch, stored_document):
 
 
 @pytest.mark.parametrize("case_records", ["sqlite", "postgres"], indirect=True)
+async def test_export_retains_service_instructions_and_their_prior_destination(
+    case_records, tmp_path,
+):
+    from httpx import ASGITransport, AsyncClient
+
+    from app.database import get_db
+    from app.main import app
+    from app.models.user import CourtRole, UserCourtRole
+
+    sessions, case = case_records["sessions"], case_records["case"]
+    async with sessions.begin() as db:
+        participant = await db.scalar(select(CaseParticipant).where(
+            CaseParticipant.case_id == case.id,
+        ))
+        participant.reviewed_at = datetime.now(UTC)
+        clerk = await db.scalar(select(UserCourtRole.user_id).where(
+            UserCourtRole.court_id == case.court_id, UserCourtRole.role == CourtRole.CLERK,
+        ))
+
+    async def database():
+        async with sessions.begin() as db:
+            yield db
+
+    app.dependency_overrides[get_db] = database
+    try:
+        async with AsyncClient(transport=ASGITransport(app), base_url="http://test",
+                               headers={"X-Demo-User-Id": str(clerk)}) as client:
+            for version, address in enumerate(["Original service address", "Corrected address"]):
+                response = await client.put(
+                    f"/api/v1/cases/{case.id}/participants/{participant.id}/service-contact",
+                    json={
+                        "method": "mail",
+                        "address": address,
+                        "authority": "Reviewed address notice",
+                        "reason": "Court-approved address correction",
+                        "expected_version": version,
+                        "expected_participant_version": 0,
+                    },
+                )
+                assert response.status_code == 200, response.text
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+    output = tmp_path / "service-history.zip"
+    result = await case_export.export_case(case.id, output)
+    assert case_export.verify_archive(output, result["manifest_sha256"])["status"] == "verified"
+    with ZipFile(output) as archive:
+        contact = json.loads(archive.read("records/service_contacts.jsonl"))
+        assert contact["address"] == "Corrected address" and contact["version"] == 2
+        assert contact["reviewer_id"] == clerk
+        events = [json.loads(line) for line in archive.read("records/audit_log.jsonl").splitlines()]
+        changes = [event for event in events if event["action"] == "case.service_contact_changed"]
+        assert len(changes) == 2
+        assert changes[1]["details"]["before"]["address"] == "Original service address"
+        assert changes[1]["details"]["after"]["address"] == "Corrected address"
+
+
+@pytest.mark.parametrize("case_records", ["sqlite", "postgres"], indirect=True)
 async def test_complete_archive_retains_private_evidence_without_changing_records(
     case_records, tmp_path
 ):

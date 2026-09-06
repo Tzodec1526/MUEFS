@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text, func
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, String, Text, false, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -46,7 +46,16 @@ class ServiceContact(Base):
         Enum(ServiceMethod), default=ServiceMethod.ELECTRONIC
     )
     address: Mapped[str | None] = mapped_column(Text)
+    participant_id: Mapped[int | None] = mapped_column(ForeignKey("case_participants.id"))
+    participant_snapshot: Mapped[dict | None] = mapped_column(JSON)
+    is_active: Mapped[bool] = mapped_column(default=False, server_default=false())
+    authority: Mapped[str | None] = mapped_column(String(1000))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    version: Mapped[int] = mapped_column(default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (Index("uq_service_contact_participant", "participant_id", unique=True),)
 
 
 class Notification(Base):

@@ -16,7 +16,7 @@ from tests.test_filing_concurrency import postgres_sessions as postgres_sessions
 
 
 @pytest.mark.skipif(not os.getenv("MUEFS_TEST_POSTGRES_URL"), reason="PostgreSQL not configured")
-@pytest.mark.parametrize("postgres_sessions", [True], indirect=True)
+@pytest.mark.parametrize("postgres_sessions", ["d4e7a12b93f0"], indirect=True)
 async def test_search_index_upgrade_recovers_failed_build_and_preserves_records(postgres_sessions):
     from app.models.case import Case, CaseParticipant, ParticipantRole
     from app.models.court import CaseCategory, CaseType, Court, CourtType
@@ -58,11 +58,12 @@ async def test_search_index_upgrade_recovers_failed_build_and_preserves_records(
         assert await conn.scalar(text("""SELECT indisvalid FROM pg_index
             WHERE indexrelid = 'ix_case_participants_party_name_trgm'::regclass""")) is False
 
-    for target, kind in [("head", "gin"), ("c3d9f06a21b8", "btree"), ("head", "gin")]:
+    for target, kind in [("d4e7a12b93f0", "gin"), ("c3d9f06a21b8", "btree"),
+                         ("d4e7a12b93f0", "gin")]:
         async with engine.connect() as conn:
             def migrate(connection):
                 config.attributes["connection"] = connection
-                (command.upgrade if target == "head" else command.downgrade)(config, target)
+                (command.upgrade if kind == "gin" else command.downgrade)(config, target)
             await conn.run_sync(migrate)
             indexes = (await conn.execute(text("""
                 SELECT c.relname, i.indisvalid, a.amname FROM pg_index i
@@ -176,6 +177,11 @@ def test_unversioned_demo_upgrade_preserves_filings(tmp_path):
                     ),
                 ),
                 (
+                    "service_contacts",
+                    dict(case_id=1, user_id=1, name="Legacy service contact",
+                         email="legacy-service@example.com", method="ELECTRONIC"),
+                ),
+                (
                     "filing_documents",
                     dict(
                         id=1,
@@ -261,6 +267,12 @@ def test_unversioned_demo_upgrade_preserves_filings(tmp_path):
             assert participant["contact_address"] == "Original contact address"
             assert participant["is_active"] == 1 and participant["access_enabled"] == 0
             assert participant["reviewed_at"] is None
+            service = conn.execute(text("SELECT * FROM service_contacts")).mappings().one()
+            assert service["name"] == "Legacy service contact"
+            assert service["email"] == "legacy-service@example.com"
+            assert service["participant_id"] is None and service["participant_snapshot"] is None
+            assert service["reviewed_at"] is None and service["authority"] is None
+            assert service["is_active"] == 0 and service["version"] == 0
             assert conn.scalar(text("SELECT participant_version FROM cases")) == 0
             assert (
                 conn.scalar(

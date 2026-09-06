@@ -258,6 +258,7 @@ async def test_service_only_filing(db_session, stored_document):
     submitted = await filing_service.submit_filing(db_session, filing.id)
     assert submitted is not None
     assert submitted.status == FilingStatus.SERVED
+    assert submitted.reviewed_at is None
     assert submitted.submitted_at is not None
 
 

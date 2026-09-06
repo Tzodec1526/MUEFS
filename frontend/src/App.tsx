@@ -20,6 +20,7 @@ const ReviewQueue = lazy(() => import('./components/clerk/ReviewQueue'));
 const CourtCaseDirectory = lazy(() => import('./components/courts/CourtCaseDirectory'));
 const DocumentPublicationPage = lazy(() => import('./components/courts/DocumentPublicationPage'));
 const CaseParticipantsPage = lazy(() => import('./components/courts/CaseParticipantsPage'));
+const ServiceContactPage = lazy(() => import('./components/courts/ServiceContactPage'));
 const CourtCalendarPage = lazy(() => import('./components/courts/CourtCalendarPage'));
 const NotificationsPage = lazy(() => import('./components/notifications/NotificationsPage'));
 const AdministrationPage = lazy(() => import('./components/admin/AdministrationPage'));
@@ -228,6 +229,7 @@ function App() {
                         <Route path="/notifications" element={<NotificationsPage />} />
                         <Route path="/admin" element={<AdministrationPage />} />
                         <Route path="/cases/:caseId/participants" element={<CourtWorkspace><CaseParticipantsPage /></CourtWorkspace>} />
+                        <Route path="/cases/:caseId/participants/:participantId/service-contact" element={<CourtWorkspace><ServiceContactPage /></CourtWorkspace>} />
                         <Route path="/clerk/cases" element={<CourtWorkspace><CourtCaseDirectory /></CourtWorkspace>} />
                         <Route path="/documents/:documentId/publication" element={<CourtWorkspace><DocumentPublicationPage /></CourtWorkspace>} />
                         <Route path="/cases/:caseId" element={<CaseDetailPage />} />

@@ -12,12 +12,12 @@ const STATUS_OPTIONS = [
   { value: 'accepted', label: 'Accepted' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'returned', label: 'Returned' },
-  { value: 'served', label: 'Served' },
+  { value: 'served', label: 'Service documents recorded' },
 ];
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Draft', submitted: 'Submitted', under_review: 'Under Review',
-  accepted: 'Accepted', rejected: 'Rejected', returned: 'Returned', served: 'Served',
+  accepted: 'Accepted', rejected: 'Rejected', returned: 'Returned', served: 'Service documents recorded',
 };
 
 function MyFilings() {
