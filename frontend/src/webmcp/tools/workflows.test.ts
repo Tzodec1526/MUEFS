@@ -1,14 +1,14 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { getCase, searchCases } from '../../api/cases';
 import { getFilingChecklists, getFilingRequirements } from '../../api/courts';
-import { getClerkQueue, listFilings } from '../../api/filings';
+import { getClerkQueue, getFilingStatusCounts } from '../../api/filings';
 import { getDemoRole } from '../../components/auth/LoginScreen';
 import type { ModelContextTool } from '../types';
 import { registerWorkflowTools } from './workflows';
 
 vi.mock('../../api/cases', () => ({ getCase: vi.fn(), searchCases: vi.fn() }));
 vi.mock('../../api/courts', () => ({ getFilingChecklists: vi.fn(), getFilingRequirements: vi.fn() }));
-vi.mock('../../api/filings', () => ({ getClerkQueue: vi.fn(), listFilings: vi.fn() }));
+vi.mock('../../api/filings', () => ({ getClerkQueue: vi.fn(), getFilingStatusCounts: vi.fn() }));
 vi.mock('../../components/auth/LoginScreen', () => ({
   getDemoRole: vi.fn(), getDemoCourtId: () => 3,
 }));
@@ -49,9 +49,10 @@ it('builds the plan for the explicitly chosen case without searching again', asy
   vi.mocked(getCase).mockResolvedValue({ id: 2, title: 'Smith B', case_number: 'B', court_id: 4, case_type_id: 7 });
   vi.mocked(getFilingRequirements).mockResolvedValue([]);
   vi.mocked(getFilingChecklists).mockResolvedValue([]);
-  vi.mocked(listFilings).mockResolvedValue({ total: 0, filings: [], status_counts: {}, court_names: {} });
+  vi.mocked(getFilingStatusCounts).mockResolvedValue({ draft: 7, accepted: 20 });
   const result = JSON.parse(await registered.get('attorney_motion_workflow')!.execute({ case_id: 2 }) as string);
   expect(result.case.id).toBe(2);
+  expect(result.draft_filings_pending).toBe(7);
   expect(result.filing_wizard_path).toContain('case_id=2&court_id=4&case_type_id=7');
   expect(searchCases).not.toHaveBeenCalled();
   expect(getFilingRequirements).toHaveBeenCalledWith(4, 7, 'subsequent');

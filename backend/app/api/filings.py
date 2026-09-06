@@ -83,7 +83,7 @@ async def list_filings(
         )
         court_names = dict(courts.tuples().all())
     return MyFilingsResponse(
-        filings=filings,  # type: ignore[arg-type]
+        filings=filings,
         total=total, page=page, page_size=page_size,
         status_counts=status_counts, court_names=court_names,
     )

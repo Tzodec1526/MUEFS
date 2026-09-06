@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { listFilings, FilingEnvelope } from '../../api/filings';
+import { listFilings, FilingSummary } from '../../api/filings';
 import LoadError from '../common/LoadError';
 import { parseServerDate } from '../../utils/format';
 
@@ -22,7 +22,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 function MyFilings() {
   const navigate = useNavigate();
-  const [filings, setFilings] = useState<FilingEnvelope[]>([]);
+  const [filings, setFilings] = useState<FilingSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
@@ -137,7 +137,7 @@ function MyFilings() {
                 <h4 className="filing-card-title">{filing.case_title || 'Untitled Filing'}</h4>
                 <div className="filing-card-meta">
                   <span>{courtNames[filing.court_id] || `Court #${filing.court_id}`}</span>
-                  <span>{filing.documents.length} document(s)</span>
+                  <span>{filing.document_count} document(s)</span>
                   <span>{formatDate(filing.submitted_at || filing.created_at)}</span>
                 </div>
                 {filing.rejection_reason && (

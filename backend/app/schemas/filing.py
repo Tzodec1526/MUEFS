@@ -87,8 +87,30 @@ class FilingEnvelopeResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class FilingSummary(BaseModel):
+    """Fields used by filing lists; documents and private details load on opening."""
+
+    id: int
+    court_id: int
+    case_id: int | None
+    filer_id: int
+    status: FilingStatus
+    case_title: str | None
+    filing_description: str | None
+    submitted_at: datetime | None
+    rejection_reason: str | None
+    fee_waiver_requested: bool
+    fee_waiver_granted: bool | None
+    created_at: datetime
+    updated_at: datetime
+    submission_count: int
+    document_count: int
+
+    model_config = {"from_attributes": True}
+
+
 class FilingListResponse(BaseModel):
-    filings: list[FilingEnvelopeResponse]
+    filings: list[FilingSummary]
     total: int
     page: int
     page_size: int

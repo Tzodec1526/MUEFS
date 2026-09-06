@@ -1,4 +1,4 @@
-import { listFilings } from '../../api/filings';
+import { getFilingStatusCounts } from '../../api/filings';
 import { getDemoRole } from '../../components/auth/LoginScreen';
 import { getAgentActivity } from '../activity';
 import { catalogForRole, TOOL_CATALOG } from '../catalog';
@@ -22,8 +22,8 @@ export async function registerSessionTools(mc: ModelContext, signal?: AbortSigna
         let drafts = 0;
         if (role === 'attorney' || role === 'srl') {
           try {
-            const data = await listFilings({ status: 'draft', page: 1 });
-            drafts = data.total;
+            const counts = await getFilingStatusCounts();
+            drafts = counts.draft || 0;
           } catch {
             drafts = 0;
           }

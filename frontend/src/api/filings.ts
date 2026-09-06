@@ -41,6 +41,13 @@ export interface FilingEnvelope {
   filing_date_basis: FilingDateBasis | null;
 }
 
+export type FilingSummary = Pick<FilingEnvelope,
+  'id' | 'court_id' | 'case_id' | 'filer_id' | 'status' | 'case_title' |
+  'filing_description' | 'submitted_at' | 'rejection_reason' |
+  'fee_waiver_requested' | 'fee_waiver_granted' | 'created_at' |
+  'updated_at' | 'submission_count'
+> & { document_count: number };
+
 export interface FilingValidation {
   is_valid: boolean;
   errors: string[];
@@ -66,7 +73,7 @@ export async function listFilings(params?: {
   status?: string;
   page?: number;
 }, signal?: AbortSignal): Promise<{
-  filings: FilingEnvelope[];
+  filings: FilingSummary[];
   total: number;
   status_counts: Record<string, number>;
   court_names: Record<number, string>;
@@ -258,7 +265,7 @@ export async function getClerkQueue(
   statusFilter?: string,
   signal?: AbortSignal,
   pageSize: number = 25,
-): Promise<{ filings: FilingEnvelope[]; total: number }> {
+): Promise<{ filings: FilingSummary[]; total: number }> {
   const params: Record<string, unknown> = { court_id: courtId, page, page_size: pageSize };
   if (statusFilter === 'waivers') {
     params.fee_waivers = true;

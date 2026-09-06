@@ -218,7 +218,10 @@ async def fee_review_queue(
     total = await db.scalar(select(func.count()).select_from(FilingEnvelope).where(*filters))
     rows = (
         await db.execute(
-            select(FilingEnvelope, User.first_name, User.last_name)
+            select(
+                FilingEnvelope.id, FilingEnvelope.case_title, FilingEnvelope.status,
+                FilingEnvelope.fee_review_requested_at, User.first_name, User.last_name,
+            )
             .join(
                 User,
                 User.id == FilingEnvelope.filer_id,
@@ -240,12 +243,11 @@ async def fee_review_queue(
                 "id": filing.id,
                 "case_title": filing.case_title,
                 "status": filing.status,
-                "filer_name": f"{first} {last}",
+                "filer_name": f"{filing.first_name} {filing.last_name}",
                 "requested_at": filing.fee_review_requested_at.replace(
                     tzinfo=filing.fee_review_requested_at.tzinfo or UTC
                 ).astimezone(UTC),
             }
-            for filing, first, last in rows
-            if filing.fee_review_requested_at is not None
+            for filing in rows
         ],
     }

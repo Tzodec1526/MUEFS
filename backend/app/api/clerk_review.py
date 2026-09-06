@@ -46,7 +46,7 @@ async def get_review_queue(
     filings, total = await filing_service.get_clerk_queue(
         db, court_id, page=page, page_size=page_size, status=status_filter, fee_waivers=fee_waivers,
     )
-    return FilingListResponse(filings=filings, total=total, page=page, page_size=page_size)  # type: ignore[arg-type]
+    return FilingListResponse(filings=filings, total=total, page=page, page_size=page_size)
 
 
 @router.post("/filings/{filing_id}/review", response_model=FilingEnvelopeResponse)

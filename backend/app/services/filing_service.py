@@ -9,9 +9,10 @@ from app.config import settings
 from app.integrations.cms_adapter import submit_filing_to_cms
 from app.models.case import Case, CaseStatus
 from app.models.court import CaseType, Court, FilingRequirement
-from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
+from app.models.filing import COURT_DOCUMENT_TYPES, FilingDocument, FilingEnvelope, FilingStatus
 from app.schemas.filing import (
     FilingEnvelopeCreate,
+    FilingSummary,
     FilingValidationResult,
 )
 from app.services import access_service, document_service
@@ -225,16 +226,44 @@ async def get_filing(
     return result.scalar_one_or_none()
 
 
+_FILING_SUMMARIES = select(
+    FilingEnvelope.id,
+    FilingEnvelope.court_id,
+    FilingEnvelope.case_id,
+    FilingEnvelope.filer_id,
+    FilingEnvelope.status,
+    FilingEnvelope.case_title,
+    FilingEnvelope.filing_description,
+    FilingEnvelope.submitted_at,
+    FilingEnvelope.rejection_reason,
+    FilingEnvelope.fee_waiver_requested,
+    FilingEnvelope.fee_waiver_granted,
+    FilingEnvelope.created_at,
+    FilingEnvelope.updated_at,
+    FilingEnvelope.submission_count,
+    # Count current attachments using the same scope as FilingEnvelope.documents.
+    select(func.count())
+    .select_from(FilingDocument)
+    .where(
+        FilingDocument.envelope_id == FilingEnvelope.id,
+        FilingDocument.removed_at.is_(None),
+        FilingDocument.document_type_code.not_in(COURT_DOCUMENT_TYPES),
+    )
+    .correlate(FilingEnvelope)
+    .scalar_subquery()
+    .label("document_count"),
+)
+
+
 async def list_filings(
     db: AsyncSession,
     filer_id: int,
     status: FilingStatus | None = None,
     page: int = 1,
     page_size: int = 25,
-) -> tuple[list[FilingEnvelope], int, dict[FilingStatus, int]]:
+) -> tuple[list[FilingSummary], int, dict[FilingStatus, int]]:
     query = (
-        select(FilingEnvelope)
-        .options(selectinload(FilingEnvelope.documents))
+        _FILING_SUMMARIES
         .where(FilingEnvelope.filer_id == filer_id)
         .order_by(FilingEnvelope.updated_at.desc(), FilingEnvelope.id.desc())
     )
@@ -248,7 +277,7 @@ async def list_filings(
         return [], 0, status_counts
     query = query.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
-    return list(result.scalars().all()), total, status_counts
+    return [FilingSummary.model_validate(row) for row in result], total, status_counts
 
 
 async def get_filing_status_counts(db: AsyncSession, filer_id: int) -> dict[FilingStatus, int]:
@@ -510,7 +539,7 @@ async def get_clerk_queue(
     page_size: int = 25,
     status: FilingStatus | None = None,
     fee_waivers: bool = False,
-) -> tuple[list[FilingEnvelope], int]:
+) -> tuple[list[FilingSummary], int]:
     filters = [
         FilingEnvelope.court_id == court_id,
         FilingEnvelope.status.in_([FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW]),
@@ -526,8 +555,7 @@ async def get_clerk_queue(
     if status is not None:
         filters.append(FilingEnvelope.status == status)
     query = (
-        select(FilingEnvelope)
-        .options(selectinload(FilingEnvelope.documents))
+        _FILING_SUMMARIES
         .where(*filters)
         .order_by(FilingEnvelope.submitted_at.asc(), FilingEnvelope.id.asc())
     )
@@ -540,4 +568,4 @@ async def get_clerk_queue(
     total = (await db.execute(count_query)).scalar() or 0
     query = query.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
-    return list(result.scalars().all()), total
+    return [FilingSummary.model_validate(row) for row in result], total

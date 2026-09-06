@@ -361,3 +361,60 @@ def test_fee_migration_preserves_only_unambiguous_payment_links(tmp_path):
                 WHERE type='index' AND name='ix_users_email_lower'""")) == 1
     finally:
         engine.dispose()
+
+
+@pytest.mark.skipif(not os.getenv("MUEFS_TEST_POSTGRES_URL"), reason="PostgreSQL not configured")
+@pytest.mark.parametrize("postgres_sessions", ["f7a21b84d903"], indirect=True)
+async def test_filer_index_recovers_failed_build_without_changing_pages(postgres_sessions):
+    from app.models.filing import FilingEnvelope, FilingStatus
+    from app.services.filing_service import list_filings
+    from tests.test_filing_history import filing_fixture
+
+    engine = postgres_sessions.kw["bind"]
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    config.set_main_option("script_location", str(Path(__file__).resolve().parents[1] / "alembic"))
+    async with postgres_sessions.begin() as db:
+        fid, filer, _, other = await filing_fixture(db)
+        original = await db.get(FilingEnvelope, fid)
+        for number in range(40):
+            db.add(FilingEnvelope(
+                court_id=original.court_id, case_type_id=original.case_type_id,
+                filer_id=other if number % 5 == 0 else filer, case_title=f"Matter {number}",
+                status=FilingStatus.RETURNED if number % 3 else FilingStatus.DRAFT,
+                updated_at=datetime(2026, 1, 1, tzinfo=UTC),
+            ))
+    async with postgres_sessions() as db:
+        before = [await list_filings(db, filer, status=status, page=2, page_size=5)
+                  for status in [None, FilingStatus.RETURNED]]
+
+    async with engine.connect() as conn:
+        await conn.execution_options(isolation_level="AUTOCOMMIT")
+        # Failed expression conversion leaves a real invalid concurrent index.
+        with pytest.raises(DBAPIError, match="invalid input syntax for type integer"):
+            await conn.execute(text("""CREATE INDEX CONCURRENTLY ix_filing_filer_updated
+                ON filing_envelopes ((case_title::integer))"""))
+        assert await conn.scalar(text("""SELECT indisvalid FROM pg_index
+            WHERE indexrelid = 'ix_filing_filer_updated'::regclass""")) is False
+
+    for upgrade in [True, False, True]:
+        async with engine.connect() as conn:
+            def migrate(connection):
+                config.attributes["connection"] = connection
+                if upgrade:
+                    command.upgrade(config, "9d34e6a81c72")
+                else:
+                    command.downgrade(config, "f7a21b84d903")
+            await conn.run_sync(migrate)
+            indexes = (await conn.execute(text("""
+                SELECT c.relname, i.indisvalid FROM pg_index i
+                JOIN pg_class c ON c.oid = i.indexrelid
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = current_schema() AND c.relname IN (
+                    'ix_filing_filer_updated', 'ix_filing_envelopes_filer_id')
+            """))).all()
+            expected = "ix_filing_filer_updated" if upgrade else "ix_filing_envelopes_filer_id"
+            assert indexes == [(expected, True)]
+        async with postgres_sessions() as db:
+            after = [await list_filings(db, filer, status=status, page=2, page_size=5)
+                     for status in [None, FilingStatus.RETURNED]]
+            assert after == before

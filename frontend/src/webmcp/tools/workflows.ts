@@ -1,6 +1,6 @@
 import { getCase, searchCases } from '../../api/cases';
 import { getFilingChecklists, getFilingRequirements } from '../../api/courts';
-import { getClerkQueue, listFilings } from '../../api/filings';
+import { getClerkQueue, getFilingStatusCounts } from '../../api/filings';
 import { getDemoCourtId, getDemoRole } from '../../components/auth/LoginScreen';
 import { UNTRUSTED_RECORDS, READ_ONLY } from '../annotations';
 import { sanitizeAgentText, toolError, toolOk } from '../output';
@@ -62,10 +62,10 @@ export async function registerWorkflowTools(mc: ModelContext, signal?: AbortSign
         }
 
         const docket = await getCase(caseId);
-        const [requirements, checklists, drafts] = await Promise.all([
+        const [requirements, checklists, counts] = await Promise.all([
           getFilingRequirements(docket.court_id, docket.case_type_id, 'subsequent'),
           getFilingChecklists(docket.court_id, docket.case_type_id),
-          listFilings({ status: 'draft', page: 1 }),
+          getFilingStatusCounts(),
         ]);
 
         const params = new URLSearchParams({
@@ -82,7 +82,7 @@ export async function registerWorkflowTools(mc: ModelContext, signal?: AbortSign
             number: docket.case_number,
             title: sanitizeAgentText(docket.title),
           },
-          draft_filings_pending: drafts.total,
+          draft_filings_pending: counts.draft || 0,
           required_documents: requirements
             .filter((r) => r.is_required)
             .map((r) => ({ code: r.document_type_code, label: r.description, mcr: r.mcr_reference })),

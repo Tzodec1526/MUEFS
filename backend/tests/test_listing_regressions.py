@@ -242,3 +242,65 @@ async def test_public_copy_docket_loads_only_page_copies_in_one_query(
         event.remove(engine, "before_cursor_execute", query)
         event.remove(db_session.sync_session, "loaded_as_persistent", load)
         app.dependency_overrides.pop(get_optional_user_id, None)
+
+
+@pytest.mark.parametrize("view", ["mine", "clerk", "waivers"])
+async def test_summary_counts_current_attachments_without_loading_details(
+    db_session, docket, api_client, view,
+):
+    owner, _, clerk, court, _, envelopes = docket
+    filing = next(row for row in reversed(envelopes) if row.filer_id == owner.id)
+    filing.status = FilingStatus.SUBMITTED
+    filing.submitted_at = datetime.now(UTC)
+    filing.fee_waiver_requested = True
+    filing.fee_waiver_reason = "Private application explanation"
+    filing.filing_date_basis = {"private": "Date evidence"}
+    for code, removed in [
+        ("FEE_WAIVER", False), ("EXHIBIT", True),
+        ("FEE_WAIVER_ORDER", False), ("FILING_DATE_ORDER", False),
+    ]:
+        db_session.add(FilingDocument(
+            envelope_id=filing.id, document_type_code=code, title=code,
+            file_key=f"summary/{code}", file_size_bytes=1, mime_type="text/plain",
+            sha256_hash="0" * 64, removed_at=datetime.now(UTC) if removed else None,
+        ))
+    await db_session.flush()
+    fid, actor_id, court_id = filing.id, owner.id if view == "mine" else clerk.id, court.id
+    db_session.expunge_all()
+    app.dependency_overrides[get_current_user_id] = lambda: actor_id
+    loaded, selects = [], []
+
+    def record_loaded(_session, instance):
+        loaded.append(type(instance))
+
+    def record_query(_conn, _cursor, statement, *_args):
+        if statement.lstrip().upper().startswith("SELECT"):
+            selects.append(statement)
+
+    engine = db_session.bind.sync_engine
+    event.listen(engine, "before_cursor_execute", record_query)
+    event.listen(db_session.sync_session, "loaded_as_persistent", record_loaded)
+    try:
+        path = (
+            "/api/v1/filings?status=submitted" if view == "mine"
+            else f"/api/v1/clerk/queue?court_id={court_id}&fee_waivers={view == 'waivers'}"
+        )
+        response = await api_client.get(path)
+        assert response.status_code == 200
+        body = response.json()
+        assert body["total"] == 1
+        summary = body["filings"][0]
+        assert summary["id"] == fid
+        assert summary["document_count"] == 2
+        assert not {"documents", "fee_waiver_reason", "filing_date_basis"} & summary.keys()
+        assert FilingDocument not in loaded and FilingEnvelope not in loaded
+        assert len(selects) <= 3
+        # Opening the same filing still supplies its full, authorized current record.
+        detail = await api_client.get(f"/api/v1/filings/{fid}")
+        assert detail.status_code == 200
+        assert len(detail.json()["documents"]) == summary["document_count"]
+        assert detail.json()["fee_waiver_reason"] == "Private application explanation"
+    finally:
+        event.remove(engine, "before_cursor_execute", record_query)
+        event.remove(db_session.sync_session, "loaded_as_persistent", record_loaded)
+        app.dependency_overrides.pop(get_current_user_id, None)

@@ -755,6 +755,47 @@ manifest fingerprint. This supports records transfer and migration evaluation; c
 approval, custody controls, source completeness, receiving-system mapping and restoration
 remain separate requirements.
 
+## Filing-list scale and detail loading
+
+My Filings and the clerk queue select summary columns and count only current attachments.
+Removed documents and court-generated waiver/date orders are excluded from that count,
+matching the full envelope. Attachment manifests, waiver explanations and filing-date
+evidence load through the authorized detail endpoint when the user opens a filing.
+The fee-review queue also selects only its displayed fields. Counts and pagination retain
+their existing filer/court scope and deterministic ID ordering.
+
+The clerk loads the current submission when a row is opened. Loading and failed reads
+expose no decision buttons; retry, closing and switching rows cancel obsolete reads.
+Opening a filing already decided by another reviewer disables intake decisions. A change
+after details load still requires closing and reviewing the new submission after HTTP 409.
+
+A local PostgreSQL 16 profile on 2026-09-06 used 50,000 synthetic filings across four courts
+and 600,000 document records (nine current attachments per filing). The busiest test
+filer owned 33,333 records. Each measurement used the real ASGI listing route and response
+serialization, with authentication overridden to isolate listing work; two warm-up
+requests were discarded and the next ten requests measured. These are local warm-cache
+measurements, not deployment capacity targets.
+
+| First page, 25 rows | Median before | Median after | Response bytes before → after |
+| --- | ---: | ---: | ---: |
+| My Filings, all statuses | 27.92 ms | 6.79 ms | 121,629 → 35,282 |
+| My Filings, returned | 20.15 ms | 6.92 ms | 121,628 → 35,282 |
+| Clerk queue, all pending | 12.00 ms | 8.20 ms | 120,759 → 34,993 |
+| Clerk queue, submitted | 9.46 ms | 4.62 ms | 120,759 → 34,963 |
+| Pending waivers | 11.82 ms | 6.16 ms | 141,518 → 34,948 |
+
+Each of those list requests now performs three SELECTs rather than four and materializes
+no filing/document ORM objects, previously 25 envelopes plus 225 documents. PostgreSQL
+counts attachments for only the 25 returned filings. The replacement filer index removes
+the 33,333-row sort and covers status counts; it replaces the single-column filer index.
+No new queue index or cache was added. The fee-review response is unchanged in size;
+its small measured latency difference (9.04 to 8.38 ms) is not treated as a performance win.
+
+Status totals still grow with a filer's record count, and deep offset pages still require
+skipping earlier matches. Concurrent filing activity can move records between pages.
+Representative concurrent-user, cold-storage and deployment-network load testing remains
+necessary before setting a court's capacity targets.
+
 ## Sources guiding the evaluation
 
 - [RFC 5321, SMTP](https://www.rfc-editor.org/rfc/rfc5321): relay acceptance, response codes and uncertainty after a lost final response.

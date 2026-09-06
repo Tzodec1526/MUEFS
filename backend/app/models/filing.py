@@ -33,7 +33,7 @@ class FilingEnvelope(Base):
     court_id: Mapped[int] = mapped_column(ForeignKey("courts.id"), index=True)
     case_id: Mapped[int | None] = mapped_column(ForeignKey("cases.id"), index=True)
     case_type_id: Mapped[int] = mapped_column(ForeignKey("case_types.id"), index=True)
-    filer_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    filer_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     filing_type: Mapped[str] = mapped_column(String(20), default="subsequent")
     status: Mapped[FilingStatus] = mapped_column(
         Enum(FilingStatus), default=FilingStatus.DRAFT, index=True
@@ -79,6 +79,8 @@ class FilingEnvelope(Base):
     )
 
     __table_args__ = (
+        # Status is covered for counters; updated_at/id support stable page ordering.
+        Index('ix_filing_filer_updated', 'filer_id', 'updated_at', 'id', 'status'),
         Index('ix_filing_court_status', 'court_id', 'status'),
         Index('ix_filing_court_status_submitted', 'court_id', 'status', 'submitted_at'),
         Index('ix_filing_court_waiver', 'court_id', 'fee_waiver_requested',

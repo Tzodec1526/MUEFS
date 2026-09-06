@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useContext } from 'react';
 import { Link } from 'react-router-dom';
-import { batchReview, getClerkQueue, reviewFiling, FilingEnvelope } from '../../api/filings';
+import { batchReview, getClerkQueue, getFiling, reviewFiling, FilingEnvelope, FilingSummary } from '../../api/filings';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import DocumentDownload from '../common/DocumentDownload';
@@ -10,17 +10,24 @@ import { getErrorDetail } from '../../utils/errors';
 function ReviewQueue() {
   const { court } = useContext(CourtContext)!;
   const courtId = court!.court_id;
-  const [filings, setFilings] = useState<FilingEnvelope[]>([]);
+  const [filings, setFilings] = useState<FilingSummary[]>([]);
   const [total, setTotal] = useState(0);
-  const [selectedFiling, setSelectedFiling] = useState<FilingEnvelope | null>(null);
+  const [review, setReview] = useState<{
+    id: number; filing?: FilingEnvelope; error?: string;
+  } | null>(null);
+  const selectedFiling = review?.filing;
   const [loading, setLoading] = useState(false);
   const [reviewReason, setReviewReason] = useState('');
   const [actionInProgress, setActionInProgress] = useState(false);
   const [selectedSubmissions, setSelectedSubmissions] = useState<Map<number, number>>(new Map());
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const canReview = selectedFiling
+    && ['submitted', 'under_review'].includes(selectedFiling.status)
+    && statusFilter !== 'waivers';
   const [page, setPage] = useState(1);
   const requestRef = useRef<AbortController | null>(null);
+  const reviewRequestRef = useRef<AbortController | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [queueError, setQueueError] = useState<string | null>(null);
 
@@ -58,14 +65,16 @@ function ReviewQueue() {
     return () => requestRef.current?.abort();
   }, [fetchQueue]);
 
+  useEffect(() => () => reviewRequestRef.current?.abort(), []);
+
   // Auto-refresh every 30 seconds, but never while a filing is open for review or an
   // action is in flight -- a refresh mid-review would clobber the clerk's work.
   useEffect(() => {
     const interval = setInterval(() => {
-      if (!document.hidden && !selectedFiling && !actionInProgress) fetchQueue();
+      if (!document.hidden && !review && !actionInProgress) fetchQueue();
     }, 30000);
     return () => clearInterval(interval);
-  }, [fetchQueue, selectedFiling, actionInProgress]);
+  }, [fetchQueue, review, actionInProgress]);
 
   async function handleReview(filing: FilingEnvelope, action: 'accept' | 'reject' | 'return') {
     if (action === 'reject' && !window.confirm(
@@ -77,8 +86,7 @@ function ReviewQueue() {
     setReviewError(null);
     try {
       await reviewFiling(filing, action, action !== 'accept' ? reviewReason : undefined);
-      setSelectedFiling(null);
-      setReviewReason('');
+      closeReview();
       await fetchQueue();
     } catch (err) {
       const msg = getErrorDetail(err) || (err instanceof Error ? err.message : 'Review failed');
@@ -110,15 +118,33 @@ function ReviewQueue() {
     }
   }
 
-  function openReview(filing: FilingEnvelope) {
-    if (actionInProgress || (selectedFiling?.id === filing.id
-      && selectedFiling.submission_count === filing.submission_count)) return;
-    setSelectedFiling(filing);
+  function closeReview() {
+    reviewRequestRef.current?.abort();
+    setReview(null);
     setReviewReason('');
     setReviewError(null);
   }
 
-  const toggleSelect = (filing: FilingEnvelope) => {
+  async function openReview(filingId: number) {
+    if (actionInProgress || selectedFiling?.id === filingId) return;
+    reviewRequestRef.current?.abort();
+    const controller = new AbortController();
+    reviewRequestRef.current = controller;
+    setReview({ id: filingId });
+    setReviewReason('');
+    setReviewError(null);
+    try {
+      const filing = await getFiling(filingId, controller.signal);
+      if (!controller.signal.aborted) setReview({ id: filingId, filing });
+    } catch (err) {
+      if (!controller.signal.aborted) setReview({
+        id: filingId,
+        error: getErrorDetail(err) || "We couldn't load this filing. Please retry.",
+      });
+    }
+  }
+
+  const toggleSelect = (filing: FilingSummary) => {
     setSelectedSubmissions(prev => {
       const next = new Map(prev);
       if (next.has(filing.id)) next.delete(filing.id);
@@ -165,7 +191,7 @@ function ReviewQueue() {
 
   return (
     <div className="clerk-review">
-      <StaffCourtSelect disabled={!!selectedFiling || actionInProgress} />
+      <StaffCourtSelect disabled={!!review || actionInProgress} />
       <div className="clerk-header">
         <h2>Clerk Review Queue</h2>
         <div className="clerk-header-stats">
@@ -200,7 +226,7 @@ function ReviewQueue() {
               name="status"
               toolparamdescription="Queue status filter: all, submitted, or under_review"
               value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); setSelectedSubmissions(new Map()); setSelectedFiling(null); }}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); setSelectedSubmissions(new Map()); closeReview(); }}
               disabled={actionInProgress}
             >
               <option value="all">All Pending</option>
@@ -276,11 +302,11 @@ function ReviewQueue() {
                 return (
                   <tr
                     key={filing.id}
-                    className={`${selectedFiling?.id === filing.id ? 'selected' : ''} ${age.level === 'overdue' ? 'row-overdue' : ''}`}
-                    onClick={() => openReview(filing)}
+                    className={`${review?.id === filing.id ? 'selected' : ''} ${age.level === 'overdue' ? 'row-overdue' : ''}`}
+                    onClick={() => openReview(filing.id)}
                     tabIndex={0}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && e.target === e.currentTarget) openReview(filing);
+                      if (e.key === 'Enter' && e.target === e.currentTarget) openReview(filing.id);
                     }}
                   >
                     <td className="td-checkbox" onClick={(e) => e.stopPropagation()}>
@@ -298,7 +324,7 @@ function ReviewQueue() {
                     <td>
                       <span className={`age-badge ${age.level}`}>{age.text}</span>
                     </td>
-                    <td>{filing.documents.length}</td>
+                    <td>{filing.document_count}</td>
                     <td>
                       <span className={`status-badge ${filing.status}`}>
                         {filing.status.replace('_', ' ')}
@@ -319,12 +345,12 @@ function ReviewQueue() {
           {total > 25 && (
             <div className="pagination">
               <button className="btn btn-secondary btn-small" disabled={page <= 1 || loading || actionInProgress}
-                onClick={() => { setPage((p) => p - 1); setSelectedSubmissions(new Map()); setSelectedFiling(null); }}>
+                onClick={() => { setPage((p) => p - 1); setSelectedSubmissions(new Map()); closeReview(); }}>
                 Previous
               </button>
               <span>Page {page} of {Math.ceil(total / 25)}</span>
               <button className="btn btn-secondary btn-small" disabled={page >= Math.ceil(total / 25) || loading || actionInProgress}
-                onClick={() => { setPage((p) => p + 1); setSelectedSubmissions(new Map()); setSelectedFiling(null); }}>
+                onClick={() => { setPage((p) => p + 1); setSelectedSubmissions(new Map()); closeReview(); }}>
                 Next
               </button>
             </div>
@@ -332,19 +358,24 @@ function ReviewQueue() {
         </div>
 
         {/* Filing Detail Panel */}
-        {selectedFiling && (
+        {review && (
           <div className="filing-detail-panel">
             <div className="detail-panel-header">
-              <h3>Filing #{selectedFiling.id}</h3>
-              <span className={`status-badge ${selectedFiling.status}`}>
+              <h3>Filing #{review.id}</h3>
+              {selectedFiling && <span className={`status-badge ${selectedFiling.status}`}>
                 {selectedFiling.status.replace('_', ' ')}
-              </span>
+              </span>}
               <button type="button" className="btn btn-secondary btn-small" disabled={actionInProgress}
-                onClick={() => { setSelectedFiling(null); setReviewReason(''); setReviewError(null); }}>
+                onClick={closeReview}>
                 Close review
               </button>
             </div>
-
+            {!selectedFiling && !review.error && <p role="status">Loading filing details…</p>}
+            {review.error && <LoadError message={review.error} onRetry={() => openReview(review.id)} />}
+            {selectedFiling && <>
+            {!canReview && statusFilter !== 'waivers' && <p role="status">
+              This filing is no longer awaiting intake review. Refresh the queue for current work.
+            </p>}
             <div className="detail-section">
               <h4>Case Information</h4>
               <p>{selectedFiling.submission_count ? `Reviewing submission ${selectedFiling.submission_count}` : 'Reviewing a legacy submission without a recorded submission number'}</p>
@@ -425,14 +456,14 @@ function ReviewQueue() {
                 <button
                   className="btn btn-success"
                   onClick={() => handleReview(selectedFiling, 'accept')}
-                  disabled={actionInProgress || statusFilter === 'waivers'}
+                  disabled={actionInProgress || !canReview}
                 >
                   {actionInProgress ? 'Processing...' : 'Accept'}
                 </button>
                 <button
                   className="btn btn-warning"
                   onClick={() => handleReview(selectedFiling, 'return')}
-                  disabled={actionInProgress || !reviewReason.trim() || statusFilter === 'waivers'}
+                  disabled={actionInProgress || !reviewReason.trim() || !canReview}
                   title={!reviewReason.trim() ? 'Reason required' : ''}
                 >
                   Return for Correction
@@ -440,7 +471,7 @@ function ReviewQueue() {
                 <button
                   className="btn btn-danger"
                   onClick={() => handleReview(selectedFiling, 'reject')}
-                  disabled={actionInProgress || !reviewReason.trim() || statusFilter === 'waivers'}
+                  disabled={actionInProgress || !reviewReason.trim() || !canReview}
                   title={!reviewReason.trim() ? 'Reason required' : ''}
                 >
                   Reject
@@ -451,10 +482,11 @@ function ReviewQueue() {
                 re-file; the earlier submission remains in their history. <strong>Reject</strong> is final.
               </p>
             </div>
+            </>}
           </div>
         )}
 
-        {!selectedFiling && filings.length > 0 && (
+        {!review && filings.length > 0 && (
           <div className="filing-detail-panel empty-detail">
             <p>Select a filing from the queue to review it.</p>
           </div>

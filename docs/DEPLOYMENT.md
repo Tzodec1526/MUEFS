@@ -14,6 +14,19 @@ External clients must retain the submission number the reviewer saw and require 
 review after HTTP 409; retrying with a newly fetched number without review is unsafe.
 See the [review request contract](STATE_READINESS.md#implemented-receipt-workflow).
 
+Filing list responses now contain summaries with `document_count`, rather than full
+envelopes and attachment arrays. This applies to `GET /api/v1/filings` and
+`GET /api/v1/clerk/queue`, including pending waivers. Deploy their clients and API together;
+clients opening a filing must fetch `GET /api/v1/filings/{id}` and keep the submission
+number from that detail response for an individual review.
+
+Migration `9d34e6a81c72` replaces the filer ID index with one supporting newest-first
+listing and status counts. PostgreSQL builds the replacement concurrently before dropping
+the old index; a rerun recovers an invalid interrupted build. Allow Alembic's autocommit
+block to run outside any deployment-wide transaction. SQLite uses ordinary index DDL.
+The migration changes no filing records and can be downgraded independently of earlier
+retention migrations.
+
 ## 1. Configuration & secrets
 
 Copy `.env.example` to `.env` and change every demo value:
