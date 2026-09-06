@@ -3,6 +3,7 @@ import io
 import logging
 from contextlib import closing
 from dataclasses import dataclass, field
+from functools import cache
 from pathlib import Path
 from typing import BinaryIO
 
@@ -17,16 +18,18 @@ def _is_demo_mode() -> bool:
 
 
 def _local_storage_path() -> Path:
-    """Get local document storage directory for demo mode."""
-    p = Path("demo_uploads")
-    p.mkdir(exist_ok=True)
-    return p
+    """Only uploads create directories; reading missing storage must have no side effects."""
+    return Path(settings.local_storage_path)
 
 
+@cache
 def get_s3_client():
+    """Reuse a process-local connection pool; settings are loaded at process startup."""
     import boto3
     from botocore.config import Config
-    return boto3.client(
+    # Independent sessions also make concurrent first calls safe; boto3's shared
+    # default session must not create clients concurrently in upload worker threads.
+    return boto3.session.Session().client(
         "s3",
         endpoint_url=settings.s3_endpoint_url,
         aws_access_key_id=settings.s3_access_key,

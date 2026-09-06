@@ -100,6 +100,12 @@ verify the deployed callback in a browser. See
 - **Object storage:** MinIO or S3 with scoped credentials. Enable bucket versioning and a
   backup/lifecycle policy for filed documents.
 
+Use the [storage recovery audit](STORAGE_RECOVERY.md) on a quiescent restored database and
+matching objects. It checks archived originals, private decisions, all prepared public
+copies and retained transaction fingerprints with read-only credentials. Require a complete
+report, resolve discrepancies, and compare its inventory with the backup source before
+declaring recovery successful. It does not repair records or remove objects.
+
 ## 5. Malware scanning (ClamAV)
 
 The built-in heuristic scan is always on. For production, also enable ClamAV:

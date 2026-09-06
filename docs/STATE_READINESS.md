@@ -9,7 +9,7 @@ establish state approval or production readiness.
 
 | Requirement | Current evidence | Remaining work |
 |---|---|---|
-| Prove what was submitted | Each new submission has a retained transaction ID, UTC receipt time, filer name, document manifest and SHA-256 fingerprints, payment reference where present, and a downloadable receipt. | Court-approved retention schedules, trusted time monitoring, external archival controls and production storage verification. |
+| Prove what was submitted | Each new submission has a retained transaction ID, UTC receipt time, filer name, document manifest and SHA-256 fingerprints, payment reference where present, and a downloadable receipt. A read-only recovery audit compares stored bytes and retained transaction references. | Court-approved retention schedules, trusted time monitoring, external archival controls and validation of the deployed storage/recovery configuration. |
 | Preserve corrections and decisions | Corrections create another numbered submission. Earlier document bytes remain downloadable by the filer and court staff. Acceptance, return, rejection and CMS failure are separate retained events. | Effective filing-date decisions, judicial relief for transmission failures, and certified/file-stamped copies. |
 | Survive retries and simultaneous actions | Optional UUID `Idempotency-Key` on submission prevents duplicate receipts. PostgreSQL row locks refresh previously read state. Batch review uses a savepoint per filing. | Operational load tests, outages during real downstream submission, and end-to-end reconciliation. |
 | Publish reviewed public copies | Assigned staff prepare and inspect a separate PDF and public title, explicitly publish it, and withdraw public access with retained authority/history. Originals and receipts stay intact; fee-waiver records cannot use this publication path. | Court-approved classification/redaction policy, approved review tools, storage immutability and retention schedules. |
@@ -414,6 +414,33 @@ This verifies integrity at the transition, not continuing storage immutability. 
 storage permissions, versioning, backup/restore, retention and reconciliation procedures
 remain necessary. Full document review and the separate CMS, payment and electronic-service
 integration requirements remain unresolved.
+
+## Recovery verification
+
+The [storage recovery audit](STORAGE_RECOVERY.md) checks all current and archived document
+rows, private court decisions and prepared public copies, including withdrawn copies.
+It also compares submission, service-recording, fee-waiver and publication snapshots with
+current file metadata. It cannot silently accept hashes changed to conceal altered bytes
+when the retained transaction records a different fingerprint. Reports stream as JSON Lines,
+omit private titles/keys and distinguish complete, discrepant and incomplete runs.
+
+A local PostgreSQL/S3-compatible exercise restored a custom-format database backup and
+seven files into separate targets. Six transaction references and every detailed file
+result matched the source. Read-only audit accounts were denied writes. Corruption,
+matching changes to mutable metadata, a missing withdrawn copy and denied storage access
+produced failing reports; restoring backup data reproduced the source results. Regression
+coverage includes batched metadata paging and real concurrent/multipart S3 transfers.
+
+The command uses a database read snapshot, bounded metadata batches and 64 KiB storage
+reads. Receipt comparisons do not download the files again. Reusing the S3 client's
+connection pool reduced a seven-small-PDF verification pass from a 123.387 ms median to
+10.765 ms over five warmed local samples against commit `84e7ce0`. These measurements
+exclude process startup and do not establish production latency or statewide capacity.
+
+Full restore evidence still requires comparison with the backup inventory, recovery of
+non-file database records, protected object versions, court retention policies and tested
+recovery targets. A matching audit of an incomplete database cannot prove that omitted
+records never existed. The tool does not repair data or decide which objects may be deleted.
 
 ## Sources guiding the evaluation
 

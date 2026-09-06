@@ -207,6 +207,8 @@ for the full security model, threat boundaries, and hardening guide.
   birth and account numbers. Validation reuses those warnings; it does not certify redaction.
 - **Stored-file integrity** — submission and acceptance stream every current attachment
   and require its SHA-256 and byte count to match the uploaded record before proceeding.
+- **Recovery verification** — a [read-only storage audit](docs/STORAGE_RECOVERY.md) checks
+  restored files, archived copies and retained transaction fingerprints with a streamed report.
 - **Hardened authentication** — Keycloak RS256 JWTs (signature, issuer, expiry verified; no `none` algorithm); OIDC auto-provisioning requires a verified email and won't adopt privileged accounts.
 - **Audit logging & ownership checks** on every object, with parameterized queries throughout.
 

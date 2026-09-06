@@ -40,6 +40,7 @@ class Settings(BaseSettings):
 
     # Document processing
     max_file_size_mb: int = 100
+    local_storage_path: str = "demo_uploads"  # SQLite demos and restored local file collections
 
     # Upload malware screening (defense in depth on top of the MIME allowlist).
     # The built-in heuristic scan is offline and always-on so the demo needs no extra
