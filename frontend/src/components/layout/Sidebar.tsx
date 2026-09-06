@@ -24,6 +24,7 @@ function Sidebar() {
     { path: '/filing/new', label: 'New Filing', icon: FilePlus2, roles: ['attorney', 'srl'] },
     { path: '/filings', label: 'My Filings', icon: FolderOpen, roles: ['attorney', 'srl'] },
     { path: '/notifications', label: 'Notices', icon: Mail, roles: ['attorney', 'srl', 'clerk', 'admin'] },
+    { path: '/service/deliveries', label: 'Document deliveries', icon: FolderOpen, roles: ['attorney', 'srl', 'clerk', 'admin'] },
     { path: '/cases/search', label: 'Case Search', icon: Search, roles: ['attorney', 'clerk', 'srl', 'public', 'admin'] },
     { path: '/favorites', label: 'Favorites', icon: Star, roles: ['attorney', 'srl'] },
     { path: '/clerk/cases', label: 'Court Cases', icon: FolderOpen, roles: ['clerk', 'admin'], courtOnly: true },

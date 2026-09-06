@@ -1,6 +1,8 @@
+import hashlib
 import mimetypes
 import re
 from contextlib import closing
+from tempfile import SpooledTemporaryFile
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -31,8 +33,11 @@ def sanitize_filename(filename: str) -> str:
 class DocumentResponse(StreamingResponse):
     """Open storage after the request transaction commits, and close it on disconnect."""
 
-    def __init__(self, doc: FilingDocument | DocumentPublicCopy):
+    def __init__(
+        self, doc: FilingDocument | DocumentPublicCopy, *, integrity: tuple[str, int] | None = None,
+    ):
         self.file_key = doc.file_key
+        self.integrity = integrity
         safe_filename = sanitize_filename(doc.title)
         extension = mimetypes.guess_extension(doc.mime_type) or ""
         if extension and not safe_filename.lower().endswith(extension):
@@ -45,9 +50,33 @@ class DocumentResponse(StreamingResponse):
             },
         )
 
+    def open_file(self):
+        stream = document_service.download_document(self.file_key)
+        if self.integrity is None:
+            return stream
+        # Verify the exact bytes before sending headers. Large deliveries spill to
+        # disk; the object is read once and memory stays bounded.
+        verified = SpooledTemporaryFile(max_size=8 * 1024 * 1024)
+        digest, size = hashlib.sha256(), 0
+        try:
+            with closing(stream):
+                while chunk := stream.read(64 * 1024):
+                    digest.update(chunk)
+                    size += len(chunk)
+                    if size > self.integrity[1]:
+                        raise HTTPException(409, "Document failed its retained integrity check")
+                    verified.write(chunk)
+            if (digest.hexdigest(), size) != self.integrity:
+                raise HTTPException(409, "Document failed its retained integrity check")
+            verified.seek(0)
+            return verified
+        except BaseException:
+            verified.close()
+            raise
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         try:
-            file_stream = await run_in_threadpool(document_service.download_document, self.file_key)
+            file_stream = await run_in_threadpool(self.open_file)
         except OSError as exc:
             raise HTTPException(404, "Document file is unavailable") from exc
 

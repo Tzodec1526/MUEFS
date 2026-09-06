@@ -46,6 +46,9 @@ The archive contains the selected case and its court and case types, plus:
 - Participant records, private contact information, service-contact records and access flags.
 - Allocated payments and legacy payment references, with recorded status and assessment basis.
 - Filing notices, retained messages, and their delivery events.
+- Selected document delivery packages, frozen recipient instructions and addresses, and
+  recipient acknowledgments, download requests and retry requests. Linked notification
+  events retain the corresponding email messages and relay outcomes.
 - The court's published calendar revisions and audit events tied to the exported case,
   filings, documents, copies, payments and notifications.
 - Limited profiles for referenced users, preserving attribution without exporting their

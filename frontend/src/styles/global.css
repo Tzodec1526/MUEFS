@@ -3883,6 +3883,21 @@ textarea:focus-visible {
 .document-publication-page .publication-grid .review-card { margin-bottom: 0; }
 .publication-confirm { display: flex; gap: 12px; align-items: flex-start; margin-block: 24px; }
 .publication-confirm input { flex-shrink: 0; margin-top: 4px; }
+.service-page { max-width: 1100px; margin-inline: auto; overflow-wrap: anywhere; }
+.service-page .review-card { margin-block: 24px; }
+.service-page p, .service-page h3 { margin-block: 12px; }
+.service-page fieldset { border: 0; padding: 0; min-width: 0; }
+.service-page legend { font-size: 1.2rem; font-weight: 600; margin-block: 20px; }
+.service-page .checkbox-label { display: flex; align-items: flex-start; gap: 12px; margin-block: 16px; }
+.service-page .checkbox-label input { flex-shrink: 0; margin-top: 4px; }
+.service-choice { padding-block: 16px; border-bottom: 1px solid var(--border); }
+.service-issue { color: var(--text-secondary); }
+.service-list { list-style: none; padding: 0; }
+.service-actions { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+.service-page details { margin-top: 12px; }
+.service-page summary { cursor: pointer; }
+.service-page ol { padding-left: 24px; }
+.service-page ol li { margin-block: 16px; }
 .publication-review { border-left: 4px solid var(--primary); }
 @media (max-width: 720px) {
   .document-publication-page .publication-grid { grid-template-columns: 1fr; gap: 0; }

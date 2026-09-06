@@ -3,6 +3,7 @@ import { apiClient } from './client';
 export interface NotificationItem {
   id: number;
   filing_envelope_id: number | null;
+  delivery_id: string | null;
   type: string;
   subject: string;
   body: string;

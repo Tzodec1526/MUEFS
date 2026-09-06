@@ -27,6 +27,7 @@ from app.models.filing import FilingDocument, FilingEnvelope
 from app.models.filing_transaction import FilingTransaction
 from app.models.notification import Notification, NotificationDeliveryEvent, ServiceContact
 from app.models.payment import Payment
+from app.models.service_delivery import ServiceEvent, ServicePacket, ServiceRecipient
 from app.models.user import User
 from app.readonly_database import ReadOnlyDatabaseError, read_only_connection
 from app.services import document_service
@@ -132,6 +133,10 @@ async def export_case(case_id: int, output: Path) -> dict:
             ),
         )
         notice_ids = select(Notification.id).where(Notification.filing_envelope_id.in_(filing_ids))
+        packet_ids = select(ServicePacket.id).where(ServicePacket.case_id == case_id)
+        recipient_ids = select(ServiceRecipient.id).where(
+            ServiceRecipient.packet_id.in_(packet_ids)
+        )
         queries = [
             (Court, Court.id == case["court_id"]),
             (Case, Case.id == case_id),
@@ -153,6 +158,9 @@ async def export_case(case_id: int, output: Path) -> dict:
             (CaseParticipant, CaseParticipant.case_id == case_id),
             (Payment, payment_filter),
             (ServiceContact, ServiceContact.case_id == case_id),
+            (ServicePacket, ServicePacket.id.in_(packet_ids)),
+            (ServiceRecipient, ServiceRecipient.id.in_(recipient_ids)),
+            (ServiceEvent, ServiceEvent.service_recipient_id.in_(recipient_ids)),
             (Notification, Notification.id.in_(notice_ids)),
             (NotificationDeliveryEvent, NotificationDeliveryEvent.notification_id.in_(notice_ids)),
             (CourtCalendar, CourtCalendar.court_id == case["court_id"]),

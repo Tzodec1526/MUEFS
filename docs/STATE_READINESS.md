@@ -19,7 +19,7 @@ establish state approval or production readiness.
 | Record the correct legal filing date | Receipt instants and filing dates are separate. Published calendars establish business dates. Assigned staff can record a signed order establishing a different date, with retained before/after evidence and explicit case opening date changes. Acceptance honors the order without rewriting the receipt. | Court verification of calendars and signed orders, motion/adjudication procedures, downstream CMS synchronization and review of closures published after acceptance. Correcting a document does not automatically preserve its legal filing date. |
 | Resolve fee waivers correctly | A completed application accompanies the filing. Clerk waivers, referral and judicial decisions are separate court-scoped actions. Signed decision PDFs and denial amounts remain in private history; a filer can pay after denial without resubmitting. | Actual notice delivery, de novo review and judicial assignment, deadline calculation, case-wide continuation and reinstatement, court verification of signed forms and prisoner-specific procedures. |
 | Establish fees and account for payments | Assigned court staff record itemized assessments with authority, reasons and retained documents. Balances use completed payments allocated to that filing; revised assessments preserve earlier credits and expose overpayments. | Court validation of assessments and fee schedules, a real hosted payment processor, signed webhooks, reconciliation, refunds and accounting exports. |
-| Deliver electronic service | Assigned court staff record service instructions for reviewed participants, with verified electronic addresses, mail/hand-delivery destinations, deactivation and retained history. Service-only documents can be recorded with accurate labels. | Court-approved enrollment and consent policies, additional/delegated recipients, recipient selection, real document transmission, failures/retries, non-electronic service evidence and retained proof. A recorded document or in-app notice is not proof of service. |
+| Deliver electronic service | Staff review service instructions. Senders explicitly select retained subsequent documents and eligible recipients; immutable packages retain contents and addresses. An opt-in SMTP outbox queues protected links, rechecks instructions and records failures/retries. Recipients download only selected, verified bytes and can acknowledge the package. | Court-approved enrollment, consent and confidential-document policy; additional/delegated recipients; bounce feedback and failed-service remedies; non-electronic evidence and certified proof. Relay acceptance and download requests do not establish legally sufficient service. |
 | Send filing alerts reliably | An opt-in SMTP outbox commits with filing changes, checks verified recipients, retains messages and attempts, retries temporary failures and exposes uncertain outcomes to assigned court staff. | A court-approved relay and sender domain, bounce/delivery feedback, operational alerting and court approval of legally sufficient notice content and procedures. Generic email alerts do not establish legal service. |
 | Connect to the court's system of record | Acceptance is explicitly blocked outside demo mode when CMS integration is absent. | A documented court/vendor contract, credentialed sandbox, document/code mapping, idempotent delivery, status callbacks, error recovery and reconciliation. |
 | Operate statewide | Explicit identity provisioning, delegated court administration, immediate checks on subsequent requests after revocation, retained changes, PostgreSQL migrations and deployment guidance exist. | State federation and lifecycle integration, access recertification, availability targets, incident response, backup restoration drills, disaster recovery and migration from incumbent systems. |
@@ -40,13 +40,37 @@ Contact and participant versions prevent stale editors from overwriting reviewed
 Changed participant details or electronic identity/access prerequisites appear as review
 issues. Deactivation remains available when an address loses verification. Changes retain
 their actor, time, authority, participant snapshot and prior destination in case history
-and private case exports. Staff cannot edit their own service instructions. These records
-are private to assigned court staff and do not grant portal access or send messages.
+and private case exports. Staff cannot edit their own service instructions. Editing and
+full history require assigned court staff; authorized senders see current instructions
+when selecting recipients. Editing instructions does not grant portal access or send messages.
 
 Migration `a63b29d5e104` preserves legacy contacts as inactive, unlinked and unreviewed;
 it does not infer eligibility from an existing address. The interface currently supports
 one primary destination per participant. Additional/delegated recipients, operational
-enrollment procedures, delivery and failed-service remedies remain required work.
+enrollment procedures and failed-service remedies remain required work.
+
+## Selected document delivery
+
+An explicit sender action creates a retained package from the current submission receipt,
+with selected document manifests and frozen reviewed recipient instructions. A UUID request
+key prevents duplicate packages on replay. Initial-case service uses separate procedures;
+fee-waiver material is excluded. Documents are available only to each named account, the
+sender and assigned staff, without granting access to the rest of the filing. Current
+participant eligibility and restricted-case access are checked on recipient downloads.
+
+`SERVICE_DELIVERY_ENABLED` is a separate, default-off gate and requires the existing SMTP
+outbox configuration. The worker rechecks frozen service instructions before transmission.
+The interface preserves generic alert status, exact selected documents, download requests
+and explicit recipient acknowledgment as separate evidence. SMTP uncertainty requires staff
+review before retrying. Changed email instructions require a new delivery; old packages keep
+their original addresses and stable account recipients. Private exports include that history.
+
+Automated verification covers real loopback SMTP, PostgreSQL concurrent requests and
+append-only guards, SQLite/PostgreSQL migrations and exports, and S3-backed browser downloads.
+The production frontend was exercised with synthetic signed identities on desktop and mobile.
+This does not establish a legally sufficient service procedure, recipient inbox delivery or
+court approval. Bounce ingestion, non-electronic evidence, certified proof and deployed load,
+security and accessibility evaluations remain outstanding.
 
 The design keeps instructions, transmission and proof separate. [MCR 1.109(G)(6)–(7)](https://www.courts.michigan.gov/siteassets/rules-instructions-administrative-orders/michigan-court-rules/court-rules-book-ch-1-responsive-html5.zip/Court_Rules_Book_Ch_1/Court_Rules_Chapter_1/Court_Rules_Chapter_1.htm)
 addresses authorized recipients, service transactions and undeliverable transmissions.

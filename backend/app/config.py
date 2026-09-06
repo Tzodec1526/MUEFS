@@ -82,6 +82,8 @@ class Settings(BaseSettings):
 
     # Notices are queued only when explicitly enabled. A separate worker sends them.
     email_delivery_enabled: bool = False
+    # Explicitly enabled after the court configures and evaluates document delivery.
+    service_delivery_enabled: bool = False
     portal_base_url: str = ""
     smtp_host: str = ""
     smtp_port: int = 587

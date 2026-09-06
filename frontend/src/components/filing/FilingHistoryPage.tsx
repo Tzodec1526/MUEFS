@@ -73,10 +73,11 @@ export default function FilingHistoryPage() {
     {error && <LoadError message={error} onRetry={() => setAttempt(n => n + 1)} />}
     {!loading && !error && history && <>
       <div className="history-summary">
-        <span className={`status-badge ${history.status}`}>{history.status.replace(/_/g, ' ')}</span>
+        <span className={`status-badge ${history.status}`}>{history.status === 'served' ? 'Service documents recorded' : history.status.replace(/_/g, ' ')}</span>
         <span>{history.submission_count} recorded submission{history.submission_count === 1 ? '' : 's'}</span>
         <button className="btn btn-secondary btn-small" onClick={() => window.print()}>Print this page</button>
         <Link to={`/filings/${filingId}/fees`}>View fees &amp; payments</Link>
+        <Link to={`/filings/${filingId}/deliveries`}>Document deliveries</Link>
       </div>
       <p className="info-text">A receipt records what this system received. Court acceptance is a separate decision.
         Times below are recorded in UTC. Service-only records do not prove delivery to another party.</p>

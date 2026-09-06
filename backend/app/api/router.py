@@ -19,6 +19,7 @@ from app.api.notifications import router as notifications_router
 from app.api.payments import router as payments_router
 from app.api.public import router as public_router
 from app.api.service_contacts import router as service_contacts_router
+from app.api.service_deliveries import router as service_deliveries_router
 
 api_router = APIRouter()
 
@@ -29,6 +30,7 @@ api_router.include_router(court_rules_router)
 api_router.include_router(cases_router)
 api_router.include_router(case_participants_router)
 api_router.include_router(service_contacts_router)
+api_router.include_router(service_deliveries_router)
 api_router.include_router(filings_router)
 api_router.include_router(clerk_router)
 api_router.include_router(fee_waivers_router)

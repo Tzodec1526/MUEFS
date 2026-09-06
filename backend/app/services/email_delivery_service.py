@@ -14,14 +14,22 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
-from app.models.notification import DeliveryStatus, Notification, NotificationDeliveryEvent
+from app.models.notification import (
+    DeliveryStatus,
+    Notification,
+    NotificationDeliveryEvent,
+    NotificationType,
+)
 from app.models.user import User
+from app.services.service_contact_service import email_context
 
 MAX_AUTOMATIC_ATTEMPTS = 5
 INTERRUPTED_AFTER = timedelta(minutes=10)
 
 
 def validate_email_config() -> None:
+    if settings.service_delivery_enabled and not settings.email_delivery_enabled:
+        raise ValueError("SERVICE_DELIVERY_ENABLED requires EMAIL_DELIVERY_ENABLED")
     if not settings.email_delivery_enabled:
         return
     origin = urlsplit(settings.portal_base_url)
@@ -62,6 +70,13 @@ async def queue_email(
         notice.delivery_status = DeliveryStatus.DISABLED
         return
     validate_email_config()
+    delivery = None
+    if notice.notification_type == NotificationType.SERVICE_OF_PROCESS:
+        delivery, error = await email_context(db, notice.id)
+        if error:
+            notice.delivery_status = DeliveryStatus.BLOCKED
+            notice.last_error = error
+            return
     user = await db.get(User, notice.recipient_id)
     if (
         not user
@@ -80,6 +95,7 @@ async def queue_email(
     message["Date"] = format_datetime(now)
     message["Message-ID"] = make_msgid(domain=str(message["From"]).rsplit("@", 1)[1])
     path = (
+        f"/service/deliveries/{delivery.id}" if delivery else
         f"/filings/{notice.filing_envelope_id}/history"
         if notice.filing_envelope_id
         else "/notifications"
@@ -155,6 +171,12 @@ async def claim_email(sessions: async_sessionmaker[AsyncSession]) -> Notificatio
             outcome = "blocked"
         else:
             outcome = "started"
+            if notice.notification_type == NotificationType.SERVICE_OF_PROCESS:
+                _, error = await email_context(db, notice.id)
+                if error:
+                    notice.delivery_status = DeliveryStatus.BLOCKED
+                    notice.last_error = error
+                    outcome = "blocked"
         db.add(
             NotificationDeliveryEvent(
                 notification_id=notice.id,

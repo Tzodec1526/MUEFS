@@ -132,7 +132,8 @@ export default function NotificationsPage() {
         {notice.delivery_status === 'sent' && notice.sent_at && <p>Relay acceptance recorded: {parseServerDate(notice.sent_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}</p>}
         {notice.next_attempt_at && <p>Next attempt: {parseServerDate(notice.next_attempt_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}</p>}
         <div className="history-summary">
-          {notice.filing_envelope_id && <Link to={`/filings/${notice.filing_envelope_id}/history`}>View filing history</Link>}
+          {notice.delivery_id ? <Link to={`/service/deliveries/${notice.delivery_id}`}>Open document delivery</Link>
+            : notice.filing_envelope_id && <Link to={`/filings/${notice.filing_envelope_id}/history`}>View filing history</Link>}
           <button className="btn btn-secondary btn-small" aria-expanded={selected === notice.id}
             onClick={() => setSelected(selected === notice.id ? null : notice.id)}>Email history</button>
         </div>

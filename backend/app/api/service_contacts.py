@@ -9,14 +9,14 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user
-from app.config import settings
 from app.database import get_db
 from app.models.audit import AuditLog
-from app.models.case import COUNSEL_ROLES, Case, CaseParticipant
+from app.models.case import Case, CaseParticipant
 from app.models.notification import ServiceContact, ServiceMethod
-from app.models.user import User, UserType
+from app.models.user import User
 from app.services import audit_service
 from app.services.case_participant_service import participant_snapshot, require_case_staff
+from app.services.service_contact_service import contact_snapshot, routing_issues
 from app.utils.http_context import client_ip, client_user_agent
 
 router = APIRouter(tags=["Service instructions"])
@@ -42,75 +42,6 @@ class ContactChange(BaseModel):
         elif not self.address or self.email:
             raise ValueError("Mail or hand-delivery instructions require an address and no email")
         return self
-
-
-def contact_snapshot(contact: ServiceContact) -> dict:
-    return {
-        field: getattr(contact, field)
-        for field in (
-            "id",
-            "participant_id",
-            "participant_snapshot",
-            "user_id",
-            "name",
-            "method",
-            "email",
-            "address",
-            "is_active",
-            "authority",
-            "version",
-        )
-    }
-
-
-def routing_issues(
-    case: Case,
-    participant: CaseParticipant,
-    account: User | None,
-    contact: ServiceContact,
-) -> list[str]:
-    issues = []
-    if not contact.is_active:
-        issues.append("These service instructions are inactive.")
-    if not participant.is_active or not participant.reviewed_at:
-        issues.append("The participant needs an active, court-reviewed record.")
-    if contact.participant_snapshot != participant_snapshot(participant):
-        issues.append(
-            "The participant record changed. Court review of these instructions is required.",
-        )
-    if contact.method == ServiceMethod.ELECTRONIC:
-        if (
-            not account
-            or not account.is_active
-            or (not account.keycloak_id and not settings.allow_demo_mode)
-        ):
-            issues.append(
-                "Electronic routing requires an active account linked to the identity provider.",
-            )
-        elif (
-            contact.user_id != account.id
-            or not account.verified_email
-            or account.verified_email != account.email.strip().lower()
-            or account.verified_email != contact.email
-        ):
-            issues.append(
-                "The service email must match the linked account's current verified email.",
-            )
-        if case.is_sealed and not participant.access_enabled:
-            issues.append(
-                "Electronic routing requires this participant's restricted-case access grant.",
-            )
-        if participant.role in COUNSEL_ROLES and (
-            not account
-            or account.user_type != UserType.ATTORNEY
-            or not account.bar_number_verified
-            or not account.bar_number
-            or account.bar_number != participant.attorney_bar_number
-        ):
-            issues.append(
-                "Counsel routing requires the linked attorney's matching verified bar number."
-            )
-    return issues
 
 
 @router.get("/cases/{case_id}/participants/{participant_id}/service-contact")

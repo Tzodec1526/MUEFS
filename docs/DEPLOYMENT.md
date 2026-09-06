@@ -385,7 +385,50 @@ The current workflow supports one primary destination per participant. Service c
 and their before/after history are included in private case archives; access and retention
 controls must cover those addresses and source references.
 
-This workflow sends no documents or invitations. Do not enable a delivery integration
-by treating the legacy `served` filing status, an active contact or a generic email alert
-as completed service. Actual service needs recipient selection, secure document delivery,
-recorded transactions and failed-delivery handling under the applicable court rules.
+Editing service instructions sends no documents or invitations. The legacy `served`
+filing status means service-only documents were recorded; it does not establish service.
+
+## 15. Selected document delivery
+
+Migration `f7a21b84d903` adds append-only delivery packages, recipient snapshots and
+portal events. Retained evidence cannot be automatically downgraded. Apply migrations
+before running the updated API or worker, and include these tables in protected backups.
+
+After the court evaluates its enrollment, service authority, restricted-document policy
+and relay operations, explicitly set `SERVICE_DELIVERY_ENABLED=true` in both the API
+and existing notice worker. This also requires `EMAIL_DELIVERY_ENABLED=true` and the
+SMTP/portal configuration in section 7. Compose shares both flags between those services.
+The separate flag defaults to false; ordinary filing alerts do not enable document delivery.
+
+The filer or assigned staff opens **Filing history → Document deliveries → Select documents
+& recipients**. The sender must have a verified account and, for ordinary filers, current
+court-reviewed case participation. This workflow accepts subsequent, motion and service-only
+documents with a retained current receipt on an existing case. Case-initiating service uses
+the applicable procedure outside this workflow. Each request requires explicit contents,
+recipients, confirmation and a UUID `Idempotency-Key`; retries of the same key and selections
+return the same package. A changed receipt or contact version requires review again.
+
+Packages retain selected document manifests and each recipient's reviewed instructions.
+Fee-waiver material is excluded. Other confidential documents require the sender's explicit
+selection and review of recipient authority. Email contains a generic alert and a protected
+link to that recipient's package. It grants access only to selected documents, not the
+sender's full submission. Downloads recheck current participation/access and verify stored
+bytes against the retained hash and size before streaming. Large files spill to temporary
+disk after 8 MiB; provision and protect the API host's temporary storage accordingly.
+
+The existing outbox checks frozen instructions again when claiming an alert. Changed
+instructions block that alert instead of silently changing its destination. Confirmed
+temporary SMTP errors use the existing bounded retries. A failed alert can be retried from
+its delivery record by the sender or assigned staff with a reason; uncertain outcomes
+require staff review. Generic notification retries cannot bypass these controls. Disabling
+the service flag blocks unclaimed service alerts; an already claimed SMTP attempt may finish.
+Previously recorded packages remain accessible to authorized viewers.
+
+The delivery inbox and linked notices let recipients download and explicitly acknowledge
+a package. Download requests, acknowledgments and SMTP results are separate retained events,
+included in private case archives. Email-address changes do not retarget past packages;
+loss of case participation or required access prevents recipient downloads. Relay acceptance
+and download requests do not prove inbox receipt, transfer completion or legally sufficient
+service. This release does not ingest bounces, record postal service evidence, certify proof
+of service, or calculate remedies/deadlines. Establish those procedures and validate the
+deployed configuration before a court pilot. Use only a loopback mail sink for synthetic tests.

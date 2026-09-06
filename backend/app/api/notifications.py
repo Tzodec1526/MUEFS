@@ -10,7 +10,13 @@ from app.api.auth import get_current_user_id
 from app.config import settings
 from app.database import get_db
 from app.models.filing import FilingEnvelope
-from app.models.notification import DeliveryStatus, Notification, NotificationDeliveryEvent
+from app.models.notification import (
+    DeliveryStatus,
+    Notification,
+    NotificationDeliveryEvent,
+    NotificationType,
+)
+from app.models.service_delivery import ServiceRecipient
 from app.services.access_service import user_is_court_staff_for_court
 from app.services.email_delivery_service import queue_email
 
@@ -46,8 +52,9 @@ async def list_notifications(
     if delivery_status is not None:
         filters.append(Notification.delivery_status == delivery_status)
     total = await db.scalar(select(func.count()).select_from(Notification).where(*filters)) or 0
-    rows = await db.scalars(
-        select(Notification)
+    rows = await db.execute(
+        select(Notification, ServiceRecipient.id)
+        .outerjoin(ServiceRecipient, ServiceRecipient.notification_id == Notification.id)
         .options(defer(Notification.email_message))
         .where(*filters)
         .order_by(Notification.created_at.desc(), Notification.id.desc())
@@ -59,6 +66,7 @@ async def list_notifications(
             {
                 "id": n.id,
                 "filing_envelope_id": n.filing_envelope_id,
+                "delivery_id": delivery_id,
                 "type": n.notification_type,
                 "subject": n.subject,
                 "body": n.body,
@@ -70,7 +78,7 @@ async def list_notifications(
                 "sent_at": _timestamp(n.sent_at),
                 "next_attempt_at": _timestamp(n.next_attempt_at),
             }
-            for n in rows
+            for n, delivery_id in rows
         ],
         "total": total,
         "page": page,
@@ -140,6 +148,7 @@ async def delivery_history(
         "page": page,
         "message_id": notice.email_message_id,
         "can_retry": settings.email_delivery_enabled
+        and notice.notification_type != NotificationType.SERVICE_OF_PROCESS
         and (
             notice.delivery_status
             in (DeliveryStatus.DISABLED, DeliveryStatus.BLOCKED, DeliveryStatus.FAILED)
@@ -157,6 +166,8 @@ async def retry_delivery(
     user_id: int = Depends(get_current_user_id),
 ):
     notice, staff = await _notice_for_viewer(db, notice_id, user_id, lock=True)
+    if notice.notification_type == NotificationType.SERVICE_OF_PROCESS:
+        raise HTTPException(409, "Review and retry this alert from its document delivery record")
     if not settings.email_delivery_enabled:
         raise HTTPException(status_code=503, detail="Email delivery is not enabled")
     if not data.reason.strip():

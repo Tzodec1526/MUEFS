@@ -21,6 +21,9 @@ const CourtCaseDirectory = lazy(() => import('./components/courts/CourtCaseDirec
 const DocumentPublicationPage = lazy(() => import('./components/courts/DocumentPublicationPage'));
 const CaseParticipantsPage = lazy(() => import('./components/courts/CaseParticipantsPage'));
 const ServiceContactPage = lazy(() => import('./components/courts/ServiceContactPage'));
+const DeliveriesPage = lazy(() => import('./components/service/DeliveriesPage'));
+const DeliveryComposePage = lazy(() => import('./components/service/DeliveryComposePage'));
+const DeliveryDetailPage = lazy(() => import('./components/service/DeliveryDetailPage'));
 const CourtCalendarPage = lazy(() => import('./components/courts/CourtCalendarPage'));
 const NotificationsPage = lazy(() => import('./components/notifications/NotificationsPage'));
 const AdministrationPage = lazy(() => import('./components/admin/AdministrationPage'));
@@ -227,6 +230,10 @@ function App() {
                         <Route path="/cases/search" element={<CaseSearch />} />
                         <Route path="/courts/:courtId/calendar" element={<CourtCalendarPage key={location.pathname} />} />
                         <Route path="/notifications" element={<NotificationsPage />} />
+                        <Route path="/service/deliveries" element={<DeliveriesPage key={location.pathname} />} />
+                        <Route path="/service/deliveries/:deliveryId" element={<DeliveryDetailPage key={location.pathname} />} />
+                        <Route path="/filings/:filingId/deliveries" element={<DeliveriesPage key={location.pathname} />} />
+                        <Route path="/filings/:filingId/deliveries/new" element={<DeliveryComposePage key={location.pathname} />} />
                         <Route path="/admin" element={<AdministrationPage />} />
                         <Route path="/cases/:caseId/participants" element={<CourtWorkspace><CaseParticipantsPage /></CourtWorkspace>} />
                         <Route path="/cases/:caseId/participants/:participantId/service-contact" element={<CourtWorkspace><ServiceContactPage /></CourtWorkspace>} />
