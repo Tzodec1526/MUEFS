@@ -240,9 +240,25 @@ updates. The client protocol follows the [ClamAV INSTREAM specification](https:/
 
 ## 6. Monitoring & operations
 
-- **Health:** the API exposes `GET /health` for process liveness; the Compose backend
-  already checks it. Verify database, object storage and other dependencies separately
-  before routing filing traffic to a deployment.
+- **Liveness:** `GET /health` checks only whether the API process can respond. Use it for
+  process restart decisions; a database outage does not make this endpoint fail.
+- **Database readiness:** `GET /ready` returns 200 only when the API can obtain a database
+  connection and its recorded Alembic revisions exactly match the migrations bundled with
+  this build. Missing, older or unknown revisions return 503 `schema_mismatch`. Connection
+  failures return `database_unavailable`; the three-second budget covers pool acquisition,
+  queries and connection release, with `database_timeout` on expiry. Responses are uncached,
+  and 503 responses include `Retry-After: 5`. They expose no connection details. The probe
+  performs metadata reads; it never applies migrations or repairs the database.
+  Compose and Render use `/ready`; configure production traffic routing to require it too.
+  Exact revision matching requires a coordinated release: applying a migration also makes
+  older API builds fail readiness. Plan traffic routing or a maintenance window accordingly,
+  and apply migrations before directing filing traffic to the new build. A recorded migration
+  revision is not a full schema-integrity or restore audit. Monitor object storage, identity,
+  Redis, scanners and workers separately; this endpoint does not test their availability or
+  establish overall filing readiness.
+  Hosted-demo checks read the existing seed template through a read-only SQLite connection.
+  Health and readiness probes create no visitor cookie or sandbox, and a missing template
+  fails the check without being recreated. Individual visitor databases are not probed.
 - **Audit log:** filing and access actions are recorded server-side; export them to your
   SIEM / log store for retention.
 

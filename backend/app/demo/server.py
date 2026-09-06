@@ -15,6 +15,8 @@ from pathlib import Path
 
 from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse, Response
+from sqlalchemy import URL
+from sqlalchemy.ext.asyncio import create_async_engine
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.config import settings
@@ -24,6 +26,10 @@ from app.main import app
 
 # Seed the template database once, before the server takes traffic.
 session_db.seed_template()
+app.state.readiness_engine = create_async_engine(URL.create(
+    "sqlite+aiosqlite", database=session_db._template_db().resolve().as_uri(),
+    query={"mode": "ro", "uri": "true"},
+))
 
 # Every visitor gets their own sandbox instead of the single global database.
 app.dependency_overrides[get_db] = session_db.get_demo_db
@@ -41,7 +47,8 @@ class DemoSessionMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
+        if (scope["type"] != "http"
+                or scope.get("path", "").rstrip("/") in {"/health", "/ready"}):
             await self.app(scope, receive, send)
             return
         sid, set_cookie = session_db.resolve_sid(Request(scope))
@@ -84,7 +91,7 @@ async def spa(full_path: str) -> FileResponse:
     """Serve the built SPA — a real static file if one exists, else index.html so
     client-side routes (e.g. /cases/search) survive a refresh. API and docs paths
     are handled by earlier routes; anything else under them 404s rather than serving HTML."""
-    if full_path.startswith(("api/", "docs", "redoc", "openapi", "health", "config.js")):
+    if full_path.startswith(("api/", "docs", "redoc", "openapi", "health", "ready", "config.js")):
         raise HTTPException(status_code=404)
     candidate = (_STATIC_ROOT / full_path).resolve()
     if full_path and candidate.is_file() and candidate.is_relative_to(_STATIC_ROOT):

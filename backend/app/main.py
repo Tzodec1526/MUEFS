@@ -6,10 +6,12 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app import database
 from app.api.router import api_router
 from app.config import settings
 from app.middleware.rate_limit import RateLimitMiddleware, close_rate_limit_redis
 from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.readiness import router as readiness_router
 from app.security.startup import validate_security_config
 
 logger = logging.getLogger(__name__)
@@ -18,8 +20,11 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     validate_security_config()
-    yield
-    await close_rate_limit_redis()
+    try:
+        yield
+    finally:
+        await close_rate_limit_redis()
+        await getattr(app.state, "readiness_engine", database.engine).dispose()
 
 
 app = FastAPI(
@@ -50,6 +55,7 @@ app.add_middleware(RateLimitMiddleware)
 
 
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(readiness_router)
 
 
 @app.exception_handler(Exception)
@@ -63,5 +69,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 
 @app.get("/health")
-async def health_check() -> dict[str, str]:
-    return {"status": "healthy", "service": "muefs-api"}
+async def health_check() -> JSONResponse:
+    return JSONResponse(
+        content={"status": "healthy", "service": "muefs-api"},
+        headers={"Cache-Control": "no-store"},
+    )
