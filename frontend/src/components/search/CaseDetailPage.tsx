@@ -208,7 +208,7 @@ function CaseDetailPage() {
             <Link2 size={16} aria-hidden="true" />
             <span className="sr-only">Copy shareable case link</span>
           </button>
-          {caseData.can_manage_records && <Link to={`/cases/${caseData.id}/participants`} className="btn btn-secondary">Manage participants</Link>}
+          {caseData.can_manage_records && <Link to={`/cases/${caseData.id}/participants`} className="btn btn-secondary">Manage case access</Link>}
           {isFiler && (
             <button
               className={`fav-btn-large ${isFavorited ? 'favorited' : ''}`}

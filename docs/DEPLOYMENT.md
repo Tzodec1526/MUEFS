@@ -344,7 +344,7 @@ decision from a role inferred by filing acceptance. A per-case audit event recor
 review is needed; the migration does not invent approval or delete the old records.
 
 Before opening an upgraded portal to users, assigned court staff must review the affected
-records through **Court Cases → Manage participants**, using the court's authorized source.
+records through **Court Cases → Manage case access**, using the court's authorized source.
 Record the reason/reference, correct the role, link the intended existing account and
 explicitly grant access where authorized. Counsel grants also require a matching verified
 bar number. Ambiguous case-insensitive email matches must be resolved by identity
@@ -358,6 +358,23 @@ someone's remaining access. History is retained; automatic downgrade is refused.
 This rollout requires court approval of the access policy and record review. Participant
 records do not replace CMS appearance data, court orders governing access, withdrawal
 procedures, or electronic-service enrollment.
+
+Public case access instructions use the same screen and existing `participant_version`;
+this addition needs no new migration. Deploy the client and API together. Assigned clerks,
+judges and administrators can record a restriction or restoration with a reason and
+authority reference. A system administrator needs an assignment at this court too.
+External clients use `PUT /api/v1/cases/{caseId}/public-access` with `expected_version`,
+`is_sealed`, `reason` and `authority_reference`; restoration also requires
+`confirm_public_release: true`. The legacy `is_sealed` field controls portal visibility.
+The participant history endpoint now includes `case.public_access_changed` events.
+
+Validate the court's authority and record-level exceptions before changing case-wide
+access. A restriction hides public search/docket/download access on subsequent requests;
+it does not recall prior downloads or revoke independent staff, participant or filer
+access. Restoration exposes eligible records according to their existing document
+settings. Verify public and restricted documents with separate accounts after each change.
+On HTTP 409 or an uncertain response, reload the records and inspect history before a new
+instruction. Public-access and participant edits invalidate each other's older versions.
 
 ## 9. Container images
 

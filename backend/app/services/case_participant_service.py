@@ -68,7 +68,7 @@ async def change_participant(
     )
     case = await require_case_staff(db, actor, case_id)
     if case.participant_version != data.expected_version:
-        raise HTTPException(409, "The participant records changed. Refresh before saving")
+        raise HTTPException(409, "The case access records changed. Refresh before saving")
     participant = await db.get(CaseParticipant, participant_id) if participant_id else None
     if participant_id and (participant is None or participant.case_id != case.id):
         raise HTTPException(404, "Participant not found on this case")
@@ -127,7 +127,7 @@ async def change_participant(
         .returning(Case.participant_version)
     )
     if version is None:
-        raise HTTPException(409, "The participant records changed. Refresh before saving")
+        raise HTTPException(409, "The case access records changed. Refresh before saving")
     if participant is None:
         participant = CaseParticipant(case_id=case_id, **values)
         db.add(participant)

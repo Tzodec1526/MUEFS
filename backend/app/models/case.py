@@ -52,6 +52,7 @@ class Case(Base):
     filing_date: Mapped[date | None]
     filing_date_version: Mapped[int] = mapped_column(default=0, server_default="0")
     judge_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
+    # Shared by participant grants and case-wide public access instructions.
     participant_version: Mapped[int] = mapped_column(default=0, server_default="0")
 
     __table_args__ = (

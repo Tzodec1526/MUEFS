@@ -664,10 +664,33 @@ measures response size, not production latency or statewide load capacity.
 
 **Court Cases** lists public and sealed matters only for a staff member's assigned court,
 with an exact case-number lookup and 25-record pages. The case docket links assigned staff
-to **Manage participants**. Staff can record a party or counsel, identify a represented
+to **Manage case access**. Staff can record a party or counsel, identify a represented
 party, link an existing account and explicitly grant restricted-case access. Generic
 attorney roles accommodate representation that is not accurately described as plaintiff
 or defendant. Retiring a record preserves it as former participation and removes its grant.
+
+The same screen now records court-authorized instructions to restrict or restore public
+case access. Restricting a case removes it from public search and unaffiliated favorites
+and denies subsequent public docket/document requests. Court staff, explicit participant
+grants and filers' access to their own envelopes remain governed by existing permissions.
+Restoration requires an explicit confirmation and preserves individual document settings:
+confidential documents remain restricted, while eligible accepted records become public
+again. Staff must review the court's authority and existing publication settings before
+restoring access. The control records an existing instruction; it does not adjudicate a
+motion, issue a sealing order or implement document-specific exceptions. Use the separate
+document publication controls for instructions limited to particular records. Courts must
+validate those distinctions against applicable statutes, rules and orders; see the
+[Michigan Judicial Institute's access guidance](https://www.courts.michigan.gov/4a5eab/siteassets/publications/benchbooks/civil/civilresponsivehtml5.zip/Civil/Ch_1_Trial_Court_Issues/Access_to_Court_Files_and_Records-.htm?rhtocid=_1_1_1).
+
+Every public-access instruction requires a reason and authority reference. It commits the
+restriction, shared access revision and private before/after audit together. An unchanged
+instruction creates no audit entry or revision. Public-access changes and participant
+edits share the existing `participant_version`, so either invalidates an older editor of
+the other. No new table or migration is needed. The editor disables pending or uncertain
+changes and requires a reload after a lost response or conflict. History includes both
+types of access changes, loads only when requested and remains paginated. This removes
+the history count and page queries from the initial participant screen. Case archives
+include the case's current restriction and these retained case audit events.
 
 Acceptance previously inferred every filer to be a plaintiff or plaintiff's attorney and
 independently granted accepted filers access to sealed dockets. Both paths are deleted.
@@ -701,6 +724,11 @@ Verification covers grant/retirement, retained private access, counsel identity 
 cross-court denials, ambiguous identities, pagination, stale edits, failed audit rollback,
 historical migration and PostgreSQL concurrency on fresh and migrated schemas. Local
 Chromium exercises the staff workflow, public-search boundary and desktop/mobile layouts.
+Additional public-access checks cover search, docket, download and favorite visibility;
+preserved confidential documents, original bytes and participant grants; concurrent access
+and participant changes; authority revocation during a pending request; and rollback after
+a deferred audit failure. Browser checks exercise uncertain-response recovery, confirmation
+before restoration, conflicts and on-demand history loading with synthetic court records.
 These administrative records do not establish legal appearance, approve withdrawal,
 replace the court's system of record, or enroll anyone in electronic service. A court
 must approve the access policy and migration review before operational use.

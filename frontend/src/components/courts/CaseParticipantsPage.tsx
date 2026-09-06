@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { isAxiosError } from 'axios';
 import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { participantRoles } from '../../api/cases';
@@ -17,12 +18,14 @@ interface Records {
 }
 interface History {
   total: number; events: { id: number; action: string; occurred_at: string; details: {
-    actor_name?: string; reason?: string; before?: Record<string, unknown>; after?: Record<string, unknown>;
+    actor_name?: string; reason?: string; authority_reference?: string;
+    before?: Record<string, unknown>; after?: Record<string, unknown>;
   } }[];
 }
 const fields: Record<string, string> = {
   party_name: 'Name', role: 'Role', user_id: 'Linked account', attorney_bar_number: 'Bar number',
   represented_party_name: 'Represented party', is_active: 'Active participant', access_enabled: 'Restricted-case access',
+  is_sealed: 'Public case access restricted',
 };
 
 function ParticipantForm({ caseId, record, version, onSaved }: {
@@ -84,6 +87,57 @@ function ParticipantForm({ caseId, record, version, onSaved }: {
   </form>;
 }
 
+function PublicAccessForm({ caseId, restricted, version, onSaved, onReload }: {
+  caseId: string; restricted: boolean; version: number; onSaved: () => void; onReload: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [mustReload, setMustReload] = useState(false);
+  const [error, setError] = useState('');
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy || mustReload) return;
+    const values = new FormData(event.currentTarget);
+    setBusy(true); setError('');
+    try {
+      await apiClient.put(`/cases/${caseId}/public-access`, {
+        expected_version: version, is_sealed: !restricted,
+        confirm_public_release: values.get('confirm_public_release') === 'on',
+        reason: values.get('reason'), authority_reference: values.get('authority_reference'),
+      });
+      onSaved();
+    } catch (err) {
+      const status = isAxiosError(err) ? err.response?.status : undefined;
+      setMustReload(!status || status >= 500 || [401, 403, 409].includes(status));
+      setError(getErrorDetail(err) || 'The change could not be confirmed. Reload the records and review history before trying again.');
+    } finally { setBusy(false); }
+  }
+  return <details className="admin-detail-section">
+    <summary>Change public case access</summary>
+    <form className="admin-account-form" onSubmit={save}>
+      <p>Record an instruction authorized by the court. This changes access throughout this portal; it does not issue a sealing order.
+        Use document-level public access controls when an instruction applies only to particular documents.</p>
+      <p>{restricted
+        ? 'Restoring public access exposes the case number, title, party names, and accepted records allowed by their existing document settings. Review those settings and the court’s authority before proceeding.'
+        : 'Restricting public access removes this case from public search and blocks public docket and document requests. Authorized staff, explicit participant grants, and filers’ access to their own records remain.'}</p>
+      <fieldset disabled={busy || mustReload}>
+        <legend>{restricted ? 'Restore public case access' : 'Restrict public case access'}</legend>
+        <div className="form-group"><label htmlFor="case-access-authority">Authority or order reference</label>
+          <input id="case-access-authority" name="authority_reference" maxLength={500} required /></div>
+        <div className="form-group"><label htmlFor="case-access-reason">Reason for this change</label>
+          <textarea id="case-access-reason" name="reason" rows={3} maxLength={1000} required /></div>
+        {restricted && <label className="checkbox-label"><input type="checkbox" name="confirm_public_release" required />
+          I verified the court&apos;s instruction to restore public access and reviewed the current document settings.</label>}
+        <button className="btn btn-primary" type="submit">{busy ? 'Saving…' : restricted ? 'Restore public access' : 'Restrict public access'}</button>
+      </fieldset>
+      {busy && <p role="status">Saving the court&apos;s access instruction…</p>}
+      {error && <div className="alert alert-error" role="alert"><p>{error}</p>
+        {mustReload && <><p>Review the current records and history before another change. Reloading replaces this form.</p>
+          <button className="btn btn-secondary" type="button" onClick={onReload}>Reload case access records</button></>}
+      </div>}
+    </form>
+  </details>;
+}
+
 function ParticipantHistory({ caseId }: { caseId: string }) {
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
@@ -94,7 +148,7 @@ function ParticipantHistory({ caseId }: { caseId: string }) {
     const controller = new AbortController();
     apiClient.get<History>(`/cases/${caseId}/participants/history`, { params: { page }, signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load participant history.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load case access history.' }); });
     return () => controller.abort();
   }, [caseId, page, key]);
   function display(value: unknown, field: string) {
@@ -104,24 +158,26 @@ function ParticipantHistory({ caseId }: { caseId: string }) {
     return field === 'user_id' ? `Account ${value}` : String(value);
   }
   return <section className="admin-detail-section">
-    <h3>Retained participant history</h3>
+    <h3>Retained case access history</h3>
     {!current && <p role="status">Loading history…</p>}
     {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
-      {!current.data.total && <p>No participant changes recorded.</p>}
+      {!current.data.total && <p>No case access changes recorded.</p>}
       <ol className="admin-history">{current.data.events.map(event => <li key={event.id}>
         <strong>{event.action === 'case.participant_created' ? 'Participant added'
-          : event.action === 'case.participant_changed' ? 'Participant changed' : 'Legacy records require review'}
+          : event.action === 'case.participant_changed' ? 'Participant changed'
+          : event.action === 'case.public_access_changed' ? 'Public case access changed' : 'Legacy records require review'}
           {event.details.after?.party_name ? ` · ${event.details.after.party_name}` : ''}</strong>
         <p>{parseServerDate(event.occurred_at).toISOString().replace('T', ' ').replace('Z', ' UTC')} · {event.details.actor_name || 'Database migration'}</p>
         <p>{event.details.reason}</p>
+        {event.details.authority_reference && <p>Authority: {event.details.authority_reference}</p>}
         {event.details.after && <details><summary>View recorded changes</summary><dl className="admin-changes">{Object.entries(fields).filter(([field]) =>
           event.details.before?.[field] !== event.details.after?.[field],
         ).map(([field, label]) => <div key={field}><dt>{label}</dt><dd>
           {display(event.details.before?.[field], field)} → {display(event.details.after?.[field], field)}
         </dd></div>)}</dl></details>}
       </li>)}</ol>
-      {current.data.total > 25 && <nav className="pagination" aria-label="Participant history pages">
+      {current.data.total > 25 && <nav className="pagination" aria-label="Case access history pages">
         <button className="btn btn-secondary" disabled={page === 1} onClick={() => setPage(n => n - 1)}>Previous changes</button>
         <span>Page {page} of {Math.ceil(current.data.total / 25)}</span>
         <button className="btn btn-secondary" disabled={page * 25 >= current.data.total} onClick={() => setPage(n => n + 1)}>Next changes</button>
@@ -136,6 +192,7 @@ export default function CaseParticipantsPage() {
   const [attempt, setAttempt] = useState(0);
   const [selection, setSelection] = useState<number | 'new' | null>(null);
   const [notice, setNotice] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
   const [result, setResult] = useState<{ key: string; data?: Records; error?: string }>();
   const key = `${caseId}:${page}:${attempt}`;
   const current = result?.key === key ? result : undefined;
@@ -153,12 +210,17 @@ export default function CaseParticipantsPage() {
       setSelection(null); setNotice('Participant record saved.'); setAttempt(n => n + 1);
     }} />;
   return <section className="case-participants-page">
-    <div className="page-header"><h2>Case participants</h2><Link to={`/cases/${caseId}`} className="btn btn-secondary">Back to case</Link></div>
+    <div className="page-header"><h2>Case access and participants</h2><Link to={`/cases/${caseId}`} className="btn btn-secondary">Back to case</Link></div>
     {!current && <p role="status">Loading participant records…</p>}
     {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
       <h3>{current.data.case_number} · {current.data.title}</h3>
-      <p>{current.data.is_sealed ? 'Sealed case. ' : ''}Record court-authorized participation and portal access. Saving a record does not file an appearance, approve withdrawal, or enroll anyone in electronic service.</p>
+      <p><strong>{current.data.is_sealed ? 'Public case access is restricted.' : 'Public case access is enabled.'}</strong></p>
+      <PublicAccessForm key={`${caseId}:${current.data.participant_version}`} caseId={caseId}
+        restricted={current.data.is_sealed} version={current.data.participant_version}
+        onSaved={() => { setSelection(null); setNotice('Public case access instruction recorded.'); setAttempt(n => n + 1); }}
+        onReload={() => { setSelection(null); setNotice(''); setAttempt(n => n + 1); }} />
+      <p>Record court-authorized participation and portal access. Saving a participant record does not file an appearance, approve withdrawal, or enroll anyone in electronic service.</p>
       {notice && <p className="alert alert-success" role="status">{notice}</p>}
       <div className="participant-actions">
         <button className="btn btn-primary" onClick={() => { setSelection('new'); setNotice(''); }}>Add participant</button>
@@ -184,7 +246,9 @@ export default function CaseParticipantsPage() {
         <span>Page {page} of {Math.ceil(current.data.total / 25)}</span>
         <button className="btn btn-secondary" disabled={page * 25 >= current.data.total} onClick={() => { setPage(n => n + 1); setSelection(null); }}>Next participants</button>
       </nav>}
-      <ParticipantHistory key={`${caseId}:${attempt}`} caseId={caseId} />
+      <button className="btn btn-secondary" onClick={() => setShowHistory(value => !value)} aria-expanded={showHistory}>
+        {showHistory ? 'Hide case access history' : 'View case access history'}</button>
+      {showHistory && <ParticipantHistory key={`${caseId}:${attempt}`} caseId={caseId} />}
     </>}
   </section>;
 }

@@ -56,7 +56,7 @@ export default function CourtCaseDirectory() {
       <ul className="court-case-list">{current.data.cases.map(item => <li key={item.id}>
         <div><Link to={`/cases/${item.id}`}><strong>{item.case_number}</strong> — {item.title}</Link>
           <p>{item.status} {item.is_sealed && '· Sealed'}</p></div>
-        <Link className="btn btn-secondary btn-small" to={`/cases/${item.id}/participants`}>Manage participants</Link>
+        <Link className="btn btn-secondary btn-small" to={`/cases/${item.id}/participants`}>Manage case access</Link>
       </li>)}</ul>
       <nav className="pagination" aria-label="Court case pages">
         <button className="btn btn-secondary" disabled={cursors.length === 1} onClick={() => setCursors(items => items.slice(0, -1))}>Previous cases</button>
