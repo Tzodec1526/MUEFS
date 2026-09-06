@@ -64,6 +64,11 @@ class FilingEnvelope(Base):
     filing_date: Mapped[date | None]
     filing_date_basis: Mapped[dict | None] = mapped_column(JSON)
     filing_date_version: Mapped[int] = mapped_column(default=0, server_default="0")
+    fee_version: Mapped[int] = mapped_column(default=0, server_default="0")
+    fee_review_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fee_assessment_id: Mapped[str | None] = mapped_column(String(36), ForeignKey(
+        "filing_transactions.id", use_alter=True, name="fk_filing_fee_assessment",
+    ))
 
     documents: Mapped[list["FilingDocument"]] = relationship(
         back_populates="envelope",
@@ -78,6 +83,7 @@ class FilingEnvelope(Base):
         Index('ix_filing_court_status_submitted', 'court_id', 'status', 'submitted_at'),
         Index('ix_filing_court_waiver', 'court_id', 'fee_waiver_requested',
               'fee_waiver_granted', 'submitted_at'),
+        Index('ix_filing_court_fee_review', 'court_id', 'fee_review_requested_at', 'id'),
     )
 
 

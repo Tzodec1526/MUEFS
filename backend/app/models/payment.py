@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, Integer, String, func
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, String, func, true
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -26,6 +26,11 @@ class Payment(Base):
     __tablename__ = "payments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    envelope_id: Mapped[int | None] = mapped_column(ForeignKey(
+        "filing_envelopes.id", use_alter=True, name="fk_payment_envelope",
+    ), index=True)
+    fee_basis: Mapped[dict | None] = mapped_column(JSON)
+    is_simulated: Mapped[bool] = mapped_column(default=True, server_default=true())
     amount_cents: Mapped[int] = mapped_column(Integer)
     status: Mapped[PaymentStatus] = mapped_column(
         Enum(PaymentStatus), default=PaymentStatus.PENDING

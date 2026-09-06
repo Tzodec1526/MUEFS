@@ -60,6 +60,8 @@ async def decide_fee_waiver(
         raise HTTPException(status_code=400, detail="Referral does not enter a court decision")
 
     now = datetime.now(UTC)
+    filing.fee_version += 1
+    filing.fee_review_requested_at = None
     details: dict = {"basis": action}
     doc = None
     if action == "refer":

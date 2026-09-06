@@ -38,11 +38,11 @@ export default function FeeWaiverPanel({ filingId, waiver, onChange }: {
   }
 
   async function pay() {
-    if (waiver.amount_due_cents == null) return;
+    if (waiver.balance_due_cents == null) return;
     setBusy(true);
     setError(null);
     try {
-      await processPayment(filingId, waiver.amount_due_cents, 'credit_card');
+      await processPayment(filingId, waiver.balance_due_cents, 'credit_card', waiver.fee_version);
       onChange();
     } catch (err) {
       setError(getErrorDetail(err) || 'Could not record payment. Refresh history before retrying.');
@@ -57,7 +57,7 @@ export default function FeeWaiverPanel({ filingId, waiver, onChange }: {
     </p>}
     {waiver.amount_due_cents != null && <p>
       Amount in the decision: <strong>{formatCents(waiver.amount_due_cents)}</strong>
-      {waiver.payment_id != null && ' · Payment recorded'}
+      {waiver.balance_due_cents != null && <> · Remaining balance: <strong>{formatCents(waiver.balance_due_cents)}</strong></>}
     </p>}
     {waiver.granted === false && <p>
       Read the signed order and court notice for payment and review deadlines. Contact the court
@@ -67,7 +67,7 @@ export default function FeeWaiverPanel({ filingId, waiver, onChange }: {
       {waiver.payments_simulated ? <>
         <p>Demo payment: no card information is collected and no money is charged.</p>
         <button className="btn btn-primary" disabled={busy} onClick={pay}>
-          {busy ? 'Processing…' : `Record simulated payment — ${formatCents(waiver.amount_due_cents!)}`}
+          {busy ? 'Processing…' : `Record simulated payment — ${formatCents(waiver.balance_due_cents!)}`}
         </button>
       </> : <p>Online payment is unavailable. Contact the court about payment options.</p>}
     </div>}

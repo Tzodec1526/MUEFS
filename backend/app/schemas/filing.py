@@ -146,7 +146,8 @@ class FeeWaiverState(BaseModel):
     referred_at: datetime | None
     decided_at: datetime | None
     amount_due_cents: int | None
-    payment_id: int | None
+    balance_due_cents: int | None = None
+    fee_version: int = 0
     can_pay: bool
     allowed_actions: list[str]
     payments_simulated: bool

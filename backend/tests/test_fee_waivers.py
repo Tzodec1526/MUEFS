@@ -14,6 +14,7 @@ from app.models.filing_transaction import FilingTransaction
 from app.models.notification import Notification
 from app.models.user import CourtRole, User, UserCourtRole, UserType
 from app.services import document_service, filing_service
+from app.services.fee_assessment_service import fee_state
 
 
 def decision_pdf():
@@ -202,6 +203,7 @@ async def test_signed_grants_are_private_retained_and_independent(
                 "envelope_id": filing.id,
                 "payment_method": "credit_card",
                 "amount_cents": 18000,
+                "expected_fee_version": filing.fee_version,
             },
         )
     ).status_code == 409
@@ -231,10 +233,10 @@ async def test_denial_can_be_paid_without_resubmission_or_fee_recalculation(
         },
     )
     assert denied.status_code == 200, denied.text
-    assert not await filing_service.fee_obligation_met(db_session, filing)
+    assert not (await fee_state(db_session, filing)).obligation_met
     case_type.filing_fee_cents = 0
     await db_session.flush()
-    assert not await filing_service.fee_obligation_met(db_session, filing)
+    assert not (await fee_state(db_session, filing)).obligation_met
     await filing_service.review_filing(
         db_session, filing.id, users[1].id, "return", "Correct title"
     )
@@ -255,7 +257,8 @@ async def test_denial_can_be_paid_without_resubmission_or_fee_recalculation(
     assert filing.fee_waiver_granted is False
     case_type.filing_fee_cents = 99000
     await db_session.flush()
-    payment = {"envelope_id": filing.id, "payment_method": "credit_card", "amount_cents": 750}
+    payment = {"envelope_id": filing.id, "payment_method": "credit_card", "amount_cents": 750,
+               "expected_fee_version": filing.fee_version}
     assert (
         await api_client.post(
             "/api/v1/payments/process",

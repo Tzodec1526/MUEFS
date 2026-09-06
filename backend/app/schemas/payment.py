@@ -1,8 +1,10 @@
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer, field_validator
 
 from app.models.payment import PaymentMethod, PaymentStatus
+from app.schemas.filing import FilingEnvelopeResponse
 
 _SIM_PAYMENT_NOTICE = (
     "No card or ACH data is collected in this build. "
@@ -10,31 +12,76 @@ _SIM_PAYMENT_NOTICE = (
 )
 
 
-class PaymentCalculateRequest(BaseModel):
-    court_id: int
-    case_type_id: int
-    filing_type: str = Field(default="initial", max_length=20)
-
-
 class FeeItem(BaseModel):
-    fee_type: str
-    amount_cents: int
-    description: str
+    fee_type: str = Field(min_length=1, max_length=100)
+    amount_cents: int = Field(ge=0, le=100_000_000)
+    description: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("fee_type", "description")
+    @classmethod
+    def require_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("A fee code and description are required")
+        return value.strip()
 
 
-class PaymentCalculateResponse(BaseModel):
-    filing_fee_cents: int
-    additional_fees: list[FeeItem] = []
-    total_cents: int
-    fee_description: str
-    is_simulated: bool = True
-    simulation_notice: str = Field(default=_SIM_PAYMENT_NOTICE)
+class FilingFeeState(BaseModel):
+    filing_id: int
+    version: int
+    source: Literal["court", "waiver", "service_only", "demo", "unassessed"]
+    assessment_id: str | None = None
+    authority_reference: str | None = None
+    items: list[FeeItem] = []
+    total_cents: int | None = None
+    paid_cents: int
+    balance_due_cents: int | None = None
+    overpaid_cents: int = 0
+    review_requested_at: datetime | None
+    review_reason: str | None = None
+    assessment_stale: bool = False
+    can_request_review: bool = False
+    can_assess: bool = False
+    can_pay: bool = False
+    can_request_waiver: bool = False
+    obligation_met: bool = False
+    payments_simulated: bool
+
+    @field_serializer("review_requested_at")
+    def serialize_review_time(self, value: datetime | None) -> str | None:
+        return (
+            value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat() if value else None
+        )
+
+
+class FilingFeeDetails(FilingFeeState):
+    filing: FilingEnvelopeResponse
+
+
+class FeeAssessmentRequest(BaseModel):
+    expected_version: int = Field(ge=0)
+    authority_reference: str = Field(min_length=1, max_length=1000)
+    reason: str = Field(min_length=1, max_length=5000)
+    items: list[FeeItem] = Field(min_length=1, max_length=50)
+    reviewed: Literal[True]
+
+    @field_validator("authority_reference", "reason")
+    @classmethod
+    def require_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("The assessment's authority and reason are required")
+        return value.strip()
+
+
+class FeeReviewRequest(BaseModel):
+    expected_version: int = Field(ge=0)
+    reason: str = Field(min_length=1, max_length=2000)
 
 
 class PaymentProcessRequest(BaseModel):
     envelope_id: int
-    payment_method: PaymentMethod
-    amount_cents: int
+    expected_fee_version: int = Field(ge=0)
+    payment_method: Literal[PaymentMethod.CREDIT_CARD, PaymentMethod.DEBIT_CARD, PaymentMethod.ACH]
+    amount_cents: int = Field(gt=0)
 
 
 class PaymentResponse(BaseModel):

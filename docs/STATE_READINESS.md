@@ -17,7 +17,7 @@ establish state approval or production readiness.
 | Control case participation and access | Assigned staff record participants, counsel representation and explicit restricted-case grants with retained reasons, before/after history, stale-edit checks and revocation. Filing acceptance no longer assigns party roles or grants case access. | Court-approved access rules, review of legacy records, CMS appearance/withdrawal synchronization, limited-scope representation and service enrollment. |
 | Record the correct legal filing date | Receipt instants and filing dates are separate. Published calendars establish business dates. Assigned staff can record a signed order establishing a different date, with retained before/after evidence and explicit case opening date changes. Acceptance honors the order without rewriting the receipt. | Court verification of calendars and signed orders, motion/adjudication procedures, downstream CMS synchronization and review of closures published after acceptance. Correcting a document does not automatically preserve its legal filing date. |
 | Resolve fee waivers correctly | A completed application accompanies the filing. Clerk waivers, referral and judicial decisions are separate court-scoped actions. Signed decision PDFs and denial amounts remain in private history; a filer can pay after denial without resubmitting. | Actual notice delivery, de novo review and judicial assignment, deadline calculation, case-wide continuation and reinstatement, court verification of signed forms and prisoner-specific procedures. |
-| Collect and reconcile funds | Demo fee quoting, simulated payments and linked payment references work. | Audited court fee schedules, a real hosted payment processor, signed webhooks, reconciliation, refunds and accounting exports. |
+| Establish fees and account for payments | Assigned court staff record itemized assessments with authority, reasons and retained documents. Balances use completed payments allocated to that filing; revised assessments preserve earlier credits and expose overpayments. | Court validation of assessments and fee schedules, a real hosted payment processor, signed webhooks, reconciliation, refunds and accounting exports. |
 | Deliver electronic service | Service-only documents can be recorded. | Verified service contacts, consent/eligibility, real transmission, failures/retries, non-electronic alternatives and retained proof. A recorded document or in-app notice is not proof of service. |
 | Send filing alerts reliably | An opt-in SMTP outbox commits with filing changes, checks verified recipients, retains messages and attempts, retries temporary failures and exposes uncertain outcomes to assigned court staff. | A court-approved relay and sender domain, bounce/delivery feedback, operational alerting and court approval of legally sufficient notice content and procedures. Generic email alerts do not establish legal service. |
 | Connect to the court's system of record | Acceptance is explicitly blocked outside demo mode when CMS integration is absent. | A documented court/vendor contract, credentialed sandbox, document/code mapping, idempotent delivery, status callbacks, error recovery and reconciliation. |
@@ -98,9 +98,9 @@ history event in the same database transaction. The stored PDF stays outside the
 attachment list. Competing decisions use the envelope row lock; only one decision wins.
 The existing private history response includes the waiver state and allowed actions.
 
-After denial, the filer can record a simulated payment of the amount in the decision from
-history. The server uses that amount, including on a corrected filing, instead of applying
-a subsequently changed fee schedule. Payment creates its own receipt and does not change
+After denial, the filer can record a simulated payment of the remaining balance from
+history in demo mode. The server uses the amount in the decision, less completed payments
+allocated to this filing, including on a corrected filing. Payment creates its own receipt and does not change
 the submission time, number of submissions, filing status or denial. It does not establish
 the legal filing date. Real payment processing remains unconfigured.
 
@@ -120,6 +120,57 @@ private signed orders, retained downloads, denial/payment and draft-edit bypass 
 The PostgreSQL suite also races waiver decisions and post-denial payments. The upload
 pipeline is shared with filer documents so size limits, MIME inspection, malware screening
 and off-thread PDF processing apply to both.
+
+## Court fee assessments and payment balances
+
+Fee determination requires more context than a court, case type and the word "subsequent."
+The official Michigan [circuit fee table](https://www.courts.michigan.gov/siteassets/court-administration/resources/cfee.pdf)
+and [district fee table](https://www.courts.michigan.gov/siteassets/court-administration/resources/dfee.pdf)
+distinguish charges and exceptions. The application no longer treats every subsequent
+filing as a motion, infers charges from fee labels, sums overlapping schedule rows, or
+adds a guessed electronic filing charge.
+
+The filer can request fee review from the fee screen. This retains the current document
+manifest and reason, and places the request in the court's **Fee Reviews** queue. It does
+not submit a draft, establish its filing date, or accept a filing. An assigned court clerk,
+judge or court administrator can inspect the private originals and record an itemized
+assessment with an authority reference, reason and explicit review confirmation. They
+cannot assess their own filing or override an independent fee-waiver decision. A zero-dollar
+assessment requires an item explaining the absence of a charge. Court procedures must
+establish the reviewer's authority and verify the referenced schedule and exceptions.
+
+Each assessment is an append-only filing transaction with the reviewed document manifest.
+Changing draft attachments invalidates it. A replacement assessment retains the old record
+and uses a new version. A short shared envelope lock lets the fee screen read the documents,
+assessment and balance consistently in one response; mutations lock the same envelope.
+Stale assessment and payment requests fail with HTTP 409, including an old payment form
+whose displayed amount happens to match the new assessment.
+
+Payments are explicitly allocated to an envelope and preserve their assessment basis.
+The balance credits positive, completed payments from that filer; failed, refunded,
+unallocated and other payers' records cannot clear the obligation. Higher reassessments
+require only the remaining balance. Lower reassessments expose the overpayment without
+inventing a refund. Submission receipts retain the assessment and all allocated payment
+records as they existed at submission. Signed waiver decisions remain the basis for waiver
+amounts, and a pending application can accompany a submission for court review.
+
+Demo initial-filing amounts are visibly synthetic examples. Outside demo mode, seeded
+amounts and simulated credits cannot satisfy fee requirements: an assessment, applicable
+waiver state or service-only filing is required. Real payment processing remains unavailable;
+the application does not collect card/bank data or claim to move money.
+
+`GET /api/v1/filings/{id}/fees` replaces `POST /api/v1/payments/calculate`. It returns the
+current fee state and the matching private filing context. Filers request review through
+`POST /api/v1/filings/{id}/fee-review`; assigned staff use `GET /api/v1/clerk/fee-reviews`
+and `POST /api/v1/clerk/filings/{id}/fees`. Both review mutations require `expected_version`.
+`POST /api/v1/payments/process` requires `expected_fee_version` and the exact remaining balance.
+
+Migration `c3d9f06a21b8` preserves only unambiguous historical payment allocations with a
+matching payer and marks legacy payments as simulated. It does not fabricate assessment
+records or allocation evidence. Ambiguous historical payments require reconciliation.
+The migration refuses destructive downgrade. `test_fee_assessments.py` covers the actual
+request, assessment, correction, payment and submission workflow; the PostgreSQL suite
+also tests duplicate requests, simultaneous document edits, consistent reads and rollback.
 
 ## Court calendars and filing dates
 

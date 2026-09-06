@@ -131,8 +131,8 @@ function FilingWizard() {
   const [reloadKey, setReloadKey] = useState(0);
   const [submission, setSubmission] = useState<FilingEnvelope>();
   const [errors, setErrors] = useState<string[]>([]);
-  const handlePaymentComplete = useCallback((filing: FilingEnvelope) => {
-    setFilingData(prev => ({ ...prev, paymentComplete: true,
+  const handleFeesChange = useCallback((filing: FilingEnvelope, obligationMet: boolean) => {
+    setFilingData(prev => ({ ...prev, paymentComplete: obligationMet,
       documents: filing.documents.map(doc => ({ id: doc.id, title: doc.title,
         type: doc.document_type_code, size: doc.file_size_bytes, isSearchable: doc.is_text_searchable })),
     }));
@@ -182,8 +182,7 @@ function FilingWizard() {
             filingDescription: recoveredDraft?.filingDescription ?? envelope.filing_description ?? '',
             motionSubtype: recoveredDraft?.motionSubtype ?? null,
             caseChoiceMade: true,
-            paymentComplete: envelope.payment_id != null
-              || (envelope.fee_waiver_requested && envelope.fee_waiver_granted === null)
+            paymentComplete: (envelope.fee_waiver_requested && envelope.fee_waiver_granted === null)
               || envelope.fee_waiver_amount_due_cents === 0
               || envelope.fee_waiver_granted === true,
             documents: envelope.documents.map((doc) => ({
@@ -668,7 +667,7 @@ function FilingWizard() {
             courtId={filingData.courtId!}
             caseTypeId={filingData.caseTypeId!}
             documents={filingData.documents}
-            onDocumentsChange={(docs) => updateData({ documents: docs })}
+            onDocumentsChange={(docs) => updateData({ documents: docs, paymentComplete: false })}
             motionSubtype={filingData.motionSubtype}
           />
         )}
@@ -677,7 +676,7 @@ function FilingWizard() {
           <FilingReview
             filingData={filingData}
             submission={submission}
-            onPaymentComplete={handlePaymentComplete}
+            onFeesChange={handleFeesChange}
             onSubmitSuccess={(filing) => { clearDraft(); setSubmission(filing); }}
           />
         )}

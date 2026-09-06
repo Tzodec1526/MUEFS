@@ -34,6 +34,7 @@ from app.schemas.filing import (
     MyFilingsResponse,
 )
 from app.services import access_service, audit_service, document_service, filing_service
+from app.services.fee_assessment_service import fee_state
 from app.services.fee_waiver_service import waiver_state
 from app.utils.http_context import client_ip, client_user_agent
 
@@ -153,6 +154,8 @@ async def update_filing(
         filing.filing_description = data.filing_description
     if data.fee_waiver_requested is not None:
         filing.fee_waiver_requested = data.fee_waiver_requested
+        if data.fee_waiver_requested:
+            filing.fee_review_requested_at = None
     if data.fee_waiver_reason is not None:
         filing.fee_waiver_reason = data.fee_waiver_reason
 
@@ -210,7 +213,7 @@ async def submit_filing(
             status_code=400, detail="Only draft or returned filings can be submitted",
         )
 
-    if not await filing_service.fee_obligation_met(db, filing_check):
+    if not (await fee_state(db, filing_check)).obligation_met:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Payment required before submission",
@@ -289,6 +292,7 @@ async def upload_document(
         db, filing_id, file, document_type_code, title, is_confidential,
     )
     try:
+        filing.fee_version += 1
         await audit_service.log_action(
             db, user_id=user_id, action="upload_document", entity_type="filing_document",
             entity_id=doc.id, details={"filing_id": filing_id, "filename": file.filename},
@@ -330,6 +334,8 @@ async def remove_document(
     doc = next((d for d in filing.documents if d.id == document_id), None)
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    filing.fee_version += 1
 
     if doc.retained_at is not None or filing.submitted_at is not None:
         # Corrections remove a document from the next submission, not from history.

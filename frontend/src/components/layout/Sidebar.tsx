@@ -28,6 +28,7 @@ function Sidebar() {
     { path: '/favorites', label: 'Favorites', icon: Star, roles: ['attorney', 'srl'] },
     { path: '/clerk/cases', label: 'Court Cases', icon: FolderOpen, roles: ['clerk', 'admin'], courtOnly: true },
     { path: '/clerk/queue', label: 'Review Queue', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
+    { path: '/clerk/fee-reviews', label: 'Fee Reviews', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
     { path: `/courts/${courtId}/calendar`, label: 'Court Calendar', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
   ];
 

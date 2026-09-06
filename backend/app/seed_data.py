@@ -22,7 +22,6 @@ from app.models.court import (
     CaseType,
     Court,
     CourtType,
-    FeeSchedule,
     FilingChecklist,
     FilingRequirement,
 )
@@ -701,17 +700,6 @@ def seed_database(reset: bool = False):
 
             session.flush()
 
-            # Add fee schedules - motion fees are lower than new case initiation fees
-            # (e.g. $20 motion vs $175 complaint in many MI courts)
-            session.add(FeeSchedule(
-                court_id=court.id,
-                fee_type="civil_motion",
-                amount_cents=2000,
-                description="Civil motion filing fee",
-                effective_date=datetime.now(UTC),
-                is_active=True,
-            ))
-
             # Add filing requirements for civil cases
             civil_ct = session.query(CaseType).filter_by(
                 court_id=court.id, code="CIV-GEN"
@@ -1021,16 +1009,6 @@ def seed_database(reset: bool = False):
                 ))
 
             session.flush()
-
-            # Motion fee schedule for district courts too
-            session.add(FeeSchedule(
-                court_id=court.id,
-                fee_type="civil_motion",
-                amount_cents=2000,
-                description="Civil motion filing fee",
-                effective_date=datetime.now(UTC),
-                is_active=True,
-            ))
 
             # Filing requirements for district civil cases
             dc_civil = session.query(CaseType).filter_by(

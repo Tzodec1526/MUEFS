@@ -123,9 +123,13 @@ MUEFS/
 - **Guided filing wizard** with plain-language instructions
 - **Fee waiver review**: private application uploads, separate clerk/judicial decisions,
   retained signed orders and payment after denial (simulated payments)
+- **Court fee review**: request an itemized assessment, see the remaining balance and
+  retain earlier payment credits when the court revises the amount (demo payments only)
 - **Step-by-step process** — no legal knowledge of e-filing procedures required
 
 ### For Court Clerks
+- **Fee assessment queue**: inspect the filer's documents and review reason, record
+  itemized charges and authority, and preserve earlier assessments and payment history
 - **Review queue** with batch accept, age tracking, and common rejection reasons
 - **Document compliance checks** — text-searchability, file format, size limits
 - **Filing status notices** — portal history plus optional SMTP alerts, retained attempts,

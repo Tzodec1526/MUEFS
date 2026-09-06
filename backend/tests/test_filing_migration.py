@@ -229,3 +229,47 @@ def test_retained_history_cannot_be_downgraded(tmp_path):
                 command.downgrade(config, "c4f8e2a91b0d")
     finally:
         engine.dispose()
+
+
+def test_fee_migration_preserves_only_unambiguous_payment_links(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'legacy-payments.db'}")
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    config.set_main_option("script_location", str(Path(__file__).resolve().parents[1] / "alembic"))
+    try:
+        with engine.begin() as conn:
+            config.attributes["connection"] = conn
+            command.upgrade(config, "b2e4a8c19d70")
+            conn.execute(text("""INSERT INTO users
+                (id, email, first_name, last_name, user_type, bar_number_verified, is_active)
+                VALUES (1, 'filer@test.com', 'Fee', 'Filer', 'ATTORNEY', false, true),
+                       (2, 'other@test.com', 'Other', 'Filer', 'ATTORNEY', false, true)"""))
+            conn.execute(text("""INSERT INTO courts
+                (id, name, county, court_type, state, is_efiling_enabled)
+                VALUES (1, 'Fee Court', 'Wayne', 'CIRCUIT', 'MI', true)"""))
+            conn.execute(text("""INSERT INTO case_types
+                (id, court_id, code, name, category, filing_fee_cents, is_active)
+                VALUES (1, 1, 'CIV', 'Civil', 'CIVIL', 0, true)"""))
+            conn.execute(text("""INSERT INTO payments (id, amount_cents, status, payer_id)
+                VALUES (1, 1000, 'COMPLETED', 1), (2, 1000, 'COMPLETED', 1),
+                       (3, 1000, 'COMPLETED', 2), (4, 1000, 'COMPLETED', 1)"""))
+            conn.execute(text("""INSERT INTO filing_envelopes
+                (id, court_id, case_type_id, filer_id, payment_id, status,
+                 filing_type, fee_waiver_requested)
+                VALUES (1, 1, 1, 1, 1, 'DRAFT', 'initial', false),
+                       (2, 1, 1, 1, 2, 'DRAFT', 'initial', false),
+                       (3, 1, 1, 1, 2, 'DRAFT', 'initial', false),
+                       (4, 1, 1, 1, 3, 'DRAFT', 'initial', false)"""))
+            command.upgrade(config, "head")
+            assert conn.execute(text(
+                "SELECT id, envelope_id, is_simulated, fee_basis FROM payments ORDER BY id"
+            )).all() == [
+                (1, 1, 1, None), (2, None, 1, None), (3, None, 1, None), (4, None, 1, None),
+            ]
+            assert conn.scalar(text("SELECT COUNT(*) FROM filing_transactions")) == 0
+            assert conn.scalar(text(
+                "SELECT COUNT(*) FROM filing_envelopes WHERE fee_version = 0"
+            )) == 4
+            assert conn.scalar(text("""SELECT COUNT(*) FROM sqlite_master
+                WHERE type='index' AND name='ix_users_email_lower'""")) == 1
+    finally:
+        engine.dispose()

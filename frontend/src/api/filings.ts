@@ -123,9 +123,17 @@ export interface FilingTransaction {
     case_number?: string | null;
     filing_description?: string | null;
     fee_waiver_requested?: boolean;
-    payment?: { amount_cents: number; transaction_ref: string; is_simulated: boolean } | null;
+    payment?: {
+      amount_cents: number; transaction_ref: string; is_simulated: boolean;
+      fee_basis?: { source: string; assessment_id: string | null; total_cents: number; previous_paid_cents: number };
+    } | null;
+    payments?: Array<{ id: number; amount_cents: number; transaction_ref: string; is_simulated: boolean; status: string }>;
+    fee_assessment?: { source: string; assessment_id: string | null; total_cents: number | null; paid_cents: number; balance_due_cents: number | null };
     basis?: string;
     amount_due_cents?: number;
+    items?: Array<{ fee_type: string; amount_cents: number; description: string }>;
+    total_cents?: number;
+    authority_reference?: string;
     filing_date_basis?: FilingDateBasis | null;
     previous_filing_date?: string | null;
     case_date_change?: { case_id: number; case_number: string; previous_filing_date: string | null; filing_date: string };
@@ -176,7 +184,8 @@ export interface FeeWaiverState {
   referred_at: string | null;
   decided_at: string | null;
   amount_due_cents: number | null;
-  payment_id: number | null;
+  balance_due_cents: number | null;
+  fee_version: number;
   can_pay: boolean;
   payments_simulated: boolean;
   allowed_actions: string[];

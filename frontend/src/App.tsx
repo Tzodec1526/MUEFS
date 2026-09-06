@@ -13,6 +13,8 @@ const FilingWizard = lazy(() => import('./components/filing/FilingWizard'));
 const MyFilings = lazy(() => import('./components/filing/MyFilings'));
 const FilingHistoryPage = lazy(() => import('./components/filing/FilingHistoryPage'));
 const FilingDateOrderPage = lazy(() => import('./components/clerk/FilingDateOrderPage'));
+const FilingFeesPage = lazy(() => import('./components/filing/FilingFeesPage'));
+const FeeReviewQueue = lazy(() => import('./components/clerk/FeeReviewQueue'));
 const ReviewQueue = lazy(() => import('./components/clerk/ReviewQueue'));
 const CourtCaseDirectory = lazy(() => import('./components/courts/CourtCaseDirectory'));
 const DocumentPublicationPage = lazy(() => import('./components/courts/DocumentPublicationPage'));
@@ -224,6 +226,7 @@ function App() {
                         <Route path="/filing/new" element={<RequireFiler><FilingWizard key={location.key} /></RequireFiler>} />
                         <Route path="/filings" element={<RequireFiler><MyFilings /></RequireFiler>} />
                         <Route path="/filings/:filingId/history" element={<FilingHistoryPage key={location.pathname} />} />
+                        <Route path="/filings/:filingId/fees" element={<FilingFeesPage key={location.pathname} />} />
                         <Route path="/filings/:filingId/filing-date" element={<RequireClerk><FilingDateOrderPage key={location.pathname} /></RequireClerk>} />
                         <Route path="/cases/search" element={<CaseSearch />} />
                         <Route path="/courts/:courtId/calendar" element={<CourtCalendarPage key={location.pathname} />} />
@@ -235,6 +238,7 @@ function App() {
                         <Route path="/cases/:caseId" element={<CaseDetailPage />} />
                         <Route path="/favorites" element={<RequireFiler><Favorites /></RequireFiler>} />
                         <Route path="/clerk/queue" element={<RequireClerk><ReviewQueue /></RequireClerk>} />
+                        <Route path="/clerk/fee-reviews" element={<RequireClerk><FeeReviewQueue /></RequireClerk>} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </Suspense>

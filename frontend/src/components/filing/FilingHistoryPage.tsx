@@ -16,6 +16,7 @@ const eventLabels: Record<string, string> = {
   waiver_denied: 'Fee waiver denied', payment_recorded: 'Payment recorded',
   filing_date_assessed: 'Filing date assessed using court calendar',
   filing_date_ordered: 'Court-ordered filing date recorded',
+  fee_review_requested: 'Fee review requested', fee_assessed: 'Court fee assessment recorded',
   public_copy_published: 'Reviewed public copy published',
   document_withheld: 'Document withheld from public access',
 };
@@ -75,6 +76,7 @@ export default function FilingHistoryPage() {
         <span className={`status-badge ${history.status}`}>{history.status.replace(/_/g, ' ')}</span>
         <span>{history.submission_count} recorded submission{history.submission_count === 1 ? '' : 's'}</span>
         <button className="btn btn-secondary btn-small" onClick={() => window.print()}>Print this page</button>
+        <Link to={`/filings/${filingId}/fees`}>View fees &amp; payments</Link>
       </div>
       <p className="info-text">A receipt records what this system received. Court acceptance is a separate decision.
         Times below are recorded in UTC. Service-only records do not prove delivery to another party.</p>
@@ -100,7 +102,7 @@ export default function FilingHistoryPage() {
           <div className="receipt-heading">
             <h3>{eventLabels[transaction.event_type] || transaction.event_type}</h3>
             <span>{transaction.submission_number ? `Submission ${transaction.submission_number}`
-              : transaction.event_type === 'payment_recorded' ? 'Before submission' : 'Legacy filing'}</span>
+              : ['payment_recorded', 'fee_review_requested', 'fee_assessed'].includes(transaction.event_type) ? 'Before submission' : 'Legacy filing'}</span>
           </div>
           <p><time dateTime={parseServerDate(transaction.occurred_at).toISOString()}>
             {parseServerDate(transaction.occurred_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}
@@ -109,6 +111,11 @@ export default function FilingHistoryPage() {
           {transaction.details.reason && <div className="alert alert-warning">{transaction.details.reason}</div>}
           {transaction.details.basis && <p>{waiverActionLabels[transaction.details.basis] || transaction.details.basis}</p>}
           {transaction.details.amount_due_cents != null && <p>Amount due under the decision: <strong>{formatCents(transaction.details.amount_due_cents)}</strong></p>}
+          {transaction.details.items && <div className="fee-summary">
+            {transaction.details.items.map((item, index) => <p key={index}>{item.description}: <strong>{formatCents(item.amount_cents)}</strong></p>)}
+            <p>Assessed total: <strong>{formatCents(transaction.details.total_cents ?? 0)}</strong></p>
+            <p>{transaction.details.authority_reference}</p>
+          </div>}
           {transaction.details.filing_date_basis && <div className="receipt-date-basis">
             <p>Filing date at this transaction: <strong>{formatCourtDate(transaction.details.filing_date_basis.filing_date)}</strong></p>
             {'previous_filing_date' in transaction.details && <p>Previous filing date: {formatCourtDate(transaction.details.previous_filing_date ?? null)}</p>}
@@ -120,14 +127,29 @@ export default function FilingHistoryPage() {
             {formatCents(transaction.details.payment.amount_cents)} · {transaction.details.payment.transaction_ref}
             {transaction.details.payment.is_simulated && ' (simulated)'}
           </p>}
+          {transaction.details.payment?.fee_basis && <p>
+            Payment basis: {transaction.details.payment.fee_basis.source} · total {formatCents(transaction.details.payment.fee_basis.total_cents)}
+            {' · '}previous payments {formatCents(transaction.details.payment.fee_basis.previous_paid_cents)}
+            {transaction.details.payment.fee_basis.assessment_id && ` · assessment #${transaction.details.payment.fee_basis.assessment_id}`}
+          </p>}
           {transaction.details.court_name && <dl className="receipt-details">
             <div><dt>Court</dt><dd>{transaction.details.court_name}</dd></div>
             <div><dt>Case at submission</dt><dd>{transaction.details.case_title || 'Not specified'}
               {transaction.details.case_number && ` · ${transaction.details.case_number}`}</dd></div>
-            <div><dt>Payment at submission</dt><dd>{transaction.details.payment
+            <div><dt>Payment at submission</dt><dd>{transaction.details.payments
+              ? transaction.details.payments.length ? <ul>{transaction.details.payments.map(payment => <li key={payment.id}>
+                {formatCents(payment.amount_cents)} · {payment.transaction_ref} · {payment.status}{payment.is_simulated && ' (simulated)'}
+              </li>)}</ul> : transaction.details.fee_waiver_requested ? 'Fee waiver requested' : 'No payment recorded'
+              : transaction.details.payment
               ? `${formatCents(transaction.details.payment.amount_cents)} · ${transaction.details.payment.transaction_ref}${transaction.details.payment.is_simulated ? ' (simulated)' : ''}`
               : transaction.details.fee_waiver_requested ? 'Fee waiver requested' : 'No payment recorded'}</dd></div>
           </dl>}
+          {transaction.details.fee_assessment && <p>
+            Fee record at submission: {transaction.details.fee_assessment.source}
+            {' · '}total {transaction.details.fee_assessment.total_cents === null ? 'not established' : formatCents(transaction.details.fee_assessment.total_cents)}
+            {' · '}completed payments {formatCents(transaction.details.fee_assessment.paid_cents)}
+            {' · '}balance {transaction.details.fee_assessment.balance_due_cents === null ? 'not established' : formatCents(transaction.details.fee_assessment.balance_due_cents)}
+          </p>}
           {transaction.details.cms_case_number && <p>Court case number: <strong>{transaction.details.cms_case_number}</strong></p>}
           {transaction.details.public_copy && transaction.details.document_id && <div className="receipt-documents">
             <h4>Public copy recorded at this transaction</h4>
@@ -139,7 +161,7 @@ export default function FilingHistoryPage() {
             <Link to={`/documents/${transaction.details.document_id}/publication`}>Manage document public access</Link>
           </p>}
           {transaction.details.documents && <>
-            <h4>Documents received ({transaction.details.documents.length})</h4>
+            <h4>Documents recorded ({transaction.details.documents.length})</h4>
             <ul className="receipt-documents">{transaction.details.documents.map(doc => <li key={doc.id}>
               <div className="receipt-document-heading"><strong>{doc.title}</strong>
                 <div className="participant-actions"><DocumentDownload id={doc.id} title={doc.title} />

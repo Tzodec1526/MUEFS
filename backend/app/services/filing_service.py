@@ -161,28 +161,6 @@ async def create_filing(
     return envelope
 
 
-async def fee_obligation_met(db: AsyncSession, filing: FilingEnvelope) -> bool:
-    """True when submit may proceed: paid, waiver granted, or waiver application pending.
-
-    An undecided application travels with the envelope. Filing review never decides
-    the waiver. A denial cannot be bypassed by leaving the request flag selected.
-    """
-    if filing.filing_type == "service_only":
-        return True
-    if filing.payment_id is not None:
-        return True
-    if filing.fee_waiver_granted is True:
-        return True
-    if filing.fee_waiver_granted is False and filing.fee_waiver_amount_due_cents is not None:
-        return filing.fee_waiver_amount_due_cents == 0
-    if filing.fee_waiver_requested and filing.fee_waiver_granted is None:
-        return True
-    from app.services.payment_service import calculate_fees
-
-    fees = await calculate_fees(db, filing.court_id, filing.case_type_id, filing.filing_type)
-    return fees.total_cents == 0
-
-
 async def get_filing(
     db: AsyncSession, filing_id: int, *, for_update: bool = False,
 ) -> FilingEnvelope | None:

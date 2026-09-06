@@ -30,6 +30,8 @@ async def notify_filing_status_change(
         "payment_recorded": "Payment recorded",
         "filing_date_assessed": "Filing date assessed using court calendar",
         "filing_date_ordered": "Court-ordered filing date recorded",
+        "fee_review_requested": "Fee review requested",
+        "fee_assessed": "Court fee assessment recorded",
         "public_copy_published": "Reviewed public copy published",
         "document_withheld": "Document withheld from public access",
     }.get(status, status.replace("_", " ").title())

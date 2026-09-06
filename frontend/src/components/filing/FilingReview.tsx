@@ -21,12 +21,12 @@ interface FilingData {
 interface Props {
   filingData: FilingData;
   submission?: FilingEnvelope;
-  onPaymentComplete?: (filing: FilingEnvelope) => void;
+  onFeesChange?: (filing: FilingEnvelope, obligationMet: boolean) => void;
   onSubmitSuccess?: (filing: FilingEnvelope) => void;
   readOnly?: boolean;
 }
 
-function FilingReview({ filingData, submission, onPaymentComplete, onSubmitSuccess, readOnly = false }: Props) {
+function FilingReview({ filingData, submission, onFeesChange, onSubmitSuccess, readOnly = false }: Props) {
   const { filingId } = filingData;
   const [validation, setValidation] = useState<FilingValidation | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -182,14 +182,10 @@ function FilingReview({ filingData, submission, onPaymentComplete, onSubmitSucce
         <p className="info-text">Recording this filing does not deliver documents to other parties. Arrange service outside this app.</p>
       )}
 
-      {/* Payment — shown here so you can review the filing first, then pay before submitting */}
-      {needsPayment && onPaymentComplete && filingId && filingData.courtId && filingData.caseTypeId && (
+      {!readOnly && filingData.filingType !== 'service_only' && filingId && (
         <PaymentForm
-          courtId={filingData.courtId}
-          caseTypeId={filingData.caseTypeId}
           filingId={filingId}
-          filingType={filingData.filingType}
-          onPaymentComplete={onPaymentComplete}
+          onFeesChange={onFeesChange}
         />
       )}
 

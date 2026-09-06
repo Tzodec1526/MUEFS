@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.case import Case
@@ -11,6 +12,7 @@ from app.models.filing_transaction import FilingTransaction
 from app.models.payment import Payment
 from app.models.user import User
 from app.schemas.filing import FilingDocumentResponse
+from app.services.fee_assessment_service import fee_state
 from app.services.notification_service import notify_filing_status_change
 
 
@@ -27,7 +29,10 @@ async def record_transaction(
         details["reason"] = reason
     if event_type in ("submitted", "service_recorded"):
         case = await db.get(Case, filing.case_id) if filing.case_id else None
-        payment = await db.get(Payment, filing.payment_id) if filing.payment_id else None
+        payments = list(await db.scalars(select(Payment).where(
+            Payment.envelope_id == filing.id,
+        ).order_by(Payment.id)))
+        fees = await fee_state(db, filing)
         now = filing.submitted_at or now
         details = {
             "court_id": filing.court_id,
@@ -40,12 +45,19 @@ async def record_transaction(
             "fee_waiver_requested": filing.fee_waiver_requested,
             "filing_date_basis": filing.filing_date_basis,
             # Financial hardship text is deliberately not copied into notices/receipts.
-            "payment": {
-                "id": payment.id, "amount_cents": payment.amount_cents,
-                "transaction_ref": payment.transaction_ref,
-                "is_simulated": bool(payment.description and
-                                     payment.description.startswith("[SIMULATED")),
-            } if payment else None,
+            "payments": [{
+                "id": item.id, "amount_cents": item.amount_cents,
+                "transaction_ref": item.transaction_ref, "status": item.status.value,
+                "is_simulated": item.is_simulated,
+            } for item in payments],
+            "fee_assessment": {
+                "source": fees.source, "assessment_id": fees.assessment_id,
+                "version": fees.version, "authority_reference": fees.authority_reference,
+                "items": [item.model_dump() for item in fees.items],
+                "total_cents": fees.total_cents, "paid_cents": fees.paid_cents,
+                "balance_due_cents": fees.balance_due_cents,
+                "overpaid_cents": fees.overpaid_cents,
+            },
             "documents": [FilingDocumentResponse.model_validate(doc).model_dump(mode="json")
                           for doc in filing.documents],
         }
@@ -71,7 +83,8 @@ async def record_transaction(
             court_name=court.name if court else f"Court #{filing.court_id}",
             case_title=filing.case_title,
             reason=("Open the private filing history to read the decision."
-                    if event_type.startswith("waiver_") or event_type == "filing_date_ordered"
+                    if event_type.startswith(("waiver_", "fee_"))
+                    or event_type == "filing_date_ordered"
                     else reason),
         )
         notice.body += (

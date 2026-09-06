@@ -3848,6 +3848,15 @@ textarea:focus-visible {
 .filing-date-page .checkbox-label { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; }
 .filing-date-page .checkbox-label input { flex-shrink: 0; margin-top: 3px; }
 .filing-date-page code { overflow-wrap: anywhere; }
+.filing-fees { overflow-wrap: anywhere; }
+.fee-assessment-form, .fee-review-request { margin-block: 20px; }
+.fee-assessment-form fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.fee-assessment-form legend { font-weight: 600; margin-block: 16px; }
+.fee-assessment-item { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 12px; border-bottom: 1px solid #d9e2ec; padding-block: 12px; }
+.fee-assessment-item > button { justify-self: start; }
+.fee-assessment-form .checkbox-label { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; }
+.fee-assessment-form .checkbox-label input { flex-shrink: 0; margin-top: 3px; }
+@media (max-width: 700px) { .fee-assessment-item { grid-template-columns: 1fr; } }
 @media (max-width: 700px) {
   .court-case-filter { grid-template-columns: 1fr; }
   .court-case-list > li { align-items: flex-start; flex-direction: column; gap: 12px; }

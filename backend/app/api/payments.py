@@ -1,37 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import get_current_user_id, require_user_may_manage_efilings
-from app.config import settings
+from app.api.auth import lock_current_user, require_user_may_manage_efilings
 from app.database import get_db
-from app.models.filing import FilingEnvelope, FilingStatus
 from app.models.user import User
 from app.schemas.payment import (
-    PaymentCalculateRequest,
-    PaymentCalculateResponse,
     PaymentProcessRequest,
     PaymentResponse,
 )
-from app.services import audit_service, payment_service
+from app.services import audit_service, filing_service, payment_service
+from app.services.fee_assessment_service import fee_state
 from app.services.filing_record_service import record_transaction
 from app.utils.http_context import client_ip, client_user_agent
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
-
-
-@router.post("/calculate", response_model=PaymentCalculateResponse)
-async def calculate_fees(
-    data: PaymentCalculateRequest,
-    db: AsyncSession = Depends(get_db),
-    _user_id: int = Depends(get_current_user_id),
-):
-    try:
-        return await payment_service.calculate_fees(
-            db, data.court_id, data.case_type_id, data.filing_type
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/process", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
@@ -42,17 +24,8 @@ async def process_payment(
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
-    if data.amount_cents <= 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Payment amount must be positive",
-        )
-
-    # Look up the filing envelope to validate payment against actual fees
-    filing = await db.scalar(
-        select(FilingEnvelope).where(FilingEnvelope.id == data.envelope_id).with_for_update()
-        .execution_options(populate_existing=True)
-    )
+    await require_user_may_manage_efilings(await lock_current_user(db, user_id))
+    filing = await filing_service.get_filing(db, data.envelope_id, for_update=True)
     if not filing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -64,45 +37,39 @@ async def process_payment(
             detail="Not authorized to pay for this filing",
         )
 
-    # Prevent double-payment
-    if filing.payment_id is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Payment already processed for this filing",
-        )
-    after_denial = filing.fee_waiver_granted is False and filing.fee_waiver_decided_at is not None
-    if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED) and not (
-        after_denial and filing.status in (
-            FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW, FilingStatus.ACCEPTED,
-        )
-    ):
-        raise HTTPException(status_code=409, detail="This filing is not awaiting payment")
-    if filing.fee_waiver_granted is True:
-        raise HTTPException(status_code=409, detail="Fees have been waived for this filing")
-
-    # Validate amount matches calculated fees
-    expected_cents = filing.fee_waiver_amount_due_cents if after_denial else None
-    if expected_cents is None:
-        calculated = await payment_service.calculate_fees(
-            db, court_id=filing.court_id, case_type_id=filing.case_type_id,
-            filing_type=filing.filing_type,
-        )
-        expected_cents = calculated.total_cents
+    fees = await fee_state(db, filing, user_id)
+    if fees.version != data.expected_fee_version:
+        raise HTTPException(409, "The fee record changed. Refresh and review it before payment")
+    if fees.balance_due_cents is None:
+        raise HTTPException(409, "A current court fee assessment is required before payment")
+    if not fees.can_pay:
+        raise HTTPException(409, "This filing is not awaiting payment")
+    expected_cents = fees.balance_due_cents
     if data.amount_cents != expected_cents:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"Payment amount ({data.amount_cents}) does not match "
-                f"amount due ({expected_cents})"
+                f"Payment amount ({data.amount_cents}) does not match amount due ({expected_cents})"
             ),
         )
 
+    basis = {
+        "source": fees.source,
+        "assessment_id": fees.assessment_id,
+        "version": fees.version,
+        "authority_reference": fees.authority_reference,
+        "items": [item.model_dump() for item in fees.items],
+        "total_cents": fees.total_cents,
+        "previous_paid_cents": fees.paid_cents,
+    }
     try:
         payment = await payment_service.process_payment(
             db,
             amount_cents=data.amount_cents,
             payment_method=data.payment_method,
             payer_id=user_id,
+            envelope_id=filing.id,
+            fee_basis=basis,
             description=f"Filing envelope #{data.envelope_id}",
         )
     except payment_service.PaymentsNotConfiguredError as exc:
@@ -111,14 +78,24 @@ async def process_payment(
             detail=str(exc),
         ) from exc
 
-    # Link payment to filing
+    # Keep the legacy latest-payment pointer; the balance uses all completed payments.
     filing.payment_id = payment.id
     await db.flush()
-    await record_transaction(db, filing, "payment_recorded", user_id, details={
-        "payment": {"id": payment.id, "amount_cents": payment.amount_cents,
-                    "transaction_ref": payment.transaction_ref,
-                    "is_simulated": settings.payments_are_simulated},
-    })
+    await record_transaction(
+        db,
+        filing,
+        "payment_recorded",
+        user_id,
+        details={
+            "payment": {
+                "id": payment.id,
+                "amount_cents": payment.amount_cents,
+                "transaction_ref": payment.transaction_ref,
+                "is_simulated": payment.is_simulated,
+                "fee_basis": basis,
+            },
+        },
+    )
 
     await audit_service.log_action(
         db,
@@ -131,17 +108,4 @@ async def process_payment(
         user_agent=client_user_agent(request),
     )
 
-    return PaymentResponse.model_validate(
-        payment,
-        from_attributes=True,
-    ).model_copy(
-        update={
-            "is_simulated": settings.payments_are_simulated,
-            "simulation_notice": (
-                "No card or ACH data is collected in this build. "
-                "This transaction is recorded for workflow testing only."
-                if settings.payments_are_simulated
-                else ""
-            ),
-        },
-    )
+    return PaymentResponse.model_validate(payment)

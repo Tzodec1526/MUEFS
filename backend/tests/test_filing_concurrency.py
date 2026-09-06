@@ -68,7 +68,7 @@ async def test_concurrent_waiver_and_post_denial_payment_commit_once(
                     return await client.post("/api/v1/payments/process",
                         headers={"X-Demo-User-Id": str(filer)},
                         json={"envelope_id": fid, "payment_method": "credit_card",
-                              "amount_cents": 750})
+                              "amount_cents": 750, "expected_fee_version": filing.fee_version})
             results = await asyncio.wait_for(asyncio.gather(act(), act()), 15)
         expected = [200 if operation == "waiver" else 201, 409]
         assert sorted(r.status_code for r in results) == expected
@@ -138,6 +138,186 @@ async def prepare_filing(factory):
             )
         )
     return fid, filer, clerk
+
+
+@pytest.mark.parametrize("postgres_sessions", [True], indirect=True)
+@pytest.mark.parametrize("operation", ["request", "assess", "pay"])
+async def test_concurrent_fee_actions_record_once(postgres_sessions, operation):
+    from httpx import ASGITransport, AsyncClient
+
+    from tests.test_fee_assessments import assessment
+
+    fid, filer, clerk = await prepare_filing(postgres_sessions)
+
+    async def database():
+        async with postgres_sessions.begin() as db:
+            yield db
+
+    app.dependency_overrides[get_db] = database
+    try:
+        async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
+            if operation == "pay":
+                fees = await client.post(f"/api/v1/clerk/filings/{fid}/fees",
+                    headers={"X-Demo-User-Id": str(clerk)}, json=assessment(0, 750))
+                assert fees.status_code == 201, fees.text
+                url = "/api/v1/payments/process"
+                actor = filer
+                body = {"envelope_id": fid, "amount_cents": 750, "payment_method": "credit_card",
+                        "expected_fee_version": fees.json()["version"]}
+            elif operation == "assess":
+                url = f"/api/v1/clerk/filings/{fid}/fees"
+                actor, body = clerk, assessment(0, 750)
+            else:
+                url = f"/api/v1/filings/{fid}/fee-review"
+                actor, body = filer, {"expected_version": 0, "reason": "Review exemption"}
+            responses = await asyncio.wait_for(asyncio.gather(*[
+                client.post(url, headers={"X-Demo-User-Id": str(actor)}, json=body)
+                for _ in range(2)
+            ]), 15)
+            assert sorted(response.status_code for response in responses) == [201, 409]
+        async with postgres_sessions() as db:
+            assert await db.scalar(select(func.count()).select_from(FilingTransaction)) == (
+                2 if operation == "pay" else 1
+            )
+            assert await db.scalar(select(func.count()).select_from(Payment)) == (
+                operation == "pay"
+            )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.mark.parametrize("postgres_sessions", [True], indirect=True)
+async def test_document_upload_cannot_leave_a_concurrent_assessment_current(postgres_sessions):
+    from httpx import ASGITransport, AsyncClient
+
+    from app.services.fee_assessment_service import fee_state
+    from tests.test_fee_assessments import assessment
+
+    fid, filer, clerk = await prepare_filing(postgres_sessions)
+
+    async def database():
+        async with postgres_sessions.begin() as db:
+            yield db
+
+    app.dependency_overrides[get_db] = database
+    try:
+        async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
+            first = await client.post(f"/api/v1/clerk/filings/{fid}/fees",
+                headers={"X-Demo-User-Id": str(clerk)}, json=assessment(0, 750))
+            assert first.status_code == 201, first.text
+            assessed, uploaded = await asyncio.wait_for(asyncio.gather(
+                client.post(f"/api/v1/clerk/filings/{fid}/fees",
+                    headers={"X-Demo-User-Id": str(clerk)},
+                    json=assessment(first.json()["version"], 750)),
+                client.post(f"/api/v1/filings/{fid}/documents",
+                    headers={"X-Demo-User-Id": str(filer)},
+                    data={"title": "Additional evidence", "document_type_code": "EXHIBIT"},
+                    files={"file": ("evidence.pdf", decision_pdf(), "application/pdf")}),
+            ), 15)
+            assert assessed.status_code in (201, 409) and uploaded.status_code == 200
+        async with postgres_sessions() as db:
+            filing = await filing_service.get_filing(db, fid)
+            fees = await fee_state(db, filing, filer)
+            assert fees.assessment_stale and fees.total_cents is None and not fees.obligation_met
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+async def test_fee_screen_reads_documents_and_balance_from_one_revision(
+    postgres_sessions, monkeypatch,
+):
+    from httpx import ASGITransport, AsyncClient
+
+    from app.api import fee_assessments
+    from tests.test_fee_assessments import assessment
+
+    fid, filer, clerk = await prepare_filing(postgres_sessions)
+    read_ready, upload_started, finish_read = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    original_state, original_filing = fee_assessments.fee_state, filing_service.get_filing
+
+    async def hold_fee_read(db, filing, user_id=None):
+        if user_id == filer:
+            read_ready.set()
+            await asyncio.wait_for(finish_read.wait(), 10)
+        return await original_state(db, filing, user_id)
+
+    async def observe_upload(db, filing_id, *, for_update=False):
+        if for_update:
+            upload_started.set()
+        return await original_filing(db, filing_id, for_update=for_update)
+
+    async def database():
+        async with postgres_sessions.begin() as db:
+            yield db
+
+    app.dependency_overrides[get_db] = database
+    try:
+        async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
+            first = await client.post(f"/api/v1/clerk/filings/{fid}/fees",
+                headers={"X-Demo-User-Id": str(clerk)}, json=assessment(0, 750))
+            assert first.status_code == 201, first.text
+            monkeypatch.setattr(fee_assessments, "fee_state", hold_fee_read)
+            monkeypatch.setattr(filing_service, "get_filing", observe_upload)
+            read = asyncio.create_task(client.get(f"/api/v1/filings/{fid}/fees",
+                headers={"X-Demo-User-Id": str(filer)}))
+            await asyncio.wait_for(read_ready.wait(), 10)
+            upload = asyncio.create_task(client.post(f"/api/v1/filings/{fid}/documents",
+                headers={"X-Demo-User-Id": str(filer)},
+                data={"title": "New evidence", "document_type_code": "EXHIBIT"},
+                files={"file": ("evidence.pdf", decision_pdf(), "application/pdf")}))
+            await asyncio.wait_for(upload_started.wait(), 10)
+            finish_read.set()
+            snapshot, changed = await asyncio.wait_for(asyncio.gather(read, upload), 15)
+            assert snapshot.status_code == 200 and changed.status_code == 200
+            assert snapshot.json()["version"] == first.json()["version"]
+            assert snapshot.json()["total_cents"] == 750
+            assert len(snapshot.json()["filing"]["documents"]) == 1
+            after = await client.get(f"/api/v1/filings/{fid}/fees",
+                headers={"X-Demo-User-Id": str(filer)})
+            assert after.json()["assessment_stale"]
+            assert len(after.json()["filing"]["documents"]) == 2
+    finally:
+        finish_read.set()
+        app.dependency_overrides.pop(get_db, None)
+
+
+async def test_payment_audit_failure_rolls_back_credit_and_receipt(postgres_sessions, monkeypatch):
+    from httpx import ASGITransport, AsyncClient
+
+    from app.services import audit_service
+    from tests.test_fee_assessments import assessment
+
+    fid, filer, clerk = await prepare_filing(postgres_sessions)
+
+    async def database():
+        async with postgres_sessions.begin() as db:
+            yield db
+
+    async def fail_audit(*args, **kwargs):
+        raise RuntimeError("Audit storage unavailable")
+
+    app.dependency_overrides[get_db] = database
+    try:
+        async with AsyncClient(transport=ASGITransport(app, raise_app_exceptions=False),
+                               base_url="http://test") as client:
+            first = await client.post(f"/api/v1/clerk/filings/{fid}/fees",
+                headers={"X-Demo-User-Id": str(clerk)}, json=assessment(0, 750))
+            assert first.status_code == 201, first.text
+            monkeypatch.setattr(audit_service, "log_action", fail_audit)
+            failed = await client.post("/api/v1/payments/process",
+                headers={"X-Demo-User-Id": str(filer)}, json={
+                    "envelope_id": fid, "amount_cents": 750, "payment_method": "credit_card",
+                    "expected_fee_version": first.json()["version"],
+                })
+            assert failed.status_code == 500
+        async with postgres_sessions() as db:
+            filing = await filing_service.get_filing(db, fid)
+            assert filing.payment_id is None
+            assert await db.scalar(select(func.count()).select_from(Payment)) == 0
+            assert await db.scalar(select(func.count()).select_from(FilingTransaction)) == 1
+            assert await db.scalar(select(func.count()).select_from(Notification)) == 1
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 
 async def test_concurrent_review_refreshes_previously_read_status(postgres_sessions):
