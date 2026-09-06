@@ -10,12 +10,16 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
+    Response,
     UploadFile,
     status,
 )
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
+from starlette.responses import JSONResponse
 
 from app.api.auth import get_current_user_id, lock_current_user, require_user_may_manage_efilings
 from app.api.document_upload import store_document_upload
@@ -41,18 +45,50 @@ from app.utils.http_context import client_ip, client_user_agent
 router = APIRouter(prefix="/filings", tags=["Filings"])
 
 
-@router.post("", response_model=FilingEnvelopeResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=FilingEnvelopeResponse, status_code=status.HTTP_201_CREATED,
+    responses={200: {"model": FilingEnvelopeResponse, "description": "Existing creation request"}},
+)
 async def create_filing(
     request: Request,
+    response: Response,
     data: FilingEnvelopeCreate,
+    idempotency_key: uuid.UUID = Header(alias="Idempotency-Key"),
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
+    current_user = await require_user_may_manage_efilings(
+        await lock_current_user(db, current_user.id),
+    )
     user_id = current_user.id
-    try:
-        envelope = await filing_service.create_filing(db, user_id, data)
-    except filing_service.FilingDestinationError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    key = str(idempotency_key)
+    query = select(FilingEnvelope).where(
+        FilingEnvelope.filer_id == user_id, FilingEnvelope.creation_key == key,
+    ).options(selectinload(FilingEnvelope.documents)).execution_options(populate_existing=True)
+    envelope = await db.scalar(query)
+    created = False
+    if envelope is None:
+        try:
+            # The unique index arbitrates simultaneous requests, including across workers.
+            # Roll back only the losing insert, then read the committed winner.
+            async with db.begin_nested():
+                envelope = await filing_service.create_filing(db, user_id, data, creation_key=key)
+            created = True
+        except (IntegrityError, filing_service.FilingDestinationError) as exc:
+            envelope = await db.scalar(query)
+            if envelope is None:
+                if isinstance(exc, filing_service.FilingDestinationError):
+                    raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+                raise
+    if not created:
+        if envelope.creation_sha256 != filing_service.creation_fingerprint(data):
+            return JSONResponse(status_code=409, content={
+                "detail": "An earlier save created this filing with different details. "
+                          "Open it and compare your edits before saving again.",
+                "filing_id": envelope.id,
+            })
+        response.status_code = status.HTTP_200_OK
+        return envelope
     await audit_service.log_action(
         db,
         user_id=user_id,

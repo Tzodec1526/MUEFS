@@ -11,6 +11,7 @@ export interface FilingDraft {
   caseTitle: string;
   filingDescription: string;
   filingId: number | null;
+  creationKey?: string;
   detailsToken: string | null;
   caseChoiceMade: boolean;
   motionSubtype: string | null;
@@ -33,6 +34,8 @@ export function loadFilingDraft(key: string): FilingDraft | null {
         draft[field] === null || (Number.isSafeInteger(draft[field]) && draft[field] > 0))
       || !['courtName', 'caseTypeName', 'caseTitle', 'filingDescription'].every(field => typeof draft[field] === 'string')
       || typeof draft.caseChoiceMade !== 'boolean'
+      || !(draft.creationKey === undefined || (typeof draft.creationKey === 'string'
+        && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(draft.creationKey)))
       || !(draft.motionSubtype === null || typeof draft.motionSubtype === 'string')
       || !(draft.detailsToken === null || (typeof draft.detailsToken === 'string' && /^[0-9a-f]{64}$/.test(draft.detailsToken)))) return null;
     return draft;
@@ -46,6 +49,7 @@ export function saveFilingDraft(key: string, data: FilingDraft): boolean {
       filingType: data.filingType, caseTypeId: data.caseTypeId, caseTypeName: data.caseTypeName,
       caseTitle: data.caseTitle, filingDescription: data.filingDescription,
       filingId: data.filingId, detailsToken: data.detailsToken,
+      creationKey: data.creationKey,
       caseChoiceMade: data.caseChoiceMade, motionSubtype: data.motionSubtype,
     };
     sessionStorage.setItem(key, JSON.stringify(draft));

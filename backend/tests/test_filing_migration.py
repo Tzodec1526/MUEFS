@@ -363,26 +363,39 @@ def test_fee_migration_preserves_only_unambiguous_payment_links(tmp_path):
         engine.dispose()
 
 
+def seed_historical_filings(connection, count):
+    metadata = MetaData()
+    for name, rows in [
+        ("users", [dict(id=i, email=f"legacy{i}@test.com", first_name="Legacy", last_name="Filer",
+                        user_type="ATTORNEY", bar_number_verified=False, is_active=True)
+                   for i in (1, 2)]),
+        ("courts", [dict(id=1, name="Legacy Court", county="Wayne", court_type="CIRCUIT",
+                         state="MI", is_efiling_enabled=True)]),
+        ("case_types", [dict(id=1, court_id=1, code="CIV", name="Civil", category="CIVIL",
+                             filing_fee_cents=0, is_active=True)]),
+        ("filing_envelopes", [dict(
+            id=number + 1, court_id=1, case_type_id=1, filer_id=2 if number % 5 == 0 else 1,
+            case_title=f"Matter {number}", filing_type="initial", fee_waiver_requested=False,
+            status="RETURNED" if number % 3 else "DRAFT",
+            updated_at=datetime(2026, 1, 1, tzinfo=UTC),
+        ) for number in range(count)]),
+    ]:
+        table = Table(name, metadata, autoload_with=connection)
+        connection.execute(table.insert(), rows)
+
+
 @pytest.mark.skipif(not os.getenv("MUEFS_TEST_POSTGRES_URL"), reason="PostgreSQL not configured")
 @pytest.mark.parametrize("postgres_sessions", ["f7a21b84d903"], indirect=True)
 async def test_filer_index_recovers_failed_build_without_changing_pages(postgres_sessions):
-    from app.models.filing import FilingEnvelope, FilingStatus
+    from app.models.filing import FilingStatus
     from app.services.filing_service import list_filings
-    from tests.test_filing_history import filing_fixture
 
     engine = postgres_sessions.kw["bind"]
     config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
     config.set_main_option("script_location", str(Path(__file__).resolve().parents[1] / "alembic"))
-    async with postgres_sessions.begin() as db:
-        fid, filer, _, other = await filing_fixture(db)
-        original = await db.get(FilingEnvelope, fid)
-        for number in range(40):
-            db.add(FilingEnvelope(
-                court_id=original.court_id, case_type_id=original.case_type_id,
-                filer_id=other if number % 5 == 0 else filer, case_title=f"Matter {number}",
-                status=FilingStatus.RETURNED if number % 3 else FilingStatus.DRAFT,
-                updated_at=datetime(2026, 1, 1, tzinfo=UTC),
-            ))
+    async with engine.begin() as conn:
+        await conn.run_sync(seed_historical_filings, 41)
+    filer = 1
     async with postgres_sessions() as db:
         before = [await list_filings(db, filer, status=status, page=2, page_size=5)
                   for status in [None, FilingStatus.RETURNED]]
@@ -418,3 +431,53 @@ async def test_filer_index_recovers_failed_build_without_changing_pages(postgres
             after = [await list_filings(db, filer, status=status, page=2, page_size=5)
                      for status in [None, FilingStatus.RETURNED]]
             assert after == before
+
+
+@pytest.mark.skipif(not os.getenv("MUEFS_TEST_POSTGRES_URL"), reason="PostgreSQL not configured")
+@pytest.mark.parametrize("postgres_sessions", ["9d34e6a81c72"], indirect=True)
+async def test_creation_key_migration_recovers_partial_build_and_retains_keys(postgres_sessions):
+    engine = postgres_sessions.kw["bind"]
+    config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+    config.set_main_option("script_location", str(Path(__file__).resolve().parents[1] / "alembic"))
+    async with engine.begin() as conn:
+        await conn.run_sync(seed_historical_filings, 3)
+        before = (await conn.execute(text(
+            "SELECT id, case_title, status FROM filing_envelopes ORDER BY id"
+        ))).all()
+        await conn.execute(text("ALTER TABLE filing_envelopes ADD COLUMN creation_key varchar(36)"))
+        await conn.execute(text(
+            "ALTER TABLE filing_envelopes ADD COLUMN creation_sha256 varchar(64)"
+        ))
+    async with engine.connect() as conn:
+        await conn.execution_options(isolation_level="AUTOCOMMIT")
+        with pytest.raises(DBAPIError, match="invalid input syntax for type integer"):
+            await conn.execute(text("""CREATE UNIQUE INDEX CONCURRENTLY uq_filing_creation_key
+                ON filing_envelopes ((case_title::integer))"""))
+        assert await conn.scalar(text("""SELECT indisvalid FROM pg_index
+            WHERE indexrelid = 'uq_filing_creation_key'::regclass""")) is False
+    for upgrade in (True, False, True):
+        async with engine.connect() as conn:
+            def migrate(connection):
+                config.attributes["connection"] = connection
+                if upgrade:
+                    command.upgrade(config, "b63c8e9204af")
+                else:
+                    command.downgrade(config, "9d34e6a81c72")
+            await conn.run_sync(migrate)
+            assert (await conn.execute(text(
+                "SELECT id, case_title, status FROM filing_envelopes ORDER BY id"
+            ))).all() == before
+    async with engine.begin() as conn:
+        await conn.execute(text("""UPDATE filing_envelopes SET
+            creation_key='12345678-1234-1234-1234-123456789012' WHERE id=2"""))
+    async with engine.begin() as conn:
+        with pytest.raises(DBAPIError, match="uq_filing_creation_key"):
+            async with conn.begin_nested():
+                await conn.execute(text("""UPDATE filing_envelopes SET
+                    creation_key='12345678-1234-1234-1234-123456789012' WHERE id=3"""))
+    async with engine.connect() as conn:
+        def downgrade_with_keys(connection):
+            config.attributes["connection"] = connection
+            command.downgrade(config, "9d34e6a81c72")
+        with pytest.raises(RuntimeError, match="creation request keys"):
+            await conn.run_sync(downgrade_with_keys)

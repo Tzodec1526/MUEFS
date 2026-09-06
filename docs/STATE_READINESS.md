@@ -35,6 +35,22 @@ On the details step, **Save draft** saves the title and description to the filer
 that same filing. **My Filings → Continue Filing** resumes the account's saved record,
 including from a browser with no local recovery data.
 
+Creation requires a UUID `Idempotency-Key` on `POST /api/v1/filings`. The browser saves
+that key with the local draft before sending and keeps it when retrying or reloading.
+The API retains the key and a fingerprint of the validated creation fields on the filing,
+with a unique index scoped to the filer. New creation returns 201; the same request
+returns 200 with the current filing, including later changes. Replay does not repeat the
+creation audit entry or reopen a submitted filing. It works after intake closes, while
+still requiring an active account permitted to manage filings.
+
+Reusing a creation key with different details returns 409 and the existing owned
+`filing_id`. The editor carries the unsaved text into that filing's comparison view;
+it never replaces newer details automatically. If local recovery storage refuses the
+transfer, the text stays on screen with a link to the saved filing and copying guidance.
+Changing the destination requires starting a separate filing. Inputs stay disabled during
+the save, and navigating away leaves recovery intact without a late response redirecting
+the user back into the editor.
+
 An envelope response includes `details_token`. A `PATCH /api/v1/filings/{id}` that changes
 `case_title` or `filing_description` must supply its opened version as
 `expected_details_token`. Missing/malformed preconditions return 422. The API compares
@@ -60,8 +76,8 @@ comparison. Unscoped entries without a verifiable saved filing are left unadopte
 Recovery is limited to the browser's tab session. Save to the account before closing
 the tab or switching devices. The interface warns about unsaved changes and storage
 refusal; browser recovery cannot guarantee survival of crashes, cleared data or closed
-sessions. Failed saves retain the form text. If the first creation response is lost,
-check My Filings before creating another draft; creation has no idempotency key.
+sessions. Failed saves retain the form text and creation key. If that recovery is gone,
+check My Filings before starting a separate draft; a new request key means a new filing.
 
 Verification reproduced a stale tab overwriting a newer save before the fix, and a live
 tab retaining the previous account's editor after a cross-tab identity change. API tests
@@ -71,6 +87,13 @@ offline failures, storage refusal, legacy recovery, desktop/mobile comparison an
 switching. In a synthetic 24-document filing, the recovery payload decreased from 2,327
 to 374 bytes (about 84%); this is a storage/serialization measurement, not a typing-latency
 or statewide load benchmark.
+
+Creation verification covers simultaneous PostgreSQL requests with matching and conflicting
+details, per-account key isolation, later edits/submissions and closed intake, one creation
+audit entry, and recovery from a failed concurrent index build. Browser checks drop actual
+committed responses and exercise reload, changed text, a request that never reaches the
+server, navigation and account switching during saving, storage refusal and desktop/mobile
+comparison.
 
 ## Court service instructions
 

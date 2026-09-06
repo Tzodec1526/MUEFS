@@ -231,7 +231,7 @@ async def test_intake_change_waits_for_submission_to_commit(
             new_draft = await client.post("/api/v1/filings", json={
                 "court_id": court_id, "case_type_id": case_type_id,
                 "filing_type": "initial", "case_title": "After intake closure",
-            })
+            }, headers={"Idempotency-Key": str(uuid4())})
             assert new_draft.status_code == 409, new_draft.text
         async with postgres_sessions() as db:
             assert await db.scalar(select(func.count()).select_from(FilingTransaction)) == 1

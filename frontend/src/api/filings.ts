@@ -65,8 +65,8 @@ export async function createFiling(data: {
   filing_description?: string;
   fee_waiver_requested?: boolean;
   fee_waiver_reason?: string;
-}): Promise<FilingEnvelope> {
-  const response = await apiClient.post('/filings', data);
+}, creationKey: string): Promise<FilingEnvelope> {
+  const response = await apiClient.post('/filings', data, { headers: { 'Idempotency-Key': creationKey } });
   return response.data;
 }
 

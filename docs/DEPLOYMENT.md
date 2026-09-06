@@ -21,6 +21,19 @@ version receives 409 and requires comparison before another save. This change ne
 database migration. See [draft editing and recovery](STATE_READINESS.md#draft-editing-and-recovery)
 for recovery scope and legacy browser entries.
 
+New draft creation requires a UUID `Idempotency-Key` header on `POST /api/v1/filings`.
+Deploy that client/API contract together after migration `b63c8e9204af`. Clients must keep
+the same key and original creation fields after an uncertain response. A new filing returns
+201; replay returns 200 with the current filing. A changed body returns 409 with the existing
+owned `filing_id` for comparison, rather than replacing its contents. Missing or malformed
+keys return 422. Keys are scoped to the filer and retained for the filing's lifetime.
+
+The migration adds two nullable columns without backfilling legacy filings and builds a
+partial unique index concurrently on PostgreSQL. Allow Alembic's autocommit block outside
+any deployment-wide transaction; a rerun handles committed columns and an invalid interrupted
+index. SQLite uses ordinary DDL. Downgrade is refused once creation keys exist, because
+discarding them would allow previously completed requests to create duplicates.
+
 Filing list responses now contain summaries with `document_count`, rather than full
 envelopes and attachment arrays. This applies to `GET /api/v1/filings` and
 `GET /api/v1/clerk/queue`, including pending waivers. Deploy their clients and API together;

@@ -51,7 +51,8 @@ async def test_invalid_intake_cannot_create_a_filing(db_session, api_client, sce
     await db_session.flush()
 
     response = await api_client.post("/api/v1/filings", json=body,
-                                     headers={"X-Demo-User-Id": str(user.id)})
+                                     headers={"X-Demo-User-Id": str(user.id),
+                                              "Idempotency-Key": str(uuid4())})
     assert response.status_code == expected, response.text
     assert await db_session.scalar(select(func.count()).select_from(FilingEnvelope)) == 0
 
@@ -72,7 +73,7 @@ async def test_saved_draft_rechecks_intake_and_retry_preserves_its_receipt(
     created = await api_client.post("/api/v1/filings", json={
         "court_id": court.id, "case_type_id": case_type.id, "case_id": case.id,
         "filing_type": "subsequent", "case_title": case.title,
-    })
+    }, headers={"Idempotency-Key": str(uuid4())})
     assert created.status_code == 201, created.text
     fid = created.json()["id"]
     document = stored_document(fid)

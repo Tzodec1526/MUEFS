@@ -42,10 +42,22 @@ describe('unsaved filing recovery', () => {
     const key = filingDraftKey(1, '7');
     for (const damaged of ['{', 'null', '[]', JSON.stringify({ ...draft, courtId: true }),
       JSON.stringify({ ...draft, detailsToken: ['a'.repeat(64)] }),
+      JSON.stringify({ ...draft, creationKey: 7 }), JSON.stringify({ ...draft, creationKey: 'broken' }),
       JSON.stringify({ ...draft, filingDescription: { private: 'value' } })]) {
       sessionStorage.setItem(key, damaged);
       expect(loadFilingDraft(key)).toBeNull();
     }
+  });
+
+  it('retains the same creation attempt across recovery without invalidating older drafts', () => {
+    const key = filingDraftKey(1, 'new:');
+    saveFilingDraft(key, draft);
+    expect(loadFilingDraft(key)?.creationKey).toBeUndefined();
+    const creationKey = '12345678-1234-1234-1234-123456789012';
+    saveFilingDraft(key, { ...draft, filingId: null, creationKey });
+    const recovered = loadFilingDraft(key)!;
+    saveFilingDraft(key, { ...recovered, caseTitle: 'Edited after a lost response' });
+    expect(loadFilingDraft(key)?.creationKey).toBe(creationKey);
   });
 
   it('reports unavailable storage without throwing away the form values', () => {

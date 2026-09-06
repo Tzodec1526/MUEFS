@@ -94,7 +94,7 @@ function FilingForm({ userId }: { userId: number }) {
     };
   });
   const [currentStep, setCurrentStep] = useState<WizardStep>(() =>
-    draft ? 'court' : filingData.caseId ? 'details' : filingData.courtId ? 'case' : 'court'
+    draft?.creationKey ? 'details' : draft ? 'court' : filingData.caseId ? 'details' : filingData.courtId ? 'case' : 'court'
   );
   const [showDraftBanner, setShowDraftBanner] = useState(!!draft);
   const [saving, setSaving] = useState(false);
@@ -109,6 +109,13 @@ function FilingForm({ userId }: { userId: number }) {
   const [conflict, setConflict] = useState<FilingEnvelope | null>(null);
   const [saveNotice, setSaveNotice] = useState('');
   const [recoveryAvailable, setRecoveryAvailable] = useState(true);
+  const [creationConflictId, setCreationConflictId] = useState<number | null>(null);
+  const destinationLocked = filingData.filingId !== null || Boolean(filingData.creationKey);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
   const dirty = !submission && (filingData.filingId
     ? loadedFiling !== null && (filingData.caseTitle !== (loadedFiling.case_title ?? '')
       || filingData.filingDescription !== (loadedFiling.filing_description ?? ''))
@@ -267,6 +274,14 @@ function FilingForm({ userId }: { userId: number }) {
     setErrors([]);
     setSaveNotice('');
     try {
+      let creationKey = filingData.creationKey;
+      if (!filingData.filingId) {
+        creationKey ??= crypto.randomUUID();
+        const pending = { ...filingData, creationKey };
+        setFilingData(pending);
+        // Persist before sending: a response can be lost even when the server commits.
+        setRecoveryAvailable(saveFilingDraft(draftKey, pending));
+      }
       const filing = filingData.filingId
         ? await updateFiling(filingData.filingId, {
           expected_details_token: filingData.detailsToken!,
@@ -276,7 +291,9 @@ function FilingForm({ userId }: { userId: number }) {
           court_id: filingData.courtId!, case_id: filingData.caseId || undefined,
           case_type_id: filingData.caseTypeId!, filing_type: filingData.filingType,
           case_title: filingData.caseTitle, filing_description: filingData.filingDescription,
-        });
+        }, creationKey!);
+      // Leaving the workspace must not clear recovery or navigate a different account.
+      if (!mounted.current) return false;
       setLoadedFiling(filing);
       setFilingData(previous => ({ ...previous, filingId: filing.id, detailsToken: filing.details_token }));
       clearFilingDraft(draftKey, filing.id);
@@ -288,13 +305,30 @@ function FilingForm({ userId }: { userId: number }) {
       }
       return true;
     } catch (err) {
+      if (!mounted.current) return false;
       setErrors([getErrorDetail(err) || 'Could not save your filing. Your edits are still here.']);
+      if (!filingData.filingId && isAxiosError(err) && err.response?.status === 409) {
+        const existingId: unknown = err.response.data?.filing_id;
+        if (typeof existingId === 'number' && Number.isSafeInteger(existingId) && existingId > 0) {
+          const recovered = { ...filingData, filingId: existingId, detailsToken: null, creationKey: undefined };
+          if (saveFilingDraft(filingDraftKey(userId, String(existingId)), recovered)) {
+            clearFilingDraft(draftKey);
+            setSearchParams({ filing_id: String(existingId), step: 'details' }, { replace: true });
+          } else {
+            setRecoveryAvailable(false);
+            setCreationConflictId(existingId);
+          }
+        }
+      }
       if (filingData.filingId && isAxiosError(err) && err.response?.status === 409) {
-        try { setConflict(await getFiling(filingData.filingId)); setErrors([]); }
+        try {
+          const latest = await getFiling(filingData.filingId);
+          if (mounted.current) { setConflict(latest); setErrors([]); }
+        }
         catch { /* Keep the edits and original precondition if comparison cannot load. */ }
       }
       return false;
-    } finally { setSaving(false); }
+    } finally { if (mounted.current) setSaving(false); }
   }
 
   function resolveConflict(keepEdits: boolean) {
@@ -354,7 +388,7 @@ function FilingForm({ userId }: { userId: number }) {
 
   const goToStep = (step: WizardStep) => {
     const targetIndex = steps.findIndex((s) => s.key === step);
-    if (filingData.filingId && targetIndex < detailsStepIndex) return;
+    if (destinationLocked && targetIndex < detailsStepIndex) return;
     // Only allow going back to completed steps
     if (targetIndex <= currentStepIndex) {
       setCurrentStep(step);
@@ -402,6 +436,7 @@ function FilingForm({ userId }: { userId: number }) {
     setSaving(false);
     setConflict(null);
     setSaveNotice('');
+    setCreationConflictId(null);
     setMotionChecklists([]);
   };
 
@@ -478,19 +513,26 @@ function FilingForm({ userId }: { userId: number }) {
             <button className="btn btn-primary btn-small" onClick={() => setShowDraftBanner(false)}>
               Continue Editing
             </button>
-            <button className="btn btn-secondary btn-small" onClick={handleDiscardDraft}>
-              {loadedFiling ? 'Use Saved Details' : 'Start Fresh'}
+            <button className="btn btn-secondary btn-small" disabled={saving} onClick={handleDiscardDraft}>
+              {loadedFiling ? 'Use Saved Details' : filingData.creationKey ? 'Start a separate filing' : 'Start Fresh'}
             </button>
           </div>
         </div>
       )}
 
       {saveNotice && <p className="alert alert-success" role="status">{saveNotice}</p>}
+      {filingData.creationKey && !filingData.filingId && <p role="note">
+        If the earlier save succeeded, retrying will reopen that filing.
+      </p>}
       {dirty && !conflict && <p role="status">Unsaved changes. Use Save draft or Continue to save them to your account.</p>}
       {!recoveryAvailable && dirty && <p className="alert alert-warning" role="alert">
         This browser could not keep a recovery copy. Keep this page open and save your draft.
       </p>}
       {conflictView}
+      {creationConflictId && <p className="alert alert-warning" role="alert">
+        Your earlier save created filing #{creationConflictId}. Copy your edits before leaving this page,
+        then <Link to={`/filing/new?filing_id=${creationConflictId}&step=details`}>open the saved filing</Link> to compare them.
+      </p>}
 
       {/* Step Progress Bar - clickable for completed steps */}
       <nav className="wizard-steps" aria-label="Filing progress">
@@ -506,7 +548,7 @@ function FilingForm({ userId }: { userId: number }) {
                 : 'upcoming'
             }`}
             onClick={() => goToStep(step.key)}
-            disabled={Boolean(submission) || Boolean(conflict) || saving || index > currentStepIndex || Boolean(filingData.filingId && index < detailsStepIndex)}
+            disabled={Boolean(submission) || Boolean(conflict) || saving || index > currentStepIndex || (destinationLocked && index < detailsStepIndex)}
             aria-current={index === currentStepIndex ? 'step' : undefined}
           >
             <span className="step-number">
@@ -618,7 +660,7 @@ function FilingForm({ userId }: { userId: number }) {
                       name="filingType"
                       value="subsequent"
                       checked={filingData.filingType === 'subsequent'}
-                      disabled={filingData.filingId !== null}
+                      disabled={destinationLocked || saving}
                       onChange={() => updateData({ filingType: 'subsequent', paymentComplete: false })}
                     />
                     <div>
@@ -632,7 +674,7 @@ function FilingForm({ userId }: { userId: number }) {
                       name="filingType"
                       value="service_only"
                       checked={filingData.filingType === 'service_only'}
-                      disabled={filingData.filingId !== null}
+                      disabled={destinationLocked || saving}
                       onChange={() => updateData({ filingType: 'service_only' })}
                     />
                     <div>
@@ -652,6 +694,7 @@ function FilingForm({ userId }: { userId: number }) {
                 </label>
                 <select
                   id="motionSubtype"
+                  disabled={saving}
                   value={filingData.motionSubtype || ''}
                   onChange={(e) => updateData({ motionSubtype: e.target.value || null })}
                 >
@@ -684,6 +727,7 @@ function FilingForm({ userId }: { userId: number }) {
               </label>
               <input
                 id="caseTitle"
+                disabled={saving}
                 type="text"
                 value={filingData.caseTitle}
                 onChange={(e) => updateData({ caseTitle: e.target.value })}
@@ -704,6 +748,7 @@ function FilingForm({ userId }: { userId: number }) {
               </label>
               <textarea
                 id="filingDesc"
+                disabled={saving}
                 value={filingData.filingDescription}
                 onChange={(e) => updateData({ filingDescription: e.target.value })}
                 placeholder={filingData.filingType === 'service_only'
@@ -746,7 +791,7 @@ function FilingForm({ userId }: { userId: number }) {
           <button
             className="btn btn-secondary"
             onClick={goBack}
-            disabled={currentStepIndex === 0 || saving || Boolean(filingData.filingId && currentStep === 'details')}
+            disabled={currentStepIndex === 0 || saving || (destinationLocked && currentStep === 'details')}
           >
             Back
           </button>

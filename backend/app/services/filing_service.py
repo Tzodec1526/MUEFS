@@ -1,3 +1,5 @@
+import hashlib
+import json
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select
@@ -184,10 +186,19 @@ async def validate_filing_destination(
     return case
 
 
+def creation_fingerprint(data: FilingEnvelopeCreate) -> str:
+    # Include validated defaults so omitted fields and their explicit defaults replay alike.
+    return hashlib.sha256(json.dumps(
+        data.model_dump(mode="json"), sort_keys=True, ensure_ascii=False,
+    ).encode("utf-8")).hexdigest()
+
+
 async def create_filing(
     db: AsyncSession,
     filer_id: int,
     data: FilingEnvelopeCreate,
+    *,
+    creation_key: str | None = None,
 ) -> FilingEnvelope:
     await validate_filing_destination(db, data, filer_id=filer_id)
 
@@ -196,6 +207,8 @@ async def create_filing(
         case_id=data.case_id,
         case_type_id=data.case_type_id,
         filer_id=filer_id,
+        creation_key=creation_key,
+        creation_sha256=creation_fingerprint(data) if creation_key else None,
         filing_type=data.filing_type,
         case_title=data.case_title,
         filing_description=data.filing_description,

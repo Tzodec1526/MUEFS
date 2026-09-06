@@ -1,6 +1,7 @@
 """HTTP: a draft on a sealed case must not unlock the docket."""
 
 from datetime import UTC, datetime
+from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -57,6 +58,7 @@ async def test_stranger_draft_does_not_unlock_sealed_case(db_session):
         ) as client:
             created = await client.post(
                 "/api/v1/filings",
+                headers={"Idempotency-Key": str(uuid4())},
                 json={
                     "court_id": court.id,
                     "case_id": case.id,

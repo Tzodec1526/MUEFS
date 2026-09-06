@@ -3,7 +3,7 @@ import hashlib
 import json
 from datetime import date, datetime
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -45,6 +45,8 @@ class FilingEnvelope(Base):
     case_id: Mapped[int | None] = mapped_column(ForeignKey("cases.id"), index=True)
     case_type_id: Mapped[int] = mapped_column(ForeignKey("case_types.id"), index=True)
     filer_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    creation_key: Mapped[str | None] = mapped_column(String(36))
+    creation_sha256: Mapped[str | None] = mapped_column(String(64))
     filing_type: Mapped[str] = mapped_column(String(20), default="subsequent")
     status: Mapped[FilingStatus] = mapped_column(
         Enum(FilingStatus), default=FilingStatus.DRAFT, index=True
@@ -90,6 +92,9 @@ class FilingEnvelope(Base):
     )
 
     __table_args__ = (
+        Index('uq_filing_creation_key', 'filer_id', 'creation_key', unique=True,
+              postgresql_where=text('creation_key IS NOT NULL'),
+              sqlite_where=text('creation_key IS NOT NULL')),
         # Status is covered for counters; updated_at/id support stable page ordering.
         Index('ix_filing_filer_updated', 'filer_id', 'updated_at', 'id', 'status'),
         Index('ix_filing_court_status', 'court_id', 'status'),

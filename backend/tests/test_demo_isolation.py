@@ -1,6 +1,8 @@
 """Per-visitor demo isolation: each browser session gets its own copy of the seeded
 template, and the per-session cap falls back to the shared sandbox."""
 
+from uuid import uuid4
+
 import pytest
 from fastapi import Request
 from httpx import ASGITransport, AsyncClient
@@ -57,7 +59,7 @@ async def test_demo_api_commits_to_the_visitors_copy_of_the_template(demo, monke
         client.cookies.set(demo.COOKIE_NAME, "a" * 32)
         response = await client.post("/api/v1/filings", json={
             "court_id": 1, "case_type_id": 1, "filing_type": "initial", "case_title": "A's filing",
-        })
+        }, headers={"Idempotency-Key": str(uuid4())})
         assert response.status_code == 201, response.text
         filing_id = response.json()["id"]
         assert (await client.get("/api/v1/filings")).json()["total"] == 1
