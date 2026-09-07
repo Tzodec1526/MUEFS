@@ -11,7 +11,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
 from app.models.filing import PRIVATE_DOCUMENT_TYPES, FilingDocument
-from app.services import document_service
+from app.services import document_service, storage_intent
 from app.utils import malware_scan
 
 
@@ -93,6 +93,7 @@ async def store_document_upload(
     safe_name = re.sub(r"[^\w\s\-.]", "", file.filename or "document") or "document"
     file_key = f"filings/{filing_id}/{uuid.uuid4()}/{safe_name}"
     await run_in_threadpool(document_service.upload_document, file_data, file_key, content_type)
+    storage_intent.track_upload(db.sync_session, file_key)
 
     try:
         doc = FilingDocument(
@@ -116,5 +117,6 @@ async def store_document_upload(
         await db.refresh(doc)
     except Exception:
         await run_in_threadpool(document_service.delete_document, file_key)
+        storage_intent.release_upload(db.sync_session, file_key)
         raise
     return doc

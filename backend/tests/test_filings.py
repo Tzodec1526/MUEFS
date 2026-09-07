@@ -267,13 +267,177 @@ async def test_create_filing_on_sealed_case_denied_to_stranger(db_session):
         case_type_id=case_type.id,
         case_id=case.id,
         case_title="Should not attach",
+        filing_type="subsequent",
     )
     with pytest.raises(filing_service.FilingDestinationError) as exc:
         await filing_service.create_filing(db_session, stranger.id, data)
     assert exc.value.status_code == 403
-    assert await db_session.get(Case, case.id)
+    assert "participation" in str(exc.value).lower() or "authorized" in str(exc.value).lower()
     from app.services import access_service
     assert await access_service.user_may_read_case(db_session, stranger.id, case.id) is False
+
+
+@pytest.mark.asyncio
+async def test_create_filing_on_public_case_denied_without_participant(db_session):
+    user, court, case_type = await create_test_fixtures(db_session)
+    stranger = User(
+        email="public-idor@example.com",
+        first_name="P",
+        last_name="Ublic",
+        user_type=UserType.ATTORNEY,
+        bar_number="P00001",
+        bar_number_verified=True,
+    )
+    db_session.add(stranger)
+    case = Case(
+        court_id=court.id,
+        case_number="OPEN-IDOR",
+        case_type_id=case_type.id,
+        title="Public docket",
+        status=CaseStatus.OPEN,
+        filed_date=datetime.now(UTC),
+        is_sealed=False,
+    )
+    db_session.add(case)
+    await db_session.flush()
+    from app.services import access_service
+    assert await access_service.user_may_read_case(db_session, stranger.id, case.id) is True
+    data = FilingEnvelopeCreate(
+        court_id=court.id,
+        case_type_id=case_type.id,
+        case_id=case.id,
+        case_title="Should not attach",
+        filing_type="subsequent",
+    )
+    with pytest.raises(filing_service.FilingDestinationError) as exc:
+        await filing_service.create_filing(db_session, stranger.id, data)
+    assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_create_filing_on_public_case_denied_when_access_disabled(db_session):
+    from app.models.case import CaseParticipant, ParticipantRole
+
+    user, court, case_type = await create_test_fixtures(db_session)
+    user.bar_number_verified = True
+    case = Case(
+        court_id=court.id,
+        case_number="OPEN-REVOKED",
+        case_type_id=case_type.id,
+        title="Public docket",
+        status=CaseStatus.OPEN,
+        filed_date=datetime.now(UTC),
+        is_sealed=False,
+    )
+    db_session.add(case)
+    await db_session.flush()
+    db_session.add(CaseParticipant(
+        case_id=case.id,
+        user_id=user.id,
+        role=ParticipantRole.ATTORNEY,
+        party_name="Counsel",
+        attorney_bar_number=user.bar_number,
+        is_active=True,
+        access_enabled=False,
+        reviewed_at=datetime.now(UTC),
+    ))
+    await db_session.flush()
+    data = FilingEnvelopeCreate(
+        court_id=court.id,
+        case_type_id=case_type.id,
+        case_id=case.id,
+        case_title="Motion",
+        filing_type="subsequent",
+    )
+    with pytest.raises(filing_service.FilingDestinationError) as exc:
+        await filing_service.create_filing(db_session, user.id, data)
+    assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_create_filing_on_public_case_allowed_with_reviewed_participant(db_session):
+    from app.models.case import CaseParticipant, ParticipantRole
+
+    user, court, case_type = await create_test_fixtures(db_session)
+    user.bar_number_verified = True
+    case = Case(
+        court_id=court.id,
+        case_number="OPEN-OK",
+        case_type_id=case_type.id,
+        title="Public docket",
+        status=CaseStatus.OPEN,
+        filed_date=datetime.now(UTC),
+        is_sealed=False,
+    )
+    db_session.add(case)
+    await db_session.flush()
+    db_session.add(CaseParticipant(
+        case_id=case.id,
+        user_id=user.id,
+        role=ParticipantRole.ATTORNEY,
+        party_name="Counsel",
+        attorney_bar_number=user.bar_number,
+        is_active=True,
+        access_enabled=True,
+        reviewed_at=datetime.now(UTC),
+    ))
+    await db_session.flush()
+    data = FilingEnvelopeCreate(
+        court_id=court.id,
+        case_type_id=case_type.id,
+        case_id=case.id,
+        case_title="Motion",
+        filing_type="subsequent",
+    )
+    filing = await filing_service.create_filing(db_session, user.id, data)
+    assert filing.case_id == case.id
+
+
+@pytest.mark.asyncio
+async def test_accept_records_only_when_cms_not_configured(
+    db_session, monkeypatch, stored_document,
+):
+    from app.config import settings
+    from app.integrations.cms_adapter import submit_filing_to_cms
+
+    monkeypatch.setattr(settings, "allow_demo_mode", False)
+    result = await submit_filing_to_cms("MI-1-2026-000001", 42)
+    assert result.success is True
+    assert result.cms_filing_id is None
+    assert result.cms_case_number == "MI-1-2026-000001"
+
+    monkeypatch.setattr(settings, "allow_demo_mode", True)
+    user, court, case_type = await create_test_fixtures(db_session)
+    data = FilingEnvelopeCreate(
+        filing_type="initial",
+        court_id=court.id,
+        case_type_id=case_type.id,
+        case_title="Records Only Path",
+    )
+    filing = await filing_service.create_filing(db_session, user.id, data)
+    db_session.add(stored_document(filing.id))
+    await db_session.flush()
+    await filing_service.submit_filing(db_session, filing.id)
+
+    async def records_only(case_number, filing_id):
+        return CMSFilingResult(success=True, cms_case_number=case_number, cms_filing_id=None)
+
+    monkeypatch.setattr("app.services.filing_service.submit_filing_to_cms", records_only)
+    clerk = User(
+        email="clerk-records@example.com",
+        first_name="C",
+        last_name="Lerk",
+        user_type=UserType.CLERK,
+    )
+    db_session.add(clerk)
+    await db_session.flush()
+    reviewed = await filing_service.review_filing(
+        db_session, filing.id, reviewer_id=clerk.id, action="accept", expected_submission_count=1,
+    )
+    assert reviewed is not None
+    assert reviewed.status == FilingStatus.ACCEPTED
+    assert reviewed.cms_error is None
+    assert reviewed.cms_filing_id is None
 
 
 @pytest.mark.asyncio

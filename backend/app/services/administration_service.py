@@ -152,7 +152,9 @@ async def update_account(
     ):
         raise HTTPException(409, "An account already uses this email address")
     before = account_snapshot(user)
-    if data.user_type != user.user_type and await db.scalar(
+    if (
+        data.user_type != user.user_type or data.keycloak_id != user.keycloak_id
+    ) and await db.scalar(
         select(UserCourtRole.id)
         .where(
             UserCourtRole.user_id == user.id,
@@ -160,7 +162,11 @@ async def update_account(
         )
         .limit(1)
     ):
-        raise HTTPException(409, "Revoke this account's court staff roles before changing its type")
+        raise HTTPException(
+            409,
+            "Revoke this account's court staff roles before changing its type "
+            "or identity provider binding",
+        )
     changes = data.model_dump(include=set(ACCOUNT_FIELDS))
     if all(getattr(user, field) == value for field, value in changes.items()):
         return user

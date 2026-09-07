@@ -37,6 +37,7 @@ class FilingEnvelope(Base):
         values = [
             self.id, self.status, self.submission_count,
             self.case_title, self.filing_description,
+            self.fee_waiver_requested, self.fee_waiver_reason,
         ]
         return hashlib.sha256(json.dumps(values, ensure_ascii=False).encode("utf-8")).hexdigest()
 

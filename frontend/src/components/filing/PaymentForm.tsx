@@ -67,7 +67,10 @@ export default function PaymentForm({ filingId, onFeesChange }: {
             filingId, waiverFile, 'FEE_WAIVER', 'Fee Waiver Request (MC 20)', waiverUpload.current.key, true,
           );
         }
-        await updateFiling(filingId, { fee_waiver_requested: true });
+        await updateFiling(filingId, {
+          expected_details_token: filing.details_token,
+          fee_waiver_requested: true,
+        });
         setNotice('Fee waiver request attached. Submit the filing to send the application for court review.');
       } else {
         if (fees.balance_due_cents === null) return;

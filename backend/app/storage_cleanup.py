@@ -75,16 +75,23 @@ async def run(once: bool = False) -> int:
     failed = False
     try:
         while True:
-            result = await cleanup_next(async_session)
-            if result == "retry":
+            try:
+                result = await cleanup_next(async_session)
+                if result == "retry":
+                    failed = True
+                elif result is None:
+                    if once:
+                        return int(failed)
+                    await asyncio.sleep(5)
+            except Exception:
                 failed = True
-            elif result is None:
+                logger.exception("Storage cleanup iteration failed")
                 if once:
-                    return int(failed)
+                    return 1
                 await asyncio.sleep(5)
     finally:
         await engine.dispose()
-
+    return int(failed)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)

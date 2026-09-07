@@ -121,6 +121,9 @@ function FilingForm({ userId }: { userId: number }) {
     : filingData.courtId !== null);
   const handleFeesChange = useCallback((filing: FilingEnvelope, obligationMet: boolean) => {
     setFilingData(prev => ({ ...prev, paymentComplete: obligationMet,
+      detailsToken: prev.caseTitle === (filing.case_title ?? '')
+        && prev.filingDescription === (filing.filing_description ?? '')
+        ? filing.details_token : prev.detailsToken,
       documents: filing.documents.map(doc => ({ id: doc.id, title: doc.title,
         type: doc.document_type_code, size: doc.file_size_bytes, isSearchable: doc.is_text_searchable })),
     }));

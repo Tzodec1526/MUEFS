@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import DeclarativeBase
 
 from app.config import settings
+from app.services import storage_intent
 
 # SQLite doesn't support pool_size/max_overflow/pool_pre_ping
 engine_kwargs: dict = {"echo": settings.debug}
@@ -30,5 +31,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             yield session
             await session.commit()
         except Exception:
+            pending = storage_intent.take_pending_uploads(session.sync_session)
             await session.rollback()
+            storage_intent.purge_keys(pending)
             raise

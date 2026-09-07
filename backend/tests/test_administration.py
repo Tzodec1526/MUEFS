@@ -210,6 +210,29 @@ async def test_deactivation_and_rebinding_reject_previously_valid_tokens(
     assert (await api_client.get("/api/v1/auth/me")).status_code == 200
 
 
+async def test_identity_rebinding_requires_revoking_court_staff_roles(
+    administrators,
+    api_client,
+    db_session,
+):
+    users, _ = administrators
+    court_admin = users[2]
+    rebound = await api_client.put(
+        f"/api/v1/admin/users/{court_admin.id}",
+        json=account_payload(court_admin, keycloak_id="hijacked-subject"),
+    )
+    assert rebound.status_code == 409
+    await db_session.refresh(court_admin)
+    assert court_admin.keycloak_id == "subject-2"
+    renamed = await api_client.put(
+        f"/api/v1/admin/users/{court_admin.id}",
+        json=account_payload(court_admin, first_name="Renamed"),
+    )
+    assert renamed.status_code == 200
+    await db_session.refresh(court_admin)
+    assert court_admin.first_name == "Renamed" and court_admin.keycloak_id == "subject-2"
+
+
 async def test_stale_changes_and_audit_failure_cannot_overwrite_an_account(
     administrators,
     api_client,

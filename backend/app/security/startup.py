@@ -21,8 +21,9 @@ _PLACEHOLDER_SECRETS = frozenset(
 
 
 def validate_security_config() -> None:
-    """Log warnings or raise when production settings are unsafe."""
+    """Raise on unsafe production settings; warn for the rest unless strict startup is on."""
     issues: list[str] = []
+    fatal: list[str] = []
     validate_email_config()
 
     if settings.allow_demo_mode and not settings.debug and not settings.demo_mode_secret:
@@ -34,9 +35,11 @@ def validate_security_config() -> None:
         issues.append("ALLOW_PUBLIC_REGISTRATION should be false outside DEBUG")
     if not settings.debug and settings.enable_api_docs:
         issues.append("ENABLE_API_DOCS should be false outside DEBUG")
-    if (not settings.debug and not settings.allow_demo_mode
-            and not settings.malware_scan_clamav_enabled):
-        issues.append("MALWARE_SCAN_CLAMAV_ENABLED must be true outside demo/debug mode")
+    # The hosted demo runs DEBUG=false with ALLOW_DEMO_MODE=true on SQLite and local
+    # storage; only a court deployment (neither flag) must refuse to start.
+    production = not settings.debug and not settings.allow_demo_mode
+    if production and not settings.malware_scan_clamav_enabled:
+        fatal.append("MALWARE_SCAN_CLAMAV_ENABLED must be true outside demo/debug mode")
 
     if not settings.debug:
         for name, value in (
@@ -45,10 +48,12 @@ def validate_security_config() -> None:
             ("S3_SECRET_KEY", settings.s3_secret_key),
         ):
             if value in _PLACEHOLDER_SECRETS or len(value) < 16:
-                issues.append(f"{name} looks like a placeholder or is too short")
+                (fatal if production else issues).append(
+                    f"{name} looks like a placeholder or is too short"
+                )
 
-    if issues:
-        message = "Security configuration issues:\n- " + "\n- ".join(issues)
-        if settings.security_strict_startup:
+    if issues or fatal:
+        message = "Security configuration issues:\n- " + "\n- ".join(fatal + issues)
+        if fatal or settings.security_strict_startup:
             raise RuntimeError(message)
         logger.warning(message)

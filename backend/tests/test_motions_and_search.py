@@ -21,6 +21,7 @@ async def create_court_with_case(db_session):
         last_name="Tester",
         user_type=UserType.ATTORNEY,
         bar_number="P77777",
+        bar_number_verified=True,
     )
     db_session.add(user)
 
@@ -71,6 +72,7 @@ async def create_court_with_case(db_session):
         case_id=case.id, user_id=user.id,
         role=ParticipantRole.ATTORNEY_PLAINTIFF,
         party_name="Motion Tester", attorney_bar_number="P77777",
+        is_active=True, access_enabled=True, reviewed_at=datetime.now(UTC),
     ))
     db_session.add(CaseParticipant(
         case_id=case.id,

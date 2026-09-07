@@ -101,6 +101,33 @@ async def user_may_read_case(db: AsyncSession, user_id: int | None, case_id: int
     )))
 
 
+async def user_may_file_on_case(db: AsyncSession, user_id: int, case_id: int) -> bool:
+    """Subsequent filings require a court-reviewed participant grant, not public docket read."""
+    user = await db.get(User, user_id)
+    if user is None or not user.is_active:
+        return False
+    counsel = (
+        CaseParticipant.attorney_bar_number == user.bar_number
+        if user.user_type == UserType.ATTORNEY and user.bar_number and user.bar_number_verified
+        else false()
+    )
+    participation = await db.scalar(
+        select(CaseParticipant.id)
+        .where(
+            CaseParticipant.case_id == case_id,
+            CaseParticipant.user_id == user.id,
+            CaseParticipant.is_active.is_(True),
+            CaseParticipant.access_enabled.is_(True),
+            CaseParticipant.reviewed_at.is_not(None),
+            or_(CaseParticipant.role.not_in(COUNSEL_ROLES), counsel),
+        )
+        .limit(1)
+    )
+    if not participation:
+        return False
+    return await user_may_read_case(db, user_id, case_id)
+
+
 async def user_may_read_filing_envelope(
     db: AsyncSession, user_id: int | None, envelope: FilingEnvelope
 ) -> bool:

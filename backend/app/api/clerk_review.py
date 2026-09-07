@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +16,7 @@ from app.schemas.filing import (
 from app.services import access_service, audit_service, filing_service
 from app.utils.http_context import client_ip, client_user_agent
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/clerk", tags=["Clerk Review"])
 
 
@@ -178,10 +181,14 @@ async def batch_review_filings(
             if f is not None and f.cms_error:
                 failure = "Court CMS submission failed. Open the filing to inspect its history."
         except (
-            filing_service.StaleFilingReviewError, filing_service.FilingDestinationError,
+            filing_service.FilingDestinationError,
+            filing_service.StaleFilingReviewError,
+            filing_service.FilingDateUnavailableError,
+            filing_service.FilingDocumentError,
         ) as exc:
             failure = str(exc)
         except Exception:
+            logger.exception("Batch acceptance of filing %s failed", fid)
             failure = "Could not accept this filing. Open it for review."
         failed.append(fid)
         errors[fid] = failure

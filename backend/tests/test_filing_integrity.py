@@ -262,6 +262,7 @@ async def test_batch_acceptance_preserves_healthy_filing_when_another_file_is_mi
     assert response.json()["succeeded"] == [second.id]
     assert response.json()["failed"] == [fid]
     assert set(response.json()["errors"]) == {str(fid)}
+    assert "unavailable" in response.json()["errors"][str(fid)]
     first = await filing_service.get_filing(db_session, fid)
     assert first.status == FilingStatus.SUBMITTED and first.reviewer_id is None
     assert (await db_session.get(FilingEnvelope, second.id)).status == FilingStatus.ACCEPTED

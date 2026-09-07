@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
-from app.api.auth import get_current_user_id
+from app.api.auth import get_current_user_id, lock_current_user
 from app.api.document_upload import store_document_upload
 from app.database import get_db
 from app.schemas.filing import FilingDocumentResponse, FilingEnvelopeResponse
@@ -34,6 +34,7 @@ async def decide_fee_waiver(
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
+    await lock_current_user(db, user_id)
     filing = await filing_service.get_filing(db, filing_id, for_update=True)
     if not filing:
         raise HTTPException(status_code=404, detail="Filing not found")

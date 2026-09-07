@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:3000,http://localhost:5173,http://0.0.0.0:3000"
     # OpenAPI /docs and /redoc (default follows debug; set false in production).
     enable_api_docs: bool | None = None
-    # Raise on unsafe production config at startup (recommended for court deploys).
+    # Missing ClamAV and placeholder secrets always refuse to start outside demo/debug;
+    # this also raises on the advisory findings (recommended for court deploys).
     security_strict_startup: bool = False
     # Comma-separated trusted proxy IPs for X-Forwarded-For (Render, nginx, etc.).
     trusted_proxy_ips: str = ""

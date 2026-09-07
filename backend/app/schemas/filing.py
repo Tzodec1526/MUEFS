@@ -55,9 +55,13 @@ class FilingEnvelopeUpdate(BaseModel):
 
     @model_validator(mode="after")
     def require_details_token(self) -> Self:
-        if (
-            self.case_title is not None or self.filing_description is not None
-        ) and not self.expected_details_token:
+        editing = (
+            self.case_title is not None
+            or self.filing_description is not None
+            or self.fee_waiver_requested is not None
+            or self.fee_waiver_reason is not None
+        )
+        if editing and not self.expected_details_token:
             raise ValueError("Load the filing's current details before editing them")
         return self
 

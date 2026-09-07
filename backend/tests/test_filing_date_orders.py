@@ -2,13 +2,14 @@
 
 import hashlib
 from datetime import UTC, date
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
 from sqlalchemy import func, select
 
 from app.api import filing_dates
-from app.config import settings
+from app.integrations.cms_adapter import CMSFilingResult
 from app.models.case import Case
 from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.models.filing_transaction import FilingTransaction
@@ -92,14 +93,16 @@ async def test_order_preserves_receipt_and_acceptance_honors_it_without_calendar
             db_session, fid, clerk, "accept", expected_submission_count=1
         )
     document_service.upload_document(ORDER, doc.file_key, "application/pdf")
-    # A date order does not bypass the real CMS integration boundary.
-    monkeypatch.setattr(settings, "allow_demo_mode", False)
-    failed = await filing_service.review_filing(
-        db_session, fid, clerk, "accept", expected_submission_count=1
-    )
-    assert failed.status == FilingStatus.UNDER_REVIEW and failed.case_id is None
-    assert "not configured" in failed.cms_error
-    monkeypatch.setattr(settings, "allow_demo_mode", True)
+    # A date order does not turn a failed CMS submission into an acceptance.
+    with monkeypatch.context() as cms_failure:
+        cms_failure.setattr(filing_service, "submit_filing_to_cms", AsyncMock(
+            return_value=CMSFilingResult(success=False, error_message="CMS unavailable"),
+        ))
+        failed = await filing_service.review_filing(
+            db_session, fid, clerk, "accept", expected_submission_count=1
+        )
+        assert failed.status == FilingStatus.UNDER_REVIEW and failed.case_id is None
+        assert failed.cms_error == "CMS unavailable"
     accepted = await filing_service.review_filing(
         db_session, fid, clerk, "accept", expected_submission_count=1
     )

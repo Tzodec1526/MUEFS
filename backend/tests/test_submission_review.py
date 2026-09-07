@@ -53,7 +53,10 @@ async def test_changed_review_cannot_create_a_receipt(
         assert response.status_code == 204, response.text
     else:
         response = await api_client.patch(
-            f"/api/v1/filings/{fid}", json={"fee_waiver_requested": True},
+            f"/api/v1/filings/{fid}", json={
+                "expected_details_token": opened["details_token"],
+                "fee_waiver_requested": True,
+            },
         )
         assert response.status_code == 200, response.text
 

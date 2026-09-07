@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import iterate_in_threadpool, run_in_threadpool
 from starlette.types import Receive, Scope, Send
 
-from app.api.auth import get_optional_user_id
+from app.api.auth import get_current_user_id, get_optional_user_id
 from app.database import get_db
 from app.models.document_public_copy import DocumentPublicCopy
 from app.models.filing import FilingDocument
@@ -122,14 +122,14 @@ async def download_document(
         user_agent=client_user_agent(request),
     )
 
-    return DocumentResponse(doc)
+    return DocumentResponse(doc, integrity=(doc.sha256_hash, doc.file_size_bytes))
 
 
 @router.get("/{document_id}/verify", response_model=DocumentVerifyResponse)
 async def verify_document(
     document_id: int,
     db: AsyncSession = Depends(get_db, scope="function"),
-    user_id: int | None = Depends(get_optional_user_id),
+    user_id: int = Depends(get_current_user_id),
 ):
     result = await db.execute(
         select(FilingDocument).where(FilingDocument.id == document_id)

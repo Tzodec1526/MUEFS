@@ -89,6 +89,11 @@ async def test_saved_draft_rechecks_intake_and_retry_preserves_its_receipt(
         case.case_type_id = other_type.id
     else:
         case.is_sealed = True
+        from app.models.case import CaseParticipant
+        for participant in await db_session.scalars(
+            select(CaseParticipant).where(CaseParticipant.case_id == case.id)
+        ):
+            participant.access_enabled = False
     await db_session.flush()
     validation = await api_client.post(f"/api/v1/filings/{fid}/validate")
     assert validation.status_code == 200
@@ -121,6 +126,12 @@ async def test_saved_draft_rechecks_intake_and_retry_preserves_its_receipt(
 
     court.is_efiling_enabled = case_type.is_active = True
     case.case_type_id, case.is_sealed = case_type.id, False
+    if change == "case_restricted":
+        from app.models.case import CaseParticipant
+        for participant in await db_session.scalars(
+            select(CaseParticipant).where(CaseParticipant.case_id == case.id)
+        ):
+            participant.access_enabled = True
     await db_session.flush()
     submitted = await api_client.post(
         f"/api/v1/filings/{fid}/submit",

@@ -177,10 +177,12 @@ async def validate_filing_destination(
         )
         if case is None:
             raise FilingDestinationError(404, "Case not found")
-        if filer_id is not None and not await access_service.user_may_read_case(
+        if filer_id is not None and not await access_service.user_may_file_on_case(
             db, filer_id, data.case_id,
         ):
-            raise FilingDestinationError(403, "Not authorized to file on this case")
+            raise FilingDestinationError(
+                403, "Court-reviewed case participation is required to file on this case",
+            )
         if case.court_id != data.court_id:
             raise FilingDestinationError(400, "Case does not belong to the selected court")
         if case.case_type_id != data.case_type_id:
@@ -232,11 +234,12 @@ async def get_filing(
         select(FilingEnvelope)
         .options(selectinload(FilingEnvelope.documents))
         .where(FilingEnvelope.id == filing_id)
+        .execution_options(populate_existing=True)
     )
     if for_update:
         # A request may already have read the row for authorization. Refresh that
         # identity-map entry after the lock, or concurrent decisions can use stale status.
-        query = query.with_for_update().execution_options(populate_existing=True)
+        query = query.with_for_update()
     result = await db.execute(query)
     return result.scalar_one_or_none()
 
@@ -404,12 +407,22 @@ async def submit_filing(
     filing_id: int,
     *, idempotency_key: str | None = None,
 ) -> FilingEnvelope | None:
+    probe = await get_filing(db, filing_id)
+    if not probe or probe.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
+        return None
+    await validate_filing_destination(db, probe, filer_id=probe.filer_id)
+    await verify_filing_documents(probe)
+    fingerprints = [(doc.id, doc.sha256_hash, doc.file_size_bytes) for doc in probe.documents]
+
     filing = await get_filing(db, filing_id, for_update=True)
     if not filing or filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
         return None
-
     await validate_filing_destination(db, filing, filer_id=filing.filer_id)
-    await verify_filing_documents(filing)
+    current = [(doc.id, doc.sha256_hash, doc.file_size_bytes) for doc in filing.documents]
+    if current != fingerprints:
+        raise FilingDocumentError(
+            "Stored documents changed after integrity verification. Review the draft and try again."
+        )
     now = datetime.now(UTC)
     filing.submitted_at = now
     filing.reviewed_at = None
@@ -448,6 +461,42 @@ async def review_filing(
     *,
     expected_submission_count: int,
 ) -> FilingEnvelope | None:
+    # Verify stored bytes before taking the write lock. Re-check cheap metadata after.
+    probe = await get_filing(db, filing_id)
+    if not probe:
+        return None
+    if probe.submission_count != expected_submission_count:
+        raise StaleFilingReviewError(
+            "The filing was resubmitted after this review was opened. Close the review, "
+            "refresh the queue and review the new submission before deciding."
+        )
+    if probe.status not in (FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW):
+        return None
+
+    ordered_date = (probe.filing_date_basis or {}).get("source") == "court_order"
+    fingerprints: list[tuple[int, str, int]] | None = None
+    if action == "accept":
+        court_order = None
+        if ordered_date:
+            basis = probe.filing_date_basis or {}
+            court_order = await db.scalar(select(FilingDocument).where(
+                FilingDocument.id == basis.get("order_document_id"),
+                FilingDocument.envelope_id == probe.id,
+                FilingDocument.document_type_code == "FILING_DATE_ORDER",
+                FilingDocument.retained_at.is_not(None),
+            ))
+            if (court_order is None or probe.filing_date is None
+                    or basis.get("submission_number") != probe.submission_count):
+                raise FilingDateUnavailableError("The filing-date order requires court review")
+        await verify_filing_documents(probe, court_order)
+        fingerprints = [
+            (doc.id, doc.sha256_hash, doc.file_size_bytes) for doc in probe.documents
+        ]
+        if court_order is not None:
+            fingerprints.append(
+                (court_order.id, court_order.sha256_hash, court_order.file_size_bytes)
+            )
+
     filing = await get_filing(db, filing_id, for_update=True)
     if not filing:
         return None
@@ -459,24 +508,23 @@ async def review_filing(
     if filing.status not in (FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW):
         return None
 
-    ordered_date = (filing.filing_date_basis or {}).get("source") == "court_order"
+    case = None
     if action == "accept":
-        # Received filings remain reviewable after intake closes or filer access ends.
-        # Legacy/imported routing still needs checking before any CMS transmission.
         case = await validate_filing_destination(db, filing, filer_id=None)
-        court_order = None
+        current = [(doc.id, doc.sha256_hash, doc.file_size_bytes) for doc in filing.documents]
         if ordered_date:
             basis = filing.filing_date_basis or {}
-            court_order = await db.scalar(select(FilingDocument).where(
+            order = await db.scalar(select(FilingDocument).where(
                 FilingDocument.id == basis.get("order_document_id"),
                 FilingDocument.envelope_id == filing.id,
-                FilingDocument.document_type_code == "FILING_DATE_ORDER",
-                FilingDocument.retained_at.is_not(None),
             ))
-            if (court_order is None or filing.filing_date is None
-                    or basis.get("submission_number") != filing.submission_count):
-                raise FilingDateUnavailableError("The filing-date order requires court review")
-        await verify_filing_documents(filing, court_order)
+            if order is not None:
+                current.append((order.id, order.sha256_hash, order.file_size_bytes))
+        if fingerprints is None or current != fingerprints:
+            raise FilingDocumentError(
+                "Stored documents changed after integrity verification. Open the filing again."
+            )
+
     now = datetime.now(UTC)
     filing.reviewer_id = reviewer_id
     filing.reviewed_at = now

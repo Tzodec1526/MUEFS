@@ -339,7 +339,8 @@ async def upload_document(
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
-    filing = await filing_service.get_filing(db, filing_id, for_update=True)
+    # Authorization and status checks without locking across AV / S3 I/O.
+    filing = await filing_service.get_filing(db, filing_id)
     if not filing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
     if filing.filer_id != user_id:
@@ -366,31 +367,45 @@ async def upload_document(
                 "This document was already uploaded and later removed. "
                 "Review the saved filing before starting another upload."
             ))
-    else:
-        if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
-            raise HTTPException(status_code=400, detail="Cannot upload documents to this filing")
-        if document_type_code in COURT_DOCUMENT_TYPES:
-            raise HTTPException(
-                status_code=403,
-                detail="Court decisions must be recorded by authorized court staff",
-            )
-        doc = await store_document_upload(
-            db, filing_id, file, document_type_code, title, is_confidential,
+        return DocumentUploadResponse(
+            id=doc.id, title=doc.title, file_size_bytes=doc.file_size_bytes,
+            mime_type=doc.mime_type, sha256_hash=doc.sha256_hash,
+            is_text_searchable=doc.is_text_searchable, page_count=doc.page_count,
+            warnings=doc.pii_warnings or [],
         )
-        try:
-            db.add(DocumentUploadRequest(
-                envelope_id=filing_id, key=key, document_id=doc.id,
-                fingerprint=fingerprint(doc.sha256_hash, doc.file_size_bytes),
-            ))
-            filing.fee_version += 1
-            await audit_service.log_action(
-                db, user_id=user_id, action="upload_document", entity_type="filing_document",
-                entity_id=doc.id, details={"filing_id": filing_id, "filename": file.filename},
-                ip_address=client_ip(request), user_agent=client_user_agent(request),
-            )
-        except Exception:
-            await run_in_threadpool(document_service.delete_document, doc.file_key)
-            raise
+
+    if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
+        raise HTTPException(status_code=400, detail="Cannot upload documents to this filing")
+    if document_type_code in COURT_DOCUMENT_TYPES:
+        raise HTTPException(
+            status_code=403,
+            detail="Court decisions must be recorded by authorized court staff",
+        )
+    # Inspect and store without holding the envelope row lock.
+    prepared = await store_document_upload(
+        db, filing_id, file, document_type_code, title, is_confidential,
+    )
+    filing = await filing_service.get_filing(db, filing_id, for_update=True)
+    if not filing or filing.filer_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your filing")
+    if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
+        await run_in_threadpool(document_service.delete_document, prepared.file_key)
+        raise HTTPException(status_code=400, detail="Cannot upload documents to this filing")
+    doc = prepared
+    try:
+        db.add(DocumentUploadRequest(
+            envelope_id=filing_id, key=key, document_id=doc.id,
+            fingerprint=fingerprint(doc.sha256_hash, doc.file_size_bytes),
+        ))
+        filing.fee_version += 1
+        await audit_service.log_action(
+            db, user_id=user_id, action="upload_document", entity_type="filing_document",
+            entity_id=doc.id, details={"filing_id": filing_id, "filename": file.filename},
+            ip_address=client_ip(request), user_agent=client_user_agent(request),
+        )
+    except Exception:
+        await run_in_threadpool(document_service.delete_document, doc.file_key)
+        raise
     return DocumentUploadResponse(
         id=doc.id, title=doc.title, file_size_bytes=doc.file_size_bytes,
         mime_type=doc.mime_type, sha256_hash=doc.sha256_hash,

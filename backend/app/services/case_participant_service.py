@@ -60,13 +60,15 @@ async def change_participant(
     )
     if actor is None:
         raise HTTPException(403, "Account is unavailable")
+    await require_case_staff(db, actor, case_id)
     case = await db.scalar(
         select(Case)
         .where(Case.id == case_id)
         .with_for_update()
         .execution_options(populate_existing=True)
     )
-    case = await require_case_staff(db, actor, case_id)
+    if case is None:
+        raise HTTPException(404, "Case not found")
     if case.participant_version != data.expected_version:
         raise HTTPException(409, "The case access records changed. Refresh before saving")
     participant = await db.get(CaseParticipant, participant_id) if participant_id else None

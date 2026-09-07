@@ -256,10 +256,12 @@ async def test_denial_can_be_paid_without_resubmission_or_fee_recalculation(
         db_session, filing.id, users[1].id, "return", "Correct title", expected_submission_count=1
     )
     api_client.headers["X-Demo-User-Id"] = str(users[0].id)
+    opened = (await api_client.get(f"/api/v1/filings/{filing.id}")).json()
     assert (
         await api_client.patch(
             f"/api/v1/filings/{filing.id}",
             json={
+                "expected_details_token": opened["details_token"],
                 "fee_waiver_requested": False,
             },
         )
@@ -351,3 +353,25 @@ async def test_failed_decision_does_not_keep_an_order_or_change_waiver(
     assert unchanged.fee_waiver_decided_at is None
     assert await db_session.scalar(select(func.count()).select_from(FilingTransaction)) == 1
     assert await db_session.scalar(select(func.count()).select_from(Notification)) == 1
+
+
+async def test_deactivated_clerk_with_lingering_role_cannot_decide(
+    waiver_case, api_client, db_session,
+):
+    from app.api.auth import get_current_user_id
+    from app.main import app
+
+    filing, users, _ = waiver_case
+    await submit_application(api_client, filing)
+    clerk = users[1]
+    clerk.is_active = False
+    await db_session.flush()
+    app.dependency_overrides[get_current_user_id] = lambda: clerk.id
+    try:
+        response = await api_client.post(
+            f"/api/v1/clerk/filings/{filing.id}/fee-waiver", data={"action": "refer"}
+        )
+    finally:
+        app.dependency_overrides.pop(get_current_user_id, None)
+    assert response.status_code == 403
+    assert (await filing_service.get_filing(db_session, filing.id)).fee_waiver_referred_at is None

@@ -5,9 +5,9 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
-from app.models.audit import AuditLog
 from app.models.document_public_copy import DocumentPublicCopy
 from app.models.filing import PRIVATE_DOCUMENT_TYPES, FilingDocument, FilingEnvelope, FilingStatus
+from app.models.filing_transaction import FilingTransaction
 from app.models.user import User
 from app.schemas.document_publication import PublicCopyResponse, PublishCopy, WithholdDocument
 from app.services import access_service, audit_service, document_service, filing_record_service
@@ -206,14 +206,14 @@ async def may_read_public_copy(
     if await access_service.user_is_court_staff_for_court(db, user_id, filing.court_id):
         return True
     if user_id == filing.filer_id:
-        # A court's prepared candidate is private until it has actually been published.
+        # Copies are append-only; publication is recorded on the filing receipt.
         return bool(
             await db.scalar(
-                select(AuditLog.id)
+                select(FilingTransaction.id)
                 .where(
-                    AuditLog.entity_type == "document_public_copy",
-                    AuditLog.entity_id == copy.id,
-                    AuditLog.action == "public_copy.published",
+                    FilingTransaction.filing_id == filing.id,
+                    FilingTransaction.event_type == "public_copy_published",
+                    FilingTransaction.details["public_copy"]["id"].as_integer() == copy.id,
                 )
                 .limit(1)
             )

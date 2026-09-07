@@ -272,6 +272,8 @@ async def finish_attempt(
         current = await db.scalar(
             select(Notification).where(Notification.id == notice.id).with_for_update()
         )
+        if current is None:
+            return
         db.add(
             NotificationDeliveryEvent(
                 notification_id=notice.id,
@@ -283,11 +285,10 @@ async def finish_attempt(
             )
         )
         if (
-            current is None
-            or current.attempt_count != notice.attempt_count
-            or (current.delivery_status not in (DeliveryStatus.SENDING, DeliveryStatus.UNKNOWN))
+            current.attempt_count != notice.attempt_count
+            or current.delivery_status not in (DeliveryStatus.SENDING, DeliveryStatus.UNKNOWN)
         ):
-            return  # A late worker cannot overwrite a newer attempt or an operator's retry.
+            return  # Keep the relay outcome; do not overwrite a newer attempt or retry.
         current.last_error = detail
         if outcome == "accepted":
             current.delivery_status = DeliveryStatus.SENT

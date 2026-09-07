@@ -50,18 +50,28 @@ async def test_details_edit_requires_a_valid_opened_version(filing_client, token
     assert envelope.case_title == "A v B"
 
 
-async def test_fee_changes_do_not_conflict_but_a_new_submission_cycle_does(
+async def test_fee_waiver_edits_require_opened_details_token(
     filing_client, db_session,
 ):
     client, envelope, _ = filing_client
     client.headers["X-Demo-User-Id"] = str(envelope.filer_id)
     url = f"/api/v1/filings/{envelope.id}"
     first = (await client.get(url)).json()
-    fees = await client.patch(url, json={"fee_waiver_requested": True})
-    assert fees.status_code == 200, fees.text
-    assert fees.json()["details_token"] == first["details_token"]
-    saved = await client.patch(url, json={
+    missing = await client.patch(url, json={"fee_waiver_requested": True})
+    assert missing.status_code == 422
+    fees = await client.patch(url, json={
         "expected_details_token": first["details_token"],
+        "fee_waiver_requested": True,
+    })
+    assert fees.status_code == 200, fees.text
+    assert fees.json()["details_token"] != first["details_token"]
+    stale = await client.patch(url, json={
+        "expected_details_token": first["details_token"],
+        "fee_waiver_requested": False,
+    })
+    assert stale.status_code == 409
+    saved = await client.patch(url, json={
+        "expected_details_token": fees.json()["details_token"],
         "case_title": first["case_title"], "filing_description": "",
     })
     assert saved.status_code == 200, saved.text
@@ -75,10 +85,10 @@ async def test_fee_changes_do_not_conflict_but_a_new_submission_cycle_does(
     returned = (await client.get(url)).json()
     envelope.submission_count = 2
     await db_session.flush()
-    stale = await client.patch(url, json={
+    stale_cycle = await client.patch(url, json={
         "expected_details_token": returned["details_token"], "case_title": "Earlier correction",
     })
-    assert stale.status_code == 409
+    assert stale_cycle.status_code == 409
     assert envelope.case_title == first["case_title"]
 
 

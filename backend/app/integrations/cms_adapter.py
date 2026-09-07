@@ -1,4 +1,4 @@
-"""CMS submission boundary. Only the demo has a simulated implementation."""
+"""CMS submission boundary. Demo simulates acceptance; production is records-only until wired."""
 
 from dataclasses import dataclass
 
@@ -14,12 +14,15 @@ class CMSFilingResult:
 
 
 async def submit_filing_to_cms(case_number: str, filing_id: int) -> CMSFilingResult:
-    if not settings.allow_demo_mode:
+    if settings.allow_demo_mode:
         return CMSFilingResult(
-            success=False, error_message="Court CMS integration is not configured",
+            success=True,
+            cms_case_number=case_number,
+            cms_filing_id=f"DEMO-{filing_id}",
         )
+    # No external court CMS is configured. Local acceptance is the court of record.
     return CMSFilingResult(
         success=True,
         cms_case_number=case_number,
-        cms_filing_id=f"DEMO-{filing_id}",
+        cms_filing_id=None,
     )
