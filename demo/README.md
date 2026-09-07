@@ -6,6 +6,17 @@ working application flows with retained records. The payment processor and live
 court CMS connection remain stubs; a state could choose and connect those systems
 as part of an implementation.
 
+## Attorney walkthrough video
+
+[Watch the complete attorney flow](muefs-attorney-flow.mp4) — about two minutes,
+1080p, with on-screen captions and chapter markers. The recording shows sign-in,
+court and case selection, a saved draft, complaint and summons uploads, simulated
+payment, submission, and the retained receipt. It has no voiceover; an editable
+[caption file](muefs-attorney-flow.srt) is included.
+
+The recording uses fictional documents, a synthetic fee, and an explicitly
+fictional court calendar in an isolated demo session. No payment is charged.
+
 ## Prepare a recording
 
 From the repository's `backend` directory, with the dependencies in the

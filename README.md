@@ -51,7 +51,7 @@ python run_demo.py
 
 Log in as an **Attorney**, **Court Clerk**, **System Administrator**, or **Self-Represented Litigant**, or **browse public court records without signing in**.
 
-For a video covering every role, follow the **[five-role recording guide](demo/README.md)**. It includes sample PDFs and a verified sequence from attorney submission through clerk acceptance, public search, a fee waiver request, and court access administration. Payments are explicitly simulated. An older [60-second attorney preview](demo/muefs-walkthrough-60s.mp4) is also available.
+Watch the **[complete attorney walkthrough](demo/muefs-attorney-flow.mp4)** from sign-in through document uploads, simulated payment, and the submission receipt. To record every role, follow the **[five-role recording guide](demo/README.md)**, which includes sample PDFs and a sequence through clerk acceptance, public search, a fee waiver request, and court access administration.
 
 ---
 
