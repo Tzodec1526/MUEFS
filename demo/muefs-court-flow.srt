@@ -1,0 +1,99 @@
+1
+00:00:00,502 --> 00:00:05,388
+Follow a received filing through court review, a decision, and a retained record.
+
+2
+00:00:07,468 --> 00:00:10,691
+The clerk starts in the review queue for an assigned court.
+
+3
+00:00:11,361 --> 00:00:14,984
+Search by case title, case number, or filing number.
+
+4
+00:00:15,666 --> 00:00:19,869
+Status and elapsed-time filters help staff find the work they need.
+
+5
+00:00:21,935 --> 00:00:25,763
+Open the Harbor Services filing submitted in the attorney walkthrough.
+
+6
+00:00:26,434 --> 00:00:31,706
+The review shows the received case information and submission number, alongside the queue.
+
+7
+00:00:33,802 --> 00:00:38,455
+Inspect the complaint and summons, and download the filed originals for review.
+
+8
+00:00:39,125 --> 00:00:43,973
+Document labels and confidentiality indicators stay with each attachment.
+
+9
+00:00:46,068 --> 00:00:50,902
+The receipt separates the submission time, fee record, and attached documents.
+
+10
+00:00:51,585 --> 00:00:55,014
+Here, the payment is explicitly marked as simulated.
+
+11
+00:00:55,683 --> 00:00:59,964
+Court staff can inspect the same retained record that the filer sees.
+
+12
+00:01:02,035 --> 00:01:07,242
+To demonstrate a correction request, return this second sample with a specific reason.
+
+13
+00:01:07,913 --> 00:01:11,445
+Staff ask the filer to clarify the requested relief.
+
+14
+00:01:12,114 --> 00:01:16,678
+Return for Correction allows another submission while keeping the earlier record.
+
+15
+00:01:18,735 --> 00:01:22,318
+For the completed Harbor Services filing, choose Accept.
+
+16
+00:01:22,989 --> 00:01:26,791
+This records the court's decision and opens a case in the demo.
+
+17
+00:01:27,461 --> 00:01:30,762
+The filing leaves the pending queue after acceptance.
+
+18
+00:01:32,835 --> 00:01:39,021
+The history now contains a separate acceptance entry, with the reviewer, time, and court case number.
+
+19
+00:01:39,705 --> 00:01:46,447
+The original submission remains below it. Receipt and decision are distinct, traceable events.
+
+20
+00:01:48,502 --> 00:01:52,008
+Open Court Cases to find the new case and its docket.
+
+21
+00:01:52,691 --> 00:01:57,241
+Case access and document publication are separate court-controlled actions.
+
+22
+00:01:57,923 --> 00:02:02,642
+Accepting a filing does not automatically publish every uploaded document.
+
+23
+00:02:04,735 --> 00:02:09,079
+The court has recorded its decision, and both sides retain the history.
+
+24
+00:02:09,749 --> 00:02:12,624
+This demonstration uses fictional records.
+
+25
+00:02:13,293 --> 00:02:17,883
+Live payment and court-system connections remain implementation choices.

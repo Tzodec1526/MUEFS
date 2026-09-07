@@ -1,4 +1,4 @@
-# Record the five-role MUEFS demo
+# MUEFS demo videos and recording guide
 
 Show one filing moving from an attorney to a court clerk and into the public
 docket, then show self-represented filing and court administration. These are
@@ -6,16 +6,30 @@ working application flows with retained records. The payment processor and live
 court CMS connection remain stubs; a state could choose and connect those systems
 as part of an implementation.
 
-## Attorney walkthrough video
+## Finished walkthroughs
 
-[Watch the complete attorney flow](muefs-attorney-flow.mp4) — about two minutes,
-1080p, with on-screen captions and chapter markers. The recording shows sign-in,
-court and case selection, a saved draft, complaint and summons uploads, simulated
-payment, submission, and the retained receipt. It has no voiceover; an editable
-[caption file](muefs-attorney-flow.srt) is included.
+| Attorney · 2:16 | Court staff · 2:20 |
+| --- | --- |
+| [![Attorney walkthrough](muefs-attorney-poster.png)](muefs-attorney-flow.mp4) | [![Court walkthrough](muefs-court-poster.png)](muefs-court-flow.mp4) |
+| [Watch the attorney video](muefs-attorney-flow.mp4) · [Captions](muefs-attorney-flow.srt) | [Watch the court video](muefs-court-flow.mp4) · [Captions](muefs-court-flow.srt) |
 
-The recording uses fictional documents, a synthetic fee, and an explicitly
-fictional court calendar in an isolated demo session. No payment is charged.
+Both videos are 1080p MP4s with a synthetic English voiceover, synchronized
+on-screen captions, and embedded chapter markers. Separate SRT files provide
+editable captions. They follow the same fictional case, **Demo Harbor Services
+v. Demo Supply**, through working application flows.
+
+- **Attorney:** sign in, select the court and case type, save a draft, upload the
+  complaint and summons, review the filing, record a simulated payment, submit,
+  retain the receipt, and find the submission in My Filings.
+- **Court staff:** search the assigned court's review queue, inspect the received
+  filing, download an original attachment, check the submission and fee record,
+  return a separate sample with a correction reason, accept the attorney's
+  filing, and inspect its acceptance history and new case docket.
+
+The recordings use fictional documents, a synthetic fee, and an explicitly
+fictional court calendar in one isolated demo session. No payment is charged.
+The court's live CMS connection remains a stub. Acceptance and public document
+publication remain separate actions.
 
 ## Prepare a recording
 
