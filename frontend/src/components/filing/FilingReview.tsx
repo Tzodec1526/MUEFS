@@ -53,6 +53,20 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
 
   const handleFeesChange = useCallback((updated: FilingEnvelope, obligationMet: boolean) => {
     setFees({ key, token: updated.submission_token, obligationMet });
+    setResult(previous => {
+      const reviewed = previous?.filing;
+      // Payment changes the submission token, but does not invalidate unchanged filing content.
+      if (previous?.key !== key || !reviewed
+        || reviewed.details_token !== updated.details_token
+        || reviewed.court_id !== updated.court_id
+        || reviewed.case_id !== updated.case_id
+        || reviewed.case_type_id !== updated.case_type_id
+        || reviewed.filing_type !== updated.filing_type
+        || reviewed.fee_waiver_requested !== updated.fee_waiver_requested
+        || reviewed.fee_waiver_granted !== updated.fee_waiver_granted
+        || JSON.stringify(reviewed.documents) !== JSON.stringify(updated.documents)) return previous;
+      return { ...previous, filing: updated };
+    });
     onFeesChange?.(updated, obligationMet);
   }, [key, onFeesChange]);
 
@@ -238,16 +252,16 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
       )}
 
       {needsRefresh && <p className="alert alert-warning" role="alert">
-        The filing or fee state changed. Refresh the review and check the saved details and documents before submitting.
+        The filing changed. Refresh the review and check the saved details and documents before submitting.
       </p>}
       {error && <div className="alert alert-error" role="alert">{error}</div>}
 
       {canSubmit && (
         <>
           <div className="review-actions">
-            <button className="btn btn-secondary" onClick={refreshReview} disabled={submitting}>
+            {needsRefresh && <button className="btn btn-secondary" onClick={refreshReview} disabled={submitting}>
               Refresh Review
-            </button>
+            </button>}
             <button
               className="btn btn-primary btn-large"
               onClick={handleSubmit}

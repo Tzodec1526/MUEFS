@@ -77,7 +77,8 @@ form.
    card or bank details are collected. The seeded example is **$150**; this is
    demonstration data, not a court-approved fee quote.
 7. Click **Record simulated payment — $150.00** (the label reflects the current
-   demo amount), then **Refresh Review**. No money is charged.
+   demo amount). No money is charged. The review updates automatically when the
+   filing details and documents are unchanged.
 8. Click **Submit Filing**, then **View submission receipt**. Show the filing ID,
    submission time, and **Submission received** history entry. **Print this
    page** provides a printable receipt if desired.

@@ -1,54 +1,54 @@
 1
-00:00:00,000 --> 00:00:06,044
+00:00:00,000 --> 00:00:06,051
 ATTORNEY WORKFLOW
 Prepare a new civil case, submit the filing, and retain the receipt.
 
 2
-00:00:06,044 --> 00:00:11,300
+00:00:06,051 --> 00:00:11,284
 01  |  YOUR FILING WORKSPACE
 Start a new filing from the attorney dashboard.
 
 3
-00:00:11,300 --> 00:00:25,355
+00:00:11,284 --> 00:00:25,288
 02  |  CHOOSE THE COURT
 Select the court and start a new case.
 
 4
-00:00:25,355 --> 00:00:32,959
+00:00:25,288 --> 00:00:32,928
 03  |  CASE TYPE & REQUIREMENTS
 Choose Civil - General and review the documents needed for this demo filing.
 
 5
-00:00:32,959 --> 00:00:46,014
+00:00:32,928 --> 00:00:45,922
 04  |  SAVE THE CASE DETAILS
 Enter a fictional case title and description. Continuing saves the draft to the account.
 
 6
-00:00:46,014 --> 00:00:57,375
+00:00:45,922 --> 00:00:57,282
 05  |  UPLOAD THE COMPLAINT
 Select the document type, choose the sample PDF, and add it to the filing.
 
 7
-00:00:57,375 --> 00:01:11,220
+00:00:57,282 --> 00:01:11,147
 06  |  ADD THE SUMMONS
 Attach the summons to complete the documents required by this demo case type.
 
 8
-00:01:11,220 --> 00:01:17,997
+00:01:11,147 --> 00:01:17,915
 07  |  REVIEW BEFORE SUBMITTING
 Check the saved case details and the documents attached to the filing.
 
 9
-00:01:17,997 --> 00:01:27,591
+00:01:17,915 --> 00:01:27,528
 08  |  SIMULATED PAYMENT
 The $150 example fee is simulated. No card details are collected and no money is charged.
 
 10
-00:01:27,591 --> 00:01:38,630
+00:01:27,528 --> 00:01:33,847
 09  |  SUBMIT THE FILING
-Refresh the review after the fee change, then submit the saved filing for court review.
+Payment updates the review automatically. Submit the saved filing for court review.
 
 11
-00:01:38,630 --> 00:01:49,773
+00:01:33,847 --> 00:01:44,987
 10  |  RETAIN THE SUBMISSION RECEIPT
 The receipt records the filing and submission time. Court acceptance is a separate next step.
