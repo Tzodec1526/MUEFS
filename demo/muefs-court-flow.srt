@@ -55,45 +55,45 @@ Staff ask the filer to clarify the requested relief.
 Return for Correction allows another submission while keeping the earlier record.
 
 15
-00:01:18,735 --> 00:01:22,318
+00:01:18,768 --> 00:01:22,352
 For the completed Harbor Services filing, choose Accept.
 
 16
-00:01:22,989 --> 00:01:26,791
+00:01:23,022 --> 00:01:26,825
 This records the court's decision and opens a case in the demo.
 
 17
-00:01:27,461 --> 00:01:30,762
+00:01:27,494 --> 00:01:30,795
 The filing leaves the pending queue after acceptance.
 
 18
-00:01:32,835 --> 00:01:39,021
+00:01:32,868 --> 00:01:39,055
 The history now contains a separate acceptance entry, with the reviewer, time, and court case number.
 
 19
-00:01:39,705 --> 00:01:46,447
+00:01:39,738 --> 00:01:46,480
 The original submission remains below it. Receipt and decision are distinct, traceable events.
 
 20
-00:01:48,502 --> 00:01:52,008
+00:01:48,535 --> 00:01:52,041
 Open Court Cases to find the new case and its docket.
 
 21
-00:01:52,691 --> 00:01:57,241
+00:01:52,725 --> 00:01:57,274
 Case access and document publication are separate court-controlled actions.
 
 22
-00:01:57,923 --> 00:02:02,642
+00:01:57,957 --> 00:02:02,675
 Accepting a filing does not automatically publish every uploaded document.
 
 23
-00:02:04,735 --> 00:02:09,079
+00:02:04,768 --> 00:02:09,112
 The court has recorded its decision, and both sides retain the history.
 
 24
-00:02:09,749 --> 00:02:12,624
+00:02:09,783 --> 00:02:12,657
 This demonstration uses fictional records.
 
 25
-00:02:13,293 --> 00:02:17,883
+00:02:13,326 --> 00:02:17,916
 Live payment and court-system connections remain implementation choices.

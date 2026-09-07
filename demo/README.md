@@ -31,6 +31,14 @@ fictional court calendar in one isolated demo session. No payment is charged.
 The court's live CMS connection remains a stub. Acceptance and public document
 publication remain separate actions.
 
+New demo case numbers use `YYYY-000001-CC`: the filing year, a six-digit filing
+sequence, and a case-type suffix. For example, a circuit general-civil case uses
+`2026-000007-CZ`; district general-civil cases use `GC`. The broad demo catalog
+uses representative SCAO classifications (for example, `DM` for the sample
+divorce with minor children). A live court CMS would assign its official number,
+including any more specific classification. Existing assigned case numbers are
+preserved.
+
 ## Prepare a recording
 
 From the repository's `backend` directory, with the dependencies in the

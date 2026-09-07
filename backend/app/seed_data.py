@@ -1305,7 +1305,7 @@ def seed_database(reset: bool = False):
             # --- Case 1: Active civil case (CIV-GEN so MCR requirements/checklists attach) ---
             case1 = Case(
                 court_id=wayne_circuit.id,
-                case_number="25-000001-CZ",
+                case_number=f"{now.year:04d}-000001-CZ",
                 case_type_id=wayne_civil.id,
                 title="Johnson v. Smith Industries LLC",
                 status=CaseStatus.OPEN,
@@ -1374,7 +1374,7 @@ def seed_database(reset: bool = False):
             # --- Case 2: Personal injury tort case ---
             case2 = Case(
                 court_id=wayne_circuit.id,
-                case_number="25-000002-CZ",
+                case_number=f"{now.year:04d}-000002-NO",
                 case_type_id=wayne_tort.id if wayne_tort else wayne_civil.id,
                 title="Williams v. City of Detroit",
                 status=CaseStatus.OPEN,
@@ -1421,7 +1421,7 @@ def seed_database(reset: bool = False):
             if wayne_divorce:
                 case3 = Case(
                     court_id=wayne_circuit.id,
-                    case_number="25-000003-NO",
+                    case_number=f"{now.year:04d}-000003-DM",
                     case_type_id=wayne_divorce.id,
                     title="Thompson v. Thompson",
                     is_sealed=True,
@@ -1445,7 +1445,7 @@ def seed_database(reset: bool = False):
                     case_type_id=wayne_divorce.id,
                     filer_id=attorney.id,
                     case_title="Thompson v. Thompson",
-                    filing_description="Complaint for Divorce",
+                    filing_description="Complaint for Divorce with Minor Children",
                     status=FilingStatus.ACCEPTED,
                     submitted_at=now, reviewed_at=now, reviewer_id=clerk_user.id,
                 )
@@ -1459,7 +1459,7 @@ def seed_database(reset: bool = False):
             if wayne_subp:
                 case4 = Case(
                     court_id=wayne_circuit.id,
-                    case_number="25-000004-NO",
+                    case_number=f"{now.year:04d}-000004-PZ",
                     case_type_id=wayne_subp.id,
                     title="In re: Subpoena from State of Ohio, Case No. CV-2025-4412",
                     status=CaseStatus.OPEN,

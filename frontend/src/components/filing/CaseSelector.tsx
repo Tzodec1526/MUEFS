@@ -108,7 +108,7 @@ function CaseSelector({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') runSearch(); }}
-                placeholder="e.g., 25-000001-CZ or Smith"
+                placeholder="e.g., 2026-000001-CZ or Smith"
               />
             </div>
             <button className="btn btn-primary" onClick={runSearch} disabled={searching || !query.trim()}>

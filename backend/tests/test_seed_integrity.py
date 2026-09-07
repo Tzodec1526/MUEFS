@@ -16,6 +16,7 @@ from sqlalchemy import create_engine, func
 from sqlalchemy.orm import Session
 
 import app.seed_data as seed_data
+from app.models.case import Case
 from app.models.court import CaseType, Court, CourtType, FilingRequirement
 from app.models.filing import FilingDocument
 from app.services import document_service
@@ -163,3 +164,12 @@ def test_sample_docket_has_real_marked_documents_with_matching_metadata(seeded_s
         assert len(pdf.pages) == doc.page_count
         assert "DEMONSTRATION ONLY - NOT A COURT FILING" in pdf.pages[0].extract_text()
         assert doc.pii_warnings == []
+
+
+def test_sample_case_numbers_match_filed_year_and_subject(seeded_session):
+    cases = seeded_session.query(Case).order_by(Case.id).all()
+    assert len(cases) == 4
+    assert [case.case_number for case in cases] == [
+        f"{case.filed_date.year:04d}-{index:06d}-{suffix}"
+        for index, (case, suffix) in enumerate(zip(cases, ["CZ", "NO", "DM", "PZ"]), 1)
+    ]

@@ -187,7 +187,7 @@ function CaseSearch() {
               type="text"
               value={caseNumber}
               onChange={(e) => setCaseNumber(e.target.value)}
-              placeholder="e.g., 25-000001-CZ"
+              placeholder="e.g., 2026-000001-CZ"
               toolparamdescription="Case number (partial match)"
             />
           </div>

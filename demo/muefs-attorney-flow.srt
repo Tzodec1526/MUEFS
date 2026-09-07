@@ -35,69 +35,69 @@ Continuing saves a draft to the attorney's account before documents are uploaded
 stable identity.
 
 10
-00:00:47,002 --> 00:00:49,992
+00:00:46,968 --> 00:00:49,959
 Add the complaint and summons as separate documents.
 
 11
-00:00:50,676 --> 00:00:54,066
+00:00:50,642 --> 00:00:54,033
 Saved uploads stay listed with their types and sizes.
 
 12
-00:00:54,735 --> 00:00:58,822
+00:00:54,702 --> 00:00:58,789
 Review the list, and remove a mistaken upload before submitting.
 
 13
-00:01:00,902 --> 00:01:05,812
+00:01:00,868 --> 00:01:05,779
 The final review brings the saved case information and attached documents together.
 
 14
-00:01:06,483 --> 00:01:12,026
+00:01:06,450 --> 00:01:11,993
 Check the filing itself, then confirm that the required-document validation has passed.
 
 15
-00:01:14,102 --> 00:01:17,968
+00:01:14,068 --> 00:01:17,935
 This demo uses a synthetic fee of one hundred fifty dollars.
 
 16
-00:01:18,652 --> 00:01:23,601
+00:01:18,619 --> 00:01:23,568
 Recording the simulated payment collects no card details and charges no money.
 
 17
-00:01:24,271 --> 00:01:28,628
+00:01:24,237 --> 00:01:28,595
 The review updates automatically, and the filing is ready to submit.
 
 18
-00:01:30,702 --> 00:01:37,868
+00:01:30,668 --> 00:01:37,835
 Submit the filing. The confirmation gives the filing number, case title, document count, and its current
 
 19
-00:01:37,868 --> 00:01:39,339
+00:01:37,835 --> 00:01:39,306
 submitted status.
 
 20
-00:01:41,435 --> 00:01:44,657
+00:01:41,402 --> 00:01:44,624
 Open the retained receipt to see what was received and when.
 
 21
-00:01:45,328 --> 00:01:48,370
+00:01:45,295 --> 00:01:48,337
 Submission and court acceptance are separate events.
 
 22
-00:01:49,039 --> 00:01:52,315
+00:01:49,006 --> 00:01:52,281
 The court's later decision appears in this same history.
 
 23
-00:01:54,402 --> 00:01:58,462
+00:01:54,368 --> 00:01:58,428
 Back in My Filings, the new submission is listed with its status.
 
 24
-00:01:59,132 --> 00:02:01,776
+00:01:59,099 --> 00:02:01,743
 The attorney has a clear record to follow.
 
 25
-00:02:03,868 --> 00:02:07,374
+00:02:03,835 --> 00:02:07,341
 The attorney has a submitted filing and a retained receipt.
 
 26
-00:02:08,045 --> 00:02:14,207
+00:02:08,012 --> 00:02:14,174
 This is a demonstration with fictional records, simulated payment, and a stub court-system connection.

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
 
+from app.case_numbers import case_number_code
 from app.config import settings
 from app.integrations.cms_adapter import submit_filing_to_cms
 from app.models.case import Case, CaseStatus
@@ -501,9 +502,16 @@ async def review_filing(
         filing.filing_date_version += 1
         filing.status = FilingStatus.UNDER_REVIEW
         if case is None:
+            court_type, code = (await db.execute(
+                select(Court.court_type, CaseType.code)
+                .join(CaseType, CaseType.court_id == Court.id)
+                .where(Court.id == filing.court_id, CaseType.id == filing.case_type_id)
+            )).one()
+            year = (filing.filing_date or filing.submitted_at).year
+            suffix = case_number_code(court_type, code)
             case = Case(
                 court_id=filing.court_id,
-                case_number=f"MI-{filing.court_id}-{now.strftime('%Y')}-{filing.id:06d}",
+                case_number=f"{year:04d}-{filing.id:06d}-{suffix}",
                 case_type_id=filing.case_type_id,
                 title=filing.case_title or "Untitled Case",
                 status=CaseStatus.OPEN,
