@@ -4,6 +4,7 @@ import type { FilingEnvelope } from './filings';
 export interface FilingFees {
   filing_id: number;
   version: number;
+  payment_version: number;
   source: 'court' | 'waiver' | 'service_only' | 'demo' | 'unassessed';
   assessment_id: string | null;
   authority_reference: string | null;
@@ -21,6 +22,8 @@ export interface FilingFees {
   can_request_waiver: boolean;
   obligation_met: boolean;
   payments_simulated: boolean;
+  can_manage_external_payments: boolean;
+  can_record_external_payment: boolean;
 }
 
 export async function getFilingFees(filingId: number, signal?: AbortSignal): Promise<FilingFees & { filing: FilingEnvelope }> {

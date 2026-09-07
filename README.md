@@ -122,9 +122,9 @@ MUEFS/
 ### For Self-Represented Litigants
 - **Guided filing wizard** with plain-language instructions
 - **Fee waiver review**: private application uploads, separate clerk/judicial decisions,
-  retained signed orders and payment after denial (simulated payments)
+  retained signed orders and payment after denial (external receipt credits or demo payments)
 - **Court fee review**: request an itemized assessment, see the remaining balance and
-  retain earlier payment credits when the court revises the amount (demo payments only)
+  retain earlier payment credits when the court revises the amount
 - **Step-by-step process** — no legal knowledge of e-filing procedures required
 
 ### For Court Clerks
@@ -132,6 +132,9 @@ MUEFS/
   case records and notices; refresh assignments without signing out
 - **Fee assessment queue**: inspect the filer's documents and review reason, record
   itemized charges and authority, and preserve earlier assessments and payment history
+- **External receipt credits**: explicitly assigned court administrators can record verified
+  receipts, recover lost responses and reverse erroneous credits with retained evidence.
+  This optional workflow does not collect funds or issue refunds.
 - **Review queue** with batch accept, age tracking, and common rejection reasons
 - **Document compliance checks** — text-searchability, file format, size limits
 - **Filing status notices** — portal history plus optional SMTP alerts, retained attempts,

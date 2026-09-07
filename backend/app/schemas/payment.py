@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import AwareDatetime, BaseModel, Field, field_serializer, field_validator
 
 from app.models.payment import PaymentMethod, PaymentStatus
 from app.schemas.filing import FilingEnvelopeResponse
@@ -28,6 +28,7 @@ class FeeItem(BaseModel):
 class FilingFeeState(BaseModel):
     filing_id: int
     version: int
+    payment_version: int = 0
     source: Literal["court", "waiver", "service_only", "demo", "unassessed"]
     assessment_id: str | None = None
     authority_reference: str | None = None
@@ -45,6 +46,8 @@ class FilingFeeState(BaseModel):
     can_request_waiver: bool = False
     obligation_met: bool = False
     payments_simulated: bool
+    can_manage_external_payments: bool = False
+    can_record_external_payment: bool = False
 
     @field_serializer("review_requested_at")
     def serialize_review_time(self, value: datetime | None) -> str | None:
@@ -96,3 +99,57 @@ class PaymentResponse(BaseModel):
     simulation_notice: str = Field(default=_SIM_PAYMENT_NOTICE)
 
     model_config = {"from_attributes": True}
+
+
+class ExternalPaymentRequest(BaseModel):
+    expected_fee_version: int = Field(ge=0)
+    expected_payment_version: int = Field(ge=0)
+    amount_cents: int = Field(gt=0, le=100_000_000)
+    receipt_system: str = Field(min_length=1, max_length=120)
+    receipt_reference: str = Field(min_length=1, max_length=200)
+    received_at: AwareDatetime
+    reason: str = Field(min_length=1, max_length=2000)
+    verified: Literal[True]
+
+    @field_validator("receipt_system", "receipt_reference", "reason")
+    @classmethod
+    def require_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("The source receipt and verification reason are required")
+        return value.strip()
+
+
+class ExternalPaymentReversal(BaseModel):
+    expected_payment_version: int = Field(ge=0)
+    reason: str = Field(min_length=1, max_length=2000)
+    reviewed: Literal[True]
+
+    @field_validator("reason")
+    @classmethod
+    def require_reason(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("A reason for reversing the credit is required")
+        return value.strip()
+
+
+class PaymentRecord(BaseModel):
+    id: int
+    amount_cents: int
+    status: PaymentStatus
+    transaction_ref: str | None
+    is_simulated: bool
+    external_receipt: dict | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+    @field_serializer("created_at")
+    def serialize_created(self, value: datetime) -> str:
+        return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
+
+
+class PaymentRecords(BaseModel):
+    payments: list[PaymentRecord]
+    total: int
+    page: int
+    payment_version: int

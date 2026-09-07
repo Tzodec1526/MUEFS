@@ -49,6 +49,7 @@ async def record_transaction(
                 "id": item.id, "amount_cents": item.amount_cents,
                 "transaction_ref": item.transaction_ref, "status": item.status.value,
                 "is_simulated": item.is_simulated,
+                "external_receipt": item.external_receipt,
             } for item in payments],
             "fee_assessment": {
                 "source": fees.source, "assessment_id": fees.assessment_id,

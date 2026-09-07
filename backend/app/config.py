@@ -77,6 +77,7 @@ class Settings(BaseSettings):
 
     # Payments: no PSP integration in this repo — UI/API must reflect simulation
     payments_are_simulated: bool = True
+    external_payments_enabled: bool = False
 
     # Notices are queued only when explicitly enabled. A separate worker sends them.
     email_delivery_enabled: bool = False

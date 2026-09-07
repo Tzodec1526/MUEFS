@@ -41,6 +41,7 @@ async def fee_state(
     result = FilingFeeState(
         filing_id=filing.id,
         version=filing.fee_version,
+        payment_version=filing.payment_version,
         source="unassessed",
         paid_cents=paid,
         review_requested_at=filing.fee_review_requested_at,
@@ -125,6 +126,18 @@ async def fee_state(
     )
     result.can_pay = (
         can_manage
+        and (result.balance_due_cents or 0) > 0
+        and filing.status not in (FilingStatus.REJECTED, FilingStatus.SERVED)
+        and not (filing.fee_waiver_requested and filing.fee_waiver_granted is None)
+    )
+    result.can_manage_external_payments = bool(
+        settings.external_payments_enabled and user_id is not None and user_id != filing.filer_id
+        and await access_service.user_has_court_administrator_assignment(
+            db, user_id, filing.court_id,
+        )
+    )
+    result.can_record_external_payment = (
+        result.can_manage_external_payments and result.source in ("court", "waiver")
         and (result.balance_due_cents or 0) > 0
         and filing.status not in (FilingStatus.REJECTED, FilingStatus.SERVED)
         and not (filing.fee_waiver_requested and filing.fee_waiver_granted is None)

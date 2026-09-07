@@ -14,6 +14,7 @@ const eventLabels: Record<string, string> = {
   cms_failed: 'Court system submission failed', service_recorded: 'Service-only documents recorded',
   waiver_referred: 'Fee waiver referred for judicial review', waiver_granted: 'Fee waiver granted',
   waiver_denied: 'Fee waiver denied', payment_recorded: 'Payment recorded',
+  fee_payment_recorded: 'External payment credited', fee_payment_reversed: 'External payment credit reversed',
   filing_date_assessed: 'Filing date assessed using court calendar',
   filing_date_ordered: 'Court-ordered filing date recorded',
   fee_review_requested: 'Fee review requested', fee_assessed: 'Court fee assessment recorded',
@@ -103,7 +104,7 @@ export default function FilingHistoryPage() {
           <div className="receipt-heading">
             <h3>{eventLabels[transaction.event_type] || transaction.event_type}</h3>
             <span>{transaction.submission_number ? `Submission ${transaction.submission_number}`
-              : ['payment_recorded', 'fee_review_requested', 'fee_assessed'].includes(transaction.event_type) ? 'Before submission' : 'Legacy filing'}</span>
+              : ['payment_recorded', 'fee_payment_recorded', 'fee_payment_reversed', 'fee_review_requested', 'fee_assessed'].includes(transaction.event_type) ? 'Before submission' : 'Legacy filing'}</span>
           </div>
           <p><time dateTime={parseServerDate(transaction.occurred_at).toISOString()}>
             {parseServerDate(transaction.occurred_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}
@@ -124,7 +125,7 @@ export default function FilingHistoryPage() {
           </div>}
           {transaction.details.case_date_change && <p>Case opening date for {transaction.details.case_date_change.case_number}:
             {' '}{formatCourtDate(transaction.details.case_date_change.previous_filing_date)} → {formatCourtDate(transaction.details.case_date_change.filing_date)}.</p>}
-          {transaction.event_type === 'payment_recorded' && transaction.details.payment && <p>
+          {['payment_recorded', 'fee_payment_recorded', 'fee_payment_reversed'].includes(transaction.event_type) && transaction.details.payment && <p>
             {formatCents(transaction.details.payment.amount_cents)} · {transaction.details.payment.transaction_ref}
             {transaction.details.payment.is_simulated && ' (simulated)'}
           </p>}
@@ -133,6 +134,11 @@ export default function FilingHistoryPage() {
             {' · '}previous payments {formatCents(transaction.details.payment.fee_basis.previous_paid_cents)}
             {transaction.details.payment.fee_basis.assessment_id && ` · assessment #${transaction.details.payment.fee_basis.assessment_id}`}
           </p>}
+          {transaction.details.payment?.external_receipt && <p>
+            External receipt: {transaction.details.payment.external_receipt.system} · {transaction.details.payment.external_receipt.reference}.
+            {' '}Received {parseServerDate(transaction.details.payment.external_receipt.received_at).toLocaleString()}.
+            {transaction.event_type === 'fee_payment_reversed' && ' This credit was reversed; the portal did not issue a refund.'}
+          </p>}
           {transaction.details.court_name && <dl className="receipt-details">
             <div><dt>Court</dt><dd>{transaction.details.court_name}</dd></div>
             <div><dt>Case at submission</dt><dd>{transaction.details.case_title || 'Not specified'}
@@ -140,6 +146,7 @@ export default function FilingHistoryPage() {
             <div><dt>Payment at submission</dt><dd>{transaction.details.payments
               ? transaction.details.payments.length ? <ul>{transaction.details.payments.map(payment => <li key={payment.id}>
                 {formatCents(payment.amount_cents)} · {payment.transaction_ref} · {payment.status}{payment.is_simulated && ' (simulated)'}
+                {payment.external_receipt && ` · ${payment.external_receipt.system}: ${payment.external_receipt.reference}`}
               </li>)}</ul> : transaction.details.fee_waiver_requested ? 'Fee waiver requested' : 'No payment recorded'
               : transaction.details.payment
               ? `${formatCents(transaction.details.payment.amount_cents)} · ${transaction.details.payment.transaction_ref}${transaction.details.payment.is_simulated ? ' (simulated)' : ''}`

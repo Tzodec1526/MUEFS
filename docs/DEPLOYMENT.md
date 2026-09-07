@@ -116,7 +116,26 @@ Generate secrets with `openssl rand -hex 32` and store them in your platform's s
 manager — never in the repo.
 
 `PAYMENTS_ARE_SIMULATED=false` disables the demo payment path. It does not connect a payment
-processor; production payment requests remain unavailable until that integration exists.
+processor; online collection remains unavailable until that integration exists.
+
+External receipts are a separate, optional workflow. After approving the court's receipt
+verification, correction and independent reconciliation procedures, configure
+`EXTERNAL_PAYMENTS_ENABLED=true`. Only an administrator explicitly assigned to the filing's
+court, acting on another filer's record, can create or reverse an external credit. Grant
+that role only to approved operators. Choose consistent source-system names and require a
+receipt allocated solely to the filing; the duplicate guard compares court, source name and
+receipt reference, and cannot reconcile source aliases or split receipts. Operators must
+verify actual funds in the external accounting records. The portal does not collect funds,
+perform settlement checks, change the external receipt journal or issue refunds.
+
+Apply migration `b28e53cad9f4` before deploying this API and client together. It adds nullable
+receipt evidence, partial unique indexes and a payment review counter without inventing
+legacy receipts. Schedule the schema/index changes with normal migration controls. A
+downgrade is refused once credits or reversal events exist. With no retained external
+records, downgrade removes the new columns and indexes; PostgreSQL keeps an unused enum
+label. Leave the feature disabled until the court evaluates the workflow. Demo-mode
+credits are marked simulated and will not satisfy a production balance. See
+[external receipt behavior and verification](STATE_READINESS.md#court-fee-assessments-and-payment-balances).
 
 ## 2. Identity (Keycloak)
 

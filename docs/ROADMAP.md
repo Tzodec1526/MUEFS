@@ -14,8 +14,10 @@ correction history and PostgreSQL concurrency checks now form part of the core w
 - **CMS integration is not connected.** Demo acceptance records a simulated identifier.
   Outside demo mode, an unconfigured CMS blocks acceptance. No JIS or Tyler request is
   made; see the submission boundary in `backend/app/integrations/cms_adapter.py`.
-- **Payments are simulated.** The fee/waiver flow is fully demonstrated, but no payment
-  processor is integrated (`PAYMENTS_ARE_SIMULATED=true`); no card data is handled.
+- **Online payments are simulated.** No payment processor is integrated
+  (`PAYMENTS_ARE_SIMULATED=true`); no card data is handled. An optional court-administered
+  workflow credits verified external receipts and retains reversals. It requires court
+  approval and reconciliation with the actual accounting records; it does not move funds.
 - **Demo auth is open by configuration.** The hosted demo enables `ALLOW_DEMO_MODE` and
   `ALLOW_PUBLIC_REGISTRATION` so anyone can explore it without an identity provider.
   Production runs Keycloak-only with no self-registration. See [SECURITY.md](../SECURITY.md).

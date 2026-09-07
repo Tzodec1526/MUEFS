@@ -28,6 +28,8 @@ async def notify_filing_status_change(
         "waiver_granted": "Fee waiver granted",
         "waiver_denied": "Fee waiver denied",
         "payment_recorded": "Payment recorded",
+        "fee_payment_recorded": "External payment credited",
+        "fee_payment_reversed": "External payment credit reversed",
         "filing_date_assessed": "Filing date assessed using court calendar",
         "filing_date_ordered": "Court-ordered filing date recorded",
         "fee_review_requested": "Fee review requested",

@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import type { ExternalReceipt } from './payments';
 
 export interface FilingDocument {
   id: number;
@@ -139,9 +140,10 @@ export interface FilingTransaction {
     fee_waiver_requested?: boolean;
     payment?: {
       amount_cents: number; transaction_ref: string; is_simulated: boolean;
+      external_receipt?: ExternalReceipt | null;
       fee_basis?: { source: string; assessment_id: string | null; total_cents: number; previous_paid_cents: number };
     } | null;
-    payments?: Array<{ id: number; amount_cents: number; transaction_ref: string; is_simulated: boolean; status: string }>;
+    payments?: Array<{ id: number; amount_cents: number; transaction_ref: string; is_simulated: boolean; status: string; external_receipt?: ExternalReceipt | null }>;
     fee_assessment?: { source: string; assessment_id: string | null; total_cents: number | null; paid_cents: number; balance_due_cents: number | null };
     basis?: string;
     amount_due_cents?: number;

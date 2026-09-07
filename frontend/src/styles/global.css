@@ -3844,6 +3844,15 @@ textarea:focus-visible {
 .case-participants-page legend { font-weight: 600; margin-bottom: 1rem; }
 .notice-filing-filter { align-items: flex-end; }
 .notice-filing-filter .form-group { margin-bottom: 0; }
+.payment-records { margin-block: 1.25rem; }
+.external-payment-form { padding: 1.25rem; margin-block: 1rem; border: 1px solid var(--gray-200); border-radius: 8px; }
+.external-payment-form fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.external-payment-form legend { font-weight: 600; margin-bottom: .75rem; }
+.external-payment-form .checkbox-label { display: flex; align-items: flex-start; gap: .5rem; margin-block: 1rem; }
+.external-payment-form .button-row { display: flex; gap: .75rem; flex-wrap: wrap; }
+.payment-record-list { list-style: none; padding: 0; }
+.payment-record-list > li { padding: 1rem; margin-block: .75rem; background: #fff; border: 1px solid var(--gray-200); border-radius: 8px; overflow-wrap: anywhere; }
+.payment-record-list details { margin-block: .5rem; }
 .participant-list > li { flex-wrap: wrap; }
 .participant-list .admin-account-form { flex-basis: 100%; width: 100%; }
 .case-participants-page .checkbox-label { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0; }

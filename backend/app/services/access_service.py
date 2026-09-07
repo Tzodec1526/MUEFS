@@ -28,6 +28,15 @@ PUBLIC_DOCKET_FILING_STATUSES = frozenset({
     FilingStatus.ACCEPTED,
 })
 
+async def user_has_court_administrator_assignment(
+    db: AsyncSession, user_id: int, court_id: int,
+) -> bool:
+    return bool(await db.scalar(select(select(UserCourtRole.id).where(
+        UserCourtRole.user_id == user_id, UserCourtRole.court_id == court_id,
+        UserCourtRole.role == CourtRole.ADMIN,
+    ).exists())))
+
+
 async def user_is_court_staff_for_court(
     db: AsyncSession, user_id: int | None, court_id: int
 ) -> bool:

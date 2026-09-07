@@ -21,7 +21,7 @@ establish state approval or production readiness.
 | Control case participation and access | Assigned staff record participants, counsel representation and explicit restricted-case grants with retained reasons, before/after history, stale-edit checks and revocation. Filing acceptance no longer assigns party roles or grants case access. | Court-approved access rules, review of legacy records, CMS appearance/withdrawal synchronization, limited-scope representation and service enrollment. |
 | Record the correct legal filing date | Receipt instants and filing dates are separate. Published calendars establish business dates. Assigned staff can record a signed order establishing a different date, with retained before/after evidence and explicit case opening date changes. Acceptance honors the order without rewriting the receipt. | Court verification of calendars and signed orders, motion/adjudication procedures, downstream CMS synchronization and review of closures published after acceptance. Correcting a document does not automatically preserve its legal filing date. |
 | Resolve fee waivers correctly | A completed application accompanies the filing. Clerk waivers, referral and judicial decisions are separate court-scoped actions. Signed decision PDFs and denial amounts remain in private history; a filer can pay after denial without resubmitting. | Actual notice delivery, de novo review and judicial assignment, deadline calculation, case-wide continuation and reinstatement, court verification of signed forms and prisoner-specific procedures. |
-| Establish fees and account for payments | Assigned court staff record itemized assessments with authority, reasons and retained documents. Balances use completed payments allocated to that filing; revised assessments preserve earlier credits and expose overpayments. | Court validation of assessments and fee schedules, a real hosted payment processor, signed webhooks, reconciliation, refunds and accounting exports. |
+| Establish fees and account for payments | Assigned staff record itemized assessments. Separately assigned court administrators can credit verified external receipts, reverse erroneous credits and retain the source evidence. Balances preserve partial payments and expose overpayments after reassessment. | Court validation of assessments and source receipts, independent reconciliation and correction review, a hosted payment processor, signed webhooks, refunds and accounting exports. |
 | Deliver electronic service | Staff review service instructions. Senders explicitly select retained subsequent documents and eligible recipients; immutable packages retain contents and addresses. An opt-in SMTP outbox queues protected links, rechecks instructions and records failures/retries. Recipients download only selected, verified bytes and can acknowledge the package. | Court-approved enrollment, consent and confidential-document policy; additional/delegated recipients; bounce feedback and failed-service remedies; non-electronic evidence and certified proof. Relay acceptance and download requests do not establish legally sufficient service. |
 | Send filing alerts reliably | An opt-in SMTP outbox commits with filing changes, checks verified recipients, retains messages and attempts, retries temporary failures and exposes uncertain outcomes to assigned court staff. | A court-approved relay and sender domain, bounce/delivery feedback, operational alerting and court approval of legally sufficient notice content and procedures. Generic email alerts do not establish legal service. |
 | Connect to the court's system of record | Acceptance is explicitly blocked outside demo mode when CMS integration is absent. | A documented court/vendor contract, credentialed sandbox, document/code mapping, idempotent delivery, status callbacks, error recovery and reconciliation. |
@@ -403,23 +403,73 @@ Stale assessment and payment requests fail with HTTP 409, including an old payme
 whose displayed amount happens to match the new assessment.
 
 Payments are explicitly allocated to an envelope and preserve their assessment basis.
-The balance credits positive, completed payments from that filer; failed, refunded,
+The balance credits positive, completed payments allocated to that filer; failed, refunded, reversed,
 unallocated and other payers' records cannot clear the obligation. Higher reassessments
 require only the remaining balance. Lower reassessments expose the overpayment without
 inventing a refund. Submission receipts retain the assessment and all allocated payment
 records as they existed at submission. Signed waiver decisions remain the basis for waiver
 amounts, and a pending application can accompany a submission for court review.
 
+With `EXTERNAL_PAYMENTS_ENABLED=true`, an administrator explicitly assigned to the filing's
+court can record an external receipt through **Fees & payments → View payment records**.
+The administrator must be someone other than the filer. A clerk/judge assignment or a
+system-administrator account without that court's administrator grant cannot create or
+reverse credits. The operator records the source system, receipt reference, received time,
+USD amount and verification reason, and confirms the receipt's allocation to this filing.
+The portal records an operator's verification; it does not contact the source system,
+collect funds, verify settlement or issue a refund. A current court assessment or denied
+waiver amount is required. Partial credits are supported up to the remaining amount due.
+
+A unique active-receipt index prevents a second credit for the same court, normalized
+source name and receipt reference. Source labels must consistently identify the same
+accounting system; aliases, split receipts and bulk allocations require court reconciliation.
+UUID request keys recover lost responses without another credit or notice. A reversal
+retains the original entry and reason, removes its credit from the current balance, and
+allows a new credit against that receipt on the correct filing. Already-reversed requests
+are harmless retries. PostgreSQL and SQLite guards reject changes to the source evidence,
+deletion and reactivation. Earlier submission receipts remain unchanged.
+
+Payments have a separate review version: a credit or reversal invalidates the filer's
+final submission review without invalidating the fee assessment. Both versions are checked
+before a new external credit. Reversal checks the payment version. Filing history and
+private case archives retain credits, reversals and source receipts. The payment list is
+private and paginated. PostgreSQL reads it and its payment version under the filing's shared lock.
+If it is newer than the displayed balance, the screen requires a fee refresh before another
+credit or reversal. The list and assessment editor load only when opened. Outside demo
+mode, unavailable simulated card controls are omitted and eligible waiver actions remain.
+
+Michigan's [trial court financial management guidance](https://www.courts.michigan.gov/4abfef/siteassets/publications/manuals/carg/carg.pdf#page=214)
+calls for traceable receipts, retained correction records and independent reconciliation.
+The court must approve the source records, administrator assignments, correction procedure
+and independent review before enabling this workflow. This is an allocation record linked
+to the court's accounting system; it does not replace that system's receipt journal.
+
 Demo initial-filing amounts are visibly synthetic examples. Outside demo mode, seeded
 amounts and simulated credits cannot satisfy fee requirements: an assessment, applicable
 waiver state or service-only filing is required. Real payment processing remains unavailable;
-the application does not collect card/bank data or claim to move money.
+verified external credits can satisfy an assessed amount when enabled. Credits entered
+in demo mode remain marked simulated and are excluded from production balances.
 
 `GET /api/v1/filings/{id}/fees` replaces `POST /api/v1/payments/calculate`. It returns the
 current fee state and the matching private filing context. Filers request review through
 `POST /api/v1/filings/{id}/fee-review`; assigned staff use `GET /api/v1/clerk/fee-reviews`
 and `POST /api/v1/clerk/filings/{id}/fees`. Both review mutations require `expected_version`.
 `POST /api/v1/payments/process` requires `expected_fee_version` and the exact remaining balance.
+
+`POST /api/v1/filings/{id}/external-payments` requires a UUID `Idempotency-Key`,
+`expected_fee_version`, `expected_payment_version` and the verified receipt details.
+`POST /api/v1/filings/{id}/external-payments/{payment_id}/reverse` requires the payment
+version, reason and explicit review. `GET /api/v1/filings/{id}/payments?page=1` returns 25
+records at a time, including reversed and historical simulated records. These records are
+available only to the filer and assigned court staff.
+
+Migration `b28e53cad9f4` adds external receipt evidence and the separate payment version.
+It leaves historical payment amounts, status, simulation flags and allocations unchanged.
+Its unique indexes omit unrelated legacy rows. Downgrade is refused once external credits
+or reversal events have been retained. PostgreSQL tests cover fresh and migrated schemas,
+competing credits across filings, request replay, revocation while a request waits, and
+transaction rollback. Browser verification includes a committed payment with a lost response,
+partial credits, source-receipt download, reversal, reallocation and court access boundaries.
 
 Migration `c3d9f06a21b8` preserves only unambiguous historical payment allocations with a
 matching payer and marks legacy payments as simulated. It does not fabricate assessment

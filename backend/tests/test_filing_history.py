@@ -49,16 +49,13 @@ async def filing_fixture(db):
     db.add(case_type)
     db.add(UserCourtRole(user_id=clerk.id, court_id=court_id, role=CourtRole.CLERK))
     await db.flush()
-    filing = FilingEnvelope(
-        court_id=court_id,
-        case_type_id=case_type.id,
-        filer_id=filer.id,
-        case_title="Original title",
-        filing_type="initial",
-    )
-    db.add(filing)
-    await db.flush()
-    return filing.id, filer.id, clerk.id, other.id
+    # Seed only baseline columns so migration tests can upgrade genuinely old filings.
+    filing_id = await db.scalar(text(
+        "INSERT INTO filing_envelopes (court_id, case_type_id, filer_id, case_title, "
+        "filing_type, status, fee_waiver_requested) "
+        "VALUES (:court, :kind, :filer, 'Original title', 'initial', 'DRAFT', false) RETURNING id"
+    ), {"court": court_id, "kind": case_type.id, "filer": filer.id})
+    return filing_id, filer.id, clerk.id, other.id
 
 
 @pytest_asyncio.fixture

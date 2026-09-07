@@ -46,8 +46,9 @@ async def test_intake_migration_preserves_existing_flags_and_retained_publicatio
         getattr(command, operation)(config, revision)
 
     async with postgres_sessions.begin() as db:
-        filing = await db.get(FilingEnvelope, fid)
-        court_id, case_type_id = filing.court_id, filing.case_type_id
+        court_id, case_type_id = (await db.execute(text(
+            "SELECT court_id, case_type_id FROM filing_envelopes WHERE id = :id"
+        ), {"id": fid})).one()
         await db.execute(text("UPDATE courts SET is_efiling_enabled = false WHERE id = :id"),
                          {"id": court_id})
         await db.execute(text("UPDATE case_types SET is_active = false WHERE id = :id"),

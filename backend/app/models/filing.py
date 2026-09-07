@@ -45,7 +45,7 @@ class FilingEnvelope(Base):
         """Bind final review to the details, active documents, and fee state."""
         values = [
             self.details_token, self.court_id, self.case_id, self.case_type_id,
-            self.filing_type, self.fee_version, self.payment_id,
+            self.filing_type, self.fee_version, self.payment_id, self.payment_version,
             self.fee_waiver_requested, self.fee_waiver_granted,
             self.fee_waiver_reason, self.fee_waiver_amount_due_cents,
             [
@@ -75,6 +75,7 @@ class FilingEnvelope(Base):
     reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
     rejection_reason: Mapped[str | None] = mapped_column(Text)
     payment_id: Mapped[int | None] = mapped_column(ForeignKey("payments.id"), index=True)
+    payment_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     fee_waiver_requested: Mapped[bool] = mapped_column(default=False)
     fee_waiver_granted: Mapped[bool | None] = mapped_column(default=None)
     fee_waiver_reason: Mapped[str | None] = mapped_column(String(2000))

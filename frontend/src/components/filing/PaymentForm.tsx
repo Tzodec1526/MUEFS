@@ -8,6 +8,7 @@ import { getErrorDetail } from '../../utils/errors';
 import LoadError from '../common/LoadError';
 
 const FeeAssessmentForm = lazy(() => import('../clerk/FeeAssessmentForm'));
+const PaymentRecordsPanel = lazy(() => import('./PaymentRecordsPanel'));
 
 export default function PaymentForm({ filingId, onFeesChange }: {
   filingId: number; onFeesChange?: (filing: FilingEnvelope, obligationMet: boolean) => void;
@@ -20,10 +21,12 @@ export default function PaymentForm({ filingId, onFeesChange }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [paymentsOpen, setPaymentsOpen] = useState(false);
+  const [assessmentOpen, setAssessmentOpen] = useState(false);
   const key = `${filingId}:${attempt}`;
   const current = result?.key === key ? result : undefined;
   const fees = current?.fees, filing = current?.filing;
-  const selectedMethod = fees?.can_pay ? paymentMethod : 'waiver';
+  const selectedMethod = fees?.can_pay && fees.payments_simulated ? paymentMethod : 'waiver';
   useEffect(() => {
     const controller = new AbortController();
     getFilingFees(filingId, controller.signal)
@@ -79,7 +82,9 @@ export default function PaymentForm({ filingId, onFeesChange }: {
   if (!current) return <p role="status">Loading filing fees…</p>;
   if (current.error) return <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />;
   if (!fees || !filing) return null;
-  const canChoosePayment = !fees.obligation_met && (fees.can_pay || fees.can_request_waiver);
+  const canChoosePayment = !fees.obligation_met && (
+    (fees.can_pay && fees.payments_simulated) || fees.can_request_waiver
+  );
   return <div className="review-card filing-fees">
     <div className="page-header"><h3>Filing fees &amp; payments</h3>
       <button className="btn btn-secondary btn-small" disabled={busy} onClick={() => { setError(''); setAttempt(n => n + 1); }}>Refresh fees</button></div>
@@ -101,20 +106,27 @@ export default function PaymentForm({ filingId, onFeesChange }: {
     {fees.obligation_met && <p className="alert alert-success">{filing.fee_waiver_requested && filing.fee_waiver_granted === null
       ? 'The pending fee waiver application allows submission for court review.' : 'No additional payment is required for the current filing.'}</p>}
     <p className="info-text">Fee review does not submit a draft or establish its filing date. <Link to={`/filings/${filingId}/history`}>View receipts and decisions</Link>.</p>
+    <button className="btn btn-secondary" aria-expanded={paymentsOpen} disabled={busy}
+      onClick={() => setPaymentsOpen(value => !value)}>{paymentsOpen ? 'Hide payment records' : 'View payment records'}</button>
+    {paymentsOpen && <Suspense fallback={<p role="status">Loading payment records…</p>}>
+      <PaymentRecordsPanel key={filingId} fees={fees} onBusyChange={setBusy}
+        onChanged={message => { setNotice(message); setAttempt(n => n + 1); }} />
+    </Suspense>}
     {fees.can_request_review && <form onSubmit={requestReview} className="fee-review-request">
       <div className="form-group"><label htmlFor="fee-review-reason">Reason for court fee review</label>
         <textarea id="fee-review-reason" name="reason" required maxLength={2000} rows={2} disabled={busy} /></div>
       <button type="submit" className="btn btn-secondary" disabled={busy}>Request court fee review</button>
     </form>}
+    {fees.can_pay && !fees.payments_simulated && <p className="info-text">Online payment is unavailable. Contact the court about payment options.</p>}
     {canChoosePayment && <>
       <div className="payment-methods"><h4>Payment or waiver</h4><div className="payment-option-list">
         {[
           { value: 'credit_card', label: 'Credit card' }, { value: 'debit_card', label: 'Debit card' },
           { value: 'ach', label: 'ACH / eCheck' }, { value: 'waiver', label: 'Fee waiver request' },
-        ].filter(method => method.value === 'waiver' ? fees.can_request_waiver : fees.can_pay).map(method => <label
+        ].filter(method => method.value === 'waiver' ? fees.can_request_waiver : fees.can_pay && fees.payments_simulated).map(method => <label
           key={method.value} className={`payment-option ${selectedMethod === method.value ? 'selected' : ''}`}>
           <input type="radio" name="paymentMethod" value={method.value} checked={selectedMethod === method.value}
-            disabled={busy || (method.value !== 'waiver' && !fees.payments_simulated)} onChange={() => setPaymentMethod(method.value)} />{method.label}
+            disabled={busy} onChange={() => setPaymentMethod(method.value)} />{method.label}
         </label>)}
       </div></div>
       {selectedMethod === 'waiver' && fees.can_request_waiver && <div className="fee-waiver-section">
@@ -124,13 +136,19 @@ export default function PaymentForm({ filingId, onFeesChange }: {
             <input id="waiver-application" type="file" accept="application/pdf,.pdf" disabled={busy} onChange={event => setWaiverFile(event.target.files?.[0] || null)} /></div>}
         <p>If filing as a prisoner under the Michigan Department of Corrections, also attach the certified institutional account statement required by MCR 2.002(B), marked confidential.</p>
       </div>}
-      {fees.can_pay && <p className="info-text">{fees.payments_simulated ? 'Payment records are simulated. No card or bank information is collected and no money is charged.' : 'Online payment is unavailable. Contact the court about payment options.'}</p>}
-      <button className="btn btn-primary" disabled={busy || (selectedMethod === 'waiver' ? !fees.can_request_waiver : !fees.can_pay || !fees.payments_simulated)} onClick={pay}>
+      {fees.can_pay && fees.payments_simulated && <p className="info-text">Payment records are simulated. No card or bank information is collected and no money is charged.</p>}
+      <button className="btn btn-primary" disabled={busy || (selectedMethod === 'waiver' ? !fees.can_request_waiver : !fees.can_pay)} onClick={pay}>
         {busy ? 'Recording…' : selectedMethod === 'waiver' ? 'Attach waiver request to filing' : `Record simulated payment — ${formatCents(fees.balance_due_cents ?? 0)}`}
       </button>
     </>}
-    {fees.can_assess && <Suspense fallback={<p role="status">Loading assessment form…</p>}>
-      <FeeAssessmentForm key={key} fees={fees} filing={filing} onSaved={() => { setNotice('Court fee assessment recorded.'); setAttempt(n => n + 1); }} />
-    </Suspense>}
+    {fees.can_assess && <>
+      <button className="btn btn-secondary" disabled={busy} aria-expanded={assessmentOpen}
+        onClick={() => setAssessmentOpen(value => !value)}>{assessmentOpen ? 'Hide fee assessment' : 'Review fee assessment'}</button>
+      {assessmentOpen && <Suspense fallback={<p role="status">Loading assessment form…</p>}>
+        <FeeAssessmentForm key={key} fees={fees} filing={filing} onSaved={() => {
+          setAssessmentOpen(false); setNotice('Court fee assessment recorded.'); setAttempt(n => n + 1);
+        }} />
+      </Suspense>}
+    </>}
   </div>;
 }
