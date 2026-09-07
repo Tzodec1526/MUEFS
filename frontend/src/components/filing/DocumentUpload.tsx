@@ -1,6 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { getFiling, uploadDocument, removeDocument } from '../../api/filings';
-import { getFilingChecklists, FilingChecklist } from '../../api/courts';
 import { getErrorDetail } from '../../utils/errors';
 import { formatBytes } from '../../utils/format';
 
@@ -14,12 +13,9 @@ interface DocumentInfo {
 
 interface Props {
   filingId: number;
-  courtId: number;
-  caseTypeId: number;
   documents: DocumentInfo[];
   onDocumentsChange: (docs: DocumentInfo[]) => void;
   onBusyChange: (busy: boolean) => void;
-  motionSubtype?: string | null;  // for dynamic companion pre-fill in civil motion filings
 }
 
 // Comprehensive MCR-based filing types organized by category
@@ -337,12 +333,9 @@ function getCompanionRequirements(uploadedTypeCodes: string[]) {
 
 function DocumentUpload({
   filingId,
-  courtId: _courtId,
-  caseTypeId: _caseTypeId,
   documents,
   onDocumentsChange,
   onBusyChange,
-  motionSubtype,
 }: Props) {
   const [pendingAction, setPendingAction] = useState<'upload' | 'remove' | null>(null);
   const busy = pendingAction !== null;
@@ -354,7 +347,14 @@ function DocumentUpload({
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [dynamicChecklist, setDynamicChecklist] = useState<FilingChecklist | null>(null);
+  const { required, recommended } = getCompanionRequirements(documents.map(doc => doc.type));
+
+  function selectCompanion(code: string, label: string) {
+    setSelectedCategory('');
+    setDocType(code);
+    setDocTitle(label);
+    fileInputRef.current?.focus();
+  }
 
   const filteredTypes = selectedCategory
     ? FILING_CATEGORIES.find(c => c.label === selectedCategory)?.types || []
@@ -445,33 +445,6 @@ function DocumentUpload({
   const getTypeMcr = (code: string) => {
     return ALL_TYPES.find(t => t.code === code)?.mcr || '';
   };
-
-  // Map checklist item label to best matching document type code for pre-fill (civil motion focus)
-  const getCodeForLabel = (label: string): string => {
-    const lower = label.toLowerCase();
-    if (lower.includes('brief')) return 'BRIEF_SUPPORT';
-    if (lower.includes('proposed order') || lower.includes('order')) return 'PROPOSED_ORDER';
-    if (lower.includes('proof of service') || lower.includes('service')) return 'POS_ELECTRONIC';
-    if (lower.includes('affidavit')) return 'AFFIDAVIT';
-    if (lower.includes('exhibit')) return 'EXHIBIT';
-    if (lower.includes('notice of hearing')) return 'NOT_HEARING';
-    if (lower.includes('certification') || lower.includes('meet-and-confer')) return 'DISC_CERT_GF';
-    if (lower.includes('motion')) return 'MOT_OTHER'; // fallback
-    return 'OTHER';
-  };
-
-  // Dynamic fetch for companions when motionSubtype provided (used for civil motion pre-fill)
-  useEffect(() => {
-    if (!motionSubtype || !_courtId || !_caseTypeId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset when inputs clear
-      setDynamicChecklist(null);
-      return;
-    }
-    getFilingChecklists(_courtId, _caseTypeId).then((lists) => {
-      const match = lists.find((l) => l.motion_type === motionSubtype);
-      setDynamicChecklist(match || null);
-    }).catch(() => setDynamicChecklist(null));
-  }, [motionSubtype, _courtId, _caseTypeId]);
 
   return (
     <div className="form-section">
@@ -593,48 +566,6 @@ function DocumentUpload({
         </button>
       </div>
 
-      {/* Dynamic Companion Pre-fill for selected Motion Subtype (civil focus) */}
-      {(motionSubtype || dynamicChecklist) && (
-        <div className="dynamic-companions">
-          <h4>Companions for: {motionSubtype || dynamicChecklist?.motion_type}</h4>
-          <p className="info-text">
-            Quick-add the required/recommended companions. This uses court checklist data for accurate MCR compliance.
-          </p>
-          <div className="quick-add-buttons">
-            {(dynamicChecklist?.checklist_items?.items || []).map((item, idx) => {
-              const code = getCodeForLabel(item.label);
-              const alreadyUploaded = documents.some(d => d.type === code);
-              if (alreadyUploaded) return null;
-              return (
-                <button
-                  key={idx}
-                  className={`btn btn-small ${item.required ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => {
-                    // Pre-fill the upload selector for this companion
-                    setSelectedCategory('Motions'); // or find best category
-                    setDocType(code);
-                    setDocTitle(item.label);
-                    // focus file input
-                    setTimeout(() => fileInputRef.current?.focus(), 0);
-                  }}
-                  disabled={busy}
-                >
-                  + {item.label} {item.required ? '(required)' : ''}
-                </button>
-              );
-            })}
-            {/* Fallback suggestions if no dynamic checklist items matched */}
-            {!dynamicChecklist?.checklist_items?.items?.length && motionSubtype && (
-              <>
-                <button className="btn btn-small btn-primary" onClick={() => { setSelectedCategory('Motions'); setDocType('BRIEF_SUPPORT'); setDocTitle('Brief in Support'); setTimeout(() => fileInputRef.current?.focus(), 0); }}>+ Brief in Support</button>
-                <button className="btn btn-small btn-primary" onClick={() => { setSelectedCategory('Orders & Judgments'); setDocType('PROPOSED_ORDER'); setDocTitle('Proposed Order'); setTimeout(() => fileInputRef.current?.focus(), 0); }}>+ Proposed Order</button>
-                <button className="btn btn-small" onClick={() => { setSelectedCategory('Proof of Service'); setDocType('POS_ELECTRONIC'); setDocTitle('Proof of Service'); setTimeout(() => fileInputRef.current?.focus(), 0); }}>+ Proof of Service</button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Uploaded Documents List */}
       {documents.length > 0 && (
         <div className="uploaded-documents">
@@ -673,45 +604,44 @@ function DocumentUpload({
       )}
 
       {/* MCR Companion Document Requirements */}
-      {documents.length > 0 && (() => {
-        const uploadedCodes = documents.map(d => d.type);
-        const { required, recommended } = getCompanionRequirements(uploadedCodes);
-        if (required.length === 0 && recommended.length === 0) return null;
-        return (
-          <div className="companion-requirements">
-            {required.length > 0 && (
-              <div className="alert alert-error">
-                <strong>Required companion documents (Michigan Court Rules):</strong>
-                <ul>
-                  {required.map(r => (
-                    <li key={r.code}>
-                      <strong>{r.label}</strong> &mdash; {r.rule}
-                      {r.code === 'BRIEF_SUPPORT' && (
-                        <span className="companion-hint"> (may be combined with the motion as a single document)</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {recommended.length > 0 && (
-              <div className="alert alert-info">
-                <strong>Recommended:</strong>
-                <ul>
-                  {recommended.map(r => (
-                    <li key={r.code}>
-                      {r.label} &mdash; {r.rule}
-                      {r.code === 'BRIEF_SUPPORT' && (
-                        <span className="companion-hint"> (may be combined with the motion as a single document, so a separate brief is not required to file)</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {(required.length > 0 || recommended.length > 0) && (
+        <div className="companion-requirements">
+          {required.length > 0 && (
+            <div className="alert alert-error">
+              <strong>Required companion documents (Michigan Court Rules):</strong>
+              <ul>
+                {required.map(r => (
+                  <li key={r.code}>
+                    <strong>{r.label}</strong> &mdash; {r.rule}
+                    {' '}<button type="button" className="btn btn-small btn-secondary" disabled={busy}
+                      onClick={() => selectCompanion(r.code, r.label)}>Add {r.label}</button>
+                    {r.code === 'BRIEF_SUPPORT' && (
+                      <span className="companion-hint"> (may be combined with the motion as a single document)</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {recommended.length > 0 && (
+            <div className="alert alert-info">
+              <strong>Recommended:</strong>
+              <ul>
+                {recommended.map(r => (
+                  <li key={r.code}>
+                    {r.label} &mdash; {r.rule}
+                    {' '}<button type="button" className="btn btn-small btn-secondary" disabled={busy}
+                      onClick={() => selectCompanion(r.code, r.label)}>Add {r.label}</button>
+                    {r.code === 'BRIEF_SUPPORT' && (
+                      <span className="companion-hint"> (may be combined with the motion as a single document, so a separate brief is not required to file)</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

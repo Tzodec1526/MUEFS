@@ -6,7 +6,7 @@ import { navigateApp } from '../navigate';
 import { toolError, toolOk } from '../output';
 import type { ModelContext } from '../types';
 
-const VALID_ROLES = ['attorney', 'clerk', 'srl', 'public'] as const;
+const VALID_ROLES = ['attorney', 'clerk', 'srl', 'public', 'admin'] as const;
 
 export async function registerAuthTools(mc: ModelContext, signal?: AbortSignal): Promise<void> {
   if (!isDemoBuild()) return;
@@ -17,7 +17,7 @@ export async function registerAuthTools(mc: ModelContext, signal?: AbortSignal):
       title: 'Sign in (demo role)',
       description:
         'Switch the demonstration role. Navigates to login and sets attorney, clerk, srl ' +
-        '(self-represented), or public. Mutating: ask the human, or pass confirmed=true.',
+        '(self-represented), public, or admin. Mutating: ask the human, or pass confirmed=true.',
       inputSchema: {
         type: 'object',
         required: ['role'],
@@ -37,7 +37,7 @@ export async function registerAuthTools(mc: ModelContext, signal?: AbortSignal):
       async execute(input) {
         const role = String(input.role);
         if (!VALID_ROLES.includes(role as (typeof VALID_ROLES)[number])) {
-          return toolError('Invalid role. Use attorney, clerk, srl, or public.');
+          return toolError('Invalid role. Use attorney, clerk, srl, public, or admin.');
         }
         if (wantsConfirmation(input)) {
           const ok = await confirmAgentAction(`Allow the agent to sign in as ${role}?`);
@@ -70,6 +70,7 @@ export async function registerAuthTools(mc: ModelContext, signal?: AbortSignal):
           clerk: 'Court Clerk',
           srl: 'Self-Represented Litigant',
           public: 'Public docket viewer',
+          admin: 'System Administrator',
         };
         return toolOk({
           role: role || 'anonymous',

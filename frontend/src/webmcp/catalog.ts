@@ -104,7 +104,7 @@ export const TOOL_CATALOG: CatalogEntry[] = [
   {
     name: 'sign_in_demo_role',
     title: 'Demo sign-in',
-    description: 'Switch demo role (attorney, clerk, srl, public).',
+    description: 'Switch demo role (attorney, clerk, srl, public, admin).',
     readOnly: false,
     tier: 'action',
   },

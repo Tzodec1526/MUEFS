@@ -14,7 +14,6 @@ export interface FilingDraft {
   creationKey?: string;
   detailsToken: string | null;
   caseChoiceMade: boolean;
-  motionSubtype: string | null;
 }
 
 const PREFIX = 'muefs_filing_draft:v2:';
@@ -36,7 +35,6 @@ export function loadFilingDraft(key: string): FilingDraft | null {
       || typeof draft.caseChoiceMade !== 'boolean'
       || !(draft.creationKey === undefined || (typeof draft.creationKey === 'string'
         && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(draft.creationKey)))
-      || !(draft.motionSubtype === null || typeof draft.motionSubtype === 'string')
       || !(draft.detailsToken === null || (typeof draft.detailsToken === 'string' && /^[0-9a-f]{64}$/.test(draft.detailsToken)))) return null;
     return draft;
   } catch { return null; }
@@ -50,7 +48,7 @@ export function saveFilingDraft(key: string, data: FilingDraft): boolean {
       caseTitle: data.caseTitle, filingDescription: data.filingDescription,
       filingId: data.filingId, detailsToken: data.detailsToken,
       creationKey: data.creationKey,
-      caseChoiceMade: data.caseChoiceMade, motionSubtype: data.motionSubtype,
+      caseChoiceMade: data.caseChoiceMade,
     };
     sessionStorage.setItem(key, JSON.stringify(draft));
     return true;
@@ -83,6 +81,6 @@ export function loadLegacyFilingDraft(userId: number, filing: Pick<FilingEnvelop
     if (draft?.filingId !== filing.id || typeof draft.caseTitle !== 'string'
       || typeof draft.filingDescription !== 'string') return null;
     return { caseTitle: draft.caseTitle, filingDescription: draft.filingDescription,
-      motionSubtype: null, detailsToken: null };
+      detailsToken: null };
   } catch { return null; }
 }

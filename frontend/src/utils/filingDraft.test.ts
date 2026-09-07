@@ -7,7 +7,7 @@ import {
 const draft: FilingDraft = {
   courtId: 1, courtName: 'Test court', caseId: null, filingType: 'initial',
   caseTypeId: 1, caseTypeName: 'Civil', caseTitle: 'Unsaved title', filingDescription: 'Private edits',
-  filingId: 7, detailsToken: 'a'.repeat(64), caseChoiceMade: true, motionSubtype: null,
+  filingId: 7, detailsToken: 'a'.repeat(64), caseChoiceMade: true,
 };
 
 beforeEach(() => {

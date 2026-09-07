@@ -36,7 +36,7 @@ Browser tools for Michigan e-filing: agents research and navigate; humans submit
 | `get_filing_requirements` | discovery | all | Document requirements for court/case type |
 | `get_motion_checklists` | discovery | all | MCR 2.119 motion companions |
 | `navigate_to` | action | all | Same-origin navigation |
-| `sign_in_demo_role` | action | demo | Switch attorney / clerk / srl / public |
+| `sign_in_demo_role` | action | demo | Switch attorney / clerk / srl / public / admin |
 | `get_current_demo_role` | discovery | demo | Current session role |
 | `list_my_filings` | discovery | filer | Attorney/SRL filings |
 | `get_filing_details` | discovery | filer | Single filing status |

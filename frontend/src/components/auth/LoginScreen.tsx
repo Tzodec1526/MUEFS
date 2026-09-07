@@ -10,7 +10,6 @@ import {
   oidcSessionExpected, safeLoginReturnPath, SessionChangedError, startKeycloakLogin,
 } from '../../auth/keycloak';
 export { notifySessionChanged as notifyDemoRoleChanged } from '../../auth/keycloak';
-import { logAgentActivity } from '../../webmcp/activity';
 
 export function getDemoRole(): string | null {
   return localStorage.getItem('demo_role');
@@ -160,35 +159,6 @@ function LoginScreen() {
         </div>
 
         {demo && <div className="login-cards">
-          <form
-            className="login-webmcp-form"
-            toolname="sign_in_demo_role"
-            tooldescription="Sign in to the MUEFS demo as attorney, clerk, self-represented litigant, or public visitor"
-            onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
-              e.preventDefault();
-              const role = new FormData(e.currentTarget).get('role') as string;
-              if (!roles.some((r) => r.role === role)) return;
-              logAgentActivity('sign_in_demo_role', { role, via: 'declarative_form' }, true, 0);
-              applyDemoRole(role);
-              navigate(role === 'public' ? '/cases/search' : returnPath);
-            }}
-          >
-            <label className="sr-only" htmlFor="demoRoleSelect">
-              Demo role
-            </label>
-            <select
-              id="demoRoleSelect"
-              name="role"
-              defaultValue="attorney"
-              className="login-webmcp-select"
-              toolparamdescription="Demo role: attorney, clerk, srl, or public"
-            >
-              {roles.map(option => <option key={option.role} value={option.role}>{option.label}</option>)}
-            </select>
-            <button type="submit" className="btn btn-secondary login-webmcp-submit">
-              Agent: sign in selected role
-            </button>
-          </form>
           {roles.map((option) => (
             <div
               key={option.role}

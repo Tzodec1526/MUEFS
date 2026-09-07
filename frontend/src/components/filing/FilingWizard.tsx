@@ -15,7 +15,7 @@ import { emitToast } from '../../utils/toastBus';
 import { getErrorDetail } from '../../utils/errors';
 import { createFiling, getFiling, updateFiling, type FilingEnvelope } from '../../api/filings';
 import LoadError from '../common/LoadError';
-import { getCourt, getCaseTypes, getFilingChecklists, FilingChecklist } from '../../api/courts';
+import { getCourt, getCaseTypes } from '../../api/courts';
 import { getDemoRole } from '../auth/LoginScreen';
 import {
   isPlainLanguageMode,
@@ -60,7 +60,6 @@ const defaultFilingData: FilingData = {
   documents: [],
   paymentComplete: false,
   caseChoiceMade: false,
-  motionSubtype: null,
 };
 
 function FilingWizard() {
@@ -127,7 +126,6 @@ function FilingForm({ userId }: { userId: number }) {
     }));
   }, []);
   const isMotionMode = filingData.filingType !== 'initial';
-  const [motionChecklists, setMotionChecklists] = useState<FilingChecklist[]>([]);
   const [plainLanguage, setPlainLanguage] = useState(() => {
     if (getDemoRole() === 'srl') {
       if (!isPlainLanguageMode()) setPlainLanguageMode(true);
@@ -173,7 +171,6 @@ function FilingForm({ userId }: { userId: number }) {
             filingType,
             caseTitle: recoveredDraft?.caseTitle ?? envelope.case_title ?? '',
             filingDescription: recoveredDraft?.filingDescription ?? envelope.filing_description ?? '',
-            motionSubtype: recoveredDraft?.motionSubtype ?? null,
             caseChoiceMade: true,
             paymentComplete: (envelope.fee_waiver_requested && envelope.fee_waiver_granted === null)
               || envelope.fee_waiver_amount_due_cents === 0
@@ -212,29 +209,6 @@ function FilingForm({ userId }: { userId: number }) {
     });
     return () => { active = false; };
   }, [searchParams, requestedFilingId, draft, reloadKey, userId]);
-
-  // Fetch motion checklists dynamically when in motion mode (for subtype dropdown + pre-fill).
-  // Focused on civil cases per requirements (civil case types will surface relevant motion checklists like Summary Disposition, General Motion, etc.)
-  useEffect(() => {
-    if (!isMotionMode || readOnly || !filingData.courtId || !filingData.caseTypeId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset when leaving motion mode
-      setMotionChecklists([]);
-      return;
-    }
-    async function fetchChecklists() {
-      try {
-        const lists = await getFilingChecklists(filingData.courtId!, filingData.caseTypeId!);
-        // Prioritize civil-focused motion types for this feature
-        const civilLists = lists.filter((l) =>
-          /civil|summary disposition|general motion|discovery|default|reconsider|in limine|injunction/i.test(l.motion_type)
-        );
-        setMotionChecklists(civilLists.length > 0 ? civilLists : lists);
-      } catch {
-        setMotionChecklists([]);
-      }
-    }
-    fetchChecklists();
-  }, [isMotionMode, readOnly, filingData.courtId, filingData.caseTypeId]);
 
   const steps = buildSteps(filingData.filingType).map((s) => ({
     ...s,
@@ -437,7 +411,6 @@ function FilingForm({ userId }: { userId: number }) {
     setConflict(null);
     setSaveNotice('');
     setCreationConflictId(null);
-    setMotionChecklists([]);
   };
 
   useEffect(() => { conflictHeading.current?.focus(); }, [conflict]);
@@ -572,9 +545,6 @@ function FilingForm({ userId }: { userId: number }) {
           {filingData.caseTypeName && (
             <span><strong>Type:</strong> {filingData.caseTypeName}</span>
           )}
-          {filingData.motionSubtype && (
-            <span><strong>Motion:</strong> {filingData.motionSubtype}</span>
-          )}
           {filingData.caseTitle && (
             <span><strong>Case:</strong> {filingData.caseTitle}</span>
           )}
@@ -619,7 +589,6 @@ function FilingForm({ userId }: { userId: number }) {
                 caseTitle: c.title,
                 filingType: 'subsequent',
                 caseChoiceMade: true,
-                motionSubtype: null,
               });
             }}
             onSelectNew={() => {
@@ -640,7 +609,7 @@ function FilingForm({ userId }: { userId: number }) {
             courtId={filingData.courtId}
             selectedCaseTypeId={filingData.caseTypeId}
             onSelect={(id, name) => {
-              updateData({ caseTypeId: id, caseTypeName: name, motionSubtype: null });
+              updateData({ caseTypeId: id, caseTypeName: name });
             }}
           />
         )}
@@ -689,33 +658,6 @@ function FilingForm({ userId }: { userId: number }) {
                     </div>
                   </label>
                 </div>
-              </div>
-            )}
-
-            {/* Motion Subtype Dropdown - added for civil cases. Populated dynamically from backend checklists (MCR 2.116, 2.119, 2.313 etc.) */}
-            {isMotionMode && motionChecklists.length > 0 && (
-              <div className="form-group">
-                <label htmlFor="motionSubtype">
-                  Motion Subtype (Civil, optional)
-                </label>
-                <select
-                  id="motionSubtype"
-                  disabled={saving}
-                  value={filingData.motionSubtype || ''}
-                  onChange={(e) => updateData({ motionSubtype: e.target.value || null })}
-                >
-                  <option value="">-- Select specific motion type --</option>
-                  {motionChecklists.map((cl) => (
-                    <option key={cl.id} value={cl.motion_type}>
-                      {cl.motion_type}
-                    </option>
-                  ))}
-                </select>
-                {filingData.motionSubtype && (
-                  <span className="field-hint">
-                    {motionChecklists.find((c) => c.motion_type === filingData.motionSubtype)?.help_text || 'Select to pre-fill required companion documents below.'}
-                  </span>
-                )}
               </div>
             )}
 
@@ -773,12 +715,9 @@ function FilingForm({ userId }: { userId: number }) {
         {currentStep === 'documents' && filingData.filingId && (
           <DocumentUpload
             filingId={filingData.filingId}
-            courtId={filingData.courtId!}
-            caseTypeId={filingData.caseTypeId!}
             documents={filingData.documents}
             onDocumentsChange={(docs) => updateData({ documents: docs, paymentComplete: false })}
             onBusyChange={setSaving}
-            motionSubtype={filingData.motionSubtype}
           />
         )}
 

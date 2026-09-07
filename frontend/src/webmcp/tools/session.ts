@@ -111,7 +111,7 @@ export async function registerSessionTools(mc: ModelContext, signal?: AbortSigna
           human_in_the_loop: 'Agents research and navigate; only humans click Submit in the filing wizard.',
           apis: {
             imperative: 'document.modelContext.registerTool in frontend/src/webmcp/',
-            declarative: ['search_cases', 'sign_in_demo_role', 'get_clerk_review_queue'],
+            declarative: ['search_cases', 'get_clerk_review_queue'],
           },
           example_prompts: [
             'Call get_challenge_briefing, then get_agent_session and get_agent_catalog.',

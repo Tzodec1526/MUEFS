@@ -24,7 +24,7 @@ export function buildAgentPageContext(): AgentPageContext {
   else if (role === 'clerk') suggested = 'clerk_triage_workflow';
   else if (role === 'attorney' || role === 'srl') suggested = 'attorney_motion_workflow';
 
-  const declarative: string[] = ['search_cases', 'sign_in_demo_role'];
+  const declarative: string[] = ['search_cases'];
   if (path.startsWith('/clerk')) declarative.push('get_clerk_review_queue');
 
   return {

@@ -30,7 +30,7 @@ Live demo: https://webmcp.tomcedoz.com/agent · https://demo.tomcedoz.com · Age
 | **AI agent tools (WebMCP)** | Not available | 20 role-aware tools + `/agent` hub |
 | **Cost / licensing** | Per-transaction vendor fees | AGPL-3.0 (no license fee) |
 
-> **Status:** Open source demo — core filing, clerk review, and public docket search work today. CMS integration is a **stub** until a court JIS/CMS adapter is wired in production.
+> **Status:** Open source demo — filing, clerk review, public records, self-represented filing, and court administration work today. The payment processor and live court CMS integration remain **stubs**. A state could select and connect those services as part of an implementation.
 
 ---
 
@@ -51,7 +51,7 @@ python run_demo.py
 
 Log in as an **Attorney**, **Court Clerk**, **System Administrator**, or **Self-Represented Litigant**, or **browse public court records without signing in**.
 
-A **60-second attorney walkthrough** is in [`demo/muefs-walkthrough-60s.mp4`](demo/muefs-walkthrough-60s.mp4) (regenerate with `scripts/record-walkthrough.ps1`).
+For a video covering every role, follow the **[five-role recording guide](demo/README.md)**. It includes sample PDFs and a verified sequence from attorney submission through clerk acceptance, public search, a fee waiver request, and court access administration. Payments are explicitly simulated. An older [60-second attorney preview](demo/muefs-walkthrough-60s.mp4) is also available.
 
 ---
 
