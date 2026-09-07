@@ -9,6 +9,7 @@ import { CourtContext, CourtSession, CourtWorkspace, StaffCourtSelect } from './
 import PlatformStats from './components/marketing/PlatformStats';
 import MifileComparison from './components/marketing/MifileComparison';
 import { getFilingStatusCounts, getClerkQueue } from './api/filings';
+import { oidcSessionExpected, SESSION_KEY } from './auth/keycloak';
 
 const FilingWizard = lazy(() => import('./components/filing/FilingWizard'));
 const MyFilings = lazy(() => import('./components/filing/MyFilings'));
@@ -208,7 +209,7 @@ function App() {
     const sessionChanged = (event: StorageEvent) => {
       if (event.storageArea !== localStorage) return;
       if (event.key === null || (event.oldValue !== event.newValue && (
-        event.key === 'auth_token' || (event.key === 'demo_role' && !localStorage.getItem('auth_token'))
+        event.key === SESSION_KEY || (event.key === 'demo_role' && !oidcSessionExpected())
       ))) setSessionEpoch(value => value + 1);
     };
     window.addEventListener('storage', sessionChanged);

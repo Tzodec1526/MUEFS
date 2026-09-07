@@ -748,9 +748,20 @@ private history and responsive layouts with demo authentication and auto-provisi
 The local HTTP test realm and synthetic appointments are not a production identity review.
 State federation, MFA and session policy, signing-key rotation exercises, lifecycle imports,
 access recertification and recovery drills remain implementation work with the court.
-The current frontend keeps bearer tokens in browser storage; the production identity review
-must address that session design and XSS exposure. An IdP cookie does not itself establish
-an application session for this API.
+The browser now uses Keycloak's maintained adapter and keeps access, refresh and ID tokens
+in memory. It removes legacy stored access tokens, restores private pages through SSO on
+reload, and ends provider SSO on sign-out. The API client renews before dispatch, shares
+concurrent renewal and discards responses from earlier accounts or local sessions. It never
+replays a failed filing or payment request. Failed renewal preserves unsaved filing recovery;
+explicit sign-out clears recovery from that tab and invalidates other portal tabs.
+
+The local Keycloak 26.7.3 evaluation used rotating refresh tokens and a short access-token
+lifetime. Browser checks covered concurrent renewal, an unchanged filing form, reload
+recovery, multiple tabs, provider logout and a revoked session stopping Save draft before
+any filing mutation reached the API. Access-token and refresh-token storage checks passed.
+These checks do not establish production federation, MFA or session-policy readiness.
+Provider-side revocation is observed on renewal; the API still validates each access token
+and current account permissions. An IdP cookie alone does not authenticate API requests.
 
 ## Staff working across courts
 

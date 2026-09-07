@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { SESSION_KEY } from '../../auth/keycloak';
 import {
   applyDemoRole,
   applySessionFromProfile,
@@ -29,11 +30,11 @@ describe('identity session boundaries', () => {
     applySessionFromProfile({ user_type: 'admin' });
     expect(hasSession()).toBe(false);
     localStorage.setItem('auth_token', 'jwt');
-    expect(hasSession()).toBe(true);
-    localStorage.removeItem('auth_token');
     expect(hasSession()).toBe(false);
     vi.stubEnv('VITE_ALLOW_DEMO_MODE', 'true');
     expect(hasSession()).toBe(true);
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ restore: true }));
+    expect(hasSession()).toBe(false);
   });
 
   it('keeps a selected assigned court across profile refresh and falls back after revocation', () => {

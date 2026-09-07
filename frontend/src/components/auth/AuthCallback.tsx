@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { handleKeycloakCallback } from '../../auth/keycloakPkce';
-import { applySessionFromProfile, notifyDemoRoleChanged } from './LoginScreen';
+import { clearSession, handleKeycloakCallback, SessionChangedError, sessionSnapshot } from '../../auth/keycloak';
+import { applySessionFromProfile } from './LoginScreen';
 import { apiClient } from '../../api/client';
 import { getErrorDetail } from '../../utils/errors';
 
@@ -10,31 +10,38 @@ function AuthCallback() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    handleKeycloakCallback(window.location.search)
+    const controller = new AbortController();
+    handleKeycloakCallback()
       .then(async (returnPath) => {
+        if (controller.signal.aborted) return;
         if (!returnPath) {
           setError('Sign-in failed. Return to the login page and try again.');
           return;
         }
+        const expected = sessionSnapshot();
         try {
-          const { data } = await apiClient.get('/auth/me');
+          const { data } = await apiClient.get('/auth/me', { signal: controller.signal });
+          if (controller.signal.aborted) return;
           applySessionFromProfile(data);
         } catch (err) {
-          localStorage.removeItem('auth_token');
+          if (controller.signal.aborted) return;
+          clearSession(expected);
           setError(getErrorDetail(err) || 'Could not verify your court account. Return to the login page and try again.');
-          notifyDemoRoleChanged();
           return;
         }
         navigate(returnPath, { replace: true });
       })
-      .catch(() => setError('Sign-in failed. Return to the login page and try again.'));
+      .catch(err => {
+        if (!controller.signal.aborted) setError(err instanceof SessionChangedError ? err.message : 'Could not complete court sign-in. Return to the login page and try again.');
+      });
+    return () => controller.abort();
   }, [navigate]);
 
   if (error) {
     return (
       <div className="login-screen">
         <div className="login-container">
-          <p role="alert">{error}</p>
+          <p className="login-message" role="alert">{error}</p>
           <button type="button" className="btn btn-primary" onClick={() => navigate('/login')}>
             Back to login
           </button>
@@ -46,7 +53,7 @@ function AuthCallback() {
   return (
     <div className="login-screen">
       <div className="login-container">
-        <p>Completing sign-in…</p>
+        <p className="login-message" role="status">Completing sign-in…</p>
       </div>
     </div>
   );

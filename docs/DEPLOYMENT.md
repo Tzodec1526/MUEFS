@@ -160,6 +160,26 @@ same public `VITE_KEYCLOAK_URL` and `VITE_KEYCLOAK_REALM` as the API's `KEYCLOAK
 authorization-code flow, PKCE S256, an exact HTTPS `/auth/callback` redirect, and the
 portal's exact web origin. Do not put a client secret in the frontend.
 
+Allow the portal's exact HTTPS `/login` URL in the client's **Valid post logout redirect
+URIs** as well. The portal uses [Keycloak's browser adapter](https://www.keycloak.org/securing-apps/javascript-adapter) for the authorization-code exchange,
+PKCE state verification, renewal and provider sign-out. Access, refresh and ID tokens
+remain in memory. Browser storage contains an account identifier and restoration hint;
+older persisted access tokens are removed on upgrade. Reloading a private page makes
+a normal SSO redirect through `/auth/callback` to restore the session and return to the
+requested page. Anonymous public pages do not initialize the identity client.
+
+API requests renew a token before sending when it has less than 30 seconds remaining
+(or the last third of its lifetime for shorter-lived tokens). Concurrent renewal uses
+the adapter's shared queue. A 401 response never replays a request, including filing
+submissions and payment actions. Identity initialization and renewal have a 15-second
+client deadline. Failure requires sign-in again; it preserves unsaved filing recovery
+in the current tab. Explicit **Sign out** clears that tab's recovery data, invalidates
+the portal session across tabs and ends Keycloak SSO. Test the exact login and logout
+redirects, renewal, reload recovery, account switching and IdP session revocation with
+the state's identity policy before enabling production access. Session iframe checks
+are disabled; provider-side revocation is observed when renewal fails, while the API
+continues to validate each access token and the current local account permissions.
+
 Tokens must contain `sub`, `exp`, the configured issuer, and an API audience matching
 `KEYCLOAK_CLIENT_ID` or `JWT_AUDIENCES`; set `JWT_VERIFY_AUDIENCE=true`. Configure the
 frontend client's audience mapper to include the API. Keep Keycloak's `basic`, `profile`

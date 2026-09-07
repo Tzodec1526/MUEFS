@@ -2,7 +2,7 @@ import { clearFilingDrafts } from '../../utils/filingDraft';
 import { useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { isDemoBuild } from '../../config/demoMode';
-import { notifyDemoRoleChanged } from '../auth/LoginScreen';
+import { signOut } from '../../auth/keycloak';
 import { CourtContext } from '../auth/CourtSession';
 import MichiganMark from '../common/MichiganMark';
 import NotificationBell from './NotificationBell';
@@ -14,14 +14,10 @@ function Header() {
 
   const handleSwitchRole = () => {
     clearFilingDrafts();
-    localStorage.removeItem('demo_role');
-    localStorage.removeItem('demo_user_name');
-    localStorage.removeItem('demo_court_id');
     localStorage.removeItem('muefs_filing_draft');
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('administration_access');
-    notifyDemoRoleChanged();
-    navigate('/login');
+    const logoutUrl = signOut();
+    if (logoutUrl) window.location.href = logoutUrl;
+    else navigate('/login');
   };
 
   const roleLabelMap: Record<string, string> = {

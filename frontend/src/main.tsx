@@ -6,19 +6,30 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import WebMcpNavigateBridge from './components/agent/WebMcpNavigateBridge';
 import { ToastProvider } from './components/common/Toast';
 import { initMuefsWebMcp } from './webmcp';
+import { handleKeycloakCallback, migrateStoredToken } from './auth/keycloak';
 import './styles/global.css';
 
+migrateStoredToken();
 initMuefsWebMcp();
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ToastProvider>
-      <BrowserRouter>
-        <ErrorBoundary>
-          <WebMcpNavigateBridge />
-          <App />
-        </ErrorBoundary>
-      </BrowserRouter>
-    </ToastProvider>
-  </React.StrictMode>
-);
+const root = ReactDOM.createRoot(document.getElementById('root')!);
+function renderApp() {
+  root.render(
+    <React.StrictMode>
+      <ToastProvider>
+        <BrowserRouter>
+          <ErrorBoundary>
+            <WebMcpNavigateBridge />
+            <App />
+          </ErrorBoundary>
+        </BrowserRouter>
+      </ToastProvider>
+    </React.StrictMode>,
+  );
+}
+
+if (window.location.pathname === '/auth/callback') {
+  root.render(<p className="loading" role="status">Completing secure sign-in…</p>);
+  // The adapter consumes OAuth parameters before the router reads the URL.
+  void handleKeycloakCallback().catch(() => {}).finally(renderApp);
+} else renderApp();

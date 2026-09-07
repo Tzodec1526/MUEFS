@@ -1,11 +1,15 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Scale, ClipboardCheck, UserRound, BookOpen, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { isDemoBuild } from '../../config/demoMode';
 import MichiganMark from '../common/MichiganMark';
 import MifileComparison from '../marketing/MifileComparison';
-import { keycloakConfigured, safeLoginReturnPath, startKeycloakLogin } from '../../auth/keycloakPkce';
+import {
+  accessToken, clearSession, keycloakConfigured, notifySessionChanged as notifyDemoRoleChanged,
+  oidcSessionExpected, safeLoginReturnPath, SessionChangedError, startKeycloakLogin,
+} from '../../auth/keycloak';
+export { notifySessionChanged as notifyDemoRoleChanged } from '../../auth/keycloak';
 import { logAgentActivity } from '../../webmcp/activity';
 
 export function getDemoRole(): string | null {
@@ -13,7 +17,7 @@ export function getDemoRole(): string | null {
 }
 
 export function hasSession(): boolean {
-  return Boolean(localStorage.getItem('auth_token') || (isDemoBuild() && getDemoRole()));
+  return Boolean(accessToken() || (isDemoBuild() && !oidcSessionExpected() && getDemoRole()));
 }
 
 export function getDemoCourtId(): number | null {
@@ -59,11 +63,8 @@ const roles: RoleOption[] = [
   },
 ];
 
-export function notifyDemoRoleChanged(): void {
-  window.dispatchEvent(new Event('muefs-demo-role-changed'));
-}
-
 export function applyDemoRole(role: string): void {
+  clearSession();
   localStorage.setItem('demo_role', role);
   localStorage.setItem('administration_access', String(role === 'admin'));
   if (role === 'clerk') {
@@ -114,6 +115,25 @@ function LoginScreen() {
   const [searchParams] = useSearchParams();
   const returnPath = safeLoginReturnPath(searchParams.get('next'));
   const demo = isDemoBuild();
+  const [signingIn, setSigningIn] = useState(false);
+  const [signInError, setSignInError] = useState('');
+  const restoreAttempted = useRef(false);
+  const signIn = useCallback(async () => {
+    setSigningIn(true);
+    setSignInError('');
+    try { await startKeycloakLogin(returnPath); }
+    catch (error) {
+      setSignInError(error instanceof SessionChangedError ? error.message : 'Could not connect to court sign-in. Try again, or contact the court if this continues.');
+      setSigningIn(false);
+    }
+  }, [returnPath]);
+
+  useEffect(() => {
+    if (!restoreAttempted.current && oidcSessionExpected() && keycloakConfigured() && !hasSession()) {
+      restoreAttempted.current = true;
+      void signIn();
+    }
+  }, [signIn]);
 
   useEffect(() => {
     const role = searchParams.get('role');
@@ -196,10 +216,13 @@ function LoginScreen() {
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => startKeycloakLogin(returnPath)}
+              onClick={() => void signIn()}
+              disabled={signingIn}
             >
-              Sign in with your court account
+              {signingIn ? 'Connecting to court sign-in…' : 'Sign in with your court account'}
             </button>
+            {signInError && <p className="login-message" role="alert">{signInError}</p>}
+            {searchParams.get('reason') === 'expired' && <p className="login-message" role="status">Your court sign-in expired. Sign in again to continue. Unsaved filing drafts are still on this device.</p>}
             <p className="login-keycloak-note">
               Use the identity account approved by your court or state.
             </p>
@@ -207,7 +230,7 @@ function LoginScreen() {
         )}
 
         {!demo && <div className="login-keycloak">
-          {!keycloakConfigured() && <p role="alert">Sign-in is not configured for this deployment. Contact the court&apos;s support team.</p>}
+          {!keycloakConfigured() && <p className="login-message" role="alert">Sign-in is not configured for this deployment. Contact the court&apos;s support team.</p>}
           <Link className="btn btn-secondary" to="/cases/search">Browse public records</Link>
         </div>}
         {demo && <MifileComparison variant="login" />}
