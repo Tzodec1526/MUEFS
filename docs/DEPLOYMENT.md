@@ -137,6 +137,15 @@ label. Leave the feature disabled until the court evaluates the workflow. Demo-m
 credits are marked simulated and will not satisfy a production balance. See
 [external receipt behavior and verification](STATE_READINESS.md#court-fee-assessments-and-payment-balances).
 
+The private **Receipt Register** supports period review and CSV export by administrators
+assigned to the selected court. Apply migration `c39f64dbea05` for its payment-activity
+index. PostgreSQL builds the index concurrently; an interrupted invalid build is repaired
+when the migration is retried. Downgrade removes only the index and preserves all records.
+Register access remains available when `EXTERNAL_PAYMENTS_ENABLED=false`. Evaluate its
+date/time-zone selection, source-reference handling and exported USD-cent columns with the
+court's reconciliation staff. Exports contain protected receipt details and must follow the
+court's access and retention procedures. See [register behavior and measurements](STATE_READINESS.md#court-receipt-register).
+
 ## 2. Identity (Keycloak)
 
 - Run production with Keycloak (or a state SSO) as the only auth path (`ALLOW_DEMO_MODE=false`).

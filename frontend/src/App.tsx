@@ -16,6 +16,7 @@ const FilingHistoryPage = lazy(() => import('./components/filing/FilingHistoryPa
 const FilingDateOrderPage = lazy(() => import('./components/clerk/FilingDateOrderPage'));
 const FilingFeesPage = lazy(() => import('./components/filing/FilingFeesPage'));
 const FeeReviewQueue = lazy(() => import('./components/clerk/FeeReviewQueue'));
+const PaymentRegisterPage = lazy(() => import('./components/clerk/PaymentRegisterPage'));
 const ReviewQueue = lazy(() => import('./components/clerk/ReviewQueue'));
 const CourtCaseDirectory = lazy(() => import('./components/courts/CourtCaseDirectory'));
 const DocumentPublicationPage = lazy(() => import('./components/courts/DocumentPublicationPage'));
@@ -256,6 +257,7 @@ function App() {
                         <Route path="/favorites" element={<RequireFiler><Favorites /></RequireFiler>} />
                         <Route path="/clerk/queue" element={<CourtWorkspace><ReviewQueue /></CourtWorkspace>} />
                         <Route path="/clerk/fee-reviews" element={<CourtWorkspace><FeeReviewQueue /></CourtWorkspace>} />
+                        <Route path="/clerk/payment-register" element={<CourtWorkspace><PaymentRegisterPage /></CourtWorkspace>} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </Suspense>

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Literal
 
 from pydantic import AwareDatetime, BaseModel, Field, field_serializer, field_validator
@@ -153,3 +153,44 @@ class PaymentRecords(BaseModel):
     total: int
     page: int
     payment_version: int
+
+
+class PaymentActivity(BaseModel):
+    event_id: str
+    filing_id: int
+    event_type: Literal["fee_payment_recorded", "fee_payment_reversed"]
+    actor_id: int
+    actor_name: str
+    occurred_at: datetime
+    payment_id: int
+    amount_cents: int
+    is_simulated: bool
+    receipt_system: str
+    receipt_reference: str
+    received_at: AwareDatetime
+    reason: str
+
+    @field_serializer("occurred_at", "received_at")
+    def serialize_time(self, value: datetime) -> str:
+        return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
+
+
+class PaymentRegisterTotals(BaseModel):
+    credits_cents: int
+    reversals_cents: int
+
+
+class PaymentRegister(BaseModel):
+    court_id: int
+    date_from: date
+    date_to: date
+    timezone: str
+    range_start: datetime
+    range_end: datetime
+    generated_at: datetime
+    include_simulated: bool
+    total: int
+    page: int
+    totals: PaymentRegisterTotals
+    simulated_totals: PaymentRegisterTotals
+    entries: list[PaymentActivity]

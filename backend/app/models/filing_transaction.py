@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -25,6 +25,11 @@ class FilingTransaction(Base):
 
     __table_args__ = (
         Index("ix_filing_transactions_history", "filing_id", "occurred_at", "id"),
+        Index(
+            "ix_filing_payment_activity", "occurred_at", "filing_id", "id",
+            postgresql_where=text("event_type IN ('fee_payment_recorded', 'fee_payment_reversed')"),
+            sqlite_where=text("event_type IN ('fee_payment_recorded', 'fee_payment_reversed')"),
+        ),
         UniqueConstraint("filing_id", "idempotency_key", name="uq_filing_submission_key"),
     )
 

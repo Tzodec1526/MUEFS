@@ -1,6 +1,8 @@
-/** Format integer cents as a USD amount, e.g. 1500 -> "$15.00". */
+const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+/** Format integer cents as a USD amount, including grouped totals and reversals. */
 export function formatCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
+  return usd.format(cents / 100);
 }
 
 /** Like formatCents, but renders a zero amount as "No fee". */

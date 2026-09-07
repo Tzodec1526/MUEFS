@@ -21,7 +21,7 @@ establish state approval or production readiness.
 | Control case participation and access | Assigned staff record participants, counsel representation and explicit restricted-case grants with retained reasons, before/after history, stale-edit checks and revocation. Filing acceptance no longer assigns party roles or grants case access. | Court-approved access rules, review of legacy records, CMS appearance/withdrawal synchronization, limited-scope representation and service enrollment. |
 | Record the correct legal filing date | Receipt instants and filing dates are separate. Published calendars establish business dates. Assigned staff can record a signed order establishing a different date, with retained before/after evidence and explicit case opening date changes. Acceptance honors the order without rewriting the receipt. | Court verification of calendars and signed orders, motion/adjudication procedures, downstream CMS synchronization and review of closures published after acceptance. Correcting a document does not automatically preserve its legal filing date. |
 | Resolve fee waivers correctly | A completed application accompanies the filing. Clerk waivers, referral and judicial decisions are separate court-scoped actions. Signed decision PDFs and denial amounts remain in private history; a filer can pay after denial without resubmitting. | Actual notice delivery, de novo review and judicial assignment, deadline calculation, case-wide continuation and reinstatement, court verification of signed forms and prisoner-specific procedures. |
-| Establish fees and account for payments | Assigned staff record itemized assessments. Separately assigned court administrators can credit verified external receipts, reverse erroneous credits and retain the source evidence. Balances preserve partial payments and expose overpayments after reassessment. | Court validation of assessments and source receipts, independent reconciliation and correction review, a hosted payment processor, signed webhooks, refunds and accounting exports. |
+| Establish fees and account for payments | Assigned staff record itemized assessments. Separately assigned court administrators can credit verified external receipts, reverse erroneous credits and retain the source evidence. Balances preserve partial payments and expose overpayments after reassessment. A private court receipt register provides period totals, recorded activity and bounded CSV exports. | Court validation of assessments and source receipts, independent reconciliation and correction review, a hosted payment processor, signed webhooks, refunds and accounting-system mappings. |
 | Deliver electronic service | Staff review service instructions. Senders explicitly select retained subsequent documents and eligible recipients; immutable packages retain contents and addresses. An opt-in SMTP outbox queues protected links, rechecks instructions and records failures/retries. Recipients download only selected, verified bytes and can acknowledge the package. | Court-approved enrollment, consent and confidential-document policy; additional/delegated recipients; bounce feedback and failed-service remedies; non-electronic evidence and certified proof. Relay acceptance and download requests do not establish legally sufficient service. |
 | Send filing alerts reliably | An opt-in SMTP outbox commits with filing changes, checks verified recipients, retains messages and attempts, retries temporary failures and exposes uncertain outcomes to assigned court staff. | A court-approved relay and sender domain, bounce/delivery feedback, operational alerting and court approval of legally sufficient notice content and procedures. Generic email alerts do not establish legal service. |
 | Connect to the court's system of record | Acceptance is explicitly blocked outside demo mode when CMS integration is absent. | A documented court/vendor contract, credentialed sandbox, document/code mapping, idempotent delivery, status callbacks, error recovery and reconciliation. |
@@ -477,6 +477,55 @@ records or allocation evidence. Ambiguous historical payments require reconcilia
 The migration refuses destructive downgrade. `test_fee_assessments.py` covers the actual
 request, assessment, correction, payment and submission workflow; the PostgreSQL suite
 also tests duplicate requests, simultaneous document edits, consistent reads and rollback.
+
+## Court receipt register
+
+**Receipt Register** in the court workspace lets an active administrator assigned to the
+selected court review external credits and reversals across filings. A system-wide role
+without that court's administrator assignment is insufficient. The register remains readable
+when external payment recording is disabled, so disabling new entries does not hide retained
+history. Filers, unassigned users and clerk/judge-only assignments cannot read or export it.
+
+Choose an inclusive period of at most 31 days and an IANA time zone. Dates select when
+MUEFS recorded the activity, independently of the source receipt's received time. Local
+midnight boundaries account for daylight-saving changes. A reversal appears on its own
+recorded day even if the original credit is outside the period. Positive credits and negative
+reversals come from retained filing transactions; reasons, operator names and receipt
+references are not reconstructed from current user profiles or payment status.
+
+The page shows credits, reversals and net activity for the whole matching period, with
+50 entries per page. Simulated entries are excluded by default; including them displays
+separate simulation totals. Net activity can be negative and is not an outstanding filing
+balance, bank balance or proof of settlement. Changing courts clears the previous court's
+rows and filters. Changing filters requires applying them before an export.
+
+`GET /api/v1/clerk/payment-register` requires `court_id`, `date_from`, `date_to` and
+`timezone`; optional parameters are `page`, `include_simulated` and `format=json|csv`.
+Each response computes totals and rows in one SQL statement. Separate pages and exports
+are fresh reads, so concurrent activity can change the result between requests. CSV exports
+include the whole matching period, up to 5,000 entries; larger exports are refused with a
+request to shorten the period. Export columns retain signed USD cents, event/payment/filing
+identifiers, UTC times, source references, simulation flags, reasons and period metadata.
+
+CSV fields are quoted and text resembling a spreadsheet formula is prefixed with an
+apostrophe. Source-exact values remain available in JSON and private filing history. Treat
+text columns as text when importing; spreadsheet save/reopen behavior varies, as described
+in [OWASP's CSV injection guidance](https://owasp.org/www-community/attacks/CSV_Injection).
+
+Migration `c39f64dbea05` adds one partial index over payment-event times and filing/event
+identifiers. PostgreSQL builds it concurrently and repairs an invalid interrupted build
+on retry; downgrade removes only the index. Receipt text loads only for selected rows.
+On a local synthetic PostgreSQL dataset of 400,000 transactions, 20,000 filings and 100
+courts, the busiest court's one-day query improved from 10.636 ms to 1.940 ms, and its
+eight-day query from 28.857 ms to 7.513 ms. The partial index used 3,883,008 bytes for
+57,142 payment events. Small-court queries remained approximately 0.14–0.27 ms. These are
+warmed query-plan measurements, not end-to-end latency or production load certification.
+
+API and PostgreSQL checks cover signed totals above 32-bit range, court isolation,
+simulation separation, period boundaries on 23-hour and 25-hour days, pagination, complete
+exports, oversized-export refusal, uncommitted activity, concurrent authority revocation,
+and failed-index recovery. The register supports a court's reconciliation procedure; it
+does not contact the accounting system or record an independent reviewer's approval.
 
 ## Court calendars and filing dates
 

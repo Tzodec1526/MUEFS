@@ -6,7 +6,7 @@ import { CourtContext } from '../auth/CourtSession';
 
 function Sidebar() {
   const location = useLocation();
-  const { court, role } = useContext(CourtContext)!;
+  const { court, courts, role } = useContext(CourtContext)!;
   const courtId = court?.court_id;
   const [webMcpOn, setWebMcpOn] = useState(() => webMcpStatus().available);
 
@@ -30,12 +30,14 @@ function Sidebar() {
     { path: '/clerk/cases', label: 'Court Cases', icon: FolderOpen, roles: ['clerk', 'admin'], courtOnly: true },
     { path: '/clerk/queue', label: 'Review Queue', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
     { path: '/clerk/fee-reviews', label: 'Fee Reviews', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
+    { path: '/clerk/payment-register', label: 'Receipt Register', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true, courtAdminOnly: true },
     { path: `/courts/${courtId}/calendar`, label: 'Court Calendar', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
     { path: `/courts/${courtId}/intake`, label: 'Filing Intake', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
   ];
 
   const links = allLinks.filter((link) => {
     if (link.agentOnly && !webMcpOn) return false;
+    if (link.courtAdminOnly && !courts.some(item => item.court_id === courtId && item.role === 'admin')) return false;
     if (link.adminOnly && role !== 'admin' && localStorage.getItem('administration_access') !== 'true') return false;
     if (link.courtOnly) return courtId != null;
     if (!role) return link.path === '/cases/search';

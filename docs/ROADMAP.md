@@ -18,6 +18,8 @@ correction history and PostgreSQL concurrency checks now form part of the core w
   (`PAYMENTS_ARE_SIMULATED=true`); no card data is handled. An optional court-administered
   workflow credits verified external receipts and retains reversals. It requires court
   approval and reconciliation with the actual accounting records; it does not move funds.
+  Assigned court administrators can review a private receipt register and export bounded
+  activity periods, with simulated activity separated from external-credit totals.
 - **Demo auth is open by configuration.** The hosted demo enables `ALLOW_DEMO_MODE` and
   `ALLOW_PUBLIC_REGISTRATION` so anyone can explore it without an identity provider.
   Production runs Keycloak-only with no self-registration. See [SECURITY.md](../SECURITY.md).

@@ -135,6 +135,8 @@ MUEFS/
 - **External receipt credits**: explicitly assigned court administrators can record verified
   receipts, recover lost responses and reverse erroneous credits with retained evidence.
   This optional workflow does not collect funds or issue refunds.
+- **Court receipt register**: assigned administrators review credits and reversals by
+  recorded period, compare separate simulation totals and export the matching activity.
 - **Review queue** with batch accept, age tracking, and common rejection reasons
 - **Document compliance checks** — text-searchability, file format, size limits
 - **Filing status notices** — portal history plus optional SMTP alerts, retained attempts,

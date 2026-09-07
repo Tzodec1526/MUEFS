@@ -18,6 +18,7 @@ from app.api.fee_waivers import router as fee_waivers_router
 from app.api.filing_dates import router as filing_dates_router
 from app.api.filings import router as filings_router
 from app.api.notifications import router as notifications_router
+from app.api.payment_register import router as payment_register_router
 from app.api.payments import router as payments_router
 from app.api.public import router as public_router
 from app.api.service_contacts import router as service_contacts_router
@@ -45,5 +46,6 @@ api_router.include_router(favorites_router)
 api_router.include_router(notifications_router)
 api_router.include_router(payments_router)
 api_router.include_router(external_payments_router)
+api_router.include_router(payment_register_router)
 api_router.include_router(admin_router)
 api_router.include_router(public_router)
