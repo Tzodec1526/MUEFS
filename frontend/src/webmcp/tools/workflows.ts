@@ -46,6 +46,9 @@ export async function registerWorkflowTools(mc: ModelContext, signal?: AbortSign
 
         const hit = search.cases[0];
         const docket = await getCase(hit.id);
+        if (docket.is_sealed) {
+          return toolError('Case is sealed. Sign in as an authorized party or counsel.');
+        }
         const [requirements, checklists, drafts] = await Promise.all([
           getFilingRequirements(docket.court_id, docket.case_type_id, 'subsequent'),
           getFilingChecklists(docket.court_id, docket.case_type_id),
