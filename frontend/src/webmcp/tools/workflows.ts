@@ -46,6 +46,9 @@ export async function registerWorkflowTools(mc: ModelContext, signal?: AbortSign
 
         const hit = search.cases[0];
         const docket = await getCase(hit.id);
+        if (docket.is_sealed) {
+          return toolError('Case is sealed. Sign in as an authorized party or counsel.');
+        }
         const [requirements, checklists, drafts] = await Promise.all([
           getFilingRequirements(docket.court_id, docket.case_type_id, 'subsequent'),
           getFilingChecklists(docket.court_id, docket.case_type_id),
@@ -59,6 +62,37 @@ export async function registerWorkflowTools(mc: ModelContext, signal?: AbortSign
           case_title: docket.title,
         });
 
+        const requiredDocuments = requirements
+          .filter((r) => r.is_required)
+          .map((r) => ({ code: r.document_type_code, label: r.description, mcr: r.mcr_reference }));
+        const motionChecklists = checklists.map((c) => ({
+          motion_type: c.motion_type,
+          required_items: (c.checklist_items?.items || [])
+            .filter((i) => i.required)
+            .map((i) => i.label),
+          help_text: c.help_text,
+        }));
+
+        const plan = [`Review ${sanitizeAgentText(docket.title)} (${docket.case_number}).`];
+        if (drafts.total > 0) {
+          plan.push(`Resume or discard ${drafts.total} pending draft filing(s) before starting a new one.`);
+        }
+        if (requiredDocuments.length) {
+          plan.push(
+            `Prepare required documents: ${requiredDocuments
+              .map((d) => (d.mcr ? `${d.label} (${d.mcr})` : d.label))
+              .join('; ')}.`,
+          );
+        } else {
+          plan.push('No required document types returned for this court/case type; confirm with the clerk.');
+        }
+        for (const m of motionChecklists) {
+          if (m.required_items.length) {
+            plan.push(`For a ${m.motion_type}, include: ${m.required_items.join(', ')}.`);
+          }
+        }
+        plan.push('Open the pre-filled wizard — upload PDFs — human submits.');
+
         return toolOk({
           workflow: 'attorney_motion',
           case: {
@@ -67,15 +101,10 @@ export async function registerWorkflowTools(mc: ModelContext, signal?: AbortSign
             title: sanitizeAgentText(docket.title),
           },
           draft_filings_pending: drafts.total,
-          required_documents: requirements
-            .filter((r) => r.is_required)
-            .map((r) => ({ code: r.document_type_code, label: r.description, mcr: r.mcr_reference })),
-          motion_types: checklists.map((c) => c.motion_type),
-          plan: [
-            `Review ${sanitizeAgentText(docket.title)} (${docket.case_number}).`,
-            'Gather motion, brief in support, proposed order, and proof of service per MCR 2.119.',
-            'Open the pre-filled wizard — upload PDFs — human submits.',
-          ],
+          required_documents: requiredDocuments,
+          motion_types: motionChecklists.map((m) => m.motion_type),
+          motion_checklists: motionChecklists,
+          plan,
           filing_wizard_path: `/filing/new?${params}`,
           navigate_hint: 'Call navigate_to with filing_wizard_path after user confirms.',
         });

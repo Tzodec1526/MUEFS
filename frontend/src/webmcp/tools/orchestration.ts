@@ -84,6 +84,17 @@ export async function registerOrchestrationTools(
             case_title: docket.title,
           });
 
+          const motionChecklists = checklists.map((c) => ({
+            motion_type: c.motion_type,
+            required_items: (c.checklist_items?.items || [])
+              .filter((i) => i.required)
+              .map((i) => i.label),
+            help_text: c.help_text,
+          }));
+          const uploadSteps = motionChecklists
+            .filter((m) => m.required_items.length)
+            .map((m) => `For a ${m.motion_type}, upload: ${m.required_items.join(', ')}.`);
+
           return toolOk({
             found: true,
             search_hit: searchHit,
@@ -99,17 +110,13 @@ export async function registerOrchestrationTools(
                   `${sanitizeAgentText(p.party_name)} (${p.role})`,
               ),
             },
-            motion_checklists: checklists.map((c) => ({
-              motion_type: c.motion_type,
-              required_items: (c.checklist_items?.items || [])
-                .filter((i) => i.required)
-                .map((i) => i.label),
-              help_text: c.help_text,
-            })),
+            motion_checklists: motionChecklists,
             next_steps: [
               'Sign in as attorney or self-represented litigant if not already.',
               'Open the pre-filled filing wizard URL.',
-              'Upload motion papers per MCR 2.119 companions.',
+              ...(uploadSteps.length
+                ? uploadSteps
+                : ['No motion checklist returned for this court/case type; confirm required papers under MCR 2.119.']),
               'Human filer reviews and submits — agent does not submit alone.',
             ],
             filing_wizard_path: `/filing/new?${params}`,
