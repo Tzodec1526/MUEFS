@@ -278,3 +278,79 @@ it.each([
 
   await waitFor(() => expect(document.title).toBe(`${title} · MUEFS`));
 });
+
+it.each([
+  ['/login', 'attorney', 'Sign in'],
+  ['/', 'attorney', 'Your filings'],
+  ['/', 'public', 'Public court records'],
+  ['/', 'clerk', 'Third Circuit Court'],
+  ['/filing/new', 'attorney', 'New E-Filing'],
+  ['/filings', 'attorney', 'My Filings'],
+  ['/filings/7/history', 'attorney', 'Filing #7: receipts & history'],
+  ['/filings/7/fees', 'attorney', 'Filing #7: fees & payments'],
+  ['/filings/7/filing-date', 'clerk', 'Filing #7: record a filing-date order'],
+  ['/cases/search', 'public', 'Statewide case search'],
+  ['/notifications', 'attorney', 'Notices & email status'],
+  ['/service/deliveries', 'attorney', 'Document delivery inbox'],
+  ['/service/deliveries/5', 'attorney', 'Document delivery record'],
+  ['/filings/7/deliveries', 'attorney', 'Filing #7: document deliveries'],
+  ['/filings/7/deliveries/new', 'attorney', 'Send selected documents'],
+  ['/admin', 'attorney', 'Administrator access required'],
+  ['/cases/42/participants', 'clerk', 'Case access and participants'],
+  ['/cases/42/participants/9/service-contact', 'clerk', 'Service instructions'],
+  ['/clerk/cases', 'clerk', 'Court cases'],
+  ['/documents/5/publication', 'clerk', 'Document public access'],
+  ['/favorites', 'attorney', 'Favorites'],
+  ['/clerk/queue', 'clerk', 'Clerk Review Queue'],
+  ['/clerk/fee-reviews', 'clerk', 'Court fee reviews'],
+  ['/clerk/payment-register', 'clerk', 'External receipt register'],
+  ['/no-such-page', 'attorney', 'Page not found'],
+])('heads %s for a %s with one h1, "%s"', async (entry, role, heading) => {
+  serve({ srl: 'self_represented' }[role] ?? role, role === 'clerk' ? clerkAtThirdCircuit : {});
+  openApp(entry, role);
+
+  await waitFor(() => expect(screen.getAllByRole('heading', { level: 1 }).map(h1 => h1.textContent)).toEqual([heading]));
+  expect(screen.queryByRole('heading', { name: 'Michigan Unified E-Filing System' })).toBeNull();
+});
+
+it('heads the administration page and a case docket with their own names once their data loads', async () => {
+  serve('admin', {
+    '/admin/access': { system_admin: true, user_id: 3, courts: [] },
+    '/admin/users': directory,
+  });
+  const admin = openApp('/admin', 'admin');
+  await waitFor(() => expect(screen.getAllByRole('heading', { level: 1 }).map(h1 => h1.textContent))
+    .toEqual(['People & court access']));
+  admin.unmount();
+  localStorage.clear();
+
+  serve('public', {
+    '/cases/42': {
+      id: 42, court_id: 3, case_number: '2026-000042-CZ', case_type_id: 11, title: 'Smith v. Jones',
+      can_manage_records: false, can_file: false, status: 'open', filed_date: '2026-03-02',
+      filing_date: '2026-03-02', judge_id: null, participants: [], created_at: '2026-03-02T12:00:00Z',
+    },
+    '/cases/42/filings': [],
+    '/courts/3': { id: 3, name: 'Third Circuit Court' },
+    '/courts/3/case-types': [],
+  });
+  openApp('/cases/42', 'public');
+  await waitFor(() => expect(screen.getAllByRole('heading', { level: 1 }).map(h1 => h1.textContent))
+    .toEqual(['Smith v. Jones']));
+});
+
+it('moves focus to the new page heading after a navigation, but not on the first page load', async () => {
+  serve('attorney', {
+    '/filings/summary': { draft: 0, returned: 0 },
+    '/public/stats': stats,
+    '/filings': { filings: [], total: 0, status_counts: {}, court_names: {} },
+  });
+  openApp('/', 'attorney');
+  await screen.findByRole('heading', { level: 1, name: 'Your filings' });
+  expect(document.activeElement).toBe(document.body);
+
+  fireEvent.click(within(screen.getByRole('complementary')).getByRole('link', { name: 'My Filings' }));
+
+  const heading = await screen.findByRole('heading', { level: 1, name: 'My Filings' });
+  await waitFor(() => expect(document.activeElement).toBe(heading));
+});

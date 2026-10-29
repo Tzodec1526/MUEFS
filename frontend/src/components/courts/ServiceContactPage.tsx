@@ -7,6 +7,7 @@ import { parseServerDate } from '../../utils/format';
 import LoadError from '../common/LoadError';
 import { CourtContext } from '../auth/CourtSession';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 const methods = { electronic: 'Electronic through portal', mail: 'Mail', hand_delivery: 'Hand delivery' };
 interface Contact {
@@ -129,7 +130,7 @@ export default function ServiceContactPage() {
     return () => controller.abort();
   }, [path, key]);
   return <section className="case-participants-page">
-    <div className="page-header"><h2>Service instructions</h2>
+    <div className="page-header"><PageHeading>Service instructions</PageHeading>
       <Link className="btn btn-secondary" to={`/cases/${caseId}/participants`}>Back to participants</Link></div>
     {!current && <p role="status">Loading service instructions…</p>}
     {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}

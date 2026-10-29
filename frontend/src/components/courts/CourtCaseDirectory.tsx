@@ -5,6 +5,7 @@ import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 interface Directory {
   cases: { id: number; case_number: string; title: string; is_sealed: boolean; status: string }[];
@@ -44,7 +45,7 @@ export default function CourtCaseDirectory() {
 
   return <section className="court-cases-page">
     <StaffCourtSelect />
-    <div className="page-header"><h2>Court cases</h2></div>
+    <div className="page-header"><PageHeading>Court cases</PageHeading></div>
     <p>Find public and sealed cases at your assigned courts. Participant records and access changes are available from each case.</p>
     <form className="court-case-filter" onSubmit={search}>
       <div className="form-group"><label htmlFor="directory-case-number">Exact case number (optional)</label>

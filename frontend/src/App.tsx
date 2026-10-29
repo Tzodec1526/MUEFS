@@ -13,6 +13,7 @@ import { oidcSessionExpected, SESSION_KEY } from './auth/keycloak';
 import LoadError from './components/common/LoadError';
 import { loadFailure, type LoadFailure } from './utils/errors';
 import { usePageTitle } from './utils/pageTitle';
+import PageHeading from './components/common/PageHeading';
 
 const FilingWizard = lazy(() => import('./components/filing/FilingWizard'));
 const MyFilings = lazy(() => import('./components/filing/MyFilings'));
@@ -62,7 +63,7 @@ function AdministrationAccessRequired() {
   usePageTitle('Administrator access required');
   return (
     <div className="empty-state">
-      <h3>Administrator access required</h3>
+      <PageHeading>Administrator access required</PageHeading>
       <p>People and court access is managed by system and court administrators.</p>
       <Link to="/" className="btn btn-primary">Go to dashboard</Link>
     </div>
@@ -93,7 +94,7 @@ function FilerDashboard() {
   return (
     <div className="dashboard">
       <div className="dashboard-welcome">
-        <h2>Your filings</h2>
+        <PageHeading>Your filings</PageHeading>
         <p>File court documents electronically.</p>
       </div>
 
@@ -145,7 +146,7 @@ function PublicDashboard() {
   return (
     <div className="dashboard">
       <div className="dashboard-welcome">
-        <h2>Public court records</h2>
+        <PageHeading>Public court records</PageHeading>
         <p>
           No account needed: search and open non-sealed matters. Draft filings and sealed cases
           stay restricted to parties, counsel, and court staff.
@@ -188,7 +189,7 @@ function ClerkDashboard() {
     <div className="dashboard">
       <StaffCourtSelect />
       <div className="dashboard-welcome">
-        <h2>{court!.court_name || `Court ${courtId}`}</h2>
+        <PageHeading>{court!.court_name || `Court ${courtId}`}</PageHeading>
         <p>
           Clerk Review Dashboard
           {pending !== null ? ` — ${pending} filing${pending === 1 ? '' : 's'} pending review` : ''}
@@ -231,7 +232,7 @@ function NotFound() {
   usePageTitle('Page not found');
   return (
     <div className="empty-state">
-      <h3>Page not found</h3>
+      <PageHeading>Page not found</PageHeading>
       <p>The page you&apos;re looking for doesn&apos;t exist or has moved.</p>
       <Link to="/" className="btn btn-primary">Go to dashboard</Link>
     </div>

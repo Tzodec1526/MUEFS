@@ -7,6 +7,7 @@ import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { useToast } from '../common/Toast';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 function Favorites() {
   usePageTitle('Favorites');
@@ -70,6 +71,7 @@ function Favorites() {
 
   return (
     <div className="favorites-page">
+      <PageHeading>Favorites</PageHeading>
       <div className="page-header">
         <h2>Favorite Cases</h2>
         <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>

@@ -8,6 +8,7 @@ import FilingDateEvidence from '../filing/FilingDateEvidence';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
 import { CourtContext } from '../auth/CourtSession';
+import PageHeading from '../common/PageHeading';
 
 interface DateState {
   filing_id: number; court_id: number; status: string; submission_count: number;
@@ -58,7 +59,7 @@ export default function FilingDateOrderPage() {
 
   return <section className="filing-date-page">
     <div className="page-header">
-      <div><h2>Filing #{filingId}: record a filing-date order</h2>
+      <div><PageHeading>Filing #{filingId}: record a filing-date order</PageHeading>
         <p>Enter the date established by an existing signed court order.</p></div>
       <Link className="btn btn-secondary" to={`/filings/${filingId}/history`}>Receipts &amp; history</Link>
     </div>

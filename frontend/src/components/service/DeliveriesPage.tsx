@@ -6,6 +6,7 @@ import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { parseServerDate } from '../../utils/format';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 interface DeliveryList {
   deliveries: { id: string; name?: string; email?: string; actor_name?: string; created_at: string; delivery_status: string }[];
@@ -31,7 +32,7 @@ export default function DeliveriesPage() {
   }, [filingId, page, key]);
   const data = current?.data;
   return <section className="service-page">
-    <div className="page-header"><div><h2>{filingId ? `Filing #${filingId}: document deliveries` : 'Document delivery inbox'}</h2>
+    <div className="page-header"><div><PageHeading>{filingId ? `Filing #${filingId}: document deliveries` : 'Document delivery inbox'}</PageHeading>
       <p>{filingId ? 'Selected recipients and their retained delivery records.' : 'Document packages addressed to your account.'}</p></div>
       <button className="btn btn-secondary" onClick={() => setAttempt(n => n + 1)}>Refresh deliveries</button></div>
     {filingId && <div className="service-actions"><Link to={`/filings/${filingId}/history`}>Filing history</Link>

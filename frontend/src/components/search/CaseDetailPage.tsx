@@ -11,6 +11,7 @@ import { getDemoRole } from '../auth/LoginScreen';
 import { useToast } from '../common/Toast';
 import DocumentDownload from '../common/DocumentDownload';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 interface CaseFiling {
   id: number;
@@ -179,7 +180,7 @@ function CaseDetailPage() {
       <div className="case-detail-header">
         <div>
           <div className="case-detail-number">{caseData.case_number}</div>
-          <h2>{caseData.title}</h2>
+          <PageHeading>{caseData.title}</PageHeading>
         </div>
         <div className="case-detail-actions">
           <button

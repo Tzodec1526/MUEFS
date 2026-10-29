@@ -5,6 +5,7 @@ import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { parseServerDate } from '../../utils/format';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -77,7 +78,7 @@ function MyFilings() {
   return (
     <div className="my-filings">
       <div className="page-header">
-        <h2>My Filings</h2>
+        <PageHeading>My Filings</PageHeading>
         <Link to="/filing/new" className="btn btn-primary">New Filing</Link>
       </div>
 

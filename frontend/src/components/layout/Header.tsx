@@ -45,7 +45,7 @@ function Header() {
           <MichiganMark size={24} />
         </div>
         <div>
-          <h1>Michigan Unified E-Filing System</h1>
+          <p className="header-title">Michigan Unified E-Filing System</p>
           <span className="header-subtitle">Statewide Electronic Filing Portal</span>
         </div>
       </div>

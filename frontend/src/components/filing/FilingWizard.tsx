@@ -25,6 +25,7 @@ import {
   stepLabel,
 } from '../../utils/srlMode';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 const CASE_LOOKUP_FAILED = "We couldn't load the court's record for this case, so its title is missing.";
 
@@ -464,7 +465,7 @@ function FilingForm({ userId }: { userId: number }) {
     return (
       <div className="filing-wizard">
         <Link to="/filings">Back to My Filings</Link>
-        <h2>Filing #{loadedFiling.id}</h2>
+        <PageHeading>Filing #{loadedFiling.id}</PageHeading>
         {conflictView}
         <p>Status: <span className={`status-badge ${loadedFiling.status}`}>{loadedFiling.status.replace('_', ' ')}</span></p>
         {loadedFiling.rejection_reason && <p role="note">Clerk note: {loadedFiling.rejection_reason}</p>}
@@ -476,7 +477,7 @@ function FilingForm({ userId }: { userId: number }) {
   return (
     <div className="filing-wizard">
       <div className="wizard-header">
-        <h2>
+        <PageHeading>
           {loadedFiling ? `Continue Filing #${loadedFiling.id}` : isMotionMode
             ? plainLanguage
               ? 'File papers in an existing case'
@@ -484,7 +485,7 @@ function FilingForm({ userId }: { userId: number }) {
             : plainLanguage
               ? 'Start a new court filing'
               : 'New E-Filing'}
-        </h2>
+        </PageHeading>
         <div className="wizard-header-badges">
           <label className="srl-plain-toggle">
             <input

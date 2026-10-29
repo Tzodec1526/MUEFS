@@ -9,6 +9,7 @@ import FeeWaiverPanel, { waiverActionLabels } from './FeeWaiverPanel';
 import FilingDateEvidence from './FilingDateEvidence';
 import { formatBytes, formatCents, formatCourtDate, getDocumentLabel, parseServerDate } from '../../utils/format';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 const eventLabels: Record<string, string> = {
   submitted: 'Submission received', accepted: 'Accepted by the court',
@@ -67,7 +68,7 @@ export default function FilingHistoryPage() {
 
   return <section className="filing-history">
     <div className="page-header">
-      <div><h2>Filing #{filingId}: receipts &amp; history</h2>
+      <div><PageHeading>Filing #{filingId}: receipts &amp; history</PageHeading>
         <p>Submission records and clerk decisions, newest first.</p></div>
       <Link className="btn btn-secondary" to={backTo}>
         {role === 'admin' ? 'People & access' : role === 'clerk' ? 'Back to queue' : 'My Filings'}

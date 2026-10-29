@@ -7,6 +7,7 @@ import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors'
 import { parseServerDate } from '../../utils/format';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 interface Participant {
   id: number; party_name: string; role: string; account_email: string | null; user_id: number | null;
@@ -212,7 +213,7 @@ export default function CaseParticipantsPage() {
       setSelection(null); setNotice('Participant record saved.'); setAttempt(n => n + 1);
     }} />;
   return <section className="case-participants-page">
-    <div className="page-header"><h2>Case access and participants</h2><Link to={`/cases/${caseId}`} className="btn btn-secondary">Back to case</Link></div>
+    <div className="page-header"><PageHeading>Case access and participants</PageHeading><Link to={`/cases/${caseId}`} className="btn btn-secondary">Back to case</Link></div>
     {!current && <p role="status">Loading participant records…</p>}
     {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>

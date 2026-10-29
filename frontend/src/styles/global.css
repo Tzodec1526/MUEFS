@@ -118,6 +118,16 @@ h1, h2 {
   line-height: 1.25;
 }
 
+.main-content h1, .error-boundary h1 {
+  font-size: 1.5em;
+}
+
+.login-heading h1 {
+  color: var(--white);
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     transition: none !important;
@@ -205,7 +215,9 @@ h1, h2 {
   justify-content: center;
 }
 
-.header-brand h1 {
+.header-title {
+  font-family: var(--font-display);
+  line-height: 1.25;
   font-size: 1.15rem;
   font-weight: 600;
   letter-spacing: 0.005em;
@@ -757,7 +769,7 @@ input[type="radio"] {
    Filing Wizard
    ============================================ */
 
-.filing-wizard h2 {
+.filing-wizard h1 {
   margin-bottom: 1rem;
 }
 
@@ -1139,7 +1151,7 @@ tr.selected {
    Clerk Review
    ============================================ */
 
-.clerk-review h2 {
+.clerk-review h1 {
   margin-bottom: 1rem;
 }
 
@@ -1322,7 +1334,7 @@ tr.selected {
    Search
    ============================================ */
 
-.case-search h2 {
+.case-search h1 {
   margin-bottom: 1rem;
 }
 
@@ -1377,7 +1389,7 @@ tr.selected {
     padding: 0.6rem 1rem;
   }
 
-  .header-brand h1 {
+  .header-title {
     font-size: 0.98rem;
     white-space: normal;
     line-height: 1.3;
@@ -2085,7 +2097,7 @@ tr.selected {
   color: var(--gray-500);
 }
 
-.empty-state h3 { margin-bottom: 0.5rem; color: var(--gray-700); }
+.empty-state h1, .empty-state h3 { margin-bottom: 0.5rem; color: var(--gray-700); }
 .empty-state p { margin-bottom: 1rem; }
 
 .pagination {
@@ -2111,7 +2123,7 @@ tr.selected {
   margin-bottom: 1.5rem;
 }
 
-.dashboard-welcome h2 {
+.dashboard-welcome h1 {
   font-size: 1.6rem;
   margin-bottom: 0.25rem;
 }
@@ -2192,6 +2204,10 @@ select:focus-visible,
 textarea:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+h1[tabindex="-1"]:focus {
+  outline: none;
 }
 
 /* Gold focus rings on dark surfaces */
@@ -2359,7 +2375,7 @@ textarea:focus-visible {
   margin-bottom: 0.25rem;
 }
 
-.case-detail-header h2 {
+.case-detail-header h1 {
   font-size: 1.45rem;
 }
 
@@ -2752,7 +2768,9 @@ textarea:focus-visible {
   background: linear-gradient(90deg, rgba(224, 180, 76, 0.6), transparent);
 }
 
-.login-branding h1 {
+.login-product {
+  font-family: var(--font-display);
+  line-height: 1.25;
   font-size: 2.5rem;
   font-weight: 700;
   letter-spacing: -0.015em;
@@ -2837,7 +2855,7 @@ textarea:focus-visible {
     margin-left: auto;
     margin-right: auto;
   }
-  .login-branding h1 {
+  .login-product {
     font-size: 1.6rem;
   }
 }
@@ -3108,7 +3126,7 @@ textarea:focus-visible {
   margin-bottom: 1rem;
 }
 
-.case-search-hero h2 {
+.case-search-hero h1 {
   margin-bottom: 0.35rem;
 }
 

@@ -8,6 +8,7 @@ import { formatBytes, parseServerDate } from '../../utils/format';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 interface EventList {
   events: { id: number; action: string; occurred_at: string; actor_name?: string; detail?: string;
@@ -114,7 +115,7 @@ export default function DeliveryDetailPage() {
   }
 
   return <section className="service-page">
-    <div className="page-header"><div><h2>Document delivery record</h2><p>Contents and evidence for this named recipient.</p></div>
+    <div className="page-header"><div><PageHeading>Document delivery record</PageHeading><p>Contents and evidence for this named recipient.</p></div>
       <Link className="btn btn-secondary" to="/service/deliveries">Delivery inbox</Link></div>
     {!current && <p role="status">Loading delivery…</p>}
     {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}

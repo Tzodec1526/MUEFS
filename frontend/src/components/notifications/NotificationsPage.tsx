@@ -7,6 +7,7 @@ import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors'
 import { parseServerDate } from '../../utils/format';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 interface DeliveryHistory {
   events: { id: number; attempt_number: number; outcome: string; occurred_at: string;
@@ -105,7 +106,7 @@ export default function NotificationsPage() {
     {staff && scope === 'court' && <StaffCourtSelect disabled={selected != null} onChange={() => {
       setPage(1); setSelected(null); setMessage('');
     }} />}
-    <div className="page-header"><div><h2>Notices &amp; email status</h2>
+    <div className="page-header"><div><PageHeading>Notices &amp; email status</PageHeading>
       <p>Read filing updates and track email attempts.</p></div>
       <button className="btn btn-secondary" onClick={() => setAttempt(n => n + 1)}>Refresh notices</button></div>
     <p>Updates remain available in the portal even when email fails. Acceptance by an email relay does not confirm inbox delivery or legal service.</p>

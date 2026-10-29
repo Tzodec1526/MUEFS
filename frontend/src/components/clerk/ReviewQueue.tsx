@@ -7,6 +7,7 @@ import DocumentDownload from '../common/DocumentDownload';
 import { formatBytes, getDocumentLabel, parseServerDate } from '../../utils/format';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 const ACTION_UNCONFIRMED = 'the request did not complete. Refresh the queue to check its current status before trying again.';
 const BATCH_UNCONFIRMED = 'Could not accept the selected filings. Refresh the queue to check their current status before trying again.';
@@ -226,7 +227,7 @@ function ReviewQueue() {
     <div className="clerk-review">
       <StaffCourtSelect disabled={!!review || actionInProgress} />
       <div className="clerk-header">
-        <h2 ref={queueHeading} tabIndex={-1}>Clerk Review Queue</h2>
+        <PageHeading headingRef={queueHeading}>Clerk Review Queue</PageHeading>
         <div className="clerk-header-stats">
           <div className="stat-card">
             <span className="stat-number">{queue ? total : '—'}</span>

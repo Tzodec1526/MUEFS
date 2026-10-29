@@ -10,6 +10,7 @@ import {
   oidcSessionExpected, safeLoginReturnPath, SessionChangedError, startKeycloakLogin,
 } from '../../auth/keycloak';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 export function getDemoRole(): string | null {
   return localStorage.getItem('demo_role');
@@ -157,9 +158,10 @@ function LoginScreen() {
             <MichiganMark size={30} />
             STATE OF MICHIGAN
           </div>
-          <h1>Michigan Unified E-Filing System</h1>
+          <p className="login-product">Michigan Unified E-Filing System</p>
           <p className="login-subtitle">{demo ? 'Demo · ' : ''}Statewide Electronic Filing Portal</p>
         </div>
+        <div className="login-heading"><PageHeading>Sign in</PageHeading></div>
 
         {demo && <div className="login-cards">
           {roles.map((option) => (

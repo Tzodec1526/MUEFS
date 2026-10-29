@@ -6,6 +6,7 @@ import { formatBytes, parseServerDate } from '../../utils/format';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 interface PublicCopy {
   id: number; document_id: number; title: string; file_size_bytes: number; sha256_hash: string;
@@ -118,7 +119,7 @@ export default function DocumentPublicationPage() {
     finally { setBusy(false); }
   }
   return <section className="document-publication-page">
-    <div className="page-header"><h2>Document public access</h2>
+    <div className="page-header"><PageHeading>Document public access</PageHeading>
       <button className="btn btn-secondary" disabled={busy} onClick={() => {
         setCandidate(undefined); setError(''); setNotice(''); setAttempt(n => n + 1);
       }}>Refresh document</button></div>

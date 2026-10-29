@@ -5,6 +5,7 @@ import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors'
 import { parseServerDate } from '../../utils/format';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 interface Access {
   system_admin: boolean; user_id: number; courts: { id: number; name: string }[];
@@ -222,7 +223,7 @@ function AccountDirectory({ access }: { access: Access }) {
     setEditor(user); setAttempt(n => n + 1);
   }
   return <>
-    <div className="page-header"><div><h2>People &amp; court access</h2>
+    <div className="page-header"><div><PageHeading>People &amp; court access</PageHeading>
       <p>{access.system_admin ? 'Provision identities and delegate court access.' : 'Manage staff access for your assigned courts.'}</p></div>
       {access.system_admin && <button className="btn btn-primary" onClick={() => setEditor('new')}>Provision account</button>}</div>
     <form className="admin-directory-filter" onSubmit={event => {

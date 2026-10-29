@@ -11,6 +11,7 @@ import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { useToast } from '../common/Toast';
 import { formatCourtDate, parseServerDate } from '../../utils/format';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 function searchRequestOf(params: URLSearchParams): string {
   return JSON.stringify(['case', 'party', 'court'].map(name => params.get(name) || ''));
@@ -173,7 +174,7 @@ function CaseSearch() {
   return (
     <div className="case-search">
       <div className="case-search-hero">
-        <h2>Statewide case search</h2>
+        <PageHeading>Statewide case search</PageHeading>
         <p className="info-text">
           One search across Michigan courts — no account, no vendor portal hopping. Sealed matters
           stay off the index. Partial names and case numbers work.

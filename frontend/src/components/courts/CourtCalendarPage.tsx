@@ -7,6 +7,7 @@ import { formatCourtDate, parseServerDate } from '../../utils/format';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 interface Calendar {
   id: number; timezone: string; valid_from: string; valid_through: string;
@@ -87,7 +88,7 @@ export default function CourtCalendarPage() {
   }
 
   return <section className="court-calendar-page">
-    <div className="page-header"><div><h2>{courtName}: filing calendar</h2>
+    <div className="page-header"><div><PageHeading>{courtName}: filing calendar</PageHeading>
       <p>Published timezones, legal holidays and court-ordered closures.</p></div>
       <Link className="btn btn-secondary" to={`/courts/${courtId}/intake`}>Electronic intake status</Link></div>
     <p>Electronic submissions can arrive at any time. Under MCR 1.109(G)(5)(b), weekend and closed-day

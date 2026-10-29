@@ -8,6 +8,7 @@ import { CourtContext } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import '../../styles/intake.css';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 interface IntakeState {
   court_id: number; court_name: string; version: number;
@@ -165,7 +166,7 @@ export default function CourtIntakePage() {
   if (!current.data) return <LoadError failure={current.error ?? { message: 'Could not load intake.', retry: true }} onRetry={() => setAttempt(n => n + 1)} />;
   const data = current.data;
   return <section className="court-intake-page">
-    <div className="page-header"><div><h2>{data.court_name}: electronic filing intake</h2>
+    <div className="page-header"><div><PageHeading>{data.court_name}: electronic filing intake</PageHeading>
       <p>Current availability and instructions published by the court.</p></div>
       <Link className="btn btn-secondary" to={`/courts/${data.court_id}/calendar`}>Court calendar</Link></div>
     <div className="review-card">

@@ -17,7 +17,7 @@ function ErrorFallback() {
   usePageTitle('Something went wrong');
   return (
     <div className="error-boundary">
-      <h2>Something went wrong</h2>
+      <h1>Something went wrong</h1>
       <p>An unexpected error occurred. Reloading usually fixes it.</p>
       <button className="btn btn-primary" onClick={() => window.location.reload()}>
         Reload

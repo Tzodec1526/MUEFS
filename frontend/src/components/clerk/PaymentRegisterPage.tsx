@@ -7,6 +7,7 @@ import { getBlobErrorDetail, loadFailure, type LoadFailure } from '../../utils/e
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 export default function PaymentRegisterPage() {
   const { court, courts } = useContext(CourtContext)!;
@@ -79,7 +80,7 @@ export default function PaymentRegisterPage() {
 
   return <section className="payment-register">
     <StaffCourtSelect disabled={exporting} />
-    <div className="page-header"><h2>External receipt register</h2>
+    <div className="page-header"><PageHeading>External receipt register</PageHeading>
       <Link to="/clerk/fee-reviews" className="btn btn-secondary">Fee reviews</Link></div>
     {!administrator ? <p className="alert alert-warning">An administrator assignment to this court is required to view its receipt register.</p> : <>
       <p>Reconcile credits and reversals by the date the portal recorded them. Compare these entries with the court’s external receipt records.</p>

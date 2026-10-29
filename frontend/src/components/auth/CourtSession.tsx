@@ -7,6 +7,7 @@ import {
   type CourtAssignment, type SessionProfile,
 } from './LoginScreen';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 interface CourtSessionState {
   userId?: number;
@@ -59,7 +60,7 @@ export function CourtSession({ children }: { children: ReactNode }) {
 function CourtAssignmentNeeded({ refresh }: { refresh: () => void }) {
   usePageTitle('Court assignment needed');
   return <div className="empty-state">
-    <h2>Court assignment needed</h2>
+    <PageHeading>Court assignment needed</PageHeading>
     <p>A clerk, judge or administrator assignment is required to use this court workspace.</p>
     <button className="btn btn-secondary" onClick={refresh}>Refresh assignments</button>
   </div>;
