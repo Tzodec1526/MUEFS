@@ -10,6 +10,8 @@ import PlatformStats from './components/marketing/PlatformStats';
 import MifileComparison from './components/marketing/MifileComparison';
 import { getFilingStatusCounts, getClerkQueue } from './api/filings';
 import { oidcSessionExpected, SESSION_KEY } from './auth/keycloak';
+import LoadError from './components/common/LoadError';
+import { loadFailure, type LoadFailure } from './utils/errors';
 
 const FilingWizard = lazy(() => import('./components/filing/FilingWizard'));
 const MyFilings = lazy(() => import('./components/filing/MyFilings'));
@@ -73,12 +75,15 @@ function RequireAdministration({ children }: { children: React.ReactNode }) {
 function FilerDashboard() {
   const [draftCount, setDraftCount] = useState<number | null>(null);
   const [returnedCount, setReturnedCount] = useState<number | null>(null);
+  const [countsError, setCountsError] = useState<LoadFailure | null>(null);
+  const [countsAttempt, setCountsAttempt] = useState(0);
   useEffect(() => {
     getFilingStatusCounts().then((counts) => {
+      setCountsError(null);
       setDraftCount(counts.draft);
       setReturnedCount(counts.returned);
-    }).catch(() => {});
-  }, []);
+    }).catch((err) => setCountsError(loadFailure(err, 'Could not load your filing counts.')));
+  }, [countsAttempt]);
 
   return (
     <div className="dashboard">
@@ -86,6 +91,8 @@ function FilerDashboard() {
         <h2>Your filings</h2>
         <p>File court documents electronically with any Michigan court.</p>
       </div>
+
+      {countsError && <LoadError failure={countsError} onRetry={() => setCountsAttempt(n => n + 1)} />}
 
       {(draftCount || returnedCount) ? (
         <div className="dashboard-alert-row">
@@ -156,13 +163,19 @@ function ClerkDashboard() {
   const { court } = useContext(CourtContext)!;
   const courtId = court!.court_id;
   const [pending, setPending] = useState<number | null>(null);
+  const [pendingError, setPendingError] = useState<LoadFailure | null>(null);
+  const [pendingAttempt, setPendingAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
     getClerkQueue(courtId, { page_size: 1, signal: controller.signal }).then((r) => {
-      if (!controller.signal.aborted) setPending(r.total);
-    }).catch(() => {});
+      if (controller.signal.aborted) return;
+      setPendingError(null);
+      setPending(r.total);
+    }).catch((err) => {
+      if (!controller.signal.aborted) setPendingError(loadFailure(err, 'Could not load the number of filings pending review.'));
+    });
     return () => controller.abort();
-  }, [courtId]);
+  }, [courtId, pendingAttempt]);
 
   return (
     <div className="dashboard">
@@ -174,6 +187,7 @@ function ClerkDashboard() {
           {pending !== null ? ` — ${pending} filing${pending === 1 ? '' : 's'} pending review` : ''}
         </p>
       </div>
+      {pendingError && <LoadError failure={pendingError} onRetry={() => setPendingAttempt(n => n + 1)} />}
 
       <div className="dashboard-cards">
         <div className="card card-primary">

@@ -32,6 +32,11 @@ const directory = {
   total: 1, page_size: 25,
 };
 
+const stats = {
+  courts_efiling_enabled: 255, public_cases_indexed: 40, total_filings: 12, pending_clerk_review: 3,
+  mcr_document_types: 20, max_upload_mb: 50, mifile_max_upload_mb: 25,
+};
+
 function serve(userType: string, answers: Record<string, Answer>) {
   const responses: Record<string, Answer> = {
     '/auth/me': { id: 3, user_type: userType, court_assignments: [] },
@@ -158,4 +163,51 @@ it("shows a failed load of a filer's filings inline and loads them again on retr
 
   await waitFor(() => expect(get.mock.calls.filter(([url]) => url === '/filings')).toHaveLength(2));
   await waitFor(() => expect(screen.queryByText("We couldn't load your filings. Please retry.")).toBeNull());
+});
+
+it('tells a filer when their filing counts fail to load, and loads them again on retry', async () => {
+  serve('attorney', {
+    '/filings/summary': failsOnce({ draft: 2, returned: 1 }),
+    '/public/stats': stats,
+  });
+  openApp('/', 'attorney');
+
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain('Could not load your filing counts.');
+
+  fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
+
+  expect(await screen.findByText(/drafts in progress/)).toBeTruthy();
+  expect(screen.getByText(/returned for correction/)).toBeTruthy();
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
+it('tells a clerk when the pending review count fails to load, and loads it again on retry', async () => {
+  serve('clerk', {
+    '/auth/me': { id: 2, user_type: 'clerk', court_assignments: [{ court_id: 3, role: 'clerk', court_name: 'Third Circuit Court' }] },
+    '/clerk/queue': failsOnce({ filings: [], total: 4, page: 1, page_size: 1 }),
+    '/public/stats': stats,
+  });
+  openApp('/', 'clerk');
+
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain('Could not load the number of filings pending review.');
+
+  fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
+
+  expect(await screen.findByText(/4 filings pending review/)).toBeTruthy();
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
+it('shows that platform statistics did not load instead of hiding them, and loads them again on retry', async () => {
+  serve('public', { '/public/stats': failsOnce(stats) });
+  openApp('/', 'public');
+
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain('Platform statistics are unavailable right now.');
+
+  fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
+
+  expect(await screen.findByText('Public cases indexed')).toBeTruthy();
+  expect(screen.queryByRole('alert')).toBeNull();
 });

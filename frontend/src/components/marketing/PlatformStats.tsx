@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Building2, FileStack, FolderSearch, Gavel, Upload } from 'lucide-react';
 import { getPublicStats, type PublicPlatformStats } from '../../api/public';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
+import LoadError from '../common/LoadError';
 
 function StatCard({
   icon,
@@ -24,21 +26,34 @@ function StatCard({
 }
 
 function PlatformStats() {
-  const [stats, setStats] = useState<PublicPlatformStats | null>(null);
+  const [result, setResult] = useState<{ stats?: PublicPlatformStats; error?: LoadFailure }>();
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     getPublicStats()
-      .then(setStats)
-      .catch(() => setStats(null));
-  }, []);
+      .then(stats => setResult({ stats }))
+      .catch(err => setResult({ error: loadFailure(err, 'Platform statistics are unavailable right now.') }));
+  }, [attempt]);
 
-  if (!stats) return null;
+  if (!result) return null;
+  const heading = (
+    <h2 id="platform-stats-heading" className="platform-stats-title">
+      Platform
+    </h2>
+  );
+  if (!result.stats) {
+    return (
+      <section className="platform-stats" aria-labelledby="platform-stats-heading">
+        {heading}
+        <LoadError failure={result.error!} onRetry={() => setAttempt(n => n + 1)} />
+      </section>
+    );
+  }
+  const { stats } = result;
 
   return (
     <section className="platform-stats" aria-labelledby="platform-stats-heading">
-      <h2 id="platform-stats-heading" className="platform-stats-title">
-        Platform
-      </h2>
+      {heading}
       <div className="platform-stats-grid">
         <StatCard
           icon={<Building2 size={22} />}
