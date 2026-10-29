@@ -42,21 +42,21 @@ function AuthCallback() {
   if (error) {
     return (
       <div className="login-screen">
-        <div className="login-container">
+        <main className="login-container">
           <p className="login-message" role="alert">{error}</p>
           <button type="button" className="btn btn-primary" onClick={() => navigate('/login')}>
             Back to login
           </button>
-        </div>
+        </main>
       </div>
     );
   }
 
   return (
     <div className="login-screen">
-      <div className="login-container">
+      <main className="login-container">
         <p className="login-message" role="status">Completing sign-in…</p>
-      </div>
+      </main>
     </div>
   );
 }

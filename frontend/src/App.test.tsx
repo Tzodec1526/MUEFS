@@ -354,3 +354,12 @@ it('moves focus to the new page heading after a navigation, but not on the first
   const heading = await screen.findByRole('heading', { level: 1, name: 'My Filings' });
   await waitFor(() => expect(document.activeElement).toBe(heading));
 });
+
+it('puts the sign-in page inside a main landmark', async () => {
+  serve('attorney', {});
+  openApp('/login', 'attorney');
+
+  const main = await screen.findByRole('main');
+  expect(within(main).getByRole('heading', { level: 1, name: 'Sign in' })).toBeTruthy();
+  expect(within(main).getByRole('button', { name: 'Sign in as Attorney' })).toBeTruthy();
+});

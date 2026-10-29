@@ -152,7 +152,7 @@ function LoginScreen() {
 
   return (
     <div className="login-screen">
-      <div className="login-container">
+      <main className="login-container">
         <div className="login-branding">
           <div className="state-seal">
             <MichiganMark size={30} />
@@ -211,7 +211,7 @@ function LoginScreen() {
           <Link className="btn btn-secondary" to="/cases/search">Browse public records</Link>
         </div>}
         {demo && <MifileComparison variant="login" />}
-      </div>
+      </main>
       {isDemoBuild() && (
         <div className="demo-stakeholder-banner demo-stakeholder-banner--login" role="status">
           Demo — not for real filings.
