@@ -8,12 +8,16 @@ export default function PageHeading({ children, headingRef }: {
 }) {
   const ownRef = useRef<HTMLHeadingElement>(null);
   const ref = headingRef ?? ownRef;
-  const navigation = useRef(useLocation().key);
+  const { key, pathname } = useLocation();
+  const navigation = useRef(key);
   useEffect(() => {
-    const key = navigation.current;
-    if (key === 'default' || focusedNavigation === key) return;
-    focusedNavigation = key;
+    navigation.current = key;
+  }, [key]);
+  useEffect(() => {
+    const target = navigation.current;
+    if (target === 'default' || focusedNavigation === target) return;
+    focusedNavigation = target;
     ref.current?.focus();
-  }, [ref]);
+  }, [ref, pathname]);
   return <h1 ref={ref} tabIndex={-1}>{children}</h1>;
 }
