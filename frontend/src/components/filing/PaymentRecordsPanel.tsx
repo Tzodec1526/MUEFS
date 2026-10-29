@@ -4,7 +4,7 @@ import { apiClient } from '../../api/client';
 import type { FilingFees } from '../../api/documents';
 import type { PaymentRecord, PaymentRecords } from '../../api/payments';
 import { formatCents, parseServerDate } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
 
 type PendingRequest = { path: string; body: Record<string, unknown>; key?: string };
@@ -14,7 +14,7 @@ export default function PaymentRecordsPanel({ fees, onChanged, onBusyChange }: {
 }) {
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; records?: PaymentRecords; error?: string }>();
+  const [result, setResult] = useState<{ key: string; records?: PaymentRecords; error?: LoadFailure }>();
   const [editing, setEditing] = useState<'new' | PaymentRecord | null>(null);
   const [pending, setPending] = useState<PendingRequest | null>(null);
   const [busy, setBusy] = useState(false);
@@ -27,7 +27,7 @@ export default function PaymentRecordsPanel({ fees, onChanged, onBusyChange }: {
     const controller = new AbortController();
     apiClient.get<PaymentRecords>(`${base}/payments`, { params: { page }, signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, records: data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load payment records.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load payment records.') }); });
     return () => controller.abort();
   }, [base, key, page]);
 
@@ -44,7 +44,7 @@ export default function PaymentRecordsPanel({ fees, onChanged, onBusyChange }: {
       const status = (err as { response?: { status?: number } }).response?.status;
       if (status && status >= 400 && status < 500) {
         setPending(null); onBusyChange(false);
-        setError(getErrorDetail(err) || 'The request was rejected. Review the current fee and payment records.');
+        setError(errorMessage(err, 'The request was rejected. Review the current fee and payment records.'));
       } else {
         setError('The outcome is unknown. Retry the same request to confirm whether the credit or reversal was recorded.');
       }
@@ -109,7 +109,7 @@ export default function PaymentRecordsPanel({ fees, onChanged, onBusyChange }: {
       </fieldset>
     </form>}
     {!current && <p role="status">Loading payment records…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.records && <>
       <p>{current.records.total} payment records</p>
       {current.records.total === 0 && <p>No payments have been recorded for this filing.</p>}

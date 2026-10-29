@@ -4,7 +4,7 @@ import { apiClient } from '../../api/client';
 import { getCourt } from '../../api/courts';
 import type { FilingDateAssessment } from '../../api/filings';
 import { formatCourtDate, parseServerDate } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
 
 interface Calendar {
@@ -21,7 +21,7 @@ export default function CourtCalendarPage() {
   const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadFailure | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [assessment, setAssessment] = useState<FilingDateAssessment>();
@@ -37,7 +37,7 @@ export default function CourtCalendarPage() {
         ]);
         if (!controller.signal.aborted) { setCourtName(court.name); setData(response.data); }
       } catch (err) {
-        if (!controller.signal.aborted) setError(getErrorDetail(err) || 'Could not load court calendars.');
+        if (!controller.signal.aborted) setError(loadFailure(err, 'Could not load court calendars.'));
       } finally { if (!controller.signal.aborted) setLoading(false); }
     }
     load();
@@ -67,7 +67,7 @@ export default function CourtCalendarPage() {
       });
       form.reset(); setPage(1); setAttempt(n => n + 1);
       setAssessment(undefined); setMessage('Calendar revision published. Earlier revisions and receipts are retained.');
-    } catch (err) { setActionError(getErrorDetail(err) || 'Could not publish the calendar.'); }
+    } catch (err) { setActionError(errorMessage(err, 'Could not publish the calendar.')); }
     finally { setBusy(false); }
   }
 
@@ -80,7 +80,7 @@ export default function CourtCalendarPage() {
         params: { received_at: values.get('received_at') },
       });
       setAssessment(response.data);
-    } catch (err) { setActionError(getErrorDetail(err) || 'Could not assess this receipt timestamp.'); }
+    } catch (err) { setActionError(errorMessage(err, 'Could not assess this receipt timestamp.')); }
     finally { setBusy(false); }
   }
 
@@ -91,7 +91,7 @@ export default function CourtCalendarPage() {
     <p>Electronic submissions can arrive at any time. Under MCR 1.109(G)(5)(b), weekend and closed-day
       submissions are assigned to the next business day. This calendar does not calculate deadlines or decide requests for relief.</p>
     {loading && <p role="status">Loading calendars…</p>}
-    {error && <LoadError message={error} onRetry={() => setAttempt(n => n + 1)} />}
+    {error && <LoadError failure={error} onRetry={() => setAttempt(n => n + 1)} />}
     {message && <p className="alert alert-success" role="status">{message}</p>}
     {actionError && <p className="alert alert-error" role="alert">{actionError}</p>}
     {!loading && !error && data && <>

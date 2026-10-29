@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { decideFeeWaiver, type FeeWaiverState } from '../../api/filings';
 import { processPayment } from '../../api/documents';
 import { formatCents } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage } from '../../utils/errors';
 
 export const waiverActionLabels: Record<string, string> = {
   grant_public_assistance: 'Clerk waiver: means-tested public assistance',
@@ -35,7 +35,7 @@ export default function FeeWaiverPanel({ filingId, waiver, onChange }: {
       await decideFeeWaiver(filingId, form);
       onChange();
     } catch (err) {
-      setError(getErrorDetail(err) || 'Could not record the fee waiver decision. Refresh history before retrying.');
+      setError(errorMessage(err, 'Could not record the fee waiver decision. Refresh history before retrying.'));
     } finally { setBusy(false); }
   }
 
@@ -47,7 +47,7 @@ export default function FeeWaiverPanel({ filingId, waiver, onChange }: {
       await processPayment(filingId, waiver.balance_due_cents, 'credit_card', waiver.fee_version);
       onChange();
     } catch (err) {
-      setError(getErrorDetail(err) || 'Could not record payment. Refresh history before retrying.');
+      setError(errorMessage(err, 'Could not record payment. Refresh history before retrying.'));
     } finally { setBusy(false); }
   }
 

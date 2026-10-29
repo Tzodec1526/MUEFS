@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { formatBytes, parseServerDate } from '../../utils/format';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
@@ -25,14 +25,14 @@ interface History {
 function PublicationHistory({ documentId }: { documentId: string }) {
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: History; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: History; error?: LoadFailure }>();
   const key = `${documentId}:${page}:${attempt}`;
   const current = result?.key === key ? result : undefined;
   useEffect(() => {
     const controller = new AbortController();
     apiClient.get<History>(`/clerk/documents/${documentId}/publication/history`, { params: { page }, signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load access history.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load access history.') }); });
     return () => controller.abort();
   }, [documentId, page, key]);
   const labels: Record<string, string> = {
@@ -41,7 +41,7 @@ function PublicationHistory({ documentId }: { documentId: string }) {
   };
   return <>
     {!current && <p role="status">Loading document access history…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
       {!current.data.total && <p>No access changes recorded.</p>}
       <ol className="admin-history">{current.data.events.map(event => <li key={event.id}>
@@ -65,7 +65,7 @@ export default function DocumentPublicationPage() {
   const { documentId = '' } = useParams<{ documentId: string }>();
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: Publication; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: Publication; error?: LoadFailure }>();
   const [candidate, setCandidate] = useState<PublicCopy>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -83,7 +83,7 @@ export default function DocumentPublicationPage() {
     const controller = new AbortController();
     apiClient.get<Publication>(`/clerk/documents/${documentId}/publication`, { params: { page }, signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load document access.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load document access.') }); });
     return () => controller.abort();
   }, [documentId, page, key]);
 
@@ -97,7 +97,7 @@ export default function DocumentPublicationPage() {
       });
       setCandidate(data); form.reset(); setAttempt(n => n + 1);
       setNotice('Copy prepared for review. It has not been published.');
-    } catch (err) { setError(getErrorDetail(err) || 'Could not prepare the copy.'); }
+    } catch (err) { setError(errorMessage(err, 'Could not prepare the copy.')); }
     finally { setBusy(false); }
   }
   async function change(event: FormEvent<HTMLFormElement>, publish: boolean) {
@@ -112,7 +112,7 @@ export default function DocumentPublicationPage() {
       });
       setCandidate(undefined); setAttempt(n => n + 1);
       setNotice(publish ? 'Public copy published. The original remains restricted.' : 'Original and public copy withheld from public access.');
-    } catch (err) { setError(getErrorDetail(err) || 'Could not change document access.'); }
+    } catch (err) { setError(errorMessage(err, 'Could not change document access.')); }
     finally { setBusy(false); }
   }
   return <section className="document-publication-page">
@@ -121,7 +121,7 @@ export default function DocumentPublicationPage() {
         setCandidate(undefined); setError(''); setNotice(''); setAttempt(n => n + 1);
       }}>Refresh document</button></div>
     {!current && <p role="status">Loading document access…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {notice && <p className="alert alert-success" role="status">{notice}</p>}
     {error && <p className="alert alert-error" role="alert">{error}</p>}
     {current?.data && <>

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { apiClient } from '../../api/client';
@@ -8,7 +8,6 @@ import { addFavorite, listFavorites } from '../../api/favorites';
 import { ToastProvider } from '../common/Toast';
 import CaseDetailPage from './CaseDetailPage';
 
-// The real needsErrorMessage decides whether the page must explain a failure itself.
 vi.mock('../../api/client', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../api/client')>(), apiClient: { get: vi.fn() },
 }));
@@ -104,16 +103,14 @@ it('explains a failed favorite update itself when the server sent no detail', as
   expect(screen.getByRole('button', { name: '☆ Favorite' })).toBeTruthy();
 });
 
-it('adds no message of its own when the server already explained the favorite failure', async () => {
+it("shows the server's explanation of a failed favorite update once, in place of its own", async () => {
   localStorage.setItem('demo_role', 'attorney');
   vi.mocked(addFavorite).mockRejectedValue({ response: { status: 409, data: { detail: 'Case already in favorites' } } });
   showCase(docket(true));
 
-  const favorite = await screen.findByRole('button', { name: '☆ Favorite' });
-  fireEvent.click(favorite);
-  // The button is disabled until the request settles.
-  await waitFor(() => expect((favorite as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(await screen.findByRole('button', { name: '☆ Favorite' }));
 
+  expect(await screen.findAllByText('Case already in favorites')).toHaveLength(1);
   expect(addFavorite).toHaveBeenCalledWith(42);
   expect(screen.queryByText('Could not update favorite')).toBeNull();
 });

@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { listFavorites, removeFavorite, FavoriteCase, listFavoriteCourts, removeFavoriteCourt, FavoriteCourt } from '../../api/favorites';
 import { parseServerDate } from '../../utils/format';
-import { needsErrorMessage } from '../../api/client';
+import { actionErrorMessage } from '../../api/client';
 import LoadError from '../common/LoadError';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { useToast } from '../common/Toast';
 
 function Favorites() {
@@ -11,7 +12,7 @@ function Favorites() {
   const [caseFavorites, setCaseFavorites] = useState<FavoriteCase[]>([]);
   const [courtFavorites, setCourtFavorites] = useState<FavoriteCourt[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadFailure | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [removingCase, setRemovingCase] = useState<number | null>(null);
   const [removingCourt, setRemovingCourt] = useState<number | null>(null);
@@ -29,8 +30,8 @@ function Favorites() {
         if (!active) return;
         setCaseFavorites(casesData.favorites);
         setCourtFavorites(courtsData.favorites);
-      } catch {
-        if (active) setError('Could not load your favorites. Please try again.');
+      } catch (err) {
+        if (active) setError(loadFailure(err, 'Could not load your favorites. Please try again.'));
       } finally {
         if (active) setLoading(false);
       }
@@ -45,7 +46,8 @@ function Favorites() {
       await removeFavorite(caseId);
       setCaseFavorites(prev => prev.filter(f => f.case_id !== caseId));
     } catch (err) {
-      if (needsErrorMessage(err)) pushToast('Could not remove the favorite case. Please try again.', 'error');
+      const message = actionErrorMessage(err, 'Could not remove the favorite case. Please try again.');
+      if (message) pushToast(message, 'error');
     } finally {
       setRemovingCase(null);
     }
@@ -57,7 +59,8 @@ function Favorites() {
       await removeFavoriteCourt(courtId);
       setCourtFavorites(prev => prev.filter(f => f.court_id !== courtId));
     } catch (err) {
-      if (needsErrorMessage(err)) pushToast('Could not remove the favorite court. Please try again.', 'error');
+      const message = actionErrorMessage(err, 'Could not remove the favorite court. Please try again.');
+      if (message) pushToast(message, 'error');
     } finally {
       setRemovingCourt(null);
     }
@@ -75,7 +78,7 @@ function Favorites() {
       </p>
 
       {loading && <p className="loading" role="status">Loading favorites...</p>}
-      {error && <LoadError message={error} onRetry={() => setAttempt(value => value + 1)} />}
+      {error && <LoadError failure={error} onRetry={() => setAttempt(value => value + 1)} />}
 
       {!loading && !error && caseFavorites.length === 0 && (
         <div className="empty-state">

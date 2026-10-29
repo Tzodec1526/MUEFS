@@ -5,8 +5,6 @@ import { listFavoriteCourts, listFavorites, removeFavorite, type FavoriteCase } 
 import { ToastProvider } from '../common/Toast';
 import Favorites from './Favorites';
 
-// The real api/client stays in place: its needsErrorMessage decides whether Favorites
-// must explain a failure itself.
 vi.mock('../../api/favorites', () => ({
   listFavorites: vi.fn(),
   removeFavorite: vi.fn(),
@@ -83,15 +81,14 @@ it('explains a failed removal itself when the server sent no detail, and keeps t
   expect(screen.getByRole('heading', { name: 'Smith v. Jones' })).toBeTruthy();
 });
 
-it('adds no toast of its own when the server already explained the failure', async () => {
+it("shows the server's explanation of a failed removal once, in place of its own", async () => {
   vi.mocked(listFavorites).mockResolvedValue({ favorites: [favorite(101, 'Smith v. Jones')], total: 1 });
   vi.mocked(removeFavorite).mockRejectedValue({ response: { status: 404, data: { detail: 'Favorite not found' } } });
   renderFavorites();
 
   fireEvent.click(await screen.findByRole('button', { name: 'Remove' }));
-  // The button reads "Removing..." until the request settles.
-  await screen.findByRole('button', { name: 'Remove' });
 
+  expect(await screen.findAllByText('Favorite not found')).toHaveLength(1);
   expect(removeFavorite).toHaveBeenCalledWith(101);
   expect(screen.queryByText(OWN_REMOVAL_MESSAGE)).toBeNull();
 });

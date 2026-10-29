@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { clearSession, handleKeycloakCallback, SessionChangedError, sessionSnapshot } from '../../auth/keycloak';
 import { applySessionFromProfile } from './LoginScreen';
 import { apiClient } from '../../api/client';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage } from '../../utils/errors';
 
 function AuthCallback() {
   const navigate = useNavigate();
@@ -26,7 +26,7 @@ function AuthCallback() {
         } catch (err) {
           if (controller.signal.aborted) return;
           clearSession(expected);
-          setError(getErrorDetail(err) || 'Could not verify your court account. Return to the login page and try again.');
+          setError(errorMessage(err, 'Could not verify your court account. Return to the login page and try again.'));
           return;
         }
         navigate(returnPath, { replace: true });

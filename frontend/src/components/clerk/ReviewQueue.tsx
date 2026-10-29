@@ -5,7 +5,7 @@ import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import DocumentDownload from '../common/DocumentDownload';
 import { formatBytes, getDocumentLabel, parseServerDate } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 
 const ACTION_UNCONFIRMED = 'the request did not complete. Refresh the queue to check its current status before trying again.';
 const BATCH_UNCONFIRMED = 'Could not accept the selected filings. Refresh the queue to check their current status before trying again.';
@@ -21,7 +21,7 @@ function ReviewQueue() {
   const filings = queue?.filings ?? [];
   const total = queue?.total ?? 0;
   const [review, setReview] = useState<{
-    id: number; filing?: FilingEnvelope; error?: string;
+    id: number; filing?: FilingEnvelope; error?: LoadFailure;
   } | null>(null);
   const selectedFiling = review?.filing;
   const [loading, setLoading] = useState(false);
@@ -44,7 +44,7 @@ function ReviewQueue() {
   // Where the processed filings were, so focus can follow the queue once it reloads.
   const focusAfterRefresh = useRef<{ index: number; queue: ClerkQueue | null } | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
-  const [queueError, setQueueError] = useState<string | null>(null);
+  const [queueError, setQueueError] = useState<LoadFailure | null>(null);
 
   const fetchQueue = useCallback(async () => {
     requestRef.current?.abort();
@@ -63,9 +63,9 @@ function ReviewQueue() {
       setSelectedSubmissions(previous => new Map(result.filings
         .filter(filing => previous.get(filing.id) === filing.submission_count)
         .map(filing => [filing.id, filing.submission_count])));
-    } catch {
+    } catch (err) {
       if (controller.signal.aborted) return;
-      setQueueError("We couldn't load the review queue. Please retry.");
+      setQueueError(loadFailure(err, "We couldn't load the review queue. Please retry."));
       setQueue(null);
       setSelectedSubmissions(new Map());
     } finally {
@@ -118,7 +118,7 @@ function ReviewQueue() {
       closeReview();
       await fetchQueue();
     } catch (err) {
-      setReviewError(`Failed to ${action} filing #${filing.id}: ${getErrorDetail(err) || ACTION_UNCONFIRMED}`);
+      setReviewError(`Failed to ${action} filing #${filing.id}: ${errorMessage(err, ACTION_UNCONFIRMED)}`);
       // The browser drops focus from a button disabled while the action ran; return it to the review.
       if (!document.activeElement || document.activeElement === document.body) reviewHeading.current?.focus();
     } finally {
@@ -140,7 +140,7 @@ function ReviewQueue() {
         setReviewError(res.failed.map(id => `Filing #${id}: ${res.errors[id]}`).join(' '));
       }
     } catch (err) {
-      setReviewError(getErrorDetail(err) || BATCH_UNCONFIRMED);
+      setReviewError(errorMessage(err, BATCH_UNCONFIRMED));
     } finally {
       // Clearing the selection removes the batch bar and its focused button.
       focusAfterRefresh.current = { index: firstSelected, queue };
@@ -171,7 +171,7 @@ function ReviewQueue() {
     } catch (err) {
       if (!controller.signal.aborted) setReview({
         id: filingId,
-        error: getErrorDetail(err) || "We couldn't load this filing. Please retry.",
+        error: loadFailure(err, "We couldn't load this filing. Please retry."),
       });
     }
   }
@@ -303,7 +303,7 @@ function ReviewQueue() {
         </div>
       )}
 
-      {queueError && <LoadError message={queueError} onRetry={fetchQueue} />}
+      {queueError && <LoadError failure={queueError} onRetry={fetchQueue} />}
 
       {/* Batch actions */}
       {selectedSubmissions.size > 0 && statusFilter !== 'waivers' && (
@@ -427,7 +427,7 @@ function ReviewQueue() {
               </button>
             </div>
             {!selectedFiling && !review.error && <p role="status">Loading filing details…</p>}
-            {review.error && <LoadError message={review.error} onRetry={() => openReview(review.id)} />}
+            {review.error && <LoadError failure={review.error} onRetry={() => openReview(review.id)} />}
             {selectedFiling && <>
             {!canReview && statusFilter !== 'waivers' && <p role="status">
               This filing is no longer awaiting intake review. Refresh the queue for current work.

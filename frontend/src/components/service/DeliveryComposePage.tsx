@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import type { DeliveryContact, DeliveryOptions } from '../../api/serviceDeliveries';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { formatBytes } from '../../utils/format';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
@@ -12,7 +12,7 @@ export default function DeliveryComposePage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: DeliveryOptions; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: DeliveryOptions; error?: LoadFailure }>();
   const [selection, setSelection] = useState<{ source: string; documents: number[]; contacts: DeliveryContact[] }>({ source: '', documents: [], contacts: [] });
   const [reviewed, setReviewed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -33,7 +33,7 @@ export default function DeliveryComposePage() {
         });
         setReviewed(false);
       })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load delivery choices.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load delivery choices.') }); });
     return () => controller.abort();
   }, [filingId, page, key]);
 
@@ -53,7 +53,7 @@ export default function DeliveryComposePage() {
       });
       navigate(`/filings/${filingId}/deliveries`, { state: { sent: true } });
     } catch (err) {
-      setError(getErrorDetail(err) || 'The request could not be confirmed. Retry these selections to retrieve the same delivery, or inspect the sent records.');
+      setError(errorMessage(err, 'The request could not be confirmed. Retry these selections to retrieve the same delivery, or inspect the sent records.'));
     } finally { setBusy(false); }
   }
 
@@ -65,7 +65,7 @@ export default function DeliveryComposePage() {
     <button className="btn btn-secondary" disabled={busy} onClick={() => {
       setSelection({ source: '', documents: [], contacts: [] }); setReviewed(false); setError(''); setAttempt(n => n + 1);
     }}>Refresh choices</button>
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {!current && <p role="status">Loading documents and service instructions…</p>}
     {data && <>
       <div className="review-card"><h3>{data.court_name}</h3><p>{data.case_number} · {data.case_title}</p></div>

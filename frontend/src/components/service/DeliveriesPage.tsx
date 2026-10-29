@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { deliveryLabels } from '../../api/notifications';
-import { getErrorDetail } from '../../utils/errors';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { parseServerDate } from '../../utils/format';
 import LoadError from '../common/LoadError';
 
@@ -17,14 +17,14 @@ export default function DeliveriesPage() {
   const location = useLocation();
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: DeliveryList; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: DeliveryList; error?: LoadFailure }>();
   const key = `${filingId}:${page}:${attempt}`;
   const current = result?.key === key ? result : undefined;
   useEffect(() => {
     const controller = new AbortController();
     apiClient.get<DeliveryList>(filingId ? `/service/filings/${filingId}/deliveries` : '/service/deliveries', { params: { page }, signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load deliveries.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load deliveries.') }); });
     return () => controller.abort();
   }, [filingId, page, key]);
   const data = current?.data;
@@ -37,7 +37,7 @@ export default function DeliveriesPage() {
     {location.state?.sent && <p className="alert alert-success" role="status">Delivery recorded and email alerts queued. Open a recipient record to check progress.</p>}
     <p>Email relay acceptance, document download requests and recipient acknowledgments are recorded separately. Follow the court&apos;s requirements for proof of service.</p>
     {!current && <p role="status">Loading deliveries…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {data && <>
       {!data.deliveries.length && <p className="empty-state">No document deliveries recorded.</p>}
       <ul className="service-list">{data.deliveries.map(item => <li className="review-card" key={item.id}>

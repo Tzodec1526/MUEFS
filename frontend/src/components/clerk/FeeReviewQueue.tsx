@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import { parseServerDate } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
 
 interface Queue { total: number; page: number; filings: { id: number; case_title: string | null; filer_name: string; status: string; requested_at: string }[] }
@@ -13,14 +13,14 @@ export default function FeeReviewQueue() {
   const courtId = court!.court_id;
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: Queue; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: Queue; error?: LoadFailure }>();
   const key = `${courtId}:${page}:${attempt}`;
   const current = result?.key === key ? result : undefined;
   useEffect(() => {
     const controller = new AbortController();
     apiClient.get<Queue>('/clerk/fee-reviews', { params: { court_id: courtId, page }, signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load fee review requests.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load fee review requests.') }); });
     return () => controller.abort();
   }, [courtId, page, key]);
   return <section>
@@ -29,7 +29,7 @@ export default function FeeReviewQueue() {
       <button className="btn btn-secondary" onClick={() => setAttempt(n => n + 1)}>Refresh requests</button></div>
     <p>Reviewing fees does not submit or accept a filing. Fee waiver applications follow their separate court procedure.</p>
     {!current && <p role="status">Loading fee review requests…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
       {!current.data.total && <p className="empty-state">No fee review requests are waiting.</p>}
       {current.data.filings.map(filing => <article className="review-card" key={filing.id}>

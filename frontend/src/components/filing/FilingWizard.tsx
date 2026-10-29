@@ -12,7 +12,7 @@ import CaseTypeSelector from './CaseTypeSelector';
 import DocumentUpload from './DocumentUpload';
 import FilingReview from './FilingReview';
 import { emitToast } from '../../utils/toastBus';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { createFiling, getFiling, updateFiling, type FilingEnvelope } from '../../api/filings';
 import LoadError from '../common/LoadError';
 import { getCase, type CaseDocket } from '../../api/cases';
@@ -67,7 +67,7 @@ const defaultFilingData: FilingData = {
 function FilingWizard() {
   const { userId, loading, error, refresh } = useContext(CourtContext)!;
   if (loading) return <p role="status">Loading your filing workspace…</p>;
-  if (!userId) return <LoadError message={error || 'Could not verify your account.'} onRetry={refresh} />;
+  if (!userId) return <LoadError failure={error ?? { message: 'Could not verify your account.', retry: true }} onRetry={refresh} />;
   return <FilingForm key={userId} userId={userId} />;
 }
 
@@ -101,7 +101,7 @@ function FilingForm({ userId }: { userId: number }) {
   const [loadedFiling, setLoadedFiling] = useState<FilingEnvelope | null>(null);
   const readOnly = loadedFiling !== null && !['draft', 'returned'].includes(loadedFiling.status);
   const [loadingExisting, setLoadingExisting] = useState(Boolean(requestedFilingId));
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<LoadFailure | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [submission, setSubmission] = useState<FilingEnvelope>();
   const [errors, setErrors] = useState<string[]>([]);
@@ -136,7 +136,7 @@ function FilingForm({ userId }: { userId: number }) {
     return isPlainLanguageMode();
   });
   // Why a case-linked filing has no caption yet: the court's case record did not load.
-  const [caseLookupError, setCaseLookupError] = useState<string | null>(null);
+  const [caseLookupError, setCaseLookupError] = useState<LoadFailure | null>(null);
 
   // Load the saved envelope, or resolve display labels for a new filing's URL prefill.
   useEffect(() => {
@@ -185,7 +185,7 @@ function FilingForm({ userId }: { userId: number }) {
           setShowDraftBanner(recoveredDraft !== null);
         } catch (err) {
           if (!controller.signal.aborted) {
-            setLoadError(getErrorDetail(err) || 'Could not load this filing. Please retry.');
+            setLoadError(loadFailure(err, 'Could not load this filing. Please retry.'));
           }
         } finally {
           if (!controller.signal.aborted) setLoadingExisting(false);
@@ -199,7 +199,7 @@ function FilingForm({ userId }: { userId: number }) {
     const caseTypeId = searchParams.get('case_type_id');
     const caseId = searchParams.get('case_id');
     let active = true;
-    type CaseLookup = { docket: CaseDocket | null; failure?: string };
+    type CaseLookup = { docket: CaseDocket | null; failure?: LoadFailure };
     Promise.all([
       getCourt(Number(courtId)).catch(() => ({ name: `Court #${courtId}` })),
       // A display label for an existing case: keep it after the court closes the type to new cases.
@@ -208,7 +208,7 @@ function FilingForm({ userId }: { userId: number }) {
       caseId
         ? getCase(Number(caseId)).then(
           (docket): CaseLookup => ({ docket }),
-          (err: unknown): CaseLookup => ({ docket: null, failure: getErrorDetail(err) || CASE_LOOKUP_FAILED }))
+          (err: unknown): CaseLookup => ({ docket: null, failure: loadFailure(err, CASE_LOOKUP_FAILED) }))
         : Promise.resolve<CaseLookup>({ docket: null }),
     ]).then(([court, types, { docket, failure }]) => {
       if (!active) return;
@@ -294,7 +294,7 @@ function FilingForm({ userId }: { userId: number }) {
       return true;
     } catch (err) {
       if (!mounted.current) return false;
-      setErrors([getErrorDetail(err) || 'Could not save your filing. Your edits are still here.']);
+      setErrors([errorMessage(err, 'Could not save your filing. Your edits are still here.')]);
       if (!filingData.filingId && isAxiosError(err) && err.response?.status === 409) {
         const existingId: unknown = err.response.data?.filing_id;
         if (typeof existingId === 'number' && Number.isSafeInteger(existingId) && existingId > 0) {
@@ -457,7 +457,7 @@ function FilingForm({ userId }: { userId: number }) {
       </section>;
 
   if (loadingExisting) return <p className="loading" role="status">Loading filing...</p>;
-  if (loadError) return <LoadError message={loadError} onRetry={() => setReloadKey((key) => key + 1)} />;
+  if (loadError) return <LoadError failure={loadError} onRetry={() => setReloadKey((key) => key + 1)} />;
   if (readOnly) {
     return (
       <div className="filing-wizard">
@@ -650,7 +650,8 @@ function FilingForm({ userId }: { userId: number }) {
             <h3>{isMotionMode ? 'Motion Details' : 'Case Details'}</h3>
 
             {captionMissing && caseLookupError && (
-              <LoadError message={`${caseLookupError} Retry, or go Back to choose the case.`} onRetry={retryCaseLookup} />
+              <LoadError failure={{ ...caseLookupError, message: `${caseLookupError.message} Retry, or go Back to choose the case.` }}
+                onRetry={retryCaseLookup} />
             )}
 
             {isMotionMode && filingData.caseTitle && (

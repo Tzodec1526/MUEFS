@@ -1,6 +1,6 @@
 import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { apiClient } from '../../api/client';
-import { getErrorDetail } from '../../utils/errors';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
 import {
   applySessionFromProfile, getDemoCourtId, getDemoRole, hasSession,
@@ -13,7 +13,7 @@ interface CourtSessionState {
   courts: CourtAssignment[];
   court: CourtAssignment | undefined;
   loading: boolean;
-  error?: string;
+  error?: LoadFailure;
   selectCourt: (id: number) => void;
   refresh: () => void;
 }
@@ -24,7 +24,7 @@ export function CourtSession({ children }: { children: ReactNode }) {
   const signedIn = hasSession();
   const [attempt, setAttempt] = useState(0);
   const [selectedId, setSelectedId] = useState(getDemoCourtId);
-  const [result, setResult] = useState<{ attempt: number; userId?: number; courts: CourtAssignment[]; error?: string }>();
+  const [result, setResult] = useState<{ attempt: number; userId?: number; courts: CourtAssignment[]; error?: LoadFailure }>();
   const current = result?.attempt === attempt ? result : undefined;
   const courts = signedIn ? current?.courts ?? [] : [];
   const court = courts.find(item => item.court_id === selectedId) ?? courts[0];
@@ -38,7 +38,7 @@ export function CourtSession({ children }: { children: ReactNode }) {
       setSelectedId(getDemoCourtId());
       setResult({ attempt, userId: data.id, courts });
     }).catch(err => {
-      if (!controller.signal.aborted) setResult({ attempt, courts: [], error: getErrorDetail(err) || 'Could not verify court assignments.' });
+      if (!controller.signal.aborted) setResult({ attempt, courts: [], error: loadFailure(err, 'Could not verify court assignments.') });
     });
     return () => controller.abort();
   }, [signedIn, attempt]);
@@ -58,7 +58,7 @@ export function CourtSession({ children }: { children: ReactNode }) {
 export function CourtWorkspace({ children }: { children: ReactNode }) {
   const { court, loading, error, refresh } = useContext(CourtContext)!;
   if (loading) return <p role="status">Loading court assignments…</p>;
-  if (error) return <LoadError message={error} onRetry={refresh} />;
+  if (error) return <LoadError failure={error} onRetry={refresh} />;
   if (!court) return <div className="empty-state">
     <h2>Court assignment needed</h2>
     <p>A clerk, judge or administrator assignment is required to use this court workspace.</p>

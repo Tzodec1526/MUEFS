@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
-import { getErrorDetail } from '../../utils/errors';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 
@@ -16,7 +16,7 @@ export default function CourtCaseDirectory() {
   const [caseNumber, setCaseNumber] = useState('');
   const [cursors, setCursors] = useState<(number | undefined)[]>([undefined]);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: Directory; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: Directory; error?: LoadFailure }>();
   const cursor = cursors[cursors.length - 1];
   const key = `${court}:${caseNumber}:${cursor}:${attempt}`;
   const current = result?.key === key ? result : undefined;
@@ -28,7 +28,7 @@ export default function CourtCaseDirectory() {
     }).then(({ data }) => {
       if (!controller.signal.aborted) setResult({ key, data });
     }).catch(err => {
-      if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load court cases.' });
+      if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load court cases.') });
     });
     return () => controller.abort();
   }, [court, caseNumber, cursor, key]);
@@ -50,7 +50,7 @@ export default function CourtCaseDirectory() {
       <button className="btn btn-primary">Find cases</button>
     </form>
     {!current && <p role="status">Loading court cases…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
       {!current.data.cases.length && <p>No cases match this court and case number.</p>}
       <ul className="court-case-list">{current.data.cases.map(item => <li key={item.id}>

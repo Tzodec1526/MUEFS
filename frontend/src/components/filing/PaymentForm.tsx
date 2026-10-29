@@ -4,7 +4,7 @@ import { apiClient } from '../../api/client';
 import { getFilingFees, processPayment, type FilingFees } from '../../api/documents';
 import { updateFiling, uploadDocument, type FilingEnvelope } from '../../api/filings';
 import { formatCents, parseServerDate } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
 
 const FeeAssessmentForm = lazy(() => import('../clerk/FeeAssessmentForm'));
@@ -13,7 +13,7 @@ const PaymentRecordsPanel = lazy(() => import('./PaymentRecordsPanel'));
 export default function PaymentForm({ filingId, onFeesChange }: {
   filingId: number; onFeesChange?: (filing: FilingEnvelope, obligationMet: boolean) => void;
 }) {
-  const [result, setResult] = useState<{ key: string; fees?: FilingFees; filing?: FilingEnvelope; error?: string }>();
+  const [result, setResult] = useState<{ key: string; fees?: FilingFees; filing?: FilingEnvelope; error?: LoadFailure }>();
   const [attempt, setAttempt] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('credit_card');
   const [waiverFile, setWaiverFile] = useState<File | null>(null);
@@ -36,7 +36,7 @@ export default function PaymentForm({ filingId, onFeesChange }: {
         setResult({ key, fees, filing });
         onFeesChange?.(filing, fees.obligation_met);
       })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load filing fees.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load filing fees.') }); });
     return () => controller.abort();
   }, [filingId, key, onFeesChange]);
 
@@ -49,7 +49,7 @@ export default function PaymentForm({ filingId, onFeesChange }: {
       await apiClient.post(`/filings/${filingId}/fee-review`, { expected_version: fees.version, reason: form.get('reason') });
       setNotice('Fee review requested. The court can now review the documents and amount due.');
       setAttempt(n => n + 1);
-    } catch (err) { setError(getErrorDetail(err) || 'Could not request fee review.'); }
+    } catch (err) { setError(errorMessage(err, 'Could not request fee review.')); }
     finally { setBusy(false); }
   }
 
@@ -78,12 +78,12 @@ export default function PaymentForm({ filingId, onFeesChange }: {
         setNotice('Simulated payment recorded. No money was charged.');
       }
       setAttempt(n => n + 1);
-    } catch (err) { setError(getErrorDetail(err) || 'Could not record payment or the fee waiver request. Refresh before retrying.'); }
+    } catch (err) { setError(errorMessage(err, 'Could not record payment or the fee waiver request. Refresh before retrying.')); }
     finally { setBusy(false); }
   }
 
   if (!current) return <p role="status">Loading filing fees…</p>;
-  if (current.error) return <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />;
+  if (current.error) return <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />;
   if (!fees || !filing) return null;
   const canChoosePayment = !fees.obligation_met && (
     (fees.can_pay && fees.payments_simulated) || fees.can_request_waiver

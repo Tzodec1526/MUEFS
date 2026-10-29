@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { listFilings, FilingSummary } from '../../api/filings';
 import LoadError from '../common/LoadError';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { parseServerDate } from '../../utils/format';
 
 const STATUS_OPTIONS = [
@@ -29,7 +30,7 @@ function MyFilings() {
   const [page, setPage] = useState(1);
   const [courtNames, setCourtNames] = useState<Record<number, string>>({});
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadFailure | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -47,9 +48,9 @@ function MyFilings() {
         setTotal(result.total);
         setCourtNames(result.court_names);
         setStatusCounts(result.status_counts);
-      } catch {
+      } catch (err) {
         if (controller.signal.aborted) return;
-        setError("We couldn't load your filings. Please retry.");
+        setError(loadFailure(err, "We couldn't load your filings. Please retry."));
         setFilings([]);
         setTotal(0);
       } finally {
@@ -111,7 +112,7 @@ function MyFilings() {
       </div>
 
       {loading && <p className="loading">Loading filings...</p>}
-      {error && <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />}
+      {error && <LoadError failure={error} onRetry={() => setReloadKey((k) => k + 1)} />}
 
       {!loading && !error && filings.length === 0 && (
         <div className="empty-state">

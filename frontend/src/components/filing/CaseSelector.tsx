@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { searchCases } from '../../api/cases';
 import { getCaseTypes } from '../../api/courts';
 import LoadError from '../common/LoadError';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
 
 export interface CaseResult {
   id: number;
@@ -32,7 +33,7 @@ function CaseSelector({
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [typeNames, setTypeNames] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadFailure | null>(null);
   const searchRequest = useRef<AbortController>();
 
   useEffect(() => () => searchRequest.current?.abort(), [courtId]);
@@ -70,9 +71,9 @@ function CaseSelector({
       const byId = new Map<number, CaseResult>();
       [...(byNum.cases || []), ...(byParty.cases || [])].forEach((c: CaseResult) => byId.set(c.id, c));
       setResults([...byId.values()]);
-    } catch {
+    } catch (err) {
       if (controller.signal.aborted) return;
-      setError('Case search is unavailable right now. Please try again.');
+      setError(loadFailure(err, 'Case search is unavailable right now. Please try again.'));
       setResults([]);
     } finally {
       if (!controller.signal.aborted) setSearching(false);
@@ -128,7 +129,7 @@ function CaseSelector({
             </button>
           </div>
 
-          {error && <LoadError message={error} onRetry={runSearch} />}
+          {error && <LoadError failure={error} onRetry={runSearch} />}
           {!error && hasSearched && !searching && (
             results.length > 0 ? (
               <table className="review-table case-results">

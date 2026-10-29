@@ -1,12 +1,13 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { needsErrorMessage } from '../../api/client';
+import { actionErrorMessage } from '../../api/client';
 import { Link2 } from 'lucide-react';
 import { CaseSearchResult, searchCases } from '../../api/cases';
 import { CourtDirectoryEntry, listCourtDirectory } from '../../api/courts';
 import { listFavorites, addFavorite, removeFavorite } from '../../api/favorites';
 import { getDemoRole } from '../auth/LoginScreen';
 import LoadError from '../common/LoadError';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { useToast } from '../common/Toast';
 import { formatCourtDate, parseServerDate } from '../../utils/format';
 
@@ -32,14 +33,14 @@ function CaseSearch() {
   const [partyName, setPartyName] = useState(submittedPartyName);
   const [courtId, setCourtId] = useState(submittedCourt);
   const [courts, setCourts] = useState<CourtDirectoryEntry[]>([]);
-  const [courtError, setCourtError] = useState(false);
+  const [courtError, setCourtError] = useState<LoadFailure | null>(null);
   const [courtReloadKey, setCourtReloadKey] = useState(0);
   const [results, setResults] = useState<CaseSearchResult[]>([]);
   const [total, setTotal] = useState(0);
   const [searching, setSearching] = useState(false);
   const [favoritedIds, setFavoritedIds] = useState<Set<number>>(() => new Set());
   const [togglingFav, setTogglingFav] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadFailure | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const searchRequest = searchRequestOf(searchParams);
 
@@ -48,10 +49,10 @@ function CaseSearch() {
     listCourtDirectory(controller.signal).then(data => {
       if (!controller.signal.aborted) {
         setCourts(data);
-        setCourtError(false);
+        setCourtError(null);
       }
-    }).catch(() => {
-      if (!controller.signal.aborted) setCourtError(true);
+    }).catch((err) => {
+      if (!controller.signal.aborted) setCourtError(loadFailure(err, "We couldn't load the court list. Please retry."));
     });
     return () => controller.abort();
   }, [courtReloadKey]);
@@ -79,7 +80,7 @@ function CaseSearch() {
       setCourtId(submittedCourt && !invalidCourt ? String(Number(submittedCourt)) : submittedCourt);
       if (invalidCourt) {
         const message = 'The court filter in this link is invalid. Choose a court and search again.';
-        setError(message);
+        setError({ message, retry: false });
         setResults([]);
         setTotal(0);
         setSearching(false);
@@ -95,9 +96,9 @@ function CaseSearch() {
         if (controller.signal.aborted) return;
         setResults(data.cases);
         setTotal(data.total);
-      } catch {
+      } catch (err) {
         if (controller.signal.aborted) return;
-        setError("We couldn't reach the records system. Please try again.");
+        setError(loadFailure(err, "We couldn't reach the records system. Please try again."));
         setResults([]);
         setTotal(0);
       } finally {
@@ -160,7 +161,8 @@ function CaseSearch() {
         pushToast('Added to favorites', 'success');
       }
     } catch (err) {
-      if (needsErrorMessage(err)) pushToast('Could not update favorite', 'error');
+      const message = actionErrorMessage(err, 'Could not update favorite');
+      if (message) pushToast(message, 'error');
     } finally {
       setTogglingFav(null);
     }
@@ -235,12 +237,11 @@ function CaseSearch() {
         </div>
       </form>
 
-      {courtError && <LoadError message="We couldn't load the court list. Please retry."
+      {courtError && <LoadError failure={courtError}
         onRetry={() => setCourtReloadKey(key => key + 1)} />}
 
       {error ? (
-        <LoadError message={error}
-          onRetry={invalidCourt ? undefined : () => setReloadKey((key) => key + 1)} />
+        <LoadError failure={error} onRetry={() => setReloadKey((key) => key + 1)} />
       ) : (
         <div className="search-results">
           <h3>{hasSearched ? `Results (${total})` : 'Recent public filings'}</h3>

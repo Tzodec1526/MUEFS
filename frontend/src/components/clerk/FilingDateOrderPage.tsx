@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import type { FilingDateBasis } from '../../api/filings';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { formatCourtDate, parseServerDate } from '../../utils/format';
 import FilingDateEvidence from '../filing/FilingDateEvidence';
 import LoadError from '../common/LoadError';
@@ -17,7 +17,7 @@ interface DateState {
 export default function FilingDateOrderPage() {
   const { filingId } = useParams();
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: DateState; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: DateState; error?: LoadFailure }>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [receipt, setReceipt] = useState('');
@@ -28,7 +28,7 @@ export default function FilingDateOrderPage() {
     const controller = new AbortController();
     apiClient.get<DateState>(`/clerk/filings/${filingId}/filing-date`, { signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load filing dates.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load filing dates.') }); });
     return () => controller.abort();
   }, [filingId, key]);
 
@@ -46,7 +46,7 @@ export default function FilingDateOrderPage() {
       setReceipt(response.data.transaction_id);
       setAttempt(n => n + 1);
     } catch (err) {
-      setError(getErrorDetail(err) || 'Could not confirm the decision. Check filing history before trying again.');
+      setError(errorMessage(err, 'Could not confirm the decision. Check filing history before trying again.'));
     } finally {
       setBusy(false);
     }
@@ -61,7 +61,7 @@ export default function FilingDateOrderPage() {
     {receipt && <div className="alert alert-success" role="status">Court-ordered filing date recorded. Transaction <code>{receipt}</code>.</div>}
     {error && <p className="alert alert-error" role="alert">{error}</p>}
     {!current && <p role="status">Loading filing dates…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {data && <>
       <div className="review-card">
         <h3>Current record</h3>

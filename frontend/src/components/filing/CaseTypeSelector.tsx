@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getCaseTypes, getFilingRequirements, CaseType, FilingRequirement } from '../../api/courts';
 import { formatFee } from '../../utils/format';
 import LoadError from '../common/LoadError';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
 
 // Maps MCR/MCL references to official Michigan Courts URLs
 function getRuleUrl(ref: string): string | null {
@@ -49,7 +50,7 @@ interface Props {
 function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
   const [caseTypes, setCaseTypes] = useState<CaseType[]>([]);
   const [requirementsResult, setRequirementsResult] = useState<{
-    key: string; requirements?: FilingRequirement[]; error?: string;
+    key: string; requirements?: FilingRequirement[]; error?: LoadFailure;
   }>();
   const [requirementsAttempt, setRequirementsAttempt] = useState(0);
   const requirementsKey = `${courtId}:${selectedCaseTypeId}:${requirementsAttempt}`;
@@ -58,7 +59,7 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
   const [loading, setLoading] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadFailure | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -70,9 +71,9 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
         const types = await getCaseTypes(courtId, false, controller.signal);
         if (controller.signal.aborted) return;
         setCaseTypes(types);
-      } catch {
+      } catch (err) {
         if (controller.signal.aborted) return;
-        setError("We couldn't load case types for this court. Please retry.");
+        setError(loadFailure(err, "We couldn't load case types for this court. Please retry."));
         setCaseTypes([]);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -89,9 +90,9 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
       try {
         const reqs = await getFilingRequirements(courtId, selectedCaseTypeId!, 'initial', controller.signal);
         if (!controller.signal.aborted) setRequirementsResult({ key: requirementsKey, requirements: reqs });
-      } catch {
+      } catch (err) {
         if (!controller.signal.aborted) setRequirementsResult({ key: requirementsKey,
-          error: 'Could not load requirements for this case type. Please retry before continuing.' });
+          error: loadFailure(err, 'Could not load requirements for this case type. Please retry before continuing.') });
       }
     }
     fetchRequirements();
@@ -148,7 +149,7 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
       </div>
 
       {loading && <p>Loading case types…</p>}
-      {error && <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />}
+      {error && <LoadError failure={error} onRetry={() => setReloadKey((k) => k + 1)} />}
 
       <div className="case-type-list">
         {filtered.map((ct) => (
@@ -181,7 +182,7 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
 
       {/* Filing Requirements - shown after selecting a case type */}
       {selectedCaseTypeId && !currentRequirements && <p role="status">Loading filing requirements…</p>}
-      {currentRequirements?.error && <LoadError message={currentRequirements.error}
+      {currentRequirements?.error && <LoadError failure={currentRequirements.error}
         onRetry={() => setRequirementsAttempt(attempt => attempt + 1)} />}
       {selectedCaseTypeId && requirements.length > 0 && (
         <div className="requirements-section">

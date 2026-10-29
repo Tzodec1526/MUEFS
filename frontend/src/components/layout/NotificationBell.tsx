@@ -4,13 +4,14 @@ import { Link } from 'react-router-dom';
 import { deliveryLabels, listNotifications, type NotificationItem } from '../../api/notifications';
 import { getDemoRole } from '../auth/LoginScreen';
 import LoadError from '../common/LoadError';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
 
 function NotificationBell() {
   const role = getDemoRole();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<LoadFailure | null>(null);
   const [attempt, setAttempt] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -43,12 +44,12 @@ function NotificationBell() {
     let active = true;
     const load = async () => {
       setLoading(true);
-      setError(false);
+      setError(null);
       try {
         const data = await listNotifications(1);
         if (active) setItems(data.notifications);
-      } catch {
-        if (active) setError(true);
+      } catch (err) {
+        if (active) setError(loadFailure(err, 'Could not load notifications.'));
       } finally {
         if (active) setLoading(false);
       }
@@ -85,7 +86,7 @@ function NotificationBell() {
         <div className="notification-panel" id={panelId}>
           <h3>Recent notifications</h3>
           {loading ? <p>Loading notifications...</p> : error ? (
-            <LoadError message="Could not load notifications." onRetry={() => setAttempt(n => n + 1)} />
+            <LoadError failure={error} onRetry={() => setAttempt(n => n + 1)} />
           ) : items.length === 0 ? (
             <p className="notification-empty">No notifications yet.</p>
           ) : (

@@ -2,7 +2,7 @@ import { useContext, useEffect, useState, type FormEvent } from 'react';
 import { isAxiosError } from 'axios';
 import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { parseServerDate } from '../../utils/format';
 import { CourtContext } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
@@ -19,7 +19,7 @@ interface Change {
   before: IntakeState; after: IntakeState;
 }
 interface History { changes: Change[]; total: number }
-interface Remote<T> { key: string; data?: T; error?: string }
+interface Remote<T> { key: string; data?: T; error?: LoadFailure }
 
 function IntakeEditor({ current, onSaved, onReload }: {
   current: Intake; onSaved: (value: Intake) => void; onReload: () => void;
@@ -51,7 +51,7 @@ function IntakeEditor({ current, onSaved, onReload }: {
       const status = isAxiosError(err) ? err.response?.status : undefined;
       const reload = !status || status >= 500 || [401, 403, 409].includes(status);
       setMustReload(reload);
-      setError(getErrorDetail(err) || 'The change could not be confirmed. Reload current settings and review the history before trying again.');
+      setError(errorMessage(err, 'The change could not be confirmed. Reload current settings and review the history before trying again.'));
     } finally { setBusy(false); }
   }
 
@@ -105,13 +105,13 @@ function IntakeHistory({ courtId }: { courtId: number }) {
     const controller = new AbortController();
     apiClient.get<History>(`/courts/${courtId}/intake/history`, { params: { page }, signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load intake changes.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load intake changes.') }); });
     return () => controller.abort();
   }, [courtId, page, key]);
   return <section aria-label="Intake change history">
     <h3>Intake change history</h3>
     {!current && <p role="status">Loading intake changes…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
       {current.data.total === 0 && <p>No intake changes have been published through this portal. Existing settings are shown above.</p>}
       {current.data.changes.map(change => {
@@ -156,11 +156,11 @@ export default function CourtIntakePage() {
     const controller = new AbortController();
     apiClient.get<Intake>(`/courts/${courtId}/intake`, { signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load court intake information.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load court intake information.') }); });
     return () => controller.abort();
   }, [courtId, key, loading]);
   if (loading || !current) return <p role="status">Loading court intake…</p>;
-  if (!current.data) return <LoadError message={current.error || 'Could not load intake.'} onRetry={() => setAttempt(n => n + 1)} />;
+  if (!current.data) return <LoadError failure={current.error ?? { message: 'Could not load intake.', retry: true }} onRetry={() => setAttempt(n => n + 1)} />;
   const data = current.data;
   return <section className="court-intake-page">
     <div className="page-header"><div><h2>{data.court_name}: electronic filing intake</h2>

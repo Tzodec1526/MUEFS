@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { deliveryLabels, listNotifications, type NotificationItem } from '../../api/notifications';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { parseServerDate } from '../../utils/format';
 import LoadError from '../common/LoadError';
 
@@ -14,7 +14,7 @@ interface DeliveryHistory {
 }
 
 function DeliveryDetails({ notice, onRetry }: { notice: NotificationItem; onRetry: () => void }) {
-  const [result, setResult] = useState<{ key: string; data?: DeliveryHistory; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: DeliveryHistory; error?: LoadFailure }>();
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -22,12 +22,12 @@ function DeliveryDetails({ notice, onRetry }: { notice: NotificationItem; onRetr
   const requestKey = `${notice.id}:${page}:${attempt}`;
   const current = result?.key === requestKey ? result : undefined;
   const history = current?.data;
-  const error = actionError || current?.error;
+  const error = actionError ? { message: actionError, retry: true } : current?.error;
   useEffect(() => {
     const controller = new AbortController();
     apiClient.get<DeliveryHistory>(`/notifications/${notice.id}/delivery`, { params: { page }, signal: controller.signal })
       .then(response => { if (!controller.signal.aborted) setResult({ key: requestKey, data: response.data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key: requestKey, error: getErrorDetail(err) || 'Could not load email history.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key: requestKey, error: loadFailure(err, 'Could not load email history.') }); });
     return () => controller.abort();
   }, [notice.id, page, requestKey]);
 
@@ -38,13 +38,13 @@ function DeliveryDetails({ notice, onRetry }: { notice: NotificationItem; onRetr
     try {
       await apiClient.post(`/notifications/${notice.id}/retry`, { reason: values.get('reason') });
       onRetry();
-    } catch (err) { setActionError(getErrorDetail(err) || 'Could not queue another email.'); }
+    } catch (err) { setActionError(errorMessage(err, 'Could not queue another email.')); }
     finally { setBusy(false); }
   }
 
   return <div className="notice-delivery">
     <h4>Email history for notice #{notice.id}</h4>
-    {error && <LoadError message={error} onRetry={() => { setActionError(null); setAttempt(n => n + 1); }} />}
+    {error && <LoadError failure={error} onRetry={() => { setActionError(null); setAttempt(n => n + 1); }} />}
     {!history && !error && <p role="status">Loading email history…</p>}
     {history && <>
       {history.message_id && <p className="receipt-reference">Message-ID: <code>{history.message_id}</code></p>}
@@ -81,7 +81,7 @@ export default function NotificationsPage() {
   const [filingId, setFilingId] = useState<number>();
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: Awaited<ReturnType<typeof listNotifications>>; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: Awaited<ReturnType<typeof listNotifications>>; error?: LoadFailure }>();
   const [selected, setSelected] = useState<number | null>(null);
   const [message, setMessage] = useState('');
   const requestKey = `${page}:${scope}:${courtId}:${status}:${filingId}:${attempt}`;
@@ -95,7 +95,7 @@ export default function NotificationsPage() {
     listNotifications(page, { court_id: scope === 'court' && courtId ? courtId : undefined,
       delivery_status: status || undefined, filing_id: filingId }, controller.signal)
       .then(data => { if (!controller.signal.aborted) setResult({ key: requestKey, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key: requestKey, error: getErrorDetail(err) || 'Could not load notices.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key: requestKey, error: loadFailure(err, 'Could not load notices.') }); });
     return () => controller.abort();
   }, [page, scope, courtId, status, filingId, requestKey, assignmentsLoading]);
 
@@ -135,7 +135,7 @@ export default function NotificationsPage() {
     {filingId != null && <p role="status">Showing notices for filing #{filingId}.</p>}
     {message && <p role="status" className="alert alert-success">{message}</p>}
     {loading && <p role="status">Loading notices…</p>}
-    {error && <LoadError message={error} onRetry={() => setAttempt(n => n + 1)} />}
+    {error && <LoadError failure={error} onRetry={() => setAttempt(n => n + 1)} />}
     {!loading && !error && data && <>
       {!data.email_enabled && <p className="alert alert-warning">Email delivery is not enabled. These notices are available in the portal.</p>}
       <p>{data.total} notice{data.total === 1 ? '' : 's'}</p>

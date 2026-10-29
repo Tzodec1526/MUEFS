@@ -132,6 +132,19 @@ it('shows an administrator a failed account directory load inline and loads it a
   expect(screen.queryByText('Could not load accounts.')).toBeNull();
 });
 
+it('shows an administrator a refused account directory once, inline, with no retry', async () => {
+  serve('admin', {
+    '/admin/access': { system_admin: true, user_id: 3, courts: [] },
+    '/admin/users': forbidden,
+  });
+  openApp('/admin', 'admin');
+
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain('System administrator access is required.');
+  expect(screen.getAllByText('System administrator access is required.')).toHaveLength(1);
+  expect(within(alert).queryByRole('button', { name: 'Retry' })).toBeNull();
+});
+
 it("shows a failed load of a filer's filings inline and loads them again on retry", async () => {
   serve('attorney', {
     '/filings': failsOnce({ filings: [], total: 0, status_counts: {}, court_names: {} }),

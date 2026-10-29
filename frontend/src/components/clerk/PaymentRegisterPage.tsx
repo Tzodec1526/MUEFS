@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import type { PaymentRegister } from '../../api/payments';
 import { formatCents, parseServerDate } from '../../utils/format';
-import { getBlobErrorDetail, getErrorDetail } from '../../utils/errors';
+import { getBlobErrorDetail, loadFailure, type LoadFailure } from '../../utils/errors';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 
@@ -19,7 +19,7 @@ export default function PaymentRegisterPage() {
   const [dirty, setDirty] = useState(false);
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: PaymentRegister; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: PaymentRegister; error?: LoadFailure }>();
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const exportRequest = useRef<AbortController | null>(null);
@@ -32,7 +32,7 @@ export default function PaymentRegisterPage() {
     apiClient.get<PaymentRegister>('/clerk/payment-register', {
       params: { court_id: courtId, ...filters, page }, signal: controller.signal,
     }).then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load the receipt register.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load the receipt register.') }); });
     return () => controller.abort();
   }, [courtId, administrator, filters, page, key]);
   useEffect(() => () => exportRequest.current?.abort(), []);
@@ -101,7 +101,7 @@ export default function PaymentRegisterPage() {
         </fieldset>
       </form>
       {!current && <p role="status">Loading receipt activity…</p>}
-      {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+      {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
       {report && <>
         <h3>{report.date_from} through {report.date_to} · {report.timezone}</h3>
         <p>{report.total} recorded {report.total === 1 ? 'entry' : 'entries'} · Generated {parseServerDate(report.generated_at).toLocaleString(undefined, { timeZone: report.timezone })} ({report.timezone})</p>

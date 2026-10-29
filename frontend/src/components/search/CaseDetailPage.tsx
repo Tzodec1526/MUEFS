@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Link2 } from 'lucide-react';
-import { apiClient, needsErrorMessage } from '../../api/client';
+import { actionErrorMessage, apiClient } from '../../api/client';
 import { participantRoles, type CaseDocket } from '../../api/cases';
 import { addFavorite, removeFavorite, listFavorites } from '../../api/favorites';
 import { getCaseTypes } from '../../api/courts';
 import { formatBytes, formatCourtDate, formatShortDate, getDocumentLabel } from '../../utils/format';
+import { errorMessage } from '../../utils/errors';
 import { getDemoRole } from '../auth/LoginScreen';
 import { useToast } from '../common/Toast';
 import DocumentDownload from '../common/DocumentDownload';
@@ -98,7 +99,7 @@ function CaseDetailPage() {
         } else if (status === 404) {
           setError('Case not found.');
         } else {
-          setError('Failed to load case details.');
+          setError(errorMessage(err, 'Failed to load case details.'));
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -149,7 +150,8 @@ function CaseDetailPage() {
         setIsFavorited(true);
       }
     } catch (err) {
-      if (needsErrorMessage(err)) pushToast('Could not update favorite', 'error');
+      const message = actionErrorMessage(err, 'Could not update favorite');
+      if (message) pushToast(message, 'error');
     } finally { setTogglingFav(false); }
   };
 

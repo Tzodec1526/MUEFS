@@ -4,6 +4,7 @@ import { getFilingHistory, type FilingHistory, type FilingTransaction } from '..
 import { getDemoRole } from '../auth/LoginScreen';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
 import FeeWaiverPanel, { waiverActionLabels } from './FeeWaiverPanel';
 import FilingDateEvidence from './FilingDateEvidence';
 import { formatBytes, formatCents, formatCourtDate, getDocumentLabel, parseServerDate } from '../../utils/format';
@@ -40,7 +41,7 @@ export default function FilingHistoryPage() {
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadFailure | null>(null);
   const role = getDemoRole();
   const backTo = role === 'admin' ? '/admin' : role === 'clerk' ? '/clerk/queue' : '/filings';
 
@@ -52,8 +53,8 @@ export default function FilingHistoryPage() {
       try {
         const result = await getFilingHistory(Number(filingId), page, controller.signal);
         if (!controller.signal.aborted) setHistory(result);
-      } catch {
-        if (!controller.signal.aborted) setError('Could not load filing history. Receipts are available to the filer and court staff.');
+      } catch (err) {
+        if (!controller.signal.aborted) setError(loadFailure(err, 'Could not load filing history. Receipts are available to the filer and court staff.'));
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -71,7 +72,7 @@ export default function FilingHistoryPage() {
       </Link>
     </div>
     {loading && <p role="status">Loading filing history…</p>}
-    {error && <LoadError message={error} onRetry={() => setAttempt(n => n + 1)} />}
+    {error && <LoadError failure={error} onRetry={() => setAttempt(n => n + 1)} />}
     {!loading && !error && history && <>
       <div className="history-summary">
         <span className={`status-badge ${history.status}`}>{history.status === 'served' ? 'Service documents recorded' : history.status.replace(/_/g, ' ')}</span>

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { getFiling, submitFiling, validateFiling, FilingValidation, FilingEnvelope } from '../../api/filings';
 import { formatBytes, getDocumentLabel } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
 import PaymentForm from './PaymentForm';
@@ -21,7 +21,7 @@ interface Props {
 function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesChange, onSubmitSuccess, onSubmittingChange, readOnly = false }: Props) {
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{
-    key: string; filing?: FilingEnvelope; validation?: FilingValidation | null; error?: string;
+    key: string; filing?: FilingEnvelope; validation?: FilingValidation | null; error?: LoadFailure;
   }>();
   const [fees, setFees] = useState<{ key: string; token: string; obligationMet: boolean }>();
   const [submitting, setSubmitting] = useState(false);
@@ -46,7 +46,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
     ]).then(([filing, validation]) => {
       if (!controller.signal.aborted) setResult({ key, filing, validation });
     }).catch(err => {
-      if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load the saved filing for review.' });
+      if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load the saved filing for review.') });
     });
     return () => controller.abort();
   }, [filingId, key, readOnly, submission]);
@@ -87,7 +87,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
       onSubmitSuccess?.(result);
     } catch (err: unknown) {
       if ((err as { response?: { status?: number } }).response?.status === 409) setConflict(true);
-      setError(getErrorDetail(err) || 'Submission could not be confirmed. Retry to check the same submission.');
+      setError(errorMessage(err, 'Submission could not be confirmed. Retry to check the same submission.'));
     } finally {
       setSubmitting(false);
       onSubmittingChange?.(false);
@@ -136,7 +136,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
   }
 
   if (!current) return <p role="status">Loading the saved filing for review…</p>;
-  if (current.error) return <LoadError message={current.error} onRetry={refreshReview} />;
+  if (current.error) return <LoadError failure={current.error} onRetry={refreshReview} />;
   if (!filing) return null;
 
   return (

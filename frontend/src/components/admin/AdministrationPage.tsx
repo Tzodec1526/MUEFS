@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { parseServerDate } from '../../utils/format';
 import LoadError from '../common/LoadError';
 
@@ -15,7 +15,7 @@ interface Account {
   court_roles: { court_id: number; court_name: string; role: string }[];
 }
 interface Directory { users: Account[]; total: number; page_size: number }
-type Remote<T> = { key: string; data?: T; error?: string };
+type Remote<T> = { key: string; data?: T; error?: LoadFailure };
 const accountTypes: Record<string, string> = {
   attorney: 'Attorney', clerk: 'Court staff', judge: 'Judge', self_represented: 'Self-represented filer',
   public: 'Public records user', admin: 'System administrator',
@@ -46,7 +46,7 @@ function AccountForm({ user, self, onSaved }: {
       const result = user ? await apiClient.put<Account>(`/admin/users/${user.id}`, data)
         : await apiClient.post<Account>('/admin/users', data);
       onSaved(result.data);
-    } catch (err) { setError(getErrorDetail(err) || 'Could not save the account.'); }
+    } catch (err) { setError(errorMessage(err, 'Could not save the account.')); }
     finally { setBusy(false); }
   }
   return <form onSubmit={save} className="admin-account-form">
@@ -98,7 +98,7 @@ function CourtAccess({ user, access, directoryCourt, onSaved }: {
         reason: new FormData(form).get('reason'),
       });
       form.reset(); onSaved(response.data);
-    } catch (err) { setError(getErrorDetail(err) || 'Could not change court access.'); }
+    } catch (err) { setError(errorMessage(err, 'Could not change court access.')); }
     finally { setBusy(false); }
   }
   return <section className="admin-detail-section">
@@ -160,13 +160,13 @@ function AccountHistory({ userId, courtId, access }: { userId: number; courtId?:
     const controller = new AbortController();
     apiClient.get<History>(`/admin/users/${userId}/history`, { params: { page, court_id: courtId }, signal: controller.signal })
       .then(response => { if (!controller.signal.aborted) setResult({ key, data: response.data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load access history.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load access history.') }); });
     return () => controller.abort();
   }, [userId, courtId, page, key]);
   return <section className="admin-detail-section">
     <h3>Retained change history</h3>
     {!current && <p role="status">Loading change history…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
       {current.data.total === 0 && <p>No administration changes have been recorded in this view.</p>}
       <ol className="admin-history">{current.data.events.map(event => {
@@ -211,7 +211,7 @@ function AccountDirectory({ access }: { access: Access }) {
     const controller = new AbortController();
     apiClient.get<Directory>('/admin/users', { params: { court_id: court || undefined, email: email || undefined, page }, signal: controller.signal })
       .then(response => { if (!controller.signal.aborted) setResult({ key, data: response.data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load accounts.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load accounts.') }); });
     return () => controller.abort();
   }, [court, email, page, key]);
   useEffect(() => { if (selectedId != null) editorRef.current?.focus(); }, [selectedId]);
@@ -243,7 +243,7 @@ function AccountDirectory({ access }: { access: Access }) {
     <div className="admin-workspace">
       <section aria-label="Account directory">
         {!current && <p role="status">Loading accounts…</p>}
-        {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+        {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
         {current?.data && <>
           <p>{current.data.total} account{current.data.total === 1 ? '' : 's'}</p>
           {current.data.users.map(user => <article className="review-card admin-user-card" key={user.id}>
@@ -281,12 +281,12 @@ export default function AdministrationPage() {
     const controller = new AbortController();
     apiClient.get<Access>('/admin/access', { signal: controller.signal })
       .then(response => { if (!controller.signal.aborted) setResult({ key, data: response.data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not verify administrator access.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not verify administrator access.') }); });
     return () => controller.abort();
   }, [key]);
   return <section className="administration-page">
     {!current && <p role="status">Checking administrator access…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <AccountDirectory access={current.data} />}
   </section>;
 }

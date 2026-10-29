@@ -2,7 +2,7 @@ import { useContext, useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { participantRoles } from '../../api/cases';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { parseServerDate } from '../../utils/format';
 import LoadError from '../common/LoadError';
 import { CourtContext } from '../auth/CourtSession';
@@ -43,7 +43,7 @@ function ContactForm({ path, records, onSaved }: {
         expected_version: contact?.version || 0, expected_participant_version: records.participant_version,
       });
       onSaved();
-    } catch (err) { setError(getErrorDetail(err) || 'Could not save service instructions.'); }
+    } catch (err) { setError(errorMessage(err, 'Could not save service instructions.')); }
     finally { setBusy(false); }
   }
   return <form className="admin-account-form" onSubmit={save}>
@@ -75,19 +75,19 @@ function ContactForm({ path, records, onSaved }: {
 function ContactHistory({ path }: { path: string }) {
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: History; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: History; error?: LoadFailure }>();
   const key = `${path}:${page}:${attempt}`;
   const current = result?.key === key ? result : undefined;
   useEffect(() => {
     const controller = new AbortController();
     apiClient.get<History>(`${path}/history`, { params: { page }, signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load history.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load history.') }); });
     return () => controller.abort();
   }, [path, page, key]);
   return <section className="admin-delegations">
     {!current && <p role="status">Loading service history…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
       {!current.data.total && <p>No service instructions have been recorded.</p>}
       <ul className="court-case-list">{current.data.events.map(event => <li key={event.id}>
@@ -114,7 +114,7 @@ export default function ServiceContactPage() {
   const [attempt, setAttempt] = useState(0);
   const [notice, setNotice] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [result, setResult] = useState<{ key: string; data?: Instructions; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: Instructions; error?: LoadFailure }>();
   const path = `/cases/${caseId}/participants/${participantId}/service-contact`;
   const key = `${path}:${attempt}`;
   const current = result?.key === key ? result : undefined;
@@ -123,14 +123,14 @@ export default function ServiceContactPage() {
     const controller = new AbortController();
     apiClient.get<Instructions>(path, { signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load service instructions.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load service instructions.') }); });
     return () => controller.abort();
   }, [path, key]);
   return <section className="case-participants-page">
     <div className="page-header"><h2>Service instructions</h2>
       <Link className="btn btn-secondary" to={`/cases/${caseId}/participants`}>Back to participants</Link></div>
     {!current && <p role="status">Loading service instructions…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
       <h3>{court?.court_name || `Court ${current.data.court_id}`} · {current.data.case_number} · {current.data.title}</h3>
       <p><strong>{current.data.participant.party_name}</strong> · {participantRoles[current.data.participant.role] || current.data.participant.role}

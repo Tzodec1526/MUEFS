@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { listCourts, Court } from '../../api/courts';
-import { needsErrorMessage } from '../../api/client';
+import { actionErrorMessage } from '../../api/client';
 import { listFavoriteCourts, addFavoriteCourt, removeFavoriteCourt } from '../../api/favorites';
 import LoadError from '../common/LoadError';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { useToast } from '../common/Toast';
 
 interface Props {
@@ -45,8 +46,8 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [statewideFailed, setStatewideFailed] = useState(false);
+  const [error, setError] = useState<LoadFailure | null>(null);
+  const [statewideFailed, setStatewideFailed] = useState<LoadFailure | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [favoritedCourtIds, setFavoritedCourtIds] = useState<Set<number>>(() => new Set());
   const [togglingFav, setTogglingFav] = useState<number | null>(null);
@@ -57,8 +58,12 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
   useEffect(() => {
     const controller = new AbortController();
     listCourts({ tier: 'appellate', page_size: 50 }, controller.signal)
-      .then((r) => { setStatewideCourts(r.courts); setStatewideFailed(false); })
-      .catch(() => { if (!controller.signal.aborted) setStatewideFailed(true); });
+      .then((r) => { setStatewideCourts(r.courts); setStatewideFailed(null); })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          setStatewideFailed(loadFailure(err, "We couldn't load the statewide and appellate courts. Please try again."));
+        }
+      });
     return () => controller.abort();
   }, [reloadKey]);
 
@@ -78,9 +83,9 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
         }, controller.signal);
         setTrialCourts(result.courts);
         setTotal(result.total);
-      } catch {
+      } catch (err) {
         if (controller.signal.aborted) return;
-        setError("We couldn't load the court list. Please try again.");
+        setError(loadFailure(err, "We couldn't load the court list. Please try again."));
         setTrialCourts([]);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -116,7 +121,8 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
         setFavoritedCourtIds(prev => new Set(prev).add(courtId));
       }
     } catch (err) {
-      if (needsErrorMessage(err)) pushToast('Could not update the favorite court. Please try again.', 'error');
+      const message = actionErrorMessage(err, 'Could not update the favorite court. Please try again.');
+      if (message) pushToast(message, 'error');
     } finally {
       setTogglingFav(null);
     }
@@ -222,7 +228,7 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
 
       {error || statewideFailed ? (
         // Missing appellate courts would otherwise look like an empty statewide list.
-        <LoadError message={error || "We couldn't load the statewide and appellate courts. Please try again."}
+        <LoadError failure={(error || statewideFailed)!}
           onRetry={() => setReloadKey((k) => k + 1)} />
       ) : (
         <>

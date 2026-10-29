@@ -3,7 +3,7 @@ import { apiClient } from '../../api/client';
 import type { FilingFees } from '../../api/documents';
 import type { FilingEnvelope } from '../../api/filings';
 import { formatBytes, formatCents, getDocumentLabel } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage } from '../../utils/errors';
 import DocumentDownload from '../common/DocumentDownload';
 
 export default function FeeAssessmentForm({ fees, filing, onSaved }: {
@@ -28,7 +28,7 @@ export default function FeeAssessmentForm({ fees, filing, onSaved }: {
       });
       onSaved();
     } catch (err) {
-      setError(getErrorDetail(err) || 'Could not confirm the assessment. Check history before retrying.');
+      setError(errorMessage(err, 'Could not confirm the assessment. Check history before retrying.'));
     } finally { setBusy(false); }
   }
   return <form className="fee-assessment-form" onSubmit={save}>

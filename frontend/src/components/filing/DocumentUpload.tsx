@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { getFilingRequirements } from '../../api/courts';
 import { getFiling, uploadDocument, removeDocument } from '../../api/filings';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { formatBytes } from '../../utils/format';
 import LoadError from '../common/LoadError';
 
@@ -361,7 +361,7 @@ function DocumentUpload({
   const { required, recommended } = getCompanionRequirements(documents.map(doc => doc.type));
   // Validation matches the court's exact document codes; offer any the catalog lacks.
   const [courtTypes, setCourtTypes] = useState<typeof ALL_TYPES>([]);
-  const [requirementsFailed, setRequirementsFailed] = useState(false);
+  const [requirementsFailed, setRequirementsFailed] = useState<LoadFailure | null>(null);
   const [requirementsAttempt, setRequirementsAttempt] = useState(0);
   const allTypes = [...courtTypes, ...ALL_TYPES];
 
@@ -369,12 +369,14 @@ function DocumentUpload({
     if (filingType === 'service_only') return;
     const controller = new AbortController();
     getFilingRequirements(courtId, caseTypeId, filingType, controller.signal).then((requirements) => {
-      setRequirementsFailed(false);
+      setRequirementsFailed(null);
       setCourtTypes(requirements
         .filter(r => !ALL_TYPES.some(t => t.code === r.document_type_code))
         .map(r => ({ code: r.document_type_code, label: r.description, mcr: r.mcr_reference ?? '' })));
-    }).catch(() => {
-      if (!controller.signal.aborted) setRequirementsFailed(true);
+    }).catch((err) => {
+      if (!controller.signal.aborted) {
+        setRequirementsFailed(loadFailure(err, "Could not load the document types in this court's rules. Retry before choosing a type."));
+      }
     });
     return () => controller.abort();
   }, [courtId, caseTypeId, filingType, requirementsAttempt]);
@@ -447,9 +449,7 @@ function DocumentUpload({
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: unknown) {
       // Surface the backend detail (e.g. malware 422 "Rejected: ...", unsupported-type 415).
-      const detail = getErrorDetail(err);
-      const message = detail || 'Could not confirm the upload. Retry with the same file, or refresh this filing to check its saved documents.';
-      setError(message);
+      setError(errorMessage(err, 'Could not confirm the upload. Retry with the same file, or refresh this filing to check its saved documents.'));
     } finally {
       setPendingAction(null);
       onBusyChange(false);
@@ -464,7 +464,7 @@ function DocumentUpload({
       await removeDocument(filingId, docId);
       await refreshDocuments();
     } catch (err) {
-      setError(getErrorDetail(err) || 'Could not confirm removal. Refresh the filing before retrying.');
+      setError(errorMessage(err, 'Could not confirm removal. Refresh the filing before retrying.'));
     } finally {
       setPendingAction(null);
       onBusyChange(false);
@@ -489,7 +489,7 @@ function DocumentUpload({
 
       {error && <div className="alert alert-error" role="alert">{error}</div>}
       {requirementsFailed && <LoadError
-        message="Could not load the document types in this court's rules. Retry before choosing a type."
+        failure={requirementsFailed}
         onRetry={() => setRequirementsAttempt(attempt => attempt + 1)} />}
 
       {warnings.length > 0 && (

@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { deliveryLabels } from '../../api/notifications';
 import type { DeliveryDetails } from '../../api/serviceDeliveries';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { formatBytes, parseServerDate } from '../../utils/format';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
@@ -19,14 +19,14 @@ function DeliveryHistory({ deliveryId }: { deliveryId: string }) {
   const [kind, setKind] = useState('portal');
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: EventList; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: EventList; error?: LoadFailure }>();
   const key = `${deliveryId}:${kind}:${page}:${attempt}`;
   const current = result?.key === key ? result : undefined;
   useEffect(() => {
     const controller = new AbortController();
     apiClient.get<EventList>(`/service/deliveries/${deliveryId}/events`, { params: { kind, page }, signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load delivery history.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load delivery history.') }); });
     return () => controller.abort();
   }, [deliveryId, kind, page, key]);
   return <div className="review-card"><h3>Retained delivery history</h3>
@@ -35,7 +35,7 @@ function DeliveryHistory({ deliveryId }: { deliveryId: string }) {
       <option value="portal">Delivery activity</option><option value="email">Email attempts</option>
     </select>
     {!current && <p role="status">Loading history…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
       {!current.data.events.length && <p>No events of this type recorded.</p>}
       <ol>{current.data.events.map(event => <li key={event.id}>
@@ -61,7 +61,7 @@ function DeliveryHistory({ deliveryId }: { deliveryId: string }) {
 export default function DeliveryDetailPage() {
   const { deliveryId } = useParams();
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: DeliveryDetails; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: DeliveryDetails; error?: LoadFailure }>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [history, setHistory] = useState(false);
@@ -74,7 +74,7 @@ export default function DeliveryDetailPage() {
     const controller = new AbortController();
     apiClient.get<DeliveryDetails>(`/service/deliveries/${deliveryId}`, { signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not open this delivery.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not open this delivery.') }); });
     return () => controller.abort();
   }, [deliveryId, key]);
 
@@ -83,7 +83,7 @@ export default function DeliveryDetailPage() {
     try {
       await apiClient.post(`/service/deliveries/${deliveryId}/${action}`, reason ? { reason } : undefined);
       setAttempt(n => n + 1);
-    } catch (err) { setError(getErrorDetail(err) || 'Could not record this action.'); }
+    } catch (err) { setError(errorMessage(err, 'Could not record this action.')); }
     finally { setBusy(false); }
   }
 
@@ -107,7 +107,7 @@ export default function DeliveryDetailPage() {
         headers: { 'Idempotency-Key': reportRequest.current.key },
       });
       setReportOpen(false); setHistory(true); setAttempt(n => n + 1);
-    } catch (err) { setError(getErrorDetail(err) || 'The report could not be confirmed. Retry the same information to retrieve the original report.'); }
+    } catch (err) { setError(errorMessage(err, 'The report could not be confirmed. Retry the same information to retrieve the original report.')); }
     finally { setBusy(false); }
   }
 
@@ -115,7 +115,7 @@ export default function DeliveryDetailPage() {
     <div className="page-header"><div><h2>Document delivery record</h2><p>Contents and evidence for this named recipient.</p></div>
       <Link className="btn btn-secondary" to="/service/deliveries">Delivery inbox</Link></div>
     {!current && <p role="status">Loading delivery…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {error && <p role="alert" className="alert alert-error">{error}</p>}
     {data && <>
       <div className="review-card"><h3>{data.court_name}</h3><p>{data.case_number} · {data.case_title}</p>
