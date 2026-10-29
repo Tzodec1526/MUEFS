@@ -151,7 +151,10 @@ it('shows a failed search inline and searches again on retry', async () => {
   fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
 
   await screen.findByRole('link', { name: '2026-000042-CZ' });
-  expect(searchCases).toHaveBeenCalledTimes(2);
+  const [[first], [second]] = vi.mocked(searchCases).mock.calls;
+  expect(vi.mocked(searchCases).mock.calls).toHaveLength(2);
+  expect(first).toMatchObject({ party_name: 'Smith' });
+  expect(second).toEqual(first);
   expect(screen.queryByRole('alert')).toBeNull();
 });
 

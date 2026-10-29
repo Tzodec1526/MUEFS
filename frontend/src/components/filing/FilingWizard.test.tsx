@@ -423,7 +423,7 @@ async function openConflict() {
 it('compares the edits with the saved filing when someone else saved it first', async () => {
   const heading = await openConflict();
 
-  const comparison = heading.closest('section')!;
+  const comparison = screen.getByRole('region', { name: 'Compare changes before saving' });
   expect(within(comparison).getByText('Doe v. Roe, amended')).toBeTruthy();
   expect(within(comparison).getByText('Doe v. Roe, Inc.')).toBeTruthy();
   expect(within(comparison).getByText('Amended complaint')).toBeTruthy();

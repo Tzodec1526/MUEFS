@@ -274,7 +274,7 @@ it('sends a typed reason with a return', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Return for Correction' }));
 
   await waitFor(() => expect(reviewFiling).toHaveBeenCalledTimes(1));
-  expect(reviewFiling).toHaveBeenCalledWith(expect.objectContaining({ id: 11, submission_token: 's-11' }),
+  expect(reviewFiling).toHaveBeenCalledWith(expect.objectContaining({ id: 11, submission_count: 1 }),
     'return', 'Caption is incomplete');
 });
 
@@ -322,5 +322,5 @@ it('shows a filing that fails to open inline in the review panel', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 
   await screen.findByRole('button', { name: 'Accept' });
-  expect(getFiling).toHaveBeenCalledTimes(2);
+  expect(vi.mocked(getFiling).mock.calls.map(([id]) => id)).toEqual([11, 11]);
 });
