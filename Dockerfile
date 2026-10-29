@@ -7,7 +7,7 @@
 #   Then open http://localhost:8000. Hosted deployments supply their own runtime secret.
 
 # ---- Stage 1: build the React SPA ----
-FROM node:22-alpine AS frontend
+FROM node:22.23.4-alpine AS frontend
 WORKDIR /fe
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
