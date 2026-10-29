@@ -1,11 +1,25 @@
-import { defineConfig } from 'vite';
+import { configDefaults, defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
 // The Compose stack runs the API in another container.
 const apiTarget = process.env.API_PROXY_TARGET || 'http://localhost:8000';
 
+const nodeTests = ['src/styles/global.css.test.ts'];
+
 export default defineConfig({
   plugins: [react()],
+  test: {
+    projects: [
+      {
+        extends: true,
+        test: { name: 'jsdom', environment: 'jsdom', exclude: [...configDefaults.exclude, ...nodeTests] },
+      },
+      {
+        extends: true,
+        test: { name: 'node', environment: 'node', include: nodeTests },
+      },
+    ],
+  },
   server: {
     // Listen on this computer only; the container image opts in to other interfaces.
     port: 3000,

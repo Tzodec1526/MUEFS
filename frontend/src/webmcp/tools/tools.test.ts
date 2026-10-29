@@ -1,4 +1,3 @@
-// @vitest-environment jsdom
 import { AxiosError, type AxiosResponse } from 'axios';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { apiClient } from '../../api/client';
