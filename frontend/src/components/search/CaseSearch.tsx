@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { needsErrorMessage } from '../../api/client';
 import { Link2 } from 'lucide-react';
 import { CaseSearchResult, searchCases } from '../../api/cases';
 import { CourtDirectoryEntry, listCourtDirectory } from '../../api/courts';
@@ -8,7 +9,17 @@ import { getDemoRole } from '../auth/LoginScreen';
 import LoadError from '../common/LoadError';
 import { useToast } from '../common/Toast';
 import { formatCourtDate, parseServerDate } from '../../utils/format';
-import { logAgentActivity } from '../../webmcp/activity';
+import { trackAgentSubmission, type AgentSubmission } from '../../webmcp/declarative';
+import { apiErrorResult, toolError } from '../../webmcp/output';
+import { caseSearchResult } from '../../webmcp/records';
+
+/** The search these URL parameters request; an agent's form submission is reported only by it. */
+function searchRequestOf(params: URLSearchParams): string {
+  return JSON.stringify(['case', 'party', 'court'].map(name => params.get(name) || ''));
+}
+
+/** The answer to an agent submission whose search never ran to completion. */
+const REPLACED = toolError('A newer search replaced this one before it finished.', 'cancelled');
 
 function CaseSearch() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -33,10 +44,13 @@ function CaseSearch() {
   const [results, setResults] = useState<CaseSearchResult[]>([]);
   const [total, setTotal] = useState(0);
   const [searching, setSearching] = useState(false);
-  const [favoritedIds, setFavoritedIds] = useState<Set<number>>(new Set());
+  const [favoritedIds, setFavoritedIds] = useState<Set<number>>(() => new Set());
   const [togglingFav, setTogglingFav] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // An agent-invoked submission of the search form, waiting for the search it requested.
+  const agentSubmission = useRef<{ request: string; report: AgentSubmission } | null>(null);
+  const searchRequest = searchRequestOf(searchParams);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -64,8 +78,19 @@ function CaseSearch() {
     loadFavorites();
   }, [showFavorites]);
 
+  // An agent submission still waiting when the page closes gets an answer too.
+  useEffect(() => () => {
+    agentSubmission.current?.report(false, REPLACED);
+    agentSubmission.current = null;
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
+    // Any search that starts supersedes a pending agent submission; only the requested one reports it.
+    const pending = agentSubmission.current;
+    agentSubmission.current = null;
+    const reportAgent = pending?.request === searchRequest && page === 1 ? pending.report : null;
+    if (pending && !reportAgent) pending.report(false, REPLACED);
     async function load() {
       setSearching(true);
       setError(null);
@@ -73,10 +98,12 @@ function CaseSearch() {
       setPartyName(submittedPartyName);
       setCourtId(submittedCourt && !invalidCourt ? String(Number(submittedCourt)) : submittedCourt);
       if (invalidCourt) {
-        setError('The court filter in this link is invalid. Choose a court and search again.');
+        const message = 'The court filter in this link is invalid. Choose a court and search again.';
+        setError(message);
         setResults([]);
         setTotal(0);
         setSearching(false);
+        reportAgent?.(false, toolError(message, 'invalid'));
         return;
       }
       try {
@@ -89,25 +116,45 @@ function CaseSearch() {
         if (controller.signal.aborted) return;
         setResults(data.cases);
         setTotal(data.total);
-      } catch {
+        // What the imperative search_cases tool returns for the same search.
+        reportAgent?.(true, caseSearchResult(data));
+      } catch (err) {
         if (controller.signal.aborted) return;
         setError("We couldn't reach the records system. Please try again.");
         setResults([]);
         setTotal(0);
+        reportAgent?.(false, apiErrorResult(err) ?? toolError('The search failed.', 'unavailable'));
       } finally {
         if (!controller.signal.aborted) setSearching(false);
       }
     }
     load();
-    return () => controller.abort();
-  }, [submittedCaseNumber, submittedPartyName, submittedCourt, invalidCourt, page, reloadKey]);
+    return () => {
+      controller.abort();
+      // A newer search, or leaving the page, replaced this one before it settled.
+      reportAgent?.(false, REPLACED);
+    };
+  }, [submittedCaseNumber, submittedPartyName, submittedCourt, invalidCourt, page, reloadKey, searchRequest]);
 
-  const handleSearch = () => {
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    // The submitted fields, which an agent may have filled, not state from the last render.
+    const fields = new FormData(event.currentTarget);
+    const field = (name: string) => String(fields.get(name) ?? '').trim();
+    const input = { case_number: field('case_number'), party_name: field('party_name'), court_id: field('court_id') };
     const next = new URLSearchParams();
-    if (caseNumber.trim()) next.set('case', caseNumber.trim());
-    if (partyName.trim()) next.set('party', partyName.trim());
-    if (courtId) next.set('court', courtId);
-    if (next.toString() === searchParams.toString()) setReloadKey((key) => key + 1);
+    if (input.case_number) next.set('case', input.case_number);
+    if (input.party_name) next.set('party', input.party_name);
+    if (input.court_id) next.set('court', input.court_id);
+    const request = searchRequestOf(next);
+
+    // Null for a human submission, which also replaces a pending agent one.
+    const report = trackAgentSubmission(event, 'search_cases_form', input);
+    agentSubmission.current?.report(false, REPLACED);
+    agentSubmission.current = report && { request, report };
+    // Every submission starts exactly one search: a changed search or page through the URL,
+    // the search already shown on page 1 through reloadKey (the URL alone would not rerun it).
+    if (request === searchRequest && page === 1) setReloadKey((key) => key + 1);
     else setSearchParams(next);
   };
 
@@ -145,8 +192,8 @@ function CaseSearch() {
         setFavoritedIds((prev) => new Set(prev).add(caseId));
         pushToast('Added to favorites', 'success');
       }
-    } catch {
-      pushToast('Could not update favorite', 'error');
+    } catch (err) {
+      if (needsErrorMessage(err)) pushToast('Could not update favorite', 'error');
     } finally {
       setTogglingFav(null);
     }
@@ -165,18 +212,9 @@ function CaseSearch() {
 
       <form
         className="search-form"
-        toolname="search_cases"
+        toolname="search_cases_form"
         tooldescription="Search Michigan public court records by party name, case number and court"
-        onSubmit={(e) => {
-          e.preventDefault();
-          logAgentActivity(
-            'search_cases',
-            { case_number: caseNumber, party_name: partyName, court_id: courtId, via: 'declarative_form' },
-            true,
-            0,
-          );
-          handleSearch();
-        }}
+        onSubmit={handleSearch}
       >
         <div className="form-row">
           <div className="form-group">
@@ -266,7 +304,7 @@ function CaseSearch() {
                           <button
                             className={`fav-btn ${favoritedIds.has(c.id) ? 'favorited' : ''}`}
                             onClick={() => toggleFavorite(c.id)}
-                            disabled={togglingFav === c.id}
+                            disabled={togglingFav !== null}
                             title={favoritedIds.has(c.id) ? 'Remove from favorites' : 'Add to favorites'}
                             aria-label={favoritedIds.has(c.id) ? 'Remove from favorites' : 'Add to favorites'}
                           >

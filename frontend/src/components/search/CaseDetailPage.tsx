@@ -1,37 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Link2 } from 'lucide-react';
-import { apiClient } from '../../api/client';
-import { participantRoles } from '../../api/cases';
+import { apiClient, needsErrorMessage } from '../../api/client';
+import { participantRoles, type CaseDocket } from '../../api/cases';
 import { addFavorite, removeFavorite, listFavorites } from '../../api/favorites';
 import { getCaseTypes } from '../../api/courts';
 import { formatBytes, formatCourtDate, formatShortDate, getDocumentLabel } from '../../utils/format';
 import { getDemoRole } from '../auth/LoginScreen';
 import { useToast } from '../common/Toast';
 import DocumentDownload from '../common/DocumentDownload';
-
-interface CaseDetail {
-  id: number;
-  court_id: number;
-  case_number: string;
-  case_type_id: number;
-  title: string;
-  is_sealed?: boolean;
-  can_manage_records: boolean;
-  status: string;
-  filed_date: string;
-  filing_date: string | null;
-  judge_id: number | null;
-  participants: Array<{
-    id: number;
-    party_name: string;
-    role: string;
-    attorney_bar_number: string | null;
-    represented_party_name: string | null;
-    is_active: boolean;
-  }>;
-  created_at: string;
-}
 
 interface CaseFiling {
   id: number;
@@ -61,7 +38,7 @@ function CaseDetailPage() {
   const role = getDemoRole();
   const isPublicViewer = role === 'public' || !role;
   const isFiler = role === 'attorney' || role === 'srl';
-  const [caseData, setCaseData] = useState<CaseDetail | null>(null);
+  const [caseData, setCaseData] = useState<CaseDocket | null>(null);
   const [filings, setFilings] = useState<CaseFiling[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +78,8 @@ function CaseDetailPage() {
         try {
           const [courtRes, types] = await Promise.all([
             apiClient.get(`/courts/${caseRes.data.court_id}`, { signal: controller.signal }),
-            getCaseTypes(caseRes.data.court_id),
+            // Include types the court has closed to new cases: existing dockets still carry them.
+            getCaseTypes(caseRes.data.court_id, true),
           ]);
           if (controller.signal.aborted) return;
           setCourtName(courtRes.data.name);
@@ -170,8 +148,9 @@ function CaseDetailPage() {
         await addFavorite(caseData.id);
         setIsFavorited(true);
       }
-    } catch { /* ignore */ }
-    finally { setTogglingFav(false); }
+    } catch (err) {
+      if (needsErrorMessage(err)) pushToast('Could not update favorite', 'error');
+    } finally { setTogglingFav(false); }
   };
 
   // Public dockets show register-of-actions language, not the internal e-filing
@@ -219,16 +198,16 @@ function CaseDetailPage() {
               {isFavorited ? '\u2605 Favorited' : '\u2606 Favorite'}
             </button>
           )}
-          {isFiler && (
+          {isFiler && caseData.can_file && (
             <>
               <Link
-                to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&case_title=${encodeURIComponent(caseData.title)}`}
+                to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}`}
                 className="btn btn-primary"
               >
                 File with Court
               </Link>
               <Link
-                to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&case_title=${encodeURIComponent(caseData.title)}&service_only=true`}
+                to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&service_only=true`}
                 className="btn btn-secondary"
               >
                 Serve Documents Only
@@ -237,6 +216,11 @@ function CaseDetailPage() {
           )}
         </div>
       </div>
+
+      {isFiler && !caseData.can_file && <p className="alert alert-info" role="status">
+        Court-reviewed case participation is required to file documents in this case.
+        Contact the court to confirm your access.
+      </p>}
 
       {/* Case Info */}
       <div className="case-detail-grid">
@@ -277,9 +261,9 @@ function CaseDetailPage() {
       <div className="case-detail-card">
         <div className="docket-header">
           <h3>Docket / Filing History ({filings.length})</h3>
-          {isFiler && (
+          {isFiler && caseData.can_file && (
             <Link
-              to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&case_title=${encodeURIComponent(caseData.title)}`}
+              to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}`}
               className="btn btn-primary btn-small"
             >
               + Create New Filing

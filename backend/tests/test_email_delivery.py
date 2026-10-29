@@ -33,7 +33,14 @@ async def smtp_sink(monkeypatch):
                 verb = line.strip().split(b" ", 1)[0].upper()
                 state["commands"].append(verb)
                 if verb == b"EHLO":
-                    writer.write(b"250-localhost\r\n250 SIZE 100000\r\n")
+                    # Offer TLS and authentication, so skipping them is the client's decision.
+                    writer.write(
+                        b"250-localhost\r\n250-STARTTLS\r\n250-AUTH PLAIN\r\n250 SIZE 100000\r\n"
+                    )
+                elif verb == b"STARTTLS":
+                    writer.write(b"454 TLS not available due to temporary reason\r\n")
+                elif verb == b"AUTH":
+                    writer.write(b"235 Authentication successful\r\n")
                 elif verb in (b"HELO", b"MAIL", b"RSET"):
                     writer.write(b"250 OK\r\n")
                 elif verb == b"RCPT":
@@ -228,7 +235,7 @@ async def test_verification_is_rechecked_before_smtp(mail_sessions, smtp_sink):
 
 
 async def test_rollback_does_not_leave_an_email_to_send(mail_sessions, smtp_sink):
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="Database work failed"):
         async with mail_sessions.begin() as db:
             await prepare_notice(db)
             raise RuntimeError("Database work failed")
@@ -305,39 +312,57 @@ async def test_oidc_verifies_email_and_revokes_mismatched_or_unverified_claims(
         return claims
 
     monkeypatch.setattr(auth, "decode_keycloak_access_token", decode)
-    assert (await api_client.get("/api/v1/auth/me")).status_code == 200
-    assert user.verified_email == user.email
+
+    async def sign_in_and_read_verified_email():
+        assert (await api_client.get("/api/v1/auth/me")).status_code == 200
+        # A column query reads the flushed row, not the session's cached User object.
+        return await db_session.scalar(select(User.verified_email).where(User.id == user.id))
+
+    assert await sign_in_and_read_verified_email() == "identity@example.com"
     claims["email"] = "different@example.com"
-    await api_client.get("/api/v1/auth/me")
-    assert user.verified_email is None
-    claims.update(email=user.email, email_verified=False)
-    await api_client.get("/api/v1/auth/me")
-    assert user.verified_email is None
+    assert await sign_in_and_read_verified_email() is None
+    claims["email"] = user.email
+    assert await sign_in_and_read_verified_email() == "identity@example.com"
+    # Revocation must start from a verified address, or it would prove nothing.
+    claims["email_verified"] = False
+    assert await sign_in_and_read_verified_email() is None
 
 
 async def test_starttls_failure_does_not_send_credentials_or_message(
     mail_sessions, smtp_sink, monkeypatch
 ):
     async with mail_sessions.begin() as db:
-        await prepare_notice(db)
+        nid, *_ = await prepare_notice(db)
     monkeypatch.setattr(settings, "smtp_tls", "starttls")
     monkeypatch.setattr(settings, "smtp_username", "test-user")
-    await delivery.deliver_next(mail_sessions)
-    assert b"MAIL" not in smtp_sink["commands"] and b"AUTH" not in smtp_sink["commands"]
+    assert await delivery.deliver_next(mail_sessions)
+    # The sink offers AUTH and accepts any login, so only the client can stop at the refusal.
+    commands = smtp_sink["commands"]
+    assert b"STARTTLS" in commands
+    assert [verb for verb in commands if verb in {b"AUTH", b"MAIL", b"RCPT", b"DATA"}] == []
     assert smtp_sink["messages"] == []
+    async with mail_sessions() as db:
+        attempt = await db.scalar(
+            select(NotificationDeliveryEvent)
+            .where(NotificationDeliveryEvent.notification_id == nid)
+            .order_by(NotificationDeliveryEvent.id.desc())
+            .limit(1)
+        )
+        assert (attempt.outcome, attempt.smtp_code) == ("temporary_failure", 454)
 
 
 @pytest.mark.parametrize(
-    "changes",
+    "changes, reason",
     [
-        {"smtp_host": "relay.example.com"},
-        {"debug": False},
-        {"portal_base_url": "https://user:password@example.com"},
-        {"smtp_from": "notices@example.com\nBcc: other@example.com"},
+        ({"smtp_host": "relay.example.com"}, "Unencrypted SMTP"),
+        ({"smtp_host": "relay.example.com", "smtp_tls": "starttls"}, "external SMTP relay"),
+        ({"debug": False}, "requires HTTPS"),
+        ({"portal_base_url": "https://user:password@example.com"}, "without credentials"),
+        ({"smtp_from": "notices@example.com\nBcc: other@example.com"}, "single valid email"),
     ],
 )
-def test_unsafe_mail_configuration_is_rejected(smtp_sink, monkeypatch, changes):
+def test_unsafe_mail_configuration_is_rejected(smtp_sink, monkeypatch, changes, reason):
     for name, value in changes.items():
         monkeypatch.setattr(settings, name, value)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=reason):
         delivery.validate_email_config()

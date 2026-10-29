@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 
 from email_validator import EmailNotValidError, validate_email
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User, UserType
@@ -62,9 +62,15 @@ async def provision_user_from_oidc(
     first = (claims.get("given_name") or claims.get("first_name") or "").strip() or "User"
     last = (claims.get("family_name") or claims.get("last_name") or "").strip() or "Name"
 
-    # Link existing row that matched email before OIDC was attached (e.g. migrated demo account)
-    result = await db.execute(select(User).where(User.email == email))
-    existing = result.scalar_one_or_none()
+    # Link existing row that matched email before OIDC was attached (e.g. migrated demo account).
+    # Stored addresses keep their original case; legacy case variants are ambiguous.
+    matches = (await db.scalars(
+        select(User).where(func.lower(User.email) == email).limit(2)
+    )).all()
+    if len(matches) > 1:
+        logger.warning("Email %s matches several accounts; refusing to auto-provision", email)
+        return None
+    existing = matches[0] if matches else None
     if existing:
         if existing.keycloak_id and existing.keycloak_id != sub:
             logger.warning("Email %s already bound to another OIDC subject", email)

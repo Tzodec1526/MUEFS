@@ -48,7 +48,13 @@ interface Props {
 
 function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
   const [caseTypes, setCaseTypes] = useState<CaseType[]>([]);
-  const [requirements, setRequirements] = useState<FilingRequirement[]>([]);
+  const [requirementsResult, setRequirementsResult] = useState<{
+    key: string; requirements?: FilingRequirement[]; error?: string;
+  }>();
+  const [requirementsAttempt, setRequirementsAttempt] = useState(0);
+  const requirementsKey = `${courtId}:${selectedCaseTypeId}:${requirementsAttempt}`;
+  const currentRequirements = requirementsResult?.key === requirementsKey ? requirementsResult : undefined;
+  const requirements = currentRequirements?.requirements ?? [];
   const [loading, setLoading] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -56,37 +62,41 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    const controller = new AbortController();
     async function fetchCaseTypes() {
       setLoading(true);
       setError(null);
       try {
-        const types = await getCaseTypes(courtId);
+        const types = await getCaseTypes(courtId, false, controller.signal);
+        if (controller.signal.aborted) return;
         setCaseTypes(types);
       } catch {
+        if (controller.signal.aborted) return;
         setError("We couldn't load case types for this court. Please retry.");
         setCaseTypes([]);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
     fetchCaseTypes();
+    return () => controller.abort();
   }, [courtId, reloadKey]);
 
   useEffect(() => {
-    if (!selectedCaseTypeId) {
-      setRequirements([]); // eslint-disable-line react-hooks/set-state-in-effect -- sync clear on selection change
-      return;
-    }
+    if (!selectedCaseTypeId) return;
+    const controller = new AbortController();
     async function fetchRequirements() {
       try {
-        const reqs = await getFilingRequirements(courtId, selectedCaseTypeId!, 'initial');
-        setRequirements(reqs);
+        const reqs = await getFilingRequirements(courtId, selectedCaseTypeId!, 'initial', controller.signal);
+        if (!controller.signal.aborted) setRequirementsResult({ key: requirementsKey, requirements: reqs });
       } catch {
-        setRequirements([]);
+        if (!controller.signal.aborted) setRequirementsResult({ key: requirementsKey,
+          error: 'Could not load requirements for this case type. Please retry before continuing.' });
       }
     }
     fetchRequirements();
-  }, [courtId, selectedCaseTypeId]);
+    return () => controller.abort();
+  }, [courtId, selectedCaseTypeId, requirementsKey]);
 
   const categories = [...new Set(caseTypes.map(ct => ct.category))];
 
@@ -148,8 +158,8 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
             onClick={() => onSelect(ct.id, ct.name)}
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(ct.id, ct.name); }}
-            aria-selected={selectedCaseTypeId === ct.id}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(ct.id, ct.name); } }}
+            aria-pressed={selectedCaseTypeId === ct.id}
           >
             <div className="case-type-header">
               <h4>{ct.name}</h4>
@@ -170,6 +180,9 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
       </div>
 
       {/* Filing Requirements - shown after selecting a case type */}
+      {selectedCaseTypeId && !currentRequirements && <p role="status">Loading filing requirements…</p>}
+      {currentRequirements?.error && <LoadError message={currentRequirements.error}
+        onRetry={() => setRequirementsAttempt(attempt => attempt + 1)} />}
       {selectedCaseTypeId && requirements.length > 0 && (
         <div className="requirements-section">
           <h4>Filing Requirements & Court Rules</h4>

@@ -5,7 +5,7 @@ The clerk review queue lists pending filings for the demo court (3rd Circuit / W
 ## Sub-features
 
 - `queue-open` opens `/clerk/queue` after clerk sign-in (`Open Queue` on the clerk dashboard).
-- `queue-list` shows `Clerk Review Queue` with a Pending count and rows or `No pending filings for this court`.
+- `queue-list` shows `Clerk Review Queue` with a matching-filings count and rows or `No filings match these filters in this court.`
 - `queue-open-filing` selects a row and shows `Filing #<id>` with Review Actions.
 - `queue-refresh` reloads via the Filter form `Refresh` button.
 
@@ -25,8 +25,8 @@ Preconditions:
 - `control-muefs doctor` is clean.
 - Seeded queue may be empty; empty is a valid end state.
 
-- **Open queue.** Run `node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser goto /clerk/queue`. Heading `Clerk Review Queue` is visible. Court label is `3rd Circuit Court - Wayne County`. Filter control `Filter` is present.
-- **Refresh.** Run `node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser click --role button --name "Refresh"`. The page still shows the queue heading (loading label may briefly read `Refreshing...`).
+- **Open queue.** Run `node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser goto /clerk/queue`. Heading `Clerk Review Queue` is visible. The `Working court` select shows `3rd Circuit Court`. Filter control `Filter` is present.
+- **Refresh.** Run `node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser click --role button --name "Refresh"`. The page still shows the queue heading (the button may briefly read `Loading...`).
 - **Open a filing (if rows exist).** Click a table row (case title cell). Panel heading `Filing #` appears with `Accept`, `Return for Correction`, and `Reject`.
 - **Proof.** Snapshot and screenshot to `artifacts/clerk-queue/queue.aria.txt` and `artifacts/clerk-queue/queue.png`. They show MUEFS and `Clerk Review Queue`. If the queue is empty, the empty-row copy is the proof — do not invent a filing.
 

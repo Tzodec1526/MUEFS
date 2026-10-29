@@ -12,15 +12,19 @@ from io import BytesIO
 
 import pytest
 from pypdf import PdfReader
-from sqlalchemy import create_engine, func
+from sqlalchemy import create_engine, func, text
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import Session
 
 import app.seed_data as seed_data
 from app.models.case import Case
 from app.models.court import CaseType, Court, CourtType, FilingRequirement
 from app.models.filing import FilingDocument
-from app.services import document_service
+from app.readiness import EXPECTED_HEADS
+from app.services import access_service, document_service
 from app.services.filing_service import requirements_for_filing_type
+from tests.test_filing_concurrency import POSTGRES_URL
+from tests.test_filing_concurrency import postgres_sessions as postgres_sessions
 
 # Served on parties, not filed with the court (MCR 2.302(H)).
 SERVED_NOT_FILED_DISCOVERY = {
@@ -34,14 +38,9 @@ SERVED_NOT_FILED_DISCOVERY = {
 def seeded_session(tmp_path_factory):
     db_path = tmp_path_factory.mktemp("seed") / "seed.db"
     url = f"sqlite:///{db_path}"
-    original = seed_data.DATABASE_URL
-    seed_data.DATABASE_URL = url
-    try:
-        with pytest.MonkeyPatch.context() as patch:
-            patch.setattr(document_service, "_local_storage_path", lambda: db_path.parent / "files")
-            seed_data.seed_database()
-    finally:
-        seed_data.DATABASE_URL = original
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(document_service, "_local_storage_path", lambda: db_path.parent / "files")
+        seed_data.seed_database(url=url)
     engine = create_engine(url)
     with Session(engine) as session:
         session.info["document_root"] = db_path.parent / "files"
@@ -128,29 +127,26 @@ def test_seed_reset_flag_rebuilds_from_scratch(tmp_path, monkeypatch):
     """--reset drops and reseeds the app tables; a plain rerun still skips."""
     url = f"sqlite:///{tmp_path / 'reset.db'}"
     monkeypatch.setattr(document_service, "_local_storage_path", lambda: tmp_path / "files")
-    original = seed_data.DATABASE_URL
-    seed_data.DATABASE_URL = url
     engine = create_engine(url)
     try:
-        seed_data.seed_database()
+        seed_data.seed_database(url=url)
         with Session(engine) as session:
             baseline_courts = session.query(Court).count()
             session.query(FilingRequirement).delete()
             session.commit()
 
         # Without reset, seeding sees existing courts and skips — damage stays.
-        seed_data.seed_database()
+        seed_data.seed_database(url=url)
         with Session(engine) as session:
             assert session.query(FilingRequirement).count() == 0
 
         # With reset, the schema is rebuilt and fully reseeded.
-        seed_data.seed_database(reset=True)
+        seed_data.seed_database(reset=True, url=url)
         with Session(engine) as session:
             assert session.query(Court).count() == baseline_courts
             assert session.query(FilingRequirement).count() > 0
     finally:
         engine.dispose()
-        seed_data.DATABASE_URL = original
 
 
 def test_sample_docket_has_real_marked_documents_with_matching_metadata(seeded_session):
@@ -173,3 +169,63 @@ def test_sample_case_numbers_match_filed_year_and_subject(seeded_session):
         f"{case.filed_date.year:04d}-{index:06d}-{suffix}"
         for index, (case, suffix) in enumerate(zip(cases, ["CZ", "NO", "DM", "PZ"]), 1)
     ]
+
+
+async def test_sample_participants_can_file_only_on_their_reviewed_cases(seeded_session):
+    engine = create_async_engine(f"sqlite+aiosqlite:///{seeded_session.bind.url.database}")
+    try:
+        async with AsyncSession(engine) as db:
+            assert await access_service.user_may_file_on_case(db, 1, 1)
+            assert await access_service.user_may_file_on_case(db, 1, 2)
+            assert await access_service.user_may_file_on_case(db, 4, 2)
+            assert not await access_service.user_may_file_on_case(db, 4, 1)
+            assert not await access_service.user_may_file_on_case(db, 1, 3)
+            assert not await access_service.user_may_file_on_case(db, 5, 1)
+    finally:
+        await engine.dispose()
+
+
+def test_async_driver_seed_matches_sync_seed(seeded_session, tmp_path, monkeypatch):
+    """PostgreSQL seeds through asyncpg; aiosqlite exercises the same driver bridge."""
+    url = f"sqlite+aiosqlite:///{tmp_path / 'async-seed.db'}"
+    monkeypatch.setattr(document_service, "_local_storage_path", lambda: tmp_path / "files")
+    engine = create_engine(f"sqlite:///{tmp_path / 'async-seed.db'}")
+    models = (Court, CaseType, FilingRequirement, FilingDocument)
+    expected = [seeded_session.query(model).count() for model in models]
+
+    def seeded_counts():
+        with Session(engine) as session:
+            assert {session.scalar(text("SELECT version_num FROM alembic_version"))} == (
+                EXPECTED_HEADS
+            )
+            return [session.query(model).count() for model in models]
+
+    try:
+        seed_data.seed_database(url=url)
+        assert seeded_counts() == expected
+        with Session(engine) as session:
+            session.query(FilingRequirement).delete()
+            session.commit()
+        seed_data.seed_database(url=url)  # A rerun keeps existing data.
+        assert seeded_counts()[2] == 0
+        seed_data.seed_database(reset=True, url=url)
+        assert seeded_counts() == expected
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.skipif(not POSTGRES_URL, reason="MUEFS_TEST_POSTGRES_URL not configured")
+@pytest.mark.parametrize("postgres_sessions", ["c39f64dbea05"], indirect=True)
+async def test_reset_rebuilds_a_postgresql_schema_from_an_earlier_release(postgres_sessions):
+    # Earlier releases left the notices' old enum type behind; the reset must not fail on it.
+    engine = postgres_sessions.kw["bind"]
+    async with engine.connect() as connection:
+        await connection.run_sync(seed_data._prepare_schema, True)
+    async with engine.connect() as connection:
+        leftover = await connection.scalar(text(
+            "SELECT count(*) FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace "
+            "WHERE t.typname = 'deliverystatus' AND n.nspname = current_schema()"
+        ))
+        versions = set(await connection.scalars(text("SELECT version_num FROM alembic_version")))
+    assert leftover == 0
+    assert versions == set(EXPECTED_HEADS)

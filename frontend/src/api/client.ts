@@ -1,4 +1,4 @@
-import axios, { AxiosError, CanceledError, type InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError, CanceledError, isCancel, type InternalAxiosRequestConfig } from 'axios';
 import { isDemoBuild } from '../config/demoMode';
 import { emitToast } from '../utils/toastBus';
 import {
@@ -18,6 +18,23 @@ export const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+/** The toast the response interceptor shows for a failed request, if any. */
+function interceptorMessage(error: unknown): string | null {
+  const { response } = error as { response?: { status?: number; data?: { detail?: unknown } } };
+  const status = response?.status;
+  const detail = response?.data?.detail;
+  if (status === 401) return null;
+  if (typeof detail === 'string') return detail;
+  if (status === 429) return 'Too many requests. Please wait a moment and try again.';
+  if (status === 403) return 'You do not have permission to do that.';
+  return null;
+}
+
+/** Whether a caller must explain this failure itself: the client neither showed nor cancelled it. */
+export function needsErrorMessage(error: unknown): boolean {
+  return !isCancel(error) && interceptorMessage(error) === null;
+}
 
 function expireSession(expected: SessionSnapshot): void {
   if (!clearSession(expected)) return;
@@ -67,20 +84,9 @@ apiClient.interceptors.response.use(
     if (expected && !isCurrentSession(expected)) {
       return Promise.reject(new CanceledError('The signed-in account changed.', error.config));
     }
-    const status = error.response?.status;
-    const detail = error.response?.data?.detail;
-    const message =
-      typeof detail === 'string'
-        ? detail
-        : status === 429
-          ? 'Too many requests. Please wait a moment and try again.'
-          : status === 403
-            ? 'You do not have permission to do that.'
-            : null;
-    if (message && status !== 401) {
-      emitToast(message, 'error');
-    }
-    if (status === 401 && expected?.token) expireSession(expected);
+    const message = interceptorMessage(error);
+    if (message) emitToast(message, 'error');
+    if (error.response?.status === 401 && expected?.token) expireSession(expected);
     return Promise.reject(error);
   }
 );

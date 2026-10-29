@@ -6,12 +6,13 @@ from uuid import uuid4
 
 # Before any app.settings load: pin the test environment to demo mode (SQLite + local
 # document storage) so tests never reach for Postgres / Redis / S3. This mirrors how the
-# hosted demo actually runs. setdefault leaves an explicit DATABASE_URL (e.g. a CI matrix
-# value) untouched.
-os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
-os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-os.environ.setdefault("DEBUG", "true")
-os.environ.setdefault("ALLOW_DEMO_MODE", "true")
+# hosted demo actually runs. Assign rather than default: a DATABASE_URL exported for the
+# app must not send test uploads to a real bucket. Service-backed tests opt in through
+# MUEFS_TEST_* variables instead.
+os.environ["RATE_LIMIT_ENABLED"] = "false"
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+os.environ["DEBUG"] = "true"
+os.environ["ALLOW_DEMO_MODE"] = "true"
 
 from collections.abc import AsyncGenerator
 

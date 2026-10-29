@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import type { PaymentRegister } from '../../api/payments';
 import { formatCents, parseServerDate } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { getBlobErrorDetail, getErrorDetail } from '../../utils/errors';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 
@@ -70,11 +70,7 @@ export default function PaymentRegisterPage() {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
       if (controller.signal.aborted) return;
-      const body = (err as { response?: { data?: unknown } }).response?.data;
-      let detail = getErrorDetail(err);
-      if (body instanceof Blob) {
-        try { detail = getErrorDetail({ response: { data: JSON.parse(await body.text()) } }); } catch { /* Use the readable fallback. */ }
-      }
+      const detail = await getBlobErrorDetail(err);
       if (!controller.signal.aborted) setExportError(detail || 'Could not export the receipt register.');
     } finally { if (!controller.signal.aborted) setExporting(false); }
   }

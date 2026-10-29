@@ -6,6 +6,17 @@ import LoadError from '../common/LoadError';
 import DocumentDownload from '../common/DocumentDownload';
 import { formatBytes, getDocumentLabel, parseServerDate } from '../../utils/format';
 import { getErrorDetail } from '../../utils/errors';
+import { trackAgentSubmission, type AgentSubmission } from '../../webmcp/declarative';
+import { apiErrorResult, toolError } from '../../webmcp/output';
+import { clerkQueueResult } from '../../webmcp/records';
+
+const ACTION_UNCONFIRMED = 'the request did not complete. Refresh the queue to check its current status before trying again.';
+const BATCH_UNCONFIRMED = 'Could not accept the selected filings. Refresh the queue to check their current status before trying again.';
+const REPLACED = toolError('A newer queue search replaced this one before it finished.', 'cancelled');
+
+const sameFilters = (a: ClerkQueueFilters, b: ClerkQueueFilters) =>
+  (a.status || 'all') === (b.status || 'all') && (a.search || '') === (b.search || '')
+  && Boolean(a.waiting_48h_only) === Boolean(b.waiting_48h_only);
 
 function ReviewQueue() {
   const { court } = useContext(CourtContext)!;
@@ -20,7 +31,7 @@ function ReviewQueue() {
   const [loading, setLoading] = useState(false);
   const [reviewReason, setReviewReason] = useState('');
   const [actionInProgress, setActionInProgress] = useState(false);
-  const [selectedSubmissions, setSelectedSubmissions] = useState<Map<number, number>>(new Map());
+  const [selectedSubmissions, setSelectedSubmissions] = useState<Map<number, number>>(() => new Map());
   const [filters, setFilters] = useState<ClerkQueueFilters>({ status: 'all', search: '', waiting_48h_only: false });
   const [filterDraft, setFilterDraft] = useState(filters);
   const statusFilter = filters.status;
@@ -33,8 +44,13 @@ function ReviewQueue() {
   const requestRef = useRef<AbortController | null>(null);
   const reviewRequestRef = useRef<AbortController | null>(null);
   const reviewHeading = useRef<HTMLHeadingElement>(null);
+  const queueHeading = useRef<HTMLHeadingElement>(null);
+  // Where the processed filings were, so focus can follow the queue once it reloads.
+  const focusAfterRefresh = useRef<{ index: number; queue: ClerkQueue | null } | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [queueError, setQueueError] = useState<string | null>(null);
+  // An agent's submission of the filter form, answered by the load of the filters it chose.
+  const agentSubmission = useRef<{ filters: ClerkQueueFilters; report: AgentSubmission } | null>(null);
 
   const fetchQueue = useCallback(async () => {
     requestRef.current?.abort();
@@ -50,12 +66,23 @@ function ReviewQueue() {
         return;
       }
       setQueue(result);
+      const pending = agentSubmission.current;
+      if (pending && sameFilters(pending.filters, filters)) {
+        agentSubmission.current = null;
+        // What the imperative get_clerk_review_queue tool returns for the same filters.
+        pending.report(true, clerkQueueResult(courtId, filters.status || 'all', result));
+      }
       setSelectedSubmissions(previous => new Map(result.filings
         .filter(filing => previous.get(filing.id) === filing.submission_count)
         .map(filing => [filing.id, filing.submission_count])));
-    } catch {
+    } catch (err) {
       if (controller.signal.aborted) return;
       setQueueError("We couldn't load the review queue. Please retry.");
+      const pending = agentSubmission.current;
+      if (pending && sameFilters(pending.filters, filters)) {
+        agentSubmission.current = null;
+        pending.report(false, apiErrorResult(err) ?? toolError('The review queue could not be loaded.', 'unavailable'));
+      }
       setQueue(null);
       setSelectedSubmissions(new Map());
     } finally {
@@ -70,9 +97,25 @@ function ReviewQueue() {
   }, [fetchQueue]);
 
   useEffect(() => () => reviewRequestRef.current?.abort(), []);
+  // An agent submission still waiting when the page closes gets an answer too.
+  useEffect(() => () => {
+    agentSubmission.current?.report(false, REPLACED);
+    agentSubmission.current = null;
+  }, []);
   useEffect(() => {
     if (review?.filing || review?.error) reviewHeading.current?.focus();
   }, [review]);
+
+  // An action removes the control that had focus. Once the queue reloads, focus the row that
+  // took the first processed filing's place (the next one), or the heading if none remain.
+  useEffect(() => {
+    const pending = focusAfterRefresh.current;
+    if (!pending || loading || queue === pending.queue) return;
+    focusAfterRefresh.current = null;
+    const rows = queue?.filings ?? [];
+    const next = rows[Math.min(pending.index, rows.length - 1)];
+    (next ? document.getElementById(`queue-filing-${next.id}`) : queueHeading.current)?.focus();
+  }, [queue, loading]);
 
   // Auto-refresh every 30 seconds, but never while a filing is open for review or an
   // action is in flight -- a refresh mid-review would clobber the clerk's work.
@@ -93,11 +136,13 @@ function ReviewQueue() {
     setReviewError(null);
     try {
       await reviewFiling(filing, action, action !== 'accept' ? reviewReason : undefined);
+      focusAfterRefresh.current = { index: Math.max(0, filings.findIndex(item => item.id === filing.id)), queue };
       closeReview();
       await fetchQueue();
     } catch (err) {
-      const msg = getErrorDetail(err) || (err instanceof Error ? err.message : 'Review failed');
-      setReviewError(`Failed to ${action} filing #${filing.id}: ${msg}`);
+      setReviewError(`Failed to ${action} filing #${filing.id}: ${getErrorDetail(err) || ACTION_UNCONFIRMED}`);
+      // The browser drops focus from a button disabled while the action ran; return it to the review.
+      if (!document.activeElement || document.activeElement === document.body) reviewHeading.current?.focus();
     } finally {
       setActionInProgress(false);
     }
@@ -105,6 +150,7 @@ function ReviewQueue() {
 
   async function handleBatchAccept() {
     if (selectedSubmissions.size === 0) return;
+    const firstSelected = Math.max(0, filings.findIndex(item => selectedSubmissions.has(item.id)));
     setActionInProgress(true);
     setReviewError(null);
     try {
@@ -116,9 +162,10 @@ function ReviewQueue() {
         setReviewError(res.failed.map(id => `Filing #${id}: ${res.errors[id]}`).join(' '));
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Batch accept failed';
-      setReviewError(msg);
+      setReviewError(getErrorDetail(err) || BATCH_UNCONFIRMED);
     } finally {
+      // Clearing the selection removes the batch bar and its focused button.
+      focusAfterRefresh.current = { index: firstSelected, queue };
       setSelectedSubmissions(new Map());
       setActionInProgress(false);
       await fetchQueue();
@@ -199,7 +246,7 @@ function ReviewQueue() {
     <div className="clerk-review">
       <StaffCourtSelect disabled={!!review || actionInProgress} />
       <div className="clerk-header">
-        <h2>Clerk Review Queue</h2>
+        <h2 ref={queueHeading} tabIndex={-1}>Clerk Review Queue</h2>
         <div className="clerk-header-stats">
           <div className="stat-card">
             <span className="stat-number">{queue ? total : '—'}</span>
@@ -215,14 +262,25 @@ function ReviewQueue() {
       <div className="queue-controls">
         <form
           className="queue-webmcp-filter"
-          toolname="get_clerk_review_queue"
+          toolname="review_queue_form"
           tooldescription="Search received filings by case title, case number or #filing number, with status and elapsed-time filters"
           onSubmit={(e) => {
             e.preventDefault();
-            if (filtersChanged) {
+            // The submitted fields, which an agent may have filled, not state from the last render.
+            const fields = new FormData(e.currentTarget);
+            const submitted: ClerkQueueFilters = {
+              status: String(fields.get('status') ?? 'all'),
+              search: String(fields.get('search') ?? '').trim(),
+              waiting_48h_only: fields.get('waiting_48h_only') !== null,
+            };
+            // Null for a human submission, which also replaces a pending agent one.
+            const report = trackAgentSubmission(e, 'review_queue_form', { ...submitted });
+            agentSubmission.current?.report(false, REPLACED);
+            agentSubmission.current = report && { filters: submitted, report };
+            if (!sameFilters(submitted, filters)) {
               setLoading(true);
-              setFilters({ ...filterDraft, search: filterDraft.search?.trim() });
-              setFilterDraft(previous => ({ ...previous, search: previous.search?.trim() }));
+              setFilters(submitted);
+              setFilterDraft(submitted);
               setPage(1);
               setSelectedSubmissions(new Map());
               closeReview();

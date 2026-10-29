@@ -267,47 +267,91 @@ async def test_service_only_filing(db_session, stored_document):
 # ========== CASE SEARCH TESTS ==========
 
 
+async def create_distractor_case(db_session):
+    """A searchable case that differs from the motion case in every filtered field."""
+    court = Court(
+        name="6th Circuit Court",
+        county="Oakland",
+        court_type=CourtType.CIRCUIT,
+        city="Pontiac",
+    )
+    db_session.add(court)
+    await db_session.flush()
+    case_type = CaseType(
+        court_id=court.id,
+        code="CIV-GEN",
+        name="Civil - General",
+        category=CaseCategory.CIVIL,
+        filing_fee_cents=15000,
+    )
+    db_session.add(case_type)
+    await db_session.flush()
+    case = Case(
+        court_id=court.id, case_type_id=case_type.id, case_number="DISTRACTOR-CASE-2",
+        title="Doe v. Acme Holdings", filed_date=datetime.now(UTC),
+    )
+    db_session.add(case)
+    await db_session.flush()
+    db_session.add_all([
+        CaseParticipant(
+            case_id=case.id, role=ParticipantRole.ATTORNEY_PLAINTIFF,
+            party_name="Other Counsel", attorney_bar_number="P88888",
+        ),
+        CaseParticipant(case_id=case.id, role=ParticipantRole.PLAINTIFF, party_name="Jane Doe"),
+        CaseParticipant(
+            case_id=case.id, role=ParticipantRole.DEFENDANT, party_name="Acme Holdings",
+        ),
+    ])
+    await db_session.flush()
+    return case
+
+
 @pytest.mark.asyncio
 async def test_search_by_case_number(db_session):
     """Test searching for a case by case number."""
     user, _, _, _, _, case = await create_court_with_case(db_session)
+    await create_distractor_case(db_session)
 
     cases, total = await search_service.search_cases(
         db_session, case_number=case.case_number
     )
-    assert total >= 1
-    assert any(c.id == case.id for c in cases)
+    assert total == 1
+    assert [c.id for c in cases] == [case.id]
 
 
 @pytest.mark.asyncio
 async def test_search_by_party_name(db_session):
     """Test searching for a case by party name."""
     user, _, _, _, _, case = await create_court_with_case(db_session)
+    await create_distractor_case(db_session)
 
     cases, total = await search_service.search_cases(
         db_session, party_name="Smith Industries"
     )
-    assert total >= 1
-    found = [c for c in cases if c.id == case.id]
-    assert len(found) == 1
-    assert found[0].title == "Johnson v. Smith Industries LLC"
+    assert total == 1
+    assert [c.id for c in cases] == [case.id]
+    assert cases[0].title == "Johnson v. Smith Industries LLC"
 
 
 @pytest.mark.asyncio
 async def test_search_by_attorney_bar_number(db_session):
     """Test searching by attorney bar number."""
     user, _, _, _, _, case = await create_court_with_case(db_session)
+    await create_distractor_case(db_session)
 
     cases, total = await search_service.search_cases(
         db_session, attorney_bar_number="P77777"
     )
-    assert total >= 1
-    assert any(c.id == case.id for c in cases)
+    assert total == 1
+    assert [c.id for c in cases] == [case.id]
 
 
 @pytest.mark.asyncio
 async def test_search_no_results(db_session):
     """Test search with no matching results."""
+    await create_court_with_case(db_session)
+    await create_distractor_case(db_session)
+
     cases, total = await search_service.search_cases(
         db_session, case_number="NONEXISTENT-999"
     )
@@ -319,12 +363,13 @@ async def test_search_no_results(db_session):
 async def test_search_by_court_id(db_session):
     """Test filtering search by court ID."""
     user, _, court, _, _, case = await create_court_with_case(db_session)
+    await create_distractor_case(db_session)
 
     cases, total = await search_service.search_cases(
         db_session, court_id=court.id
     )
-    assert total >= 1
-    assert all(c.court_id == court.id for c in cases)
+    assert total == 1
+    assert [c.id for c in cases] == [case.id]
 
 
 @pytest.mark.asyncio
@@ -397,14 +442,14 @@ async def test_favorite_case(db_session):
     db_session.add(fav)
     await db_session.flush()
 
+    # Select the column, not the entity: an entity query returns the cached `fav` object.
     result = await db_session.execute(
-        select(FavoriteCase).where(
+        select(FavoriteCase.notes).where(
             FavoriteCase.user_id == user.id,
             FavoriteCase.case_id == case.id,
         )
     )
-    saved = result.scalar_one()
-    assert saved.notes == "Key breach of contract case"
+    assert result.scalar_one() == "Key breach of contract case"
 
 
 @pytest.mark.asyncio
@@ -501,3 +546,30 @@ async def test_discovery_motion_requires_certification(db_session):
     await db_session.refresh(motion, ["documents"])
     validation = await filing_service.validate_filing(db_session, motion.id)
     assert validation.is_valid, validation.missing_required_documents
+
+
+@pytest.mark.parametrize("codes, missing", [
+    (["ANSWER"], []),
+    (["MOT_COMPEL"], ["DISC_CERT_GF"]),
+])
+async def test_subsequent_filing_needs_motion_companions_only_with_a_motion(
+    db_session, codes, missing,
+):
+    """An answer into an existing case is not a motion; a discovery motion still is."""
+    user, _, court, case_type, _, case = await create_court_with_case(db_session)
+    await _seed_motion_requirements(db_session, court, case_type)
+    filing = FilingEnvelope(
+        court_id=court.id, case_id=case.id, case_type_id=case_type.id,
+        filer_id=user.id, case_title=case.title, filing_type="subsequent",
+        status=FilingStatus.DRAFT,
+    )
+    db_session.add(filing)
+    await db_session.flush()
+    db_session.add_all([_motion_doc(filing.id, code, code.title()) for code in codes])
+    await db_session.flush()
+
+    validation = await filing_service.validate_filing(db_session, filing.id)
+    missing_codes = [code for code in ("MOTION", "DISC_CERT_GF") if any(
+        f"({code})" in message for message in validation.missing_required_documents
+    )]
+    assert missing_codes == missing

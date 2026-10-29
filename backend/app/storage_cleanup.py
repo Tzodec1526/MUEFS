@@ -69,6 +69,15 @@ async def cleanup_next(
         return "deleted"
 
 
+async def drain(sessions: async_sessionmaker[AsyncSession]) -> None:
+    """Delete every object that is due now, for deployments that run no worker."""
+    async with sessions() as db:
+        if await db.scalar(select(StorageDeletion.id).limit(1)) is None:
+            return
+    while await cleanup_next(sessions) == "deleted":
+        pass
+
+
 async def run(once: bool = False) -> int:
     if settings.demo_isolated_sessions:
         raise RuntimeError("Storage cleanup cannot operate on isolated demo databases")
@@ -91,7 +100,7 @@ async def run(once: bool = False) -> int:
                 await asyncio.sleep(5)
     finally:
         await engine.dispose()
-    return int(failed)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)

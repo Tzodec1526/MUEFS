@@ -2,40 +2,50 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { listFavorites, removeFavorite, FavoriteCase, listFavoriteCourts, removeFavoriteCourt, FavoriteCourt } from '../../api/favorites';
 import { parseServerDate } from '../../utils/format';
+import { needsErrorMessage } from '../../api/client';
+import LoadError from '../common/LoadError';
+import { useToast } from '../common/Toast';
 
 function Favorites() {
+  const { pushToast } = useToast();
   const [caseFavorites, setCaseFavorites] = useState<FavoriteCase[]>([]);
   const [courtFavorites, setCourtFavorites] = useState<FavoriteCourt[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [removingCase, setRemovingCase] = useState<number | null>(null);
   const [removingCourt, setRemovingCourt] = useState<number | null>(null);
 
   useEffect(() => {
+    let active = true;
     async function load() {
+      setLoading(true);
+      setError(null);
       try {
         const [casesData, courtsData] = await Promise.all([
           listFavorites(),
           listFavoriteCourts(),
         ]);
+        if (!active) return;
         setCaseFavorites(casesData.favorites);
         setCourtFavorites(courtsData.favorites);
       } catch {
-        setCaseFavorites([]);
-        setCourtFavorites([]);
+        if (active) setError('Could not load your favorites. Please try again.');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
     load();
-  }, []);
+    return () => { active = false; };
+  }, [attempt]);
 
   const handleRemoveCase = async (caseId: number) => {
     setRemovingCase(caseId);
     try {
       await removeFavorite(caseId);
       setCaseFavorites(prev => prev.filter(f => f.case_id !== caseId));
-    } catch {
-      // ignore
+    } catch (err) {
+      if (needsErrorMessage(err)) pushToast('Could not remove the favorite case. Please try again.', 'error');
     } finally {
       setRemovingCase(null);
     }
@@ -46,8 +56,8 @@ function Favorites() {
     try {
       await removeFavoriteCourt(courtId);
       setCourtFavorites(prev => prev.filter(f => f.court_id !== courtId));
-    } catch {
-      // ignore
+    } catch (err) {
+      if (needsErrorMessage(err)) pushToast('Could not remove the favorite court. Please try again.', 'error');
     } finally {
       setRemovingCourt(null);
     }
@@ -64,9 +74,10 @@ function Favorites() {
         by clicking the star icon.
       </p>
 
-      {loading && <p className="loading">Loading favorites...</p>}
+      {loading && <p className="loading" role="status">Loading favorites...</p>}
+      {error && <LoadError message={error} onRetry={() => setAttempt(value => value + 1)} />}
 
-      {!loading && caseFavorites.length === 0 && (
+      {!loading && !error && caseFavorites.length === 0 && (
         <div className="empty-state">
           <h3>No favorite cases yet</h3>
           <p>Search for a case and click the star to add it to your favorites.</p>
@@ -74,7 +85,7 @@ function Favorites() {
         </div>
       )}
 
-      {!loading && caseFavorites.length > 0 && (
+      {!loading && !error && caseFavorites.length > 0 && (
         <div className="favorites-list">
           {caseFavorites.map((fav) => (
             <div key={fav.id} className="favorite-card">
@@ -96,7 +107,7 @@ function Favorites() {
                 <button
                   className="btn btn-danger btn-small"
                   onClick={() => handleRemoveCase(fav.case_id)}
-                  disabled={removingCase === fav.case_id}
+                  disabled={removingCase !== null}
                 >
                   {removingCase === fav.case_id ? 'Removing...' : 'Remove'}
                 </button>
@@ -114,7 +125,7 @@ function Favorites() {
         Your frequently used courts (attorneys often practice across many). Star courts in the court selector during filing.
       </p>
 
-      {!loading && courtFavorites.length === 0 && (
+      {!loading && !error && courtFavorites.length === 0 && (
         <div className="empty-state">
           <h3>No favorite courts yet</h3>
           <p>When filing, use the court selector and star your common courts for quick access.</p>
@@ -122,7 +133,7 @@ function Favorites() {
         </div>
       )}
 
-      {!loading && courtFavorites.length > 0 && (
+      {!loading && !error && courtFavorites.length > 0 && (
         <div className="favorites-list">
           {courtFavorites.map((fav) => (
             <div key={fav.id} className="favorite-card">
@@ -144,7 +155,7 @@ function Favorites() {
                 <button
                   className="btn btn-danger btn-small"
                   onClick={() => handleRemoveCourt(fav.court_id)}
-                  disabled={removingCourt === fav.court_id}
+                  disabled={removingCourt !== null}
                 >
                   {removingCourt === fav.court_id ? 'Removing...' : 'Remove'}
                 </button>

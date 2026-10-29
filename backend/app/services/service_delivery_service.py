@@ -33,6 +33,8 @@ async def require_sender(
     *,
     lock: bool = False,
 ) -> tuple[FilingEnvelope, Case]:
+    if actor.user_type == UserType.PUBLIC:
+        raise HTTPException(403, access_service.PUBLIC_ACCOUNT_REFUSAL)
     query = (
         select(FilingEnvelope)
         .where(FilingEnvelope.id == filing_id)
@@ -243,7 +245,7 @@ async def create_packet(
             digest, size = await run_in_threadpool(
                 document_service.stored_integrity, document.file_key
             )
-        except OSError as exc:
+        except FileNotFoundError as exc:
             raise HTTPException(409, "A selected document could not be read from storage") from exc
         if digest != saved["sha256_hash"] or size != saved["file_size_bytes"]:
             raise HTTPException(409, "A selected document failed its integrity check")
@@ -328,7 +330,11 @@ async def require_delivery_viewer(
     staff = await access_service.user_is_court_staff_for_court(db, actor.id, case.court_id)
     if not actor.is_active:
         raise HTTPException(403, "Account is unavailable")
-    if actor.id != packet.actor_id and not staff:
+    # Staff send on behalf of the court; revoking the assignment ends that access.
+    sender = actor.id == packet.actor_id and (staff or await db.scalar(
+        select(FilingEnvelope.filer_id).where(FilingEnvelope.id == packet.filing_id)
+    ) == actor.id)
+    if not sender and not staff:
         if actor.id != recipient.recipient_id:
             raise HTTPException(403, "Delivery recipient, sender or assigned court staff required")
         participant_id = recipient.contact_snapshot.get("participant_id")

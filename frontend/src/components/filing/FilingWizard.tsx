@@ -15,19 +15,22 @@ import { emitToast } from '../../utils/toastBus';
 import { getErrorDetail } from '../../utils/errors';
 import { createFiling, getFiling, updateFiling, type FilingEnvelope } from '../../api/filings';
 import LoadError from '../common/LoadError';
+import { getCase, type CaseDocket } from '../../api/cases';
 import { getCourt, getCaseTypes } from '../../api/courts';
 import { getDemoRole } from '../auth/LoginScreen';
 import {
+  hasPlainLanguagePreference,
   isPlainLanguageMode,
   setPlainLanguageMode,
   stepLabel,
 } from '../../utils/srlMode';
 
+const CASE_LOOKUP_FAILED = "We couldn't load the court's record for this case, so its title is missing.";
+
 type WizardStep = 'court' | 'case' | 'case-type' | 'details' | 'documents' | 'review';
 
 interface FilingData extends FilingDraft {
   documents: Array<{ id: number; title: string; type: string; size: number; isSearchable: boolean }>;
-  paymentComplete: boolean;
 }
 
 // Steps adapt to the filing: a new case adds Case Type + Case Details; filing into an
@@ -58,7 +61,6 @@ const defaultFilingData: FilingData = {
   filingId: null,
   detailsToken: null,
   documents: [],
-  paymentComplete: false,
   caseChoiceMade: false,
 };
 
@@ -87,7 +89,6 @@ function FilingForm({ userId }: { userId: number }) {
       courtId: Number(courtId),
       caseId: Number(caseId),
       caseTypeId: Number(caseTypeId),
-      caseTitle: searchParams.get('case_title') || '',
       filingType: serviceOnly ? 'service_only' : 'subsequent',
       caseChoiceMade: true,
     };
@@ -119,8 +120,8 @@ function FilingForm({ userId }: { userId: number }) {
     ? loadedFiling !== null && (filingData.caseTitle !== (loadedFiling.case_title ?? '')
       || filingData.filingDescription !== (loadedFiling.filing_description ?? ''))
     : filingData.courtId !== null);
-  const handleFeesChange = useCallback((filing: FilingEnvelope, obligationMet: boolean) => {
-    setFilingData(prev => ({ ...prev, paymentComplete: obligationMet,
+  const handleFeesChange = useCallback((filing: FilingEnvelope) => {
+    setFilingData(prev => ({ ...prev,
       detailsToken: prev.caseTitle === (filing.case_title ?? '')
         && prev.filingDescription === (filing.filing_description ?? '')
         ? filing.details_token : prev.detailsToken,
@@ -130,12 +131,12 @@ function FilingForm({ userId }: { userId: number }) {
   }, []);
   const isMotionMode = filingData.filingType !== 'initial';
   const [plainLanguage, setPlainLanguage] = useState(() => {
-    if (getDemoRole() === 'srl') {
-      if (!isPlainLanguageMode()) setPlainLanguageMode(true);
-      return true;
-    }
+    // Self-represented filers start in plain language, but a filer who turned it off keeps it off.
+    if (getDemoRole() === 'srl' && !hasPlainLanguagePreference()) setPlainLanguageMode(true);
     return isPlainLanguageMode();
   });
+  // Why a case-linked filing has no caption yet: the court's case record did not load.
+  const [caseLookupError, setCaseLookupError] = useState<string | null>(null);
 
   // Load the saved envelope, or resolve display labels for a new filing's URL prefill.
   useEffect(() => {
@@ -175,9 +176,6 @@ function FilingForm({ userId }: { userId: number }) {
             caseTitle: recoveredDraft?.caseTitle ?? envelope.case_title ?? '',
             filingDescription: recoveredDraft?.filingDescription ?? envelope.filing_description ?? '',
             caseChoiceMade: true,
-            paymentComplete: (envelope.fee_waiver_requested && envelope.fee_waiver_granted === null)
-              || envelope.fee_waiver_amount_due_cents === 0
-              || envelope.fee_waiver_granted === true,
             documents: envelope.documents.map((doc) => ({
               id: doc.id, title: doc.title, type: doc.document_type_code,
               size: doc.file_size_bytes, isSearchable: doc.is_text_searchable,
@@ -199,16 +197,28 @@ function FilingForm({ userId }: { userId: number }) {
     const courtId = searchParams.get('court_id');
     if (!courtId) return;
     const caseTypeId = searchParams.get('case_type_id');
+    const caseId = searchParams.get('case_id');
     let active = true;
+    type CaseLookup = { docket: CaseDocket | null; failure?: string };
     Promise.all([
       getCourt(Number(courtId)).catch(() => ({ name: `Court #${courtId}` })),
-      caseTypeId ? getCaseTypes(Number(courtId)).catch(() => []) : Promise.resolve([]),
-    ]).then(([court, types]) => {
-      if (active) setFilingData(prev => prev.courtId !== Number(courtId) ? prev : {
+      // A display label for an existing case: keep it after the court closes the type to new cases.
+      caseTypeId ? getCaseTypes(Number(courtId), true).catch(() => []) : Promise.resolve([]),
+      // The court's case record, not the link, names the case being filed into.
+      caseId
+        ? getCase(Number(caseId)).then(
+          (docket): CaseLookup => ({ docket }),
+          (err: unknown): CaseLookup => ({ docket: null, failure: getErrorDetail(err) || CASE_LOOKUP_FAILED }))
+        : Promise.resolve<CaseLookup>({ docket: null }),
+    ]).then(([court, types, { docket, failure }]) => {
+      if (!active) return;
+      setFilingData(prev => prev.courtId !== Number(courtId) ? prev : {
         ...prev,
         courtName: court.name,
         caseTypeName: types.find(t => t.id === prev.caseTypeId)?.name || prev.caseTypeName,
+        caseTitle: docket && prev.caseId === docket.id ? docket.title : prev.caseTitle,
       });
+      setCaseLookupError(failure ?? null);
     });
     return () => { active = false; };
   }, [searchParams, requestedFilingId, draft, reloadKey, userId]);
@@ -373,13 +383,23 @@ function FilingForm({ userId }: { userId: number }) {
     }
   };
 
+  // In an existing case the caption is read-only: it comes from the court's case record.
+  const captionMissing = isMotionMode && !filingData.caseTitle.trim();
+  const retryCaseLookup = () => {
+    setCaseLookupError(null);
+    setErrors([]);
+    setReloadKey((key) => key + 1);
+  };
+
   const getStepError = (): string => {
     if (plainLanguage) {
       switch (currentStep) {
         case 'court': return 'Choose the court where you want to file.';
         case 'case': return 'Pick an existing case or start a new one.';
         case 'case-type': return 'Select what kind of case this is.';
-        case 'details': return 'Add a short title describing your filing.';
+        case 'details': return captionMissing
+          ? 'We could not load your case yet. Try again, or go Back and pick your case.'
+          : 'Add a short title describing your filing.';
         case 'documents': return 'Upload at least one PDF or document.';
         default: return 'Finish this step to continue.';
       }
@@ -388,7 +408,9 @@ function FilingForm({ userId }: { userId: number }) {
       case 'court': return 'Please select a court to continue.';
       case 'case': return 'Please choose an existing case or start a new case.';
       case 'case-type': return 'Please select a case type to continue.';
-      case 'details': return 'Please enter a case title to continue.';
+      case 'details': return captionMissing
+        ? "The case title comes from the court's case record, which has not loaded. Retry loading it, or go Back to choose the case."
+        : 'Please enter a case title to continue.';
       case 'documents': return 'Please upload at least one document to continue.';
       default: return 'Please complete this step to continue.';
     }
@@ -568,6 +590,7 @@ function FilingForm({ userId }: { userId: number }) {
           <CourtSelector
             selectedCourtId={filingData.courtId}
             onSelect={(courtId, courtName) => {
+              if (courtId === filingData.courtId) return;
               // Changing court invalidates any case picked in another court.
               updateData({
                 courtId, courtName,
@@ -584,6 +607,10 @@ function FilingForm({ userId }: { userId: number }) {
             courtName={filingData.courtName}
             selectedCaseId={filingData.caseId}
             isNewChosen={filingData.caseChoiceMade && filingData.caseId === null}
+            onChooseExisting={() => {
+              if (filingData.caseId !== null) return;
+              updateData({ caseChoiceMade: false, caseTypeId: null, caseTypeName: '', caseTitle: '' });
+            }}
             onSelectExisting={(c: CaseResult, caseTypeName: string) => {
               updateData({
                 caseId: c.id,
@@ -621,6 +648,10 @@ function FilingForm({ userId }: { userId: number }) {
           <div className="form-section">
             <h3>{isMotionMode ? 'Motion Details' : 'Case Details'}</h3>
 
+            {captionMissing && caseLookupError && (
+              <LoadError message={`${caseLookupError} Retry, or go Back to choose the case.`} onRetry={retryCaseLookup} />
+            )}
+
             {isMotionMode && filingData.caseTitle && (
               <div className="motion-case-info">
                 <strong>Filing motion to:</strong> {filingData.caseTitle}
@@ -629,8 +660,8 @@ function FilingForm({ userId }: { userId: number }) {
 
             {/* Filing type selector - shown when filing to existing case */}
             {isMotionMode && (
-              <div className="form-group">
-                <label htmlFor="filingType">Filing Type <span className="required-marker">*</span></label>
+              <fieldset className="form-group filing-type-fieldset">
+                <legend>Filing Type <span className="required-marker">*</span></legend>
                 <div className="filing-type-options">
                   <label className={`filing-type-option ${filingData.filingType === 'subsequent' ? 'selected' : ''}`}>
                     <input
@@ -639,7 +670,7 @@ function FilingForm({ userId }: { userId: number }) {
                       value="subsequent"
                       checked={filingData.filingType === 'subsequent'}
                       disabled={destinationLocked || saving}
-                      onChange={() => updateData({ filingType: 'subsequent', paymentComplete: false })}
+                      onChange={() => updateData({ filingType: 'subsequent' })}
                     />
                     <div>
                       <strong>File with Court</strong>
@@ -661,7 +692,7 @@ function FilingForm({ userId }: { userId: number }) {
                     </div>
                   </label>
                 </div>
-              </div>
+              </fieldset>
             )}
 
             <p className="info-text">
@@ -718,8 +749,11 @@ function FilingForm({ userId }: { userId: number }) {
         {currentStep === 'documents' && filingData.filingId && (
           <DocumentUpload
             filingId={filingData.filingId}
+            courtId={filingData.courtId!}
+            caseTypeId={filingData.caseTypeId!}
+            filingType={filingData.filingType}
             documents={filingData.documents}
-            onDocumentsChange={(docs) => updateData({ documents: docs, paymentComplete: false })}
+            onDocumentsChange={(docs) => updateData({ documents: docs })}
             onBusyChange={setSaving}
           />
         )}

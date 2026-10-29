@@ -27,6 +27,11 @@ def decision_pdf():
     return out.getvalue()
 
 
+def waiver(filing, action, **fields):
+    """A decision form for the fee version the reviewer is looking at."""
+    return {"action": action, "expected_fee_version": filing.fee_version, **fields}
+
+
 @pytest_asyncio.fixture
 async def waiver_case(db_session, api_client, tmp_path, monkeypatch, stored_document):
     monkeypatch.setattr(document_service, "_local_storage_path", lambda: tmp_path)
@@ -121,16 +126,16 @@ async def test_application_required_and_clerk_referral_has_no_filing_decision(
     endpoint = f"/api/v1/clerk/filings/{filing.id}/fee-waiver"
     for user in [users[0], users[3], users[4]]:
         api_client.headers["X-Demo-User-Id"] = str(user.id)
-        denied = await api_client.post(endpoint, data={"action": "refer"})
+        denied = await api_client.post(endpoint, data=waiver(filing, "refer"))
         assert denied.status_code == 403
     api_client.headers["X-Demo-User-Id"] = str(users[1].id)
-    no_judicial_authority = await api_client.post(endpoint, data={"action": "deny_judicial"})
+    no_judicial_authority = await api_client.post(endpoint, data=waiver(filing, "deny_judicial"))
     assert no_judicial_authority.status_code == 403
-    result = await api_client.post(endpoint, data={"action": "refer"})
+    result = await api_client.post(endpoint, data=waiver(filing, "refer"))
     assert result.status_code == 200
     assert result.json()["status"] == "submitted"
     assert result.json()["fee_waiver_granted"] is None
-    assert (await api_client.post(endpoint, data={"action": "refer"})).status_code == 403
+    assert (await api_client.post(endpoint, data=waiver(filing, "refer"))).status_code == 403
     history = (await api_client.get(f"/api/v1/filings/{filing.id}/history")).json()
     assert history["fee_waiver"]["allowed_actions"] == []
     assert history["transactions"][0]["event_type"] == "waiver_referred"
@@ -170,11 +175,11 @@ async def test_signed_grants_are_private_retained_and_independent(
     await submit_application(api_client, filing)
     api_client.headers["X-Demo-User-Id"] = str(users[actor_index].id)
     endpoint = f"/api/v1/clerk/filings/{filing.id}/fee-waiver"
-    assert (await api_client.post(endpoint, data={"action": action})).status_code == 400
+    assert (await api_client.post(endpoint, data=waiver(filing, action))).status_code == 400
     assert (
         await api_client.post(
             endpoint,
-            data={"action": action},
+            data=waiver(filing, action),
             files={
                 "file": ("fake.pdf", b"plain text", "application/pdf"),
             },
@@ -182,7 +187,7 @@ async def test_signed_grants_are_private_retained_and_independent(
     ).status_code in (415, 422)
     result = await api_client.post(
         endpoint,
-        data={"action": action},
+        data=waiver(filing, action),
         files={
             "file": ("signed.pdf", decision_pdf(), "application/pdf"),
         },
@@ -194,7 +199,7 @@ async def test_signed_grants_are_private_retained_and_independent(
     assert not any(
         d["document_type_code"] == "FEE_WAIVER_ORDER" for d in result.json()["documents"]
     )
-    assert (await api_client.post(endpoint, data={"action": action})).status_code == 409
+    assert (await api_client.post(endpoint, data=waiver(filing, action))).status_code == 409
     order = await db_session.scalar(
         select(FilingDocument).where(
             FilingDocument.document_type_code == "FEE_WAIVER_ORDER",
@@ -237,7 +242,8 @@ async def test_denial_can_be_paid_without_resubmission_or_fee_recalculation(
     received_at = filing.submitted_at
     api_client.headers["X-Demo-User-Id"] = str(users[2].id)
     endpoint = f"/api/v1/clerk/filings/{filing.id}/fee-waiver"
-    body = {"action": "deny_judicial", "reason": " ", "amount_due_cents": "750"}
+    body = {"action": "deny_judicial", "reason": " ", "amount_due_cents": "750",
+            "expected_fee_version": filing.fee_version}
     assert (await api_client.post(endpoint, data=body)).status_code == 400
     body["reason"] = "Reason in the private order"
     denied = await api_client.post(
@@ -321,7 +327,7 @@ async def test_judge_cannot_decide_own_application(waiver_case, api_client, db_s
     await db_session.flush()
     api_client.headers["X-Demo-User-Id"] = str(users[2].id)
     response = await api_client.post(
-        f"/api/v1/clerk/filings/{filing.id}/fee-waiver", data={"action": "grant_judicial"}
+        f"/api/v1/clerk/filings/{filing.id}/fee-waiver", data=waiver(filing, "grant_judicial")
     )
     assert response.status_code == 403
 
@@ -346,6 +352,7 @@ async def test_failed_decision_does_not_keep_an_order_or_change_waiver(
         async with db_session.begin_nested():
             await api_client.post(f"/api/v1/clerk/filings/{fid}/fee-waiver", data={
                 "action": "grant_public_assistance",
+                "expected_fee_version": filing.fee_version,
             }, files={"file": ("signed.pdf", decision_pdf(), "application/pdf")})
     assert {p for p in tmp_path.rglob("*") if p.is_file()} == before
     unchanged = await filing_service.get_filing(db_session, fid)
@@ -369,9 +376,72 @@ async def test_deactivated_clerk_with_lingering_role_cannot_decide(
     app.dependency_overrides[get_current_user_id] = lambda: clerk.id
     try:
         response = await api_client.post(
-            f"/api/v1/clerk/filings/{filing.id}/fee-waiver", data={"action": "refer"}
+            f"/api/v1/clerk/filings/{filing.id}/fee-waiver", data=waiver(filing, "refer")
         )
     finally:
         app.dependency_overrides.pop(get_current_user_id, None)
     assert response.status_code == 403
     assert (await filing_service.get_filing(db_session, filing.id)).fee_waiver_referred_at is None
+
+
+async def test_decision_recorded_during_screening_refuses_and_discards_the_order(
+    waiver_case, api_client, db_session, monkeypatch, tmp_path,
+):
+    from sqlalchemy import update
+
+    from app.api import document_upload
+
+    filing, users, _ = waiver_case
+    await submit_application(api_client, filing)
+    fid = filing.id
+    api_client.headers["X-Demo-User-Id"] = str(users[1].id)
+    before = {p for p in tmp_path.rglob("*") if p.is_file()}
+    scan = document_upload.malware_scan.scan_upload
+
+    async def decided_while_screening(data):
+        # Another reviewer's decision commits while this order is being screened.
+        await db_session.execute(
+            update(FilingEnvelope).where(FilingEnvelope.id == fid)
+            .values(fee_waiver_granted=True, fee_waiver_decided_at=datetime.now(UTC))
+            .execution_options(synchronize_session=False)
+        )
+        return await scan(data)
+
+    monkeypatch.setattr(document_upload.malware_scan, "scan_upload", decided_while_screening)
+    response = await api_client.post(f"/api/v1/clerk/filings/{fid}/fee-waiver", data={
+        "action": "grant_public_assistance",
+        "expected_fee_version": filing.fee_version,
+    }, files={"file": ("signed.pdf", decision_pdf(), "application/pdf")})
+    assert response.status_code == 409, response.text
+    assert {p for p in tmp_path.rglob("*") if p.is_file()} == before
+    assert not await db_session.scalar(select(func.count()).select_from(FilingDocument).where(
+        FilingDocument.document_type_code == "FEE_WAIVER_ORDER",
+    ))
+
+
+async def test_decision_on_a_replaced_application_is_refused(waiver_case, api_client, db_session):
+    filing, users, _ = waiver_case
+    await submit_application(api_client, filing)
+    api_client.headers["X-Demo-User-Id"] = str(users[2].id)
+    reviewed = (await api_client.get(f"/api/v1/filings/{filing.id}/history")).json()
+    # While the judge reads the application, the court returns the filing and the filer
+    # replaces the application.
+    await filing_service.review_filing(
+        db_session, filing.id, users[1].id, "return", "Replace the MC 20",
+        expected_submission_count=1,
+    )
+    api_client.headers["X-Demo-User-Id"] = str(users[0].id)
+    await submit_application(api_client, filing)
+    api_client.headers["X-Demo-User-Id"] = str(users[2].id)
+    response = await api_client.post(
+        f"/api/v1/clerk/filings/{filing.id}/fee-waiver",
+        data={"action": "grant_judicial",
+              "expected_fee_version": reviewed["fee_waiver"]["fee_version"]},
+        files={"file": ("signed.pdf", decision_pdf(), "application/pdf")},
+    )
+    assert response.status_code == 409, response.text
+    assert "Refresh and review" in response.json()["detail"]
+    assert (await filing_service.get_filing(db_session, filing.id)).fee_waiver_granted is None
+    assert not await db_session.scalar(select(func.count()).select_from(FilingDocument).where(
+        FilingDocument.document_type_code == "FEE_WAIVER_ORDER",
+    ))

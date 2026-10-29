@@ -111,4 +111,5 @@ records change, complete private archives, superseded files, inactive public cop
 retained notices and payment bases, destination collisions, and altered archives. The
 S3-compatible integration test verifies bounded reads, closed streams and corruption in
 a second object whose original contents matched an already exported copy. Run the full
-suite with the disposable PostgreSQL and S3 environment described in `STATE_READINESS.md`.
+suite with the disposable services described in
+[the README's backend section](../README.md#service-backed-tests).

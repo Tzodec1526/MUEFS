@@ -99,8 +99,12 @@ async def test_removal_commits_before_physical_deletion(
         assert await db.get(FilingDocument, document_id) is None
         job = (await db.scalars(select(StorageDeletion))).one()
         assert job.file_key == key
+    # Local-storage deployments run no worker: they try the deletion as soon as the
+    # removal commits. Object storage leaves it to the worker.
+    assert job.attempt_count == (1 if storage == "local" else 0)
     assert document_service.stored_integrity(key) == (digest, size)
-    assert await cleanup_next(sessions) == "retry"
+    if storage != "local":
+        assert await cleanup_next(sessions) == "retry"
     assert document_service.stored_integrity(key) == (digest, size)
     monkeypatch.setattr(document_service, "delete_document", delete)
     async with sessions.begin() as db:

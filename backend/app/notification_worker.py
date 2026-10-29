@@ -23,7 +23,6 @@ async def run(once: bool = False) -> int:
     if settings.demo_isolated_sessions:
         raise RuntimeError("The notice worker does not operate on isolated demo sessions")
     last_recovery = time.monotonic() - 60
-    failed = False
     try:
         while True:
             try:
@@ -32,17 +31,15 @@ async def run(once: bool = False) -> int:
                     last_recovery = time.monotonic()
                 if not await deliver_next(async_session):
                     if once:
-                        return int(failed)
+                        return 0
                     await asyncio.sleep(5)
             except Exception:
-                failed = True
                 logger.exception("Notice delivery iteration failed")
                 if once:
                     return 1
                 await asyncio.sleep(5)
     finally:
         await engine.dispose()
-    return int(failed)
 
 
 if __name__ == "__main__":

@@ -355,7 +355,9 @@ async def test_create_filing_on_public_case_denied_when_access_disabled(db_sessi
 
 
 @pytest.mark.asyncio
-async def test_create_filing_on_public_case_allowed_with_reviewed_participant(db_session):
+async def test_create_filing_on_public_case_allowed_with_reviewed_participant(
+    db_session, api_client,
+):
     from app.models.case import CaseParticipant, ParticipantRole
 
     user, court, case_type = await create_test_fixtures(db_session)
@@ -391,6 +393,25 @@ async def test_create_filing_on_public_case_allowed_with_reviewed_participant(db
     )
     filing = await filing_service.create_filing(db_session, user.id, data)
     assert filing.case_id == case.id
+    # Queues and receipts identify the case by the court's caption, not the client's.
+    assert filing.case_title == "Public docket"
+    path = f"/api/v1/cases/{case.id}"
+    assert (await api_client.get(path)).json()["can_file"] is False
+    api_client.headers["X-Demo-User-Id"] = str(user.id)
+    assert (await api_client.get(path)).json()["can_file"] is True
+    participant = await db_session.scalar(select(CaseParticipant).where(
+        CaseParticipant.case_id == case.id,
+    ))
+    participant.access_enabled = False
+    await db_session.flush()
+    assert (await api_client.get(path)).json()["can_file"] is False
+
+    edit = {"expected_details_token": filing.details_token}
+    url = f"/api/v1/filings/{filing.id}"
+    renamed = await api_client.patch(url, json={**edit, "case_title": "Another case"})
+    assert renamed.status_code == 409, renamed.text
+    unchanged = await api_client.patch(url, json={**edit, "case_title": "Public docket"})
+    assert unchanged.status_code == 200, unchanged.text
 
 
 @pytest.mark.asyncio

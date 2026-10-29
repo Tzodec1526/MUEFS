@@ -1,4 +1,4 @@
-import { logAgentActivity } from './activity';
+import { agentActivityEpoch, logAgentActivity } from './activity';
 import type { ModelContext, ModelContextRegisterOptions, ModelContextTool } from './types';
 
 export async function registerMuefsTool(
@@ -10,6 +10,8 @@ export async function registerMuefsTool(
     ...tool,
     async execute(input: Record<string, unknown>) {
       const started = performance.now();
+      // A call still running when the session changes is not logged into the next session.
+      const since = agentActivityEpoch();
       try {
         const result = await tool.execute(input);
         const ms = Math.round(performance.now() - started);
@@ -22,11 +24,11 @@ export async function registerMuefsTool(
             /* non-JSON success string */
           }
         }
-        logAgentActivity(tool.name, input, ok, ms);
+        logAgentActivity(tool.name, input, ok, ms, since);
         return result;
       } catch (err) {
         const ms = Math.round(performance.now() - started);
-        logAgentActivity(tool.name, input, false, ms);
+        logAgentActivity(tool.name, input, false, ms, since);
         throw err;
       }
     },

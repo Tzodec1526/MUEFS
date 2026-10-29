@@ -1,10 +1,11 @@
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import get_current_user_id, get_optional_user_id
+from app.api.auth import get_current_user_id, get_optional_user_id, lock_current_user
+from app.api.params import Page, RecordId
 from app.database import get_db
 from app.models.court import Court
 from app.models.court_calendar import CourtCalendar
@@ -23,8 +24,8 @@ router = APIRouter(prefix="/courts", tags=["Court Calendars"])
 
 @router.get("/{court_id}/calendars", response_model=CourtCalendarsResponse)
 async def calendars(
-    court_id: int,
-    page: int = Query(1, ge=1),
+    court_id: RecordId,
+    page: Page = 1,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int | None = Depends(get_optional_user_id),
 ):
@@ -57,11 +58,12 @@ async def calendars(
 @router.post("/{court_id}/calendars", response_model=CourtCalendarResponse, status_code=201)
 async def publish_calendar(
     request: Request,
-    court_id: int,
+    court_id: RecordId,
     data: CourtCalendarCreate,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
+    await lock_current_user(db, user_id)
     if not await may_publish_calendar(db, user_id, court_id):
         raise HTTPException(
             status_code=403, detail="Court administrator or judge assignment required"
@@ -90,7 +92,7 @@ async def publish_calendar(
 
 @router.get("/{court_id}/filing-date", response_model=FilingDateAssessment)
 async def preview_filing_date(
-    court_id: int,
+    court_id: RecordId,
     received_at: datetime,
     db: AsyncSession = Depends(get_db, scope="function"),
 ):

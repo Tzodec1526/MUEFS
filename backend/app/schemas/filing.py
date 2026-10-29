@@ -4,6 +4,7 @@ from typing import Self
 from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
 from app.models.filing import FilingStatus, FilingType
+from app.schemas.common import MAX_RECORD_ID, RecordId
 
 
 class FilingDocumentResponse(BaseModel):
@@ -26,9 +27,9 @@ class FilingDocumentResponse(BaseModel):
 
 
 class FilingEnvelopeCreate(BaseModel):
-    court_id: int = Field(ge=1, le=2_147_483_647)
-    case_id: int | None = Field(None, ge=1, le=2_147_483_647)
-    case_type_id: int = Field(ge=1, le=2_147_483_647)
+    court_id: RecordId
+    case_id: RecordId | None = None
+    case_type_id: RecordId
     filing_type: FilingType = FilingType.SUBSEQUENT
     case_title: str | None = Field(None, max_length=500)
     filing_description: str | None = Field(None, max_length=5000)
@@ -175,7 +176,7 @@ class ClerkReviewRequest(BaseModel):
 
 
 class BatchReviewItem(BaseModel):
-    filing_id: int = Field(..., ge=1, strict=True)
+    filing_id: int = Field(..., ge=1, le=MAX_RECORD_ID, strict=True)
     expected_submission_count: int = Field(..., ge=0, strict=True)
 
 

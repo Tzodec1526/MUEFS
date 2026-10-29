@@ -5,19 +5,18 @@ browser session gets its own isolated, seeded SQLite sandbox. Run with:
 
     uvicorn app.demo.server:app
 
-The core app (app.main) is untouched; this module wraps it.
+Importing this module extends the core app (app.main) with the demo's session
+middleware, database override and SPA routes.
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-from fastapi import HTTPException, Request
-from fastapi.responses import FileResponse, Response
+from fastapi import HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy import URL
 from sqlalchemy.ext.asyncio import create_async_engine
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.config import settings
 from app.database import get_db
@@ -33,57 +32,9 @@ app.state.readiness_engine = create_async_engine(URL.create(
 
 # Every visitor gets their own sandbox instead of the single global database.
 app.dependency_overrides[get_db] = session_db.get_demo_db
+app.add_middleware(session_db.DemoSessionMiddleware)
 
 _STATIC_ROOT = Path(settings.demo_static_dir).resolve()
-
-
-class DemoSessionMiddleware:
-    """Pure-ASGI middleware: pin each request to a sandbox id (written into scope
-    state, where get_demo_db reads it) and set the cookie for new private sandboxes.
-
-    Pure ASGI (not BaseHTTPMiddleware) so scope-state and Set-Cookie propagate reliably."""
-
-    def __init__(self, app: ASGIApp) -> None:
-        self.app = app
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if (scope["type"] != "http"
-                or scope.get("path", "").rstrip("/") in {"/health", "/ready"}):
-            await self.app(scope, receive, send)
-            return
-        sid, set_cookie = session_db.resolve_sid(Request(scope))
-        scope.setdefault("state", {})["demo_sid"] = sid
-        session_db.touch(sid)
-        session_db.maybe_sweep()
-        if not set_cookie:
-            await self.app(scope, receive, send)
-            return
-        ttl = settings.demo_session_ttl_minutes * 60
-        cookie = (
-            f"{session_db.COOKIE_NAME}={sid}; Max-Age={ttl}; Path=/; HttpOnly; SameSite=Lax"
-        ).encode()
-
-        async def send_with_cookie(message: Message) -> None:
-            if message["type"] == "http.response.start":
-                message.setdefault("headers", []).append((b"set-cookie", cookie))
-            await send(message)
-
-        await self.app(scope, receive, send_with_cookie)
-
-
-app.add_middleware(DemoSessionMiddleware)
-
-
-@app.get("/config.js", include_in_schema=False)
-async def runtime_frontend_config() -> Response:
-    """Inject demo auth secret at runtime (hosted demo) without rebaking the SPA."""
-    secret = settings.demo_mode_secret or ""
-    body = f"window.__MUEFS_DEMO_SECRET__={json.dumps(secret)};"
-    return Response(
-        content=body,
-        media_type="application/javascript",
-        headers={"Cache-Control": "no-store"},
-    )
 
 
 @app.get("/{full_path:path}", include_in_schema=False)
@@ -95,8 +46,19 @@ async def spa(full_path: str) -> FileResponse:
         raise HTTPException(status_code=404)
     candidate = (_STATIC_ROOT / full_path).resolve()
     if full_path and candidate.is_file() and candidate.is_relative_to(_STATIC_ROOT):
-        return FileResponse(candidate)
+        # Vite emits content-hashed bundles in assets/. HTML must always fetch the
+        # current filenames after a deployment instead of reusing a stale index.
+        cache = (
+            "public, max-age=31536000, immutable"
+            if full_path.startswith("assets/") else "no-cache"
+        )
+        if candidate.name == "index.html":
+            cache = "no-store"
+        return FileResponse(candidate, headers={"Cache-Control": cache})
+    if full_path.startswith("assets/"):
+        # A missing old bundle must be a real 404, not HTML with a JavaScript MIME error.
+        raise HTTPException(status_code=404)
     index = _STATIC_ROOT / "index.html"
     if index.is_file():
-        return FileResponse(index)
+        return FileResponse(index, headers={"Cache-Control": "no-store"})
     raise HTTPException(status_code=404)

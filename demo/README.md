@@ -1,4 +1,4 @@
-# MUEFS demo videos and recording guide
+# MUEFS demo walkthrough
 
 Show one filing moving from an attorney to a court clerk and into the public
 docket, then show self-represented filing and court administration. These are
@@ -6,30 +6,10 @@ working application flows with retained records. The payment processor and live
 court CMS connection remain stubs; a state could choose and connect those systems
 as part of an implementation.
 
-## Finished walkthroughs
-
-| Attorney · 2:16 | Court staff · 2:20 |
-| --- | --- |
-| [![Attorney walkthrough](muefs-attorney-poster.png)](muefs-attorney-flow.mp4) | [![Court walkthrough](muefs-court-poster.png)](muefs-court-flow.mp4) |
-| [Watch the attorney video](muefs-attorney-flow.mp4) · [Captions](muefs-attorney-flow.srt) | [Watch the court video](muefs-court-flow.mp4) · [Captions](muefs-court-flow.srt) |
-
-Both videos are 1080p MP4s with a synthetic English voiceover, synchronized
-on-screen captions, and embedded chapter markers. Separate SRT files provide
-editable captions. They follow the same fictional case, **Demo Harbor Services
-v. Demo Supply**, through working application flows.
-
-- **Attorney:** sign in, select the court and case type, save a draft, upload the
-  complaint and summons, review the filing, record a simulated payment, submit,
-  retain the receipt, and find the submission in My Filings.
-- **Court staff:** search the assigned court's review queue, inspect the received
-  filing, download an original attachment, check the submission and fee record,
-  return a separate sample with a correction reason, accept the attorney's
-  filing, and inspect its acceptance history and new case docket.
-
-The recordings use fictional documents, a synthetic fee, and an explicitly
-fictional court calendar in one isolated demo session. No payment is charged.
-The court's live CMS connection remains a stub. Acceptance and public document
-publication remain separate actions.
+The walkthrough follows one fictional case, **Demo Harbor Services v. Demo
+Supply**, with fictional documents, a synthetic fee, and an explicitly fictional
+court calendar. No payment is charged. Acceptance and public document publication
+remain separate actions.
 
 New demo case numbers use `YYYY-000001-CC`: the filing year, a six-digit filing
 sequence, and a case-type suffix. For example, a circuit general-civil case uses
@@ -39,7 +19,7 @@ divorce with minor children). A live court CMS would assign its official number,
 including any more specific classification. Existing assigned case numbers are
 preserved.
 
-## Prepare a recording
+## Prepare the demo
 
 From the repository's `backend` directory, with the dependencies in the
 [quick start](../README.md#try-it-now) installed:
@@ -53,19 +33,18 @@ keeps existing demo records on subsequent starts, enables all five role cards,
 and uses simulated payments. External payment recording and outbound email and
 service delivery are disabled for this local demonstration.
 
-Use a desktop window around 1440 × 1050 or larger. Switch accounts with **Switch
-Role** in the header, keeping the same browser window throughout the recording.
-The hosted demo isolates records by visitor: another browser or private window
-gets a different sandbox and will not see the filing you just submitted.
+Switch accounts with **Switch Role** in the header, keeping the same browser
+window throughout. The hosted demo isolates records by visitor: another browser
+or private window gets a different sandbox and will not see the filing you just
+submitted.
 
 The local demo keeps its SQLite database between runs. Use a distinct case title
-for each take, and note the filing ID and case number as they appear. The examples
-below use the seeded **3rd Circuit Court**, where the demo clerk already has
-review access.
+for each run-through, and note the filing ID and case number as they appear. The
+examples below use the seeded **3rd Circuit Court**, where the demo clerk already
+has review access.
 
-Download these searchable, one-page PDFs before recording. Every page is marked
-as a fictional demonstration sample; the waiver sample is not an official court
-form.
+Download these searchable, one-page PDFs first. Every page is marked as a
+fictional demonstration sample; the waiver sample is not an official court form.
 
 | File | Use |
 | --- | --- |
@@ -105,9 +84,9 @@ form.
    submission time, and **Submission received** history entry. **Print this
    page** provides a printable receipt if desired.
 
-Suggested narration: “The filer can prepare the documents, resolve the fee step,
-and receive a retained submission receipt. This demonstration simulates payment;
-a state's payment provider would handle the actual transaction.”
+Talking point: “The filer can prepare the documents, resolve the fee step, and
+receive a retained submission receipt. This demonstration simulates payment; a
+state's payment provider would handle the actual transaction.”
 
 ### 2. Court Clerk: review and accept the filing
 
@@ -121,13 +100,15 @@ a state's payment provider would handle the actual transaction.”
 5. Optionally switch back to **Attorney** and open that filing's history to show
    **Accepted by the court**.
 
-Suggested narration: “Submission and court acceptance are separate events. The
-clerk controls intake, and the filer can see the result and its history.”
+Talking point: “Submission and court acceptance are separate events. The clerk
+controls intake, and the filer can see the result and its history.”
 
 ### 3. Public docket: find the accepted case
 
 1. Choose **Switch Role**, then **Public docket → Browse records**.
-2. Search for the new case by its title or case number and open it.
+2. Enter the case number the clerk noted (for example `2026-000007-CZ`) in **Case
+   Number**, search, and open the case. Public search matches case numbers and party
+   names, not case titles.
 3. Show the case and docket. The public view has no **File with Court** action.
 
 Public docket visibility does not automatically publish every uploaded document.
@@ -148,9 +129,9 @@ a published demo copy, such as **Johnson v. Smith Industries LLC**.
 6. Click **Refresh Review**, then **Submit Filing**. Show the receipt and the
    waiver's pending review status.
 
-Suggested narration: “A filer can submit a waiver request without paying the
-simulated fee first. The attachment is nonpublic, and the request goes to the
-court for a decision; submitting it does not grant the waiver.”
+Talking point: “A filer can submit a waiver request without paying the simulated
+fee first. The attachment is nonpublic, and the request goes to the court for a
+decision; submitting it does not grant the waiver.”
 
 ### 5. System Administrator: manage court access
 
@@ -163,8 +144,8 @@ court for a decision; submitting it does not grant the waiver.”
 5. To complete the example, enter a reason and **Revoke court role** for that
    additional assignment. The original 3rd Circuit Court assignment remains.
 
-Suggested narration: “Court access is an explicit assignment. Administrators can
-change it and retain who made the change and why.”
+Talking point: “Court access is an explicit assignment. Administrators can change
+it and retain who made the change and why.”
 
 ## Optional: motion companion upload
 
@@ -177,10 +158,3 @@ the correct document type and focuses the file picker; choose `brief-demo.pdf`
 and upload it. Companion guidance follows the actual uploaded document types.
 The optional motion example can end at the saved draft. Use the new-case flow
 above to demonstrate an assessed fee and simulated payment.
-
-## Existing video
-
-[`muefs-walkthrough-60s.mp4`](muefs-walkthrough-60s.mp4) is an older attorney-only
-preview covering sign-in, case search, and the beginning of a filing. It does not
-cover submission, clerk acceptance, waivers, or administration. Use the sequence
-above for the current five-role recording.

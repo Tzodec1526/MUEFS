@@ -1,11 +1,10 @@
 import { useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { publishAgentPageContext } from '../../webmcp/context';
+import { useNavigate } from 'react-router-dom';
 import { MUEFS_NAVIGATE_EVENT, setNavigateBridgeArmed } from '../../webmcp/navigate';
 
+/** Routes agent navigate_to calls through the SPA router instead of a full page load. */
 function WebMcpNavigateBridge() {
   const navigate = useNavigate();
-  const location = useLocation();
 
   useEffect(() => {
     setNavigateBridgeArmed(true);
@@ -21,11 +20,7 @@ function WebMcpNavigateBridge() {
     };
   }, [navigate]);
 
-  // Republish provideContext on every SPA route change (links, back/forward, agent navigate).
-  useEffect(() => {
-    publishAgentPageContext();
-  }, [location.pathname, location.search]);
-
+  // Page context for agents comes from get_agent_session; the spec's provideContext() is gone.
   return null;
 }
 

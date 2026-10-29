@@ -174,6 +174,8 @@ function LoginScreen() {
               <button
                 className="btn btn-primary login-card-btn"
                 onClick={() => handleSignIn(option)}
+                // Four cards share the visible "Sign In"; the name says which role each opens.
+                aria-label={option.role === 'public' ? undefined : `Sign in as ${option.label}`}
               >
                 {option.role === 'public' ? 'Browse records' : 'Sign In'}
               </button>

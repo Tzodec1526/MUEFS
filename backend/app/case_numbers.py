@@ -1,8 +1,9 @@
 """Case-number suffixes for the demo's filing catalog.
 
 The catalog groups some subjects more broadly than SCAO's case types. These are
-representative demo classifications, not a substitute for a court's CMS assigning
-the official number. Already assigned numbers are never reformatted.
+representative classifications, not a substitute for a court's CMS assigning the
+official number; without a connected CMS, acceptance records these numbers.
+Already assigned numbers are never reformatted.
 SCAO source:
 https://courts.mi.gov/siteassets/court-administration/standardsguidelines/casefile/cf_casetypecodes.pdf
 """

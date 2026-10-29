@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { onToast } from '../../utils/toastBus';
 
 export type ToastTone = 'info' | 'success' | 'error';
@@ -18,24 +18,50 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 let nextId = 1;
+const MAX_VISIBLE_TOASTS = 3;
+const TOAST_LIFETIME_MS = 5000;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const visibleToasts = useRef<Toast[]>([]);
+  const timers = useRef(new Map<number, number>());
 
   const dismissToast = useCallback((id: number) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+    window.clearTimeout(timers.current.get(id));
+    timers.current.delete(id);
+    visibleToasts.current = visibleToasts.current.filter(toast => toast.id !== id);
+    setToasts(visibleToasts.current);
   }, []);
 
   const pushToast = useCallback(
     (message: string, tone: ToastTone = 'info') => {
-      const id = nextId++;
-      setToasts((prev) => [...prev, { id, message, tone }]);
-      window.setTimeout(() => dismissToast(id), 5000);
+      const duplicate = visibleToasts.current.find(toast => toast.message === message && toast.tone === tone);
+      const id = duplicate?.id ?? nextId++;
+      if (duplicate) {
+        window.clearTimeout(timers.current.get(id));
+      } else {
+        const next = [...visibleToasts.current, { id, message, tone }];
+        if (next.length > MAX_VISIBLE_TOASTS) {
+          const removed = next.shift()!;
+          window.clearTimeout(timers.current.get(removed.id));
+          timers.current.delete(removed.id);
+        }
+        visibleToasts.current = next;
+        setToasts(next);
+      }
+      timers.current.set(id, window.setTimeout(() => dismissToast(id), TOAST_LIFETIME_MS));
     },
     [dismissToast],
   );
 
   useEffect(() => onToast(pushToast), [pushToast]);
+  useEffect(() => {
+    const pending = timers.current;
+    return () => {
+      for (const timer of pending.values()) window.clearTimeout(timer);
+      pending.clear();
+    };
+  }, []);
 
   const value = useMemo(
     () => ({ toasts, pushToast, dismissToast }),

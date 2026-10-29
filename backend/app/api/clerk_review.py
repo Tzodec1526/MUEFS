@@ -5,8 +5,10 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user_id, lock_current_user
+from app.api.params import Page, RecordId
 from app.database import get_db
-from app.models.filing import FilingStatus
+from app.models.filing import FilingEnvelope, FilingStatus
+from app.schemas.common import MAX_RECORD_ID
 from app.schemas.filing import (
     BatchReviewRequest,
     ClerkQueueResponse,
@@ -31,10 +33,22 @@ async def _require_clerk_role(
         )
 
 
+async def _require_independent_reviewer(
+    db: AsyncSession, user_id: int, filing: FilingEnvelope,
+) -> None:
+    """Like fee assessments and waivers, a filer cannot decide their own filing."""
+    await _require_clerk_role(db, user_id, filing.court_id)
+    if filing.filer_id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Another court reviewer must decide your own filing",
+        )
+
+
 @router.get("/queue", response_model=ClerkQueueResponse)
 async def get_review_queue(
-    court_id: int = Query(...),
-    page: int = Query(1, ge=1),
+    court_id: int = Query(ge=1, le=MAX_RECORD_ID),
+    page: Page = 1,
     page_size: int = Query(25, ge=1, le=100),
     status_filter: FilingStatus | None = Query(None, alias="status"),
     fee_waivers: bool = Query(False),
@@ -57,7 +71,7 @@ async def get_review_queue(
 @router.post("/filings/{filing_id}/review", response_model=FilingEnvelopeResponse)
 async def review_filing(
     request: Request,
-    filing_id: int,
+    filing_id: RecordId,
     data: ClerkReviewRequest,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
@@ -82,7 +96,7 @@ async def review_filing(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found"
         )
-    await _require_clerk_role(db, user_id, filing_check.court_id)
+    await _require_independent_reviewer(db, user_id, filing_check)
 
     try:
         filing = await filing_service.review_filing(
@@ -167,7 +181,7 @@ async def batch_review_filings(
                 filing_check = await filing_service.get_filing(db, fid)
                 f = None
                 if filing_check:
-                    await _require_clerk_role(db, user_id, filing_check.court_id)
+                    await _require_independent_reviewer(db, user_id, filing_check)
                     f = await filing_service.review_filing(
                         db,
                         fid,
@@ -187,6 +201,8 @@ async def batch_review_filings(
             filing_service.FilingDocumentError,
         ) as exc:
             failure = str(exc)
+        except HTTPException as exc:
+            failure = str(exc.detail)
         except Exception:
             logger.exception("Batch acceptance of filing %s failed", fid)
             failure = "Could not accept this filing. Open it for review."

@@ -13,6 +13,7 @@ from starlette.concurrency import iterate_in_threadpool, run_in_threadpool
 from starlette.types import Receive, Scope, Send
 
 from app.api.auth import get_current_user_id, get_optional_user_id
+from app.api.params import RecordId
 from app.database import get_db
 from app.models.document_public_copy import DocumentPublicCopy
 from app.models.filing import FilingDocument
@@ -76,8 +77,9 @@ class DocumentResponse(StreamingResponse):
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         try:
-            file_stream = await run_in_threadpool(self.open_file)
-        except OSError as exc:
+            with document_service.storage_errors():
+                file_stream = await run_in_threadpool(self.open_file)
+        except FileNotFoundError as exc:
             raise HTTPException(404, "Document file is unavailable") from exc
 
         def chunks():
@@ -92,7 +94,7 @@ class DocumentResponse(StreamingResponse):
 @router.get("/{document_id}/download")
 async def download_document(
     request: Request,
-    document_id: int,
+    document_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int | None = Depends(get_optional_user_id),
 ):
@@ -127,7 +129,7 @@ async def download_document(
 
 @router.get("/{document_id}/verify", response_model=DocumentVerifyResponse)
 async def verify_document(
-    document_id: int,
+    document_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -149,12 +151,12 @@ async def verify_document(
             document_service.stored_integrity, doc.file_key,
         )
         is_valid = current_hash == doc.sha256_hash and size == doc.file_size_bytes
-    except OSError:
+    except FileNotFoundError:
         return DocumentVerifyResponse(
             document_id=document_id,
             sha256_hash=doc.sha256_hash,
             is_valid=False,
-            message="Unable to verify document - file may be missing from storage",
+            message="Unable to verify document - the file is missing from storage",
         )
 
     return DocumentVerifyResponse(

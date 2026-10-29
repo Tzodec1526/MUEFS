@@ -62,7 +62,8 @@ async def test_concurrent_waiver_and_post_denial_payment_commit_once(
                 async def act():
                     return await client.post(f"/api/v1/clerk/filings/{fid}/fee-waiver",
                         headers={"X-Demo-User-Id": str(clerk)},
-                        data={"action": "grant_public_assistance"},
+                        data={"action": "grant_public_assistance",
+                              "expected_fee_version": filing.fee_version},
                         files={"file": ("signed.pdf", decision_pdf(), "application/pdf")})
             else:
                 async def act():
@@ -83,6 +84,55 @@ async def test_concurrent_waiver_and_post_denial_payment_commit_once(
                 assert await db.scalar(select(func.count()).select_from(Payment)) == 1
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+async def test_fee_waiver_order_is_screened_before_the_filing_is_locked(
+    postgres_sessions, tmp_path, monkeypatch,
+):
+    from httpx import ASGITransport, AsyncClient
+
+    from app.api import document_upload
+    from app.models.filing import FilingEnvelope
+    from app.models.user import User
+
+    monkeypatch.setattr(document_service, "_local_storage_path", lambda: tmp_path)
+    fid, filer, clerk = await prepare_filing(postgres_sessions)
+    async with postgres_sessions.begin() as db:
+        filing = await filing_service.submit_filing(db, fid)
+        filing.fee_waiver_requested = True
+    scan = document_upload.malware_scan.scan_upload
+    probes = []
+
+    async def screen(data):
+        # Screening can take many seconds; other requests must still reach the filing.
+        async with postgres_sessions.begin() as other:
+            for model, row in ((FilingEnvelope, fid), (User, clerk)):
+                await other.execute(
+                    select(model.id).where(model.id == row).with_for_update(nowait=True)
+                )
+        probes.append("unlocked")
+        return await scan(data)
+
+    monkeypatch.setattr(document_upload.malware_scan, "scan_upload", screen)
+
+    async def database():
+        async with postgres_sessions.begin() as db:
+            yield db
+
+    app.dependency_overrides[get_db] = database
+    try:
+        async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
+            response = await client.post(
+                f"/api/v1/clerk/filings/{fid}/fee-waiver",
+                headers={"X-Demo-User-Id": str(clerk)},
+                data={"action": "grant_public_assistance",
+                      "expected_fee_version": filing.fee_version},
+                files={"file": ("signed.pdf", decision_pdf(), "application/pdf")},
+            )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+    assert response.status_code == 200, response.text
+    assert probes == ["unlocked"]
 
 
 @pytest_asyncio.fixture
@@ -354,8 +404,11 @@ async def test_fee_screen_reads_documents_and_balance_from_one_revision(
             await asyncio.wait_for(finish_read.wait(), 10)
         return await original_state(db, filing, user_id)
 
+    upload_pid = []
+
     async def observe_upload(db, filing_id, *, for_update=False):
         if for_update:
+            upload_pid.append(await db.scalar(text("SELECT pg_backend_pid()")))
             upload_started.set()
         return await original_filing(db, filing_id, for_update=for_update)
 
@@ -379,6 +432,13 @@ async def test_fee_screen_reads_documents_and_balance_from_one_revision(
                 data={"title": "New evidence", "document_type_code": "EXHIBIT"},
                 files={"file": ("evidence.pdf", decision_pdf(), "application/pdf")}))
             await asyncio.wait_for(upload_started.wait(), 10)
+            # The upload must wait for the fee read's share lock, not commit beside it.
+            async with asyncio.timeout(5), postgres_sessions() as observer:
+                while not await observer.scalar(
+                    text("SELECT cardinality(pg_blocking_pids(:pid))"), {"pid": upload_pid[0]},
+                ):
+                    await asyncio.sleep(0.01)
+            assert not upload.done()
             finish_read.set()
             snapshot, changed = await asyncio.wait_for(asyncio.gather(read, upload), 15)
             assert snapshot.status_code == 200 and changed.status_code == 200

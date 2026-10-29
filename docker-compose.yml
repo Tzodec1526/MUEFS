@@ -11,11 +11,14 @@ x-notice-environment: &notice-environment
 
 x-storage-environment: &storage-environment
   DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://muefs:muefs_dev@postgres:5432/muefs}
-  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-http://minio:9000}
-  S3_ACCESS_KEY: ${S3_ACCESS_KEY:-muefs_minio}
-  S3_SECRET_KEY: ${S3_SECRET_KEY:-muefs_minio_secret}
+  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-http://storage:7070}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:-muefs_storage}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:-muefs_storage_secret}
   S3_BUCKET_NAME: ${S3_BUCKET_NAME:-muefs-documents}
 
+# A local evaluation stack: demo sign-in and development credentials are enabled, so
+# every published port listens on this computer only. See docs/DEPLOYMENT.md for a
+# court deployment.
 services:
   # PostgreSQL Database
   postgres:
@@ -25,7 +28,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-muefs_dev}
       POSTGRES_DB: ${POSTGRES_DB:-muefs}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     deploy:
@@ -42,7 +45,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     deploy:
@@ -55,52 +58,65 @@ services:
       timeout: 5s
       retries: 5
 
-  # MinIO Object Storage (S3-compatible)
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
+  # S3-compatible document storage: Versity Gateway serving a local volume. The
+  # migrate service creates the bucket.
+  storage:
+    image: versity/versitygw:v1.8.0@sha256:30292fc2eeacc67a36993b01f7a7a5e3361a19cced0e80c1d71cfa2a4b0a2499
+    command: ["posix", "/data"]
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-muefs_minio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-muefs_minio_secret}
+      ROOT_ACCESS_KEY: ${S3_ACCESS_KEY:-muefs_storage}
+      ROOT_SECRET_KEY: ${S3_SECRET_KEY:-muefs_storage_secret}
+      VGW_HEALTH: /health
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:7070:7070"
     volumes:
-      - minio_data:/data
+      - storage_data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:7070/health"]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
-  # MinIO bucket initialization
-  minio-init:
-    image: minio/mc:latest
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set muefs http://minio:9000 ${MINIO_ROOT_USER:-muefs_minio} ${MINIO_ROOT_PASSWORD:-muefs_minio_secret};
-      mc mb muefs/${S3_BUCKET_NAME:-muefs-documents} --ignore-existing;
-      exit 0;
-      "
-
-  # Keycloak Identity Provider
+  # Keycloak identity provider with the local realm in keycloak/muefs-realm.json
+  # (imported on first start). Its one sign-in account is for local evaluation only.
   keycloak:
-    image: quay.io/keycloak/keycloak:24.0
-    command: start-dev --import-realm
+    image: quay.io/keycloak/keycloak:26.7.4@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
+    command: ["start-dev", "--import-realm"]
     environment:
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # Tokens name the address browsers use; the API fetches keys over the internal
+      # network (KEYCLOAK_INTERNAL_URL) and still requires this issuer.
+      KC_HOSTNAME: ${KEYCLOAK_URL:-http://localhost:8080}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-muefs}
       KC_DB_USERNAME: ${POSTGRES_USER:-muefs}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD:-muefs_dev}
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
     depends_on:
       postgres:
+        condition: service_healthy
+
+  # Creates the document bucket, applies migrations, then seeds the demo courts and
+  # accounts once. Services that read the schema wait for it; rerunning skips an
+  # already seeded database.
+  migrate:
+    build: ./backend
+    command: ["python", "-m", "app.seed_data"]
+    init: true
+    environment:
+      <<: *storage-environment
+      DEBUG: ${DEBUG:-true}
+      ALLOW_DEMO_MODE: ${ALLOW_DEMO_MODE:-true}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      storage:
         condition: service_healthy
 
   # Backend API
@@ -114,17 +130,26 @@ services:
       DEBUG: ${DEBUG:-true}
       SECURITY_STRICT_STARTUP: ${SECURITY_STRICT_STARTUP:-false}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      KEYCLOAK_URL: ${KEYCLOAK_URL:-http://keycloak:8080}
+      KEYCLOAK_URL: ${KEYCLOAK_URL:-http://localhost:8080}
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8080}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-muefs}
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-muefs-api}
-      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-change-me-in-production}
-      SECRET_KEY: ${SECRET_KEY:-change-this-to-a-random-secret-in-production}
       # Local stack: true (X-Demo-User-Id). Production deploys: must be false.
       ALLOW_DEMO_MODE: ${ALLOW_DEMO_MODE:-true}
       ALLOW_PUBLIC_REGISTRATION: ${ALLOW_PUBLIC_REGISTRATION:-true}
       PROVISION_USER_ON_FIRST_OIDC_LOGIN: ${PROVISION_USER_ON_FIRST_OIDC_LOGIN:-true}
       RATE_LIMIT_BACKEND: ${RATE_LIMIT_BACKEND:-redis}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      # Empty values mean "use the default" (several follow DEBUG).
+      DEMO_MODE_SECRET: ${DEMO_MODE_SECRET:-}
+      ENABLE_API_DOCS: ${ENABLE_API_DOCS:-}
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-}
+      STRICT_MIME_DETECTION: ${STRICT_MIME_DETECTION:-}
+      JWT_VERIFY_AUDIENCE: ${JWT_VERIFY_AUDIENCE:-}
+      JWT_AUDIENCES: ${JWT_AUDIENCES:-}
+      RATE_LIMIT_FAIL_CLOSED: ${RATE_LIMIT_FAIL_CLOSED:-}
+      PAYMENTS_ARE_SIMULATED: ${PAYMENTS_ARE_SIMULATED:-true}
+      EXTERNAL_PAYMENTS_ENABLED: ${EXTERNAL_PAYMENTS_ENABLED:-false}
       # Optional ClamAV scanning. Off by default; enable with the `security` profile and
       # MALWARE_SCAN_CLAMAV_ENABLED=true (see the clamav service below). Built-in heuristic
       # screening runs regardless.
@@ -134,7 +159,7 @@ services:
       CLAMAV_PORT: ${CLAMAV_PORT:-3310}
       CLAMAV_TIMEOUT_SECONDS: ${CLAMAV_TIMEOUT_SECONDS:-30}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./backend:/app
     healthcheck:
@@ -144,18 +169,19 @@ services:
       retries: 5
       start_period: 10s
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
-      minio:
+      storage:
         condition: service_healthy
 
-  # Deletes only draft objects whose removal has committed. Apply migrations first.
+  # Deletes only draft objects whose removal has committed.
   storage-worker:
     build: ./backend
     restart: unless-stopped
     command: ["python", "-m", "app.storage_cleanup"]
+    init: true
     environment:
       <<: *storage-environment
       DEBUG: ${DEBUG:-true}
@@ -163,27 +189,26 @@ services:
     volumes:
       - ./backend:/app
     depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      minio-init:
+      migrate:
         condition: service_completed_successfully
+      storage:
+        condition: service_healthy
 
-  # Opt-in notice sender; run migrations and configure the relay before starting it.
+  # Opt-in notice sender; configure the relay before starting it.
   notice-worker:
     profiles: ["email"]
     build: ./backend
     restart: unless-stopped
     command: ["python", "-m", "app.notification_worker"]
+    init: true
     environment:
       <<: *notice-environment
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://muefs:muefs_dev@postgres:5432/muefs}
       DEBUG: ${DEBUG:-true}
       ALLOW_DEMO_MODE: ${ALLOW_DEMO_MODE:-true}
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   # Frontend
   frontend:
@@ -192,12 +217,15 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - ./frontend/src:/app/src
     environment:
       VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
       VITE_ALLOW_DEMO_MODE: ${VITE_ALLOW_DEMO_MODE:-true}
+      VITE_DEMO_MODE_SECRET: ${VITE_DEMO_MODE_SECRET:-}
+      # The dev server proxies /config.js (and /api) to the API container.
+      API_PROXY_TARGET: http://backend:8000
       VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-http://localhost:8080}
       VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-muefs}
       VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-muefs-frontend}
@@ -217,5 +245,5 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  minio_data:
+  storage_data:
   clamav_data:

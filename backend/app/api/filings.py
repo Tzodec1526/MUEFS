@@ -25,6 +25,7 @@ from starlette.responses import JSONResponse
 
 from app.api.auth import get_current_user_id, lock_current_user, require_user_may_manage_efilings
 from app.api.document_upload import read_upload, store_document_upload
+from app.api.params import Page, RecordId
 from app.database import get_db
 from app.models.court import Court
 from app.models.filing import (
@@ -47,7 +48,13 @@ from app.schemas.filing import (
     FilingValidationResult,
     MyFilingsResponse,
 )
-from app.services import access_service, audit_service, document_service, filing_service
+from app.services import (
+    access_service,
+    audit_service,
+    document_service,
+    filing_service,
+    storage_intent,
+)
 from app.services.fee_assessment_service import fee_state
 from app.services.fee_waiver_service import waiver_state
 from app.utils.http_context import client_ip, client_user_agent
@@ -114,7 +121,7 @@ async def create_filing(
 @router.get("", response_model=MyFilingsResponse)
 async def list_filings(
     status_filter: FilingStatus | None = Query(None, alias="status"),
-    page: int = Query(1, ge=1),
+    page: Page = 1,
     page_size: int = Query(25, ge=1, le=100),
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
@@ -145,7 +152,7 @@ async def filing_summary(
 
 @router.get("/{filing_id}", response_model=FilingEnvelopeResponse)
 async def get_filing(
-    filing_id: int,
+    filing_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -166,7 +173,7 @@ async def get_filing(
 
 @router.patch("/{filing_id}", response_model=FilingEnvelopeResponse)
 async def update_filing(
-    filing_id: int,
+    filing_id: RecordId,
     data: FilingEnvelopeUpdate,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
@@ -203,7 +210,12 @@ async def update_filing(
             detail="A submitted fee waiver request cannot be changed through draft editing",
         )
 
-    if data.case_title is not None:
+    if data.case_title is not None and data.case_title != filing.case_title:
+        if filing.case_id is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="A filing in an existing case uses the court's case title.",
+            )
         filing.case_title = data.case_title
     if data.filing_description is not None:
         filing.filing_description = data.filing_description
@@ -222,7 +234,7 @@ async def update_filing(
 
 @router.post("/{filing_id}/validate", response_model=FilingValidationResult)
 async def validate_filing(
-    filing_id: int,
+    filing_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
@@ -245,7 +257,7 @@ async def validate_filing(
 @router.post("/{filing_id}/submit", response_model=FilingEnvelopeResponse)
 async def submit_filing(
     request: Request,
-    filing_id: int,
+    filing_id: RecordId,
     data: FilingSubmitRequest,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
@@ -329,11 +341,11 @@ async def submit_filing(
 @router.post("/{filing_id}/documents", response_model=DocumentUploadResponse)
 async def upload_document(
     request: Request,
-    filing_id: int,
+    filing_id: RecordId,
     idempotency_key: uuid.UUID = Header(alias="Idempotency-Key"),
     file: UploadFile = File(...),
-    document_type_code: str = Form(...),
-    title: str = Form(...),
+    document_type_code: str = Form(..., min_length=1, max_length=50, pattern=r"\S"),
+    title: str = Form(..., min_length=1, max_length=500, pattern=r"\S"),
     is_confidential: bool = Form(False),
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
@@ -351,12 +363,8 @@ async def upload_document(
                   file.filename, file.content_type, size, sha256]
         return hashlib.sha256(json.dumps(fields, separators=(",", ":")).encode()).hexdigest()
 
-    key = str(idempotency_key)
-    recorded = await db.get(DocumentUploadRequest, (filing_id, key))
-    if recorded:
-        content = await read_upload(file)
-        digest = (await run_in_threadpool(hashlib.sha256, content)).hexdigest()
-        if recorded.fingerprint != fingerprint(digest, len(content)):
+    async def replay(recorded: DocumentUploadRequest, digest: str, size: int):
+        if recorded.fingerprint != fingerprint(digest, size):
             raise HTTPException(status_code=409, detail=(
                 "This upload request key was already used for a different document. "
                 "Review the saved filing before starting another upload."
@@ -374,6 +382,13 @@ async def upload_document(
             warnings=doc.pii_warnings or [],
         )
 
+    key = str(idempotency_key)
+    recorded = await db.get(DocumentUploadRequest, (filing_id, key))
+    if recorded:
+        content = await read_upload(file)
+        digest = (await run_in_threadpool(hashlib.sha256, content)).hexdigest()
+        return await replay(recorded, digest, len(content))
+
     if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
         raise HTTPException(status_code=400, detail="Cannot upload documents to this filing")
     if document_type_code in COURT_DOCUMENT_TYPES:
@@ -381,18 +396,26 @@ async def upload_document(
             status_code=403,
             detail="Court decisions must be recorded by authorized court staff",
         )
-    # Inspect and store without holding the envelope row lock.
-    prepared = await store_document_upload(
+    doc = await store_document_upload(
         db, filing_id, file, document_type_code, title, is_confidential,
     )
-    filing = await filing_service.get_filing(db, filing_id, for_update=True)
-    if not filing or filing.filer_id != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your filing")
-    if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
-        await run_in_threadpool(document_service.delete_document, prepared.file_key)
-        raise HTTPException(status_code=400, detail="Cannot upload documents to this filing")
-    doc = prepared
     try:
+        await require_user_may_manage_efilings(await lock_current_user(db, user_id))
+        # Insert only after locking: an earlier document INSERT takes a foreign-key
+        # lock that can deadlock when simultaneous uploads upgrade the envelope lock.
+        filing = await filing_service.get_filing(db, filing_id, for_update=True)
+        if not filing or filing.filer_id != user_id:
+            raise HTTPException(status_code=403, detail="Not your filing")
+        recorded = await db.get(DocumentUploadRequest, (filing_id, key), populate_existing=True)
+        if recorded:
+            response = await replay(recorded, doc.sha256_hash, doc.file_size_bytes)
+            await run_in_threadpool(document_service.delete_document, doc.file_key)
+            storage_intent.release_upload(db.sync_session, doc.file_key)
+            return response
+        if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
+            raise HTTPException(status_code=400, detail="Cannot upload documents to this filing")
+        db.add(doc)
+        await db.flush()
         db.add(DocumentUploadRequest(
             envelope_id=filing_id, key=key, document_id=doc.id,
             fingerprint=fingerprint(doc.sha256_hash, doc.file_size_bytes),
@@ -404,7 +427,7 @@ async def upload_document(
             ip_address=client_ip(request), user_agent=client_user_agent(request),
         )
     except Exception:
-        await run_in_threadpool(document_service.delete_document, doc.file_key)
+        await run_in_threadpool(storage_intent.purge_keys, {doc.file_key})
         raise
     return DocumentUploadResponse(
         id=doc.id, title=doc.title, file_size_bytes=doc.file_size_bytes,
@@ -417,8 +440,8 @@ async def upload_document(
 @router.delete("/{filing_id}/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_document(
     request: Request,
-    filing_id: int,
-    document_id: int,
+    filing_id: RecordId,
+    document_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
@@ -471,8 +494,8 @@ async def remove_document(
 
 @router.get("/{filing_id}/history", response_model=FilingHistoryResponse)
 async def filing_history(
-    filing_id: int,
-    page: int = Query(1, ge=1),
+    filing_id: RecordId,
+    page: Page = 1,
     page_size: int = Query(25, ge=1, le=100),
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
@@ -501,5 +524,7 @@ async def filing_history(
         fee_waiver=await waiver_state(db, filing, user_id) if filing.fee_waiver_requested else None,
         filing_date=filing.filing_date, filing_date_basis=filing.filing_date_basis,
         court_id=filing.court_id,
-        can_manage_documents=staff,
+        # Filing-date orders and publication are court decisions; a filer cannot make
+        # them on their own filing.
+        can_manage_documents=staff and filing.filer_id != user_id,
     )

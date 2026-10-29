@@ -1,3 +1,4 @@
+from ipaddress import ip_network
 from typing import Literal
 
 from pydantic import Field, SecretStr, field_validator
@@ -11,21 +12,25 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379/0"
 
-    # S3 / MinIO
-    s3_endpoint_url: str = "http://localhost:9000"
-    s3_access_key: str = "muefs_minio"
-    s3_secret_key: str = "muefs_minio_secret"
+    # S3-compatible document storage (the local stack runs Versity Gateway)
+    s3_endpoint_url: str = "http://localhost:7070"
+    s3_access_key: str = "muefs_storage"
+    s3_secret_key: str = "muefs_storage_secret"
     s3_bucket_name: str = "muefs-documents"
 
-    # Keycloak
+    # Keycloak. Tokens must name KEYCLOAK_URL (the browser-facing address) as issuer.
     keycloak_url: str = "http://localhost:8080"
+    # Optional address the API uses to fetch signing keys when KEYCLOAK_URL is not
+    # reachable from its network (e.g. http://keycloak:8080 inside Docker Compose).
+    keycloak_internal_url: str = ""
     keycloak_realm: str = "muefs"
     keycloak_client_id: str = "muefs-api"
-    keycloak_client_secret: str = "change-me-in-production"
 
     # App
-    secret_key: str = "change-this-to-a-random-secret-in-production"
-    debug: bool = True
+    # Local tooling sets DEBUG=true. An unset value keeps production startup checks on.
+    debug: bool = False
+    # Log every SQL statement and its parameters (development diagnostics only).
+    database_echo: bool = False
     # Court compliance: NEVER enable in production. Allows X-Demo-User-Id header auth.
     allow_demo_mode: bool = False
     # Required when ALLOW_DEMO_MODE=true and DEBUG=false (hosted demo / staging).
@@ -36,7 +41,8 @@ class Settings(BaseSettings):
     # Missing ClamAV and placeholder secrets always refuse to start outside demo/debug;
     # this also raises on the advisory findings (recommended for court deploys).
     security_strict_startup: bool = False
-    # Comma-separated trusted proxy IPs for X-Forwarded-For (Render, nginx, etc.).
+    # Comma-separated proxy addresses or networks (CIDR) whose X-Forwarded-For is
+    # trusted, e.g. 10.0.0.0/8 for a platform load balancer.
     trusted_proxy_ips: str = ""
 
     # Document processing
@@ -56,7 +62,8 @@ class Settings(BaseSettings):
     # Reject uploads when libmagic cannot identify type (recommended outside DEBUG).
     strict_mime_detection: bool | None = None
 
-    # JWT: validate `aud` claim against Keycloak client id(s).
+    # JWT: validate `aud` against KEYCLOAK_CLIENT_ID and JWT_AUDIENCES. Keycloak's generic
+    # "account" audience is not accepted unless it is listed explicitly.
     jwt_verify_audience: bool | None = None
     # Optional extra audiences (comma-separated), e.g. muefs-frontend,muefs-api
     jwt_audiences: str = ""
@@ -98,15 +105,13 @@ class Settings(BaseSettings):
     demo_isolated_sessions: bool = False
     demo_max_sessions: int = 100
     demo_session_ttl_minutes: int = 60
+    # Uploads each sandbox may keep; its folder is deleted with the sandbox.
+    demo_storage_quota_mb: int = Field(default=200, gt=0)
     demo_static_dir: str = "static"  # built frontend the demo server serves
 
     @property
     def allowed_origins_list(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
-
-    @property
-    def trusted_proxy_ips_list(self) -> list[str]:
-        return [ip.strip() for ip in self.trusted_proxy_ips.split(",") if ip.strip()]
 
     @property
     def api_docs_enabled(self) -> bool:
@@ -129,8 +134,7 @@ class Settings(BaseSettings):
     @property
     def jwt_audiences_list(self) -> list[str]:
         extras = [a.strip() for a in self.jwt_audiences.split(",") if a.strip()]
-        base = [self.keycloak_client_id, "account"]
-        return list(dict.fromkeys([*extras, *base]))
+        return list(dict.fromkeys([*extras, self.keycloak_client_id]))
 
     @property
     def rate_limit_fail_closed_enabled(self) -> bool:
@@ -138,12 +142,19 @@ class Settings(BaseSettings):
             return self.rate_limit_fail_closed
         return not self.debug
 
+    @field_validator("trusted_proxy_ips")
+    @classmethod
+    def _check_proxy_networks(cls, value: str) -> str:
+        for entry in filter(None, (part.strip() for part in value.split(","))):
+            ip_network(entry, strict=False)  # ValueError names the bad entry
+        return value
+
     @field_validator("demo_mode_secret")
     @classmethod
     def _strip_demo_secret(cls, value: str) -> str:
         return value.strip()
 
-    model_config = {"env_file": ".env", "extra": "ignore"}
+    model_config = {"env_file": ".env", "extra": "ignore", "env_ignore_empty": True}
 
 
 settings = Settings()

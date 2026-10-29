@@ -9,7 +9,7 @@ services:
     plan: standard        # 2 GB / always-on (~$25/mo). Use "starter" for a cheaper 512 MB box.
     region: oregon
     healthCheckPath: /ready
-    autoDeploy: false     # hold deploys until challenge build is ready to go live
+    autoDeploy: false     # deploy deliberately: Manual Deploy or the "Deploy demo" workflow
     # Single instance only — the per-session sandboxes live on this box's local disk.
     envVars:
       - key: DEMO_ISOLATED_SESSIONS
@@ -29,11 +29,19 @@ services:
         value: "true"
       - key: RATE_LIMIT_BACKEND
         value: memory
+      # Render's load balancers reach the service from private addresses. Trusting them
+      # lets rate limits and audit records use the visitor's address from
+      # X-Forwarded-For instead of one shared proxy address. After deploying, check that
+      # the audit log's ip_address values differ between visitors.
+      - key: TRUSTED_PROXY_IPS
+        value: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,fc00::/7
       - key: PAYMENTS_ARE_SIMULATED
         value: "true"
       - key: DEMO_MAX_SESSIONS
         value: "100"
       - key: DEMO_SESSION_TTL_MINUTES
         value: "60"
+      - key: DEMO_STORAGE_QUOTA_MB
+        value: "200"
       - key: ALLOWED_ORIGINS
-        value: https://demo.tomcedoz.com,https://webmcp.tomcedoz.com,https://muefs.tomcedoz.com,https://muefs-webmcp-live.tom-72b.workers.dev
+        value: https://demo.tomcedoz.com

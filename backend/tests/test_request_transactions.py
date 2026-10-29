@@ -10,6 +10,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app import database
+from app.api.documents import DocumentResponse
 from app.main import app
 from app.models.audit import AuditLog
 from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
@@ -117,15 +118,16 @@ async def test_slow_document_transfer_releases_database_connection(
         database, "async_session", async_sessionmaker(engine, expire_on_commit=False)
     )
     transfer_started, finish_transfer = asyncio.Event(), asyncio.Event()
-    streams = []
-    real_download = document_service.download_document
+    # Track the verified copy the response streams; the storage handle closes after hashing.
+    streamed = []
+    real_open_file = DocumentResponse.open_file
 
-    def track_stream(key):
-        stream = real_download(key)
-        streams.append(stream)
+    def track_streamed_file(response):
+        stream = real_open_file(response)
+        streamed.append(stream)
         return stream
 
-    monkeypatch.setattr(document_service, "download_document", track_stream)
+    monkeypatch.setattr(DocumentResponse, "open_file", track_streamed_file)
 
     async def slow_connection(scope, receive, send):
         async def slow_send(message):
@@ -165,7 +167,7 @@ async def test_slow_document_transfer_releases_database_connection(
                     downloaded = await asyncio.wait_for(transfer, timeout=5)
                     assert downloaded.status_code == 200
                     assert downloaded.content == content
-            assert len(streams) == 1 and streams[0].closed
+            assert len(streamed) == 1 and streamed[0].closed
     finally:
         await engine.dispose()
 

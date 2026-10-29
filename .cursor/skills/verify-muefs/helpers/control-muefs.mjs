@@ -17,6 +17,7 @@ const statePath = join(runDir, 'state.json');
 const logPath = join(runDir, 'demo.log');
 const profileDir = join(runDir, 'browser-profile');
 const portPath = join(runDir, 'browser.port');
+const tokenPath = join(runDir, 'browser.token');
 const daemonScript = join(helperDir, 'browser-daemon.mjs');
 const FRONTEND = process.env.MUEFS_FRONTEND_URL || 'http://127.0.0.1:3000';
 const API = process.env.MUEFS_API_URL || 'http://127.0.0.1:8000';
@@ -214,7 +215,7 @@ function cmdCleanup() {
   } else {
     console.log('no owned demo instance');
   }
-  for (const p of [profileDir, portPath, statePath, join(runDir, 'browser.ws')]) {
+  for (const p of [profileDir, portPath, tokenPath, statePath, join(runDir, 'browser.ws')]) {
     if (existsSync(p)) rmSync(p, { recursive: true, force: true });
   }
   console.log('cleanup: run state removed; artifacts preserved');
@@ -287,7 +288,10 @@ async function cmdBrowser(argv) {
   const port = await ensureBrowserServer();
   const res = await fetch(`http://127.0.0.1:${port}/cmd`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      'x-verify-token': readFileSync(tokenPath, 'utf8').trim(),
+    },
     body: JSON.stringify({ sub, flags, rest }),
   });
   const body = await res.json();

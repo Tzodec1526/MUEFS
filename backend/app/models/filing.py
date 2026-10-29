@@ -3,7 +3,19 @@ import hashlib
 import json
 from datetime import date, datetime
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, Integer, String, Text, func, text
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    and_,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -102,11 +114,14 @@ class FilingEnvelope(Base):
         "filing_transactions.id", use_alter=True, name="fk_filing_fee_assessment",
     ))
 
+    # The filer's current attachments; court orders and removed versions stay in history.
     documents: Mapped[list["FilingDocument"]] = relationship(
         back_populates="envelope",
-        primaryjoin="and_(FilingEnvelope.id == FilingDocument.envelope_id, "
-        "FilingDocument.removed_at.is_(None), "
-        "FilingDocument.document_type_code.not_in(('FEE_WAIVER_ORDER', 'FILING_DATE_ORDER')))",
+        primaryjoin=lambda: and_(
+            FilingEnvelope.id == FilingDocument.envelope_id,
+            FilingDocument.removed_at.is_(None),
+            FilingDocument.document_type_code.not_in(sorted(COURT_DOCUMENT_TYPES)),
+        ),
         order_by="FilingDocument.id",
     )
 

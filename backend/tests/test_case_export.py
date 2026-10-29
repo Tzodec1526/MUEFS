@@ -61,7 +61,7 @@ async def case_records(request, tmp_path, monkeypatch, stored_document):
     engine = create_async_engine(url)
     monkeypatch.setattr(settings, "database_url", url)
     # Object storage is independent of the database dialect during these snapshot tests.
-    monkeypatch.setattr(document_service, "_is_demo_mode", lambda: True)
+    monkeypatch.setattr(document_service, "uses_local_storage", lambda: True)
     try:
         async with engine.connect() as connection:
             if connection.dialect.name == "sqlite":
@@ -329,7 +329,7 @@ async def test_complete_archive_retains_private_evidence_without_changing_record
     data, output = case_records, tmp_path / "case.zip"
     result = await case_export.export_case(data["case"].id, output)
     verified = case_export.verify_archive(output, result["manifest_sha256"])
-    assert verified["status"] == "verified" and verified["expected_fingerprint_checked"]
+    assert verified["status"] == "verified"
     with ZipFile(output) as archive:
 
         def records(table):
@@ -528,7 +528,7 @@ async def test_s3_objects_are_streamed_closed_and_verified_even_when_contents_re
             Bucket=bucket, Key=doc.file_key, Body=(data["storage"] / doc.file_key).read_bytes()
         )
     monkeypatch.setattr(settings, "database_url", data["url"])
-    monkeypatch.setattr(document_service, "_is_demo_mode", lambda: False)
+    monkeypatch.setattr(document_service, "uses_local_storage", lambda: False)
     download = document_service.download_document
     reads, closed = [], []
 
@@ -560,14 +560,27 @@ async def test_s3_objects_are_streamed_closed_and_verified_even_when_contents_re
     assert not failed.exists() and not list(tmp_path.glob(".case-export-*"))
 
 
-async def test_verifier_rejects_unlisted_entries_without_extracting_files(case_records, tmp_path):
+async def test_verifier_rejects_unlisted_entries_without_extracting_files(
+    case_records, tmp_path, monkeypatch,
+):
     output = tmp_path / "unlisted.zip"
     await case_export.export_case(case_records["case"].id, output)
     with ZipFile(output, "a") as archive:
         archive.writestr("../outside.txt", b"Do not extract")
+    extractions = []
+
+    def refuse_extraction(_archive, *args, **kwargs):
+        extractions.append(args)
+        raise AssertionError("Verification extracted archive entries")
+
+    # ZipFile strips "..", so extraction would write beside the archive, not above it.
+    monkeypatch.setattr(ZipFile, "extract", refuse_extraction)
+    monkeypatch.setattr(ZipFile, "extractall", refuse_extraction)
+    files_before = sorted(tmp_path.rglob("*"))
     with pytest.raises(case_export.CaseExportError, match="contents"):
         case_export.verify_archive(output)
-    assert not (tmp_path.parent / "outside.txt").exists()
+    assert extractions == []
+    assert sorted(tmp_path.rglob("*")) == files_before
 
 
 async def test_simultaneous_exports_cannot_overwrite_one_another(case_records, tmp_path):

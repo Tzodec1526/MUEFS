@@ -9,14 +9,19 @@ Usage: python -m app.seed_data [--reset]
 changing seed data; Keycloak's tables and stored documents are untouched).
 """
 
-import os
+import asyncio
 from datetime import UTC, datetime
 
-from sqlalchemy import create_engine, func
+from sqlalchemy import Connection, Engine, create_engine, func
+from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import Session
 
+from alembic import command
+from app.config import settings
 from app.database import Base
 from app.demo.documents import sample_document
+from app.demo.schema import alembic_config, prepare_demo_connection
 from app.models.court import (
     CaseCategory,
     CaseType,
@@ -26,11 +31,8 @@ from app.models.court import (
     FilingRequirement,
 )
 from app.models.user import CourtRole, User, UserCourtRole, UserType
+from app.services import document_service
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL_SYNC",
-    "postgresql://muefs:muefs_dev@localhost:5432/muefs",
-)
 
 def _ordinal(n: int) -> str:
     """1 -> 1st, 2 -> 2nd, 21 -> 21st; but 11/12/13 -> 11th/12th/13th."""
@@ -593,18 +595,56 @@ PROBATE_MOTION_REQUIREMENTS = [
 ]
 
 
-def seed_database(reset: bool = False):
-    engine = create_engine(DATABASE_URL, echo=False)
+def seed_database(reset: bool = False, url: str | None = None) -> None:
+    """Create or upgrade the schema, then seed it unless it already has courts."""
+    url = url or settings.database_url
+    # The seeded sample documents are written to the configured document storage.
+    document_service.ensure_bucket()
+    if make_url(url).get_dialect().is_async:
+        asyncio.run(_seed_with_async_driver(url, reset))
+        return
+    engine = create_engine(url, echo=False)
+    try:
+        with engine.connect() as connection:
+            _prepare_schema(connection, reset)
+        _populate(engine)
+    finally:
+        engine.dispose()
+
+
+async def _seed_with_async_driver(url: str, reset: bool) -> None:
+    # The application ships asyncpg, not a synchronous PostgreSQL driver.
+    engine = create_async_engine(url, echo=False)
+    try:
+        async with engine.connect() as connection:
+            await connection.run_sync(_prepare_schema, reset)
+            await connection.run_sync(_populate)
+            await connection.commit()
+    finally:
+        await engine.dispose()
+
+
+def _prepare_schema(connection: Connection, reset: bool) -> None:
     if reset:
         print("Reset: dropping application tables...")
-        Base.metadata.drop_all(engine)
-    if engine.dialect.name == "sqlite":
-        from app.demo.schema import prepare_demo_schema
-        prepare_demo_schema(engine)
+        Base.metadata.drop_all(connection)
+        # A retained version stamp would skip recreating migrated objects.
+        connection.exec_driver_sql("DROP TABLE IF EXISTS alembic_version")
+        if connection.dialect.name == "postgresql":
+            # Schemas migrated before e6b3f0a72c95 still hold this unused type, and the
+            # baseline migration creates it again.
+            connection.exec_driver_sql("DROP TYPE IF EXISTS deliverystatus")
+        connection.commit()
+    if connection.dialect.name == "sqlite":
+        prepare_demo_connection(connection)
     else:
-        Base.metadata.create_all(engine)
+        # Migrations manage their own transactions, including concurrent index builds.
+        command.upgrade(alembic_config(connection), "head")
+    connection.commit()
 
-    with Session(engine) as session:
+
+def _populate(bind: Engine | Connection) -> None:
+    with Session(bind) as session:
         # Check if already seeded
         existing = session.query(Court).first()
         if existing:
@@ -1326,6 +1366,7 @@ def seed_database(reset: bool = False):
                 case_id=case1.id, user_id=attorney.id,
                 role=ParticipantRole.ATTORNEY_PLAINTIFF,
                 party_name="Jane Doe", attorney_bar_number="P12345",
+                access_enabled=True, reviewed_at=now,
             ))
 
             # Initial complaint filing (accepted)
@@ -1388,6 +1429,7 @@ def seed_database(reset: bool = False):
                 user_id=srl_user.id,
                 role=ParticipantRole.PLAINTIFF,
                 party_name="Maria Williams",
+                access_enabled=True, reviewed_at=now,
             ))
             session.add(CaseParticipant(
                 case_id=case2.id, role=ParticipantRole.DEFENDANT,
@@ -1397,6 +1439,7 @@ def seed_database(reset: bool = False):
                 case_id=case2.id, user_id=attorney.id,
                 role=ParticipantRole.ATTORNEY_PLAINTIFF,
                 party_name="Jane Doe", attorney_bar_number="P12345",
+                access_enabled=True, reviewed_at=now,
             ))
 
             filing2 = FilingEnvelope(
@@ -1524,9 +1567,6 @@ def seed_database(reset: bool = False):
                     user_id=attorney.id, court_id=wayne_circuit.id,
                     notes="Primary court - Wayne County",
                 ))
-            if wayne_tort:
-                # favor the court of the tort case too
-                pass  # same court
             # Favorite a couple more common ones for demo
             oakland_court = session.query(Court).filter_by(name="6th Circuit Court", county="Oakland").first()
             if oakland_court:
@@ -1538,8 +1578,6 @@ def seed_database(reset: bool = False):
             demo_cases = session.query(Case).count()
             demo_filings = session.query(FilingEnvelope).count()
             print(f"  Created {demo_cases} demo cases with {demo_filings} filings")
-
-        session.commit()
 
         # Guard: one row per (court, case type, document code). Duplicate rows render
         # as duplicate checklist cards in the filing UI, so fail loudly at seed time.
@@ -1561,6 +1599,8 @@ def seed_database(reset: bool = False):
             raise ValueError(
                 f"{len(dupes)} duplicate filing-requirement rows seeded; first: {dupes[:5]}"
             )
+
+        session.commit()
 
         total = session.query(Court).count()
         total_types = session.query(CaseType).count()

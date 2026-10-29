@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 from zipfile import ZipFile
 
 import pytest
-from sqlalchemy import func, select, text
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import DBAPIError
 
 from app import case_export
@@ -20,7 +20,7 @@ from app.models.filing import FilingEnvelope
 from app.models.filing_transaction import FilingTransaction
 from app.models.notification import DeliveryStatus, Notification, ServiceContact
 from app.models.service_delivery import ServiceEvent, ServicePacket, ServiceRecipient
-from app.models.user import User
+from app.models.user import User, UserCourtRole, UserType
 from app.schemas.service_delivery import ServiceFailureReport, ServicePacketCreate
 from app.services import document_service, email_delivery_service, filing_service
 from app.services.case_participant_service import participant_snapshot
@@ -177,6 +177,27 @@ async def test_delivery_grants_only_selected_bytes_and_retains_recipient_acknowl
     )
 
 
+async def test_revoking_a_staff_senders_assignment_ends_their_delivery_access(
+    delivery_case, db_session, api_client,
+):
+    f = delivery_case
+    staff = await db_session.get(User, f["staff"])
+    staff.verified_email = staff.email
+    api_client.headers["X-Demo-User-Id"] = str(f["staff"])
+    sent = await send(api_client, f)
+    assert sent.status_code == 201, sent.text
+    recipient = await db_session.scalar(select(ServiceRecipient))
+    path = f"/api/v1/service/deliveries/{recipient.id}"
+    views = [path, path + "/events", f"{path}/documents/{f['documents'][0].id}"]
+    for view in views:
+        assert (await api_client.get(view)).status_code == 200, view
+    # Staff send for the court; the sealed caption and documents are not theirs to keep.
+    await db_session.execute(delete(UserCourtRole).where(UserCourtRole.user_id == staff.id))
+    await db_session.flush()
+    for view in views:
+        assert (await api_client.get(view)).status_code == 403, view
+
+
 @pytest.mark.parametrize(
     "change", ["contact", "receipt", "private", "storage", "unreviewed", "disabled", "other_sender"]
 )
@@ -268,6 +289,29 @@ async def test_uncertain_alert_retry_requires_staff_and_keeps_the_same_package(
         path + "/retry", json={"reason": "Relay logs checked; no acknowledgment"}
     )
     assert result.status_code == 200 and result.json()["delivery_status"] == "pending"
+    assert await db_session.scalar(select(func.count()).select_from(ServicePacket)) == 1
+
+
+async def test_accounts_without_filing_privileges_cannot_send_or_retry(
+    delivery_case, db_session, api_client,
+):
+    f = delivery_case
+    assert (await send(api_client, f)).status_code == 201
+    recipient = await db_session.scalar(select(ServiceRecipient))
+    notice = await db_session.get(Notification, recipient.notification_id)
+    notice.delivery_status = DeliveryStatus.FAILED
+    sender = await db_session.get(User, f["sender"])
+    # The court downgraded the sender to a public docket account.
+    sender.user_type = UserType.PUBLIC
+    await db_session.flush()
+    for response in (
+        await api_client.get(f"/api/v1/service/filings/{f['fid']}/options"),
+        await send(api_client, f),
+        await api_client.post(f"/api/v1/service/deliveries/{recipient.id}/retry",
+                              json={"reason": "Try again"}),
+    ):
+        assert response.status_code == 403, response.text
+        assert "Public docket accounts" in response.json()["detail"]
     assert await db_session.scalar(select(func.count()).select_from(ServicePacket)) == 1
 
 

@@ -163,6 +163,46 @@ it('discards an old request while a new sign-in is still pending', async () => {
   expect(window.location.href).toBe('');
 });
 
+it.each([
+  ['signs out', { generation: 'other-tab', restore: false }],
+  ['signs in a different account', {
+    generation: 'other-tab', restore: true, issuer: 'https://identity.example.gov/realms/courts', subject: 'account-b',
+  }],
+])('continues anonymously after another tab %s', async (_, otherTabMarker) => {
+  const client = await signIn();
+  const activity = await import('../webmcp/activity');
+  activity.logAgentActivity('search_cases', { party_name: 'Smith' }, true, 12);
+  const inFlight = pendingRequest();
+  const stale = api.apiClient.get('/filings', { adapter: inFlight.adapter });
+  const discarded = expect(stale).rejects.toMatchObject({ code: 'ERR_CANCELED' });
+  const config = await inFlight.sent;
+
+  // The other tab rewrites the shared marker; this tab only learns of it from storage.
+  localStorage.setItem(auth.SESSION_KEY, JSON.stringify(otherTabMarker));
+  inFlight.response.resolve({ status: 200, statusText: '', headers: {}, config, data: { private: 'account-a' } });
+  await discarded;
+
+  const adapter = vi.fn(async (sent: InternalAxiosRequestConfig) => (
+    { status: 200, statusText: '', headers: {}, config: sent, data: { cases: [] } }));
+  await api.apiClient.get('/cases/search', { adapter });
+  await api.apiClient.get('/cases/search', { adapter });
+  expect(adapter).toHaveBeenCalledTimes(2);
+  expect(adapter.mock.calls.some(([sent]) => sent.headers.has('Authorization'))).toBe(false);
+  expect(auth.accessToken()).toBeNull();
+  expect(client.clearToken).toHaveBeenCalled();
+  expect(activity.getAgentActivity()).toEqual([]);
+});
+
+it("clears the agent activity log when a different account signs in, not when the same one returns", async () => {
+  const activity = await import('../webmcp/activity');
+  await signIn();
+  activity.logAgentActivity('search_cases', { party_name: 'Smith' }, true, 12);
+  await signIn();
+  expect(activity.getAgentActivity()).toHaveLength(1);
+  await signIn('account-b');
+  expect(activity.getAgentActivity()).toEqual([]);
+});
+
 it('stops a mutation when renewal fails and preserves its unsaved filing draft', async () => {
   const client = await signIn();
   sessionStorage.setItem('muefs_filing_draft:v2:1:new', 'unsaved');

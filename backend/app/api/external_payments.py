@@ -5,12 +5,13 @@ import json
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user_id, lock_current_user
+from app.api.params import Page, RecordId
 from app.config import settings
 from app.database import get_db
 from app.models.filing import FilingEnvelope
@@ -54,8 +55,8 @@ async def lock_payment_filing(
 
 @router.get("/{filing_id}/payments", response_model=PaymentRecords)
 async def list_payment_records(
-    filing_id: int,
-    page: int = Query(1, ge=1),
+    filing_id: RecordId,
+    page: Page = 1,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -90,7 +91,7 @@ async def list_payment_records(
 
 @router.post("/{filing_id}/external-payments", response_model=PaymentRecord, status_code=201)
 async def record_external_payment(
-    filing_id: int,
+    filing_id: RecordId,
     data: ExternalPaymentRequest,
     request: Request,
     response: Response,
@@ -252,8 +253,8 @@ async def record_external_payment(
 
 @router.post("/{filing_id}/external-payments/{payment_id}/reverse", response_model=PaymentRecord)
 async def reverse_external_payment(
-    filing_id: int,
-    payment_id: int,
+    filing_id: RecordId,
+    payment_id: RecordId,
     data: ExternalPaymentReversal,
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),

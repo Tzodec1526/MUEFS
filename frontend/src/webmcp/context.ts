@@ -1,52 +1,49 @@
 import { getDemoRole } from '../components/auth/LoginScreen';
-import { catalogForRole, TOOL_CATALOG } from './catalog';
-import type { ModelContext } from './types';
+import { catalogForBuild, catalogForRole } from './catalog';
+import { HUMAN_IN_THE_LOOP, suggestNextStep } from './guidance';
 
 export interface AgentPageContext {
   role: string;
   path: string;
   tool_count: number;
   catalog_size: number;
-  suggested_next_tool: string;
+  /** Null when the human must act first (for example, sign in at /login). */
+  suggested_next_tool: string | null;
+  next_step: string;
   agent_hub: string;
   human_in_the_loop: string;
   declarative_tools_on_site: string[];
   workflows: string[];
 }
 
+/** The current page as agents may see it. */
+export function agentVisiblePath(): string {
+  if (typeof window === 'undefined') return '/';
+  const { pathname, search } = window.location;
+  // Sign-in callbacks carry one-time authorization codes in the query.
+  return pathname.startsWith('/auth/') ? pathname : pathname + search;
+}
+
 export function buildAgentPageContext(): AgentPageContext {
   const role = getDemoRole();
   const tools = catalogForRole(role);
-  const path =
-    typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/';
-  let suggested = 'get_agent_catalog';
-  if (!role) suggested = 'sign_in_demo_role';
-  else if (role === 'clerk') suggested = 'clerk_triage_workflow';
-  else if (role === 'attorney' || role === 'srl') suggested = 'attorney_motion_workflow';
+  const path = agentVisiblePath();
+  const next = suggestNextStep(role);
 
-  const declarative: string[] = ['search_cases'];
-  if (path.startsWith('/clerk')) declarative.push('get_clerk_review_queue');
+  // Form tool names differ from every registered tool's: a host may keep one name map.
+  const declarative: string[] = ['search_cases_form'];
+  if (path.startsWith('/clerk')) declarative.push('review_queue_form');
 
   return {
     role: role || 'anonymous',
     path,
     tool_count: tools.length,
-    catalog_size: TOOL_CATALOG.length,
-    suggested_next_tool: suggested,
+    catalog_size: catalogForBuild().length,
+    suggested_next_tool: next.tool,
+    next_step: next.hint,
     agent_hub: '/agent',
-    human_in_the_loop:
-      'Agents may research and navigate; only humans submit filings in the wizard.',
+    human_in_the_loop: HUMAN_IN_THE_LOOP,
     declarative_tools_on_site: declarative,
     workflows: tools.filter(t => t.tier === 'workflow').map(t => t.name),
   };
-}
-
-export function publishAgentPageContext(mc?: ModelContext | null): void {
-  const host = mc ?? (typeof document !== 'undefined' ? document.modelContext : undefined);
-  if (!host?.provideContext) return;
-  try {
-    void host.provideContext({ ...buildAgentPageContext() });
-  } catch {
-    /* host optional */
-  }
 }

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app.api import filing_dates
 from app.integrations.cms_adapter import CMSFilingResult
@@ -14,7 +14,7 @@ from app.models.case import Case
 from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.models.filing_transaction import FilingTransaction
 from app.models.notification import Notification
-from app.models.user import User, UserType
+from app.models.user import CourtRole, User, UserCourtRole, UserType
 from app.services import audit_service, document_service, filing_service
 from app.storage_audit import inspect_receipts
 from tests.test_document_publication import prepare_copy, publication_pdf
@@ -111,6 +111,33 @@ async def test_order_preserves_receipt_and_acceptance_honors_it_without_calendar
     assert case.filed_date.replace(tzinfo=UTC) == accepted.submitted_at.replace(tzinfo=UTC)
     assert doc.id not in [attachment.id for attachment in accepted.documents]
     assert (await api_client.get(history_url)).json()["transactions"][-1] == original_receipt
+
+
+async def test_acceptance_rechecks_a_date_order_recorded_during_verification(
+    date_record, db_session, monkeypatch,
+):
+    fid, _, clerk, _ = date_record
+    verify = filing_service.verify_filing_documents
+
+    async def order_during_verification(filing, court_order=None):
+        await verify(filing, court_order)
+        # Another request commits a signed date order while acceptance reads bytes.
+        await db_session.execute(
+            update(FilingEnvelope).where(FilingEnvelope.id == fid).values(
+                filing_date=date(2026, 9, 3),
+                filing_date_basis={"source": "court_order"},
+                filing_date_version=FilingEnvelope.filing_date_version + 1,
+            ).execution_options(synchronize_session=False)
+        )
+
+    monkeypatch.setattr(filing_service, "verify_filing_documents", order_during_verification)
+    with pytest.raises(filing_service.StaleFilingReviewError, match="filing date changed"):
+        await filing_service.review_filing(
+            db_session, fid, clerk, "accept", expected_submission_count=1
+        )
+    filing = await filing_service.get_filing(db_session, fid)
+    assert filing.filing_date == date(2026, 9, 3)
+    assert filing.status == FilingStatus.SUBMITTED
 
 
 async def test_case_date_is_explicit_and_old_orders_remain_publishable(
@@ -383,3 +410,20 @@ async def test_authority_rechecked_after_pdf_inspection_and_legacy_receipt_not_i
     order = await db_session.get(FilingTransaction, recorded.json()["transaction_id"])
     assert order.submission_number == 0
     assert "legacy filing" in order.details["documents"][0]["title"]
+
+
+async def test_staff_cannot_date_their_own_filing(date_record, db_session, api_client):
+    fid, filer, clerk, _ = date_record
+    filing = await db_session.get(FilingEnvelope, fid)
+    db_session.add(UserCourtRole(user_id=filer, court_id=filing.court_id, role=CourtRole.CLERK))
+    await db_session.flush()
+    api_client.headers["X-Demo-User-Id"] = str(filer)
+    url = f"/api/v1/clerk/filings/{fid}/filing-date"
+    assert (await api_client.get(url)).status_code == 200  # Reading the state is fine.
+    response = await api_client.post(url, data=DECISION, files={"file": ("order.pdf", ORDER)})
+    assert response.status_code == 403, response.text
+    assert "Another court reviewer" in response.json()["detail"]
+    assert (await db_session.get(FilingEnvelope, fid)).filing_date_version == 1
+    assert not await db_session.scalar(select(func.count()).select_from(FilingDocument).where(
+        FilingDocument.envelope_id == fid, FilingDocument.document_type_code != "COMPLAINT",
+    ))

@@ -3,58 +3,42 @@ import { Link } from 'react-router-dom';
 import { Bot, CheckCircle2, Copy, XCircle } from 'lucide-react';
 import {
   catalogForRole,
+  examplePrompts,
   listRegisteredToolsFromBrowser,
   webMcpStatus,
 } from '../../webmcp';
-import { getDemoRole } from '../auth/LoginScreen';
 import MichiganMark from '../common/MichiganMark';
 import { useToast } from '../common/Toast';
 import AgentActivityFeed from './AgentActivityFeed';
 import AgentDeclarativeSearch from './AgentDeclarativeSearch';
 
-const EXAMPLE_PROMPTS = [
-  {
-    title: 'Session',
-    prompt:
-      'Call get_challenge_briefing, then get_agent_session and get_agent_catalog.',
-  },
-  {
-    title: 'Attorney motion',
-    prompt:
-      'Sign in as attorney, run attorney_motion_workflow for party Smith, let me choose a case if there are several matches, navigate_to the filing wizard, then call get_agent_activity.',
-  },
-  {
-    title: 'SRL MCR',
-    prompt:
-      'Sign in as srl. Run explain_mcr_for_filing for court_id 3 case_type_id 35 filing_type motion.',
-  },
-  {
-    title: 'Clerk triage',
-    prompt:
-      'Sign in as clerk, run clerk_triage_workflow, then navigate_to /clerk/queue.',
-  },
-];
-
 function WebMcpAgentPage() {
-  const status = webMcpStatus();
-  const role = getDemoRole();
+  const [status, setStatus] = useState(webMcpStatus);
+  const role = status.role;
   const tools = catalogForRole(role);
   const { pushToast } = useToast();
   const [browserTools, setBrowserTools] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!status.available) return;
-    listRegisteredToolsFromBrowser().then(setBrowserTools);
+    let revision = 0;
     const refresh = () => {
-      listRegisteredToolsFromBrowser().then(setBrowserTools);
+      const current = ++revision;
+      setStatus(webMcpStatus());
+      void listRegisteredToolsFromBrowser().then(names => {
+        if (current === revision) setBrowserTools(names);
+      });
     };
+    refresh();
     window.addEventListener('muefs-webmcp-tools-changed', refresh);
     window.addEventListener('muefs-demo-role-changed', refresh);
+    window.addEventListener('storage', refresh);
     return () => {
+      revision++;
       window.removeEventListener('muefs-webmcp-tools-changed', refresh);
       window.removeEventListener('muefs-demo-role-changed', refresh);
+      window.removeEventListener('storage', refresh);
     };
-  }, [status.available, role]);
+  }, []);
 
   const handleCopy = async (text: string) => {
     try {
@@ -164,7 +148,7 @@ function WebMcpAgentPage() {
 
       <section className="agent-hub-prompts">
         <h2>Prompts</h2>
-        {EXAMPLE_PROMPTS.map((item) => (
+        {examplePrompts().map((item) => (
           <article key={item.title} className="agent-prompt-card">
             <div className="agent-prompt-header">
               <h3>{item.title}</h3>

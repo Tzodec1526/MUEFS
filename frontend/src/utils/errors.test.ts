@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getErrorDetail } from './errors';
+import { getBlobErrorDetail, getErrorDetail } from './errors';
 
 describe('API error messages', () => {
   it('preserves the server explanation for a rejected action', () => {
@@ -16,5 +16,11 @@ describe('API error messages', () => {
     for (const error of [null, new Error('Network failure'), { response: { data: { detail: [{}] } } }]) {
       expect(getErrorDetail(error)).toBeUndefined();
     }
+  });
+  it('reads the explanation from a failed file download', async () => {
+    const body = new Blob([JSON.stringify({ detail: 'Document failed its retained integrity check' })]);
+    expect(await getBlobErrorDetail({ response: { data: body } }))
+      .toBe('Document failed its retained integrity check');
+    expect(await getBlobErrorDetail({ response: { data: new Blob(['<html>']) } })).toBeUndefined();
   });
 });

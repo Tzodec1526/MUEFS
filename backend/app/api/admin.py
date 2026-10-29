@@ -8,6 +8,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user
+from app.api.params import Page, RecordId
 from app.database import get_db
 from app.models.audit import AuditLog
 from app.models.case import Case
@@ -15,6 +16,7 @@ from app.models.court import Court
 from app.models.filing import FilingEnvelope, FilingStatus
 from app.models.user import CourtRole, User, UserCourtRole, UserType
 from app.schemas.administration import AccountChange, AccountUpdate, CourtRoleChange
+from app.schemas.common import MAX_RECORD_ID
 from app.services import administration_service as administration
 from app.utils.http_context import client_ip, client_user_agent
 
@@ -78,8 +80,8 @@ async def get_system_stats(
 async def get_audit_log(
     action: str | None = None,
     entity_type: str | None = None,
-    user_id: int | None = None,
-    page: int = Query(1, ge=1),
+    user_id: int | None = Query(None, ge=1, le=MAX_RECORD_ID),
+    page: Page = 1,
     page_size: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(_require_admin),
@@ -198,9 +200,9 @@ async def _user_records(
 
 @router.get("/users")
 async def list_accounts(
-    court_id: int | None = None,
+    court_id: int | None = Query(None, ge=1, le=MAX_RECORD_ID),
     email: str | None = Query(default=None, max_length=255),
-    page: int = Query(1, ge=1),
+    page: Page = 1,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
@@ -260,7 +262,7 @@ async def provision_account(
 
 @router.put("/users/{user_id}")
 async def change_account(
-    user_id: int,
+    user_id: RecordId,
     data: AccountUpdate,
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -282,8 +284,8 @@ async def change_account(
 
 @router.post("/courts/{court_id}/users/{user_id}/roles")
 async def change_role(
-    court_id: int,
-    user_id: int,
+    court_id: RecordId,
+    user_id: RecordId,
     data: CourtRoleChange,
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -310,9 +312,9 @@ async def change_role(
 
 @router.get("/users/{user_id}/history")
 async def account_history(
-    user_id: int,
-    court_id: int | None = None,
-    page: int = Query(1, ge=1),
+    user_id: RecordId,
+    court_id: int | None = Query(None, ge=1, le=MAX_RECORD_ID),
+    page: Page = 1,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):

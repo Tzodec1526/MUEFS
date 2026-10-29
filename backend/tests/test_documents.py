@@ -8,6 +8,7 @@ from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 from app.services.document_service import inspect_pdf, validate_mime_type
 from app.utils.pdf import check_pii_patterns
+from tests.test_document_publication import publication_pdf
 
 
 def test_validate_mime_type():
@@ -85,11 +86,11 @@ def test_pdf_inspection_handles_malformed_files_and_limits_sampling():
     assert not broken.is_text_searchable
     assert broken.pii_warnings == []
 
-    writer = PdfWriter()
-    writer.add_blank_page(width=100, height=100)
-    buffer = io.BytesIO()
-    writer.write(buffer)
-    blank = inspect_pdf(buffer.getvalue(), max_pages=0)
-    assert blank.page_count == 1
-    assert not blank.is_text_searchable
-    assert blank.pii_warnings == []
+    # A page with text and an SSN shows whether sampling actually stops at the limit.
+    record = publication_pdf("SSN 123-45-6789")
+    unsampled = inspect_pdf(record, max_pages=0)
+    assert unsampled.page_count == 1
+    assert not unsampled.is_text_searchable
+    assert unsampled.pii_warnings == []
+    sampled = inspect_pdf(record, max_pages=1)
+    assert sampled.is_text_searchable and sampled.pii_warnings

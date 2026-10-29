@@ -1,22 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, selectinload
 
 from app.api.auth import get_current_user, get_current_user_id, require_user_may_manage_efilings
+from app.api.params import RecordId
 from app.database import get_db
 from app.models.case import Case
 from app.models.court import Court
 from app.models.user import FavoriteCase, FavoriteCourt, User
+from app.schemas.common import MAX_RECORD_ID
 from app.services.access_service import case_visibility_filter
 
 router = APIRouter(prefix="/favorites", tags=["Favorites"])
 
 
 class FavoriteCaseCreate(BaseModel):
-    case_id: int
-    notes: str | None = None
+    case_id: int = Field(ge=1, le=MAX_RECORD_ID)
+    notes: str | None = Field(None, max_length=500)
 
 
 class FavoriteCaseResponse(BaseModel):
@@ -34,8 +37,8 @@ class FavoriteCaseListResponse(BaseModel):
 
 
 class FavoriteCourtCreate(BaseModel):
-    court_id: int
-    notes: str | None = None
+    court_id: int = Field(ge=1, le=MAX_RECORD_ID)
+    notes: str | None = Field(None, max_length=500)
 
 
 class FavoriteCourtResponse(BaseModel):
@@ -96,21 +99,15 @@ async def add_favorite(
     if not case:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
 
-    # Check not already favorited
-    existing = await db.execute(
-        select(FavoriteCase).where(
-            FavoriteCase.user_id == user_id,
-            FavoriteCase.case_id == data.case_id,
-        )
-    )
-    if existing.scalar_one_or_none():
+    fav = FavoriteCase(user_id=user_id, case_id=data.case_id, notes=data.notes)
+    try:
+        # The unique constraint decides; checking first races a request from another tab.
+        async with db.begin_nested():
+            db.add(fav)
+    except IntegrityError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Case already in favorites"
-        )
-
-    fav = FavoriteCase(user_id=user_id, case_id=data.case_id, notes=data.notes)
-    db.add(fav)
-    await db.flush()
+        ) from None
 
     return FavoriteCaseResponse(
         id=fav.id,
@@ -124,7 +121,7 @@ async def add_favorite(
 
 @router.delete("/{case_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_favorite(
-    case_id: int,
+    case_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
@@ -136,11 +133,10 @@ async def remove_favorite(
         )
     )
     fav = result.scalar_one_or_none()
-    if not fav:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Favorite not found")
-
-    await db.delete(fav)
-    await db.flush()
+    # Deleting is idempotent: another tab may already have removed it.
+    if fav is not None:
+        await db.delete(fav)
+        await db.flush()
 
 
 # --- Court Favorites ---
@@ -187,21 +183,14 @@ async def add_favorite_court(
     if not court:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Court not found")
 
-    # Check not already favorited
-    existing = await db.execute(
-        select(FavoriteCourt).where(
-            FavoriteCourt.user_id == user_id,
-            FavoriteCourt.court_id == data.court_id,
-        )
-    )
-    if existing.scalar_one_or_none():
+    fav = FavoriteCourt(user_id=user_id, court_id=data.court_id, notes=data.notes)
+    try:
+        async with db.begin_nested():
+            db.add(fav)
+    except IntegrityError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Court already in favorites"
-        )
-
-    fav = FavoriteCourt(user_id=user_id, court_id=data.court_id, notes=data.notes)
-    db.add(fav)
-    await db.flush()
+        ) from None
 
     return FavoriteCourtResponse(
         id=fav.id,
@@ -216,7 +205,7 @@ async def add_favorite_court(
 
 @router.delete("/courts/{court_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_favorite_court(
-    court_id: int,
+    court_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
@@ -228,8 +217,7 @@ async def remove_favorite_court(
         )
     )
     fav = result.scalar_one_or_none()
-    if not fav:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Favorite not found")
-
-    await db.delete(fav)
-    await db.flush()
+    # Deleting is idempotent: another tab may already have removed it.
+    if fav is not None:
+        await db.delete(fav)
+        await db.flush()

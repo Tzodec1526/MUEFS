@@ -128,8 +128,8 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
         </p>
         <div className="success-actions">
           <Link to={`/filings/${filingId}/history`} className="btn btn-primary">View submission receipt</Link>
-          <a href="/" className="btn btn-primary">Return to Dashboard</a>
-          <a href="/filing/new" className="btn btn-secondary">File Another</a>
+          <Link to="/" className="btn btn-primary">Return to Dashboard</Link>
+          <Link to="/filing/new" className="btn btn-secondary">File Another</Link>
         </div>
       </div>
     );

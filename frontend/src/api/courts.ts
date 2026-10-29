@@ -61,9 +61,10 @@ export async function getCourt(courtId: number): Promise<Court> {
   return data;
 }
 
-export async function getCaseTypes(courtId: number, includeInactive = false): Promise<CaseType[]> {
+export async function getCaseTypes(courtId: number, includeInactive = false, signal?: AbortSignal): Promise<CaseType[]> {
   const { data } = await apiClient.get(`/courts/${courtId}/case-types`, {
     params: includeInactive ? { include_inactive: true } : undefined,
+    signal,
   });
   return data;
 }
@@ -71,11 +72,12 @@ export async function getCaseTypes(courtId: number, includeInactive = false): Pr
 export async function getFilingRequirements(
   courtId: number,
   caseTypeId: number,
-  filingType?: string
+  filingType?: string,
+  signal?: AbortSignal,
 ): Promise<FilingRequirement[]> {
   const { data } = await apiClient.get(
     `/courts/${courtId}/case-types/${caseTypeId}/requirements`,
-    filingType ? { params: { filing_type: filingType } } : undefined
+    { params: filingType ? { filing_type: filingType } : undefined, signal },
   );
   return data;
 }

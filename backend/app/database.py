@@ -4,10 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import DeclarativeBase
 
 from app.config import settings
-from app.services import storage_intent
+from app.services import document_service, storage_intent
 
 # SQLite doesn't support pool_size/max_overflow/pool_pre_ping
-engine_kwargs: dict = {"echo": settings.debug}
+engine_kwargs: dict = {"echo": settings.database_echo}
 if "sqlite" not in settings.database_url:
     engine_kwargs["pool_size"] = 20
     engine_kwargs["max_overflow"] = 10
@@ -29,9 +29,19 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with async_session() as session:
         try:
             yield session
-            await session.commit()
-        except Exception:
-            pending = storage_intent.take_pending_uploads(session.sync_session)
-            await session.rollback()
-            storage_intent.purge_keys(pending)
+        except BaseException:
+            await storage_intent.rollback_with_upload_cleanup(session)
             raise
+        try:
+            await session.commit()
+        except BaseException:
+            await storage_intent.rollback_with_upload_cleanup(
+                session, verify_with=async_session,
+            )
+            raise
+    if document_service.uses_local_storage():
+        # Deployments that keep documents on local disk (the demos) run no storage
+        # worker: delete removed drafts' files once their removal has committed.
+        from app import storage_cleanup  # it imports this module
+
+        await storage_cleanup.drain(async_session)

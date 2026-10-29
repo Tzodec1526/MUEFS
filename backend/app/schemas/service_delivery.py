@@ -1,15 +1,15 @@
-from typing import Annotated, Literal, Self
+from typing import Literal, Self
 from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
-RecordId = Annotated[int, Field(ge=1, le=2_147_483_647)]
+from app.schemas.common import MAX_RECORD_ID, RecordId
 
 
 class SelectedServiceContact(BaseModel):
     model_config = ConfigDict(extra="forbid")
     contact_id: RecordId
-    version: int = Field(ge=1)
+    version: int = Field(ge=1, le=MAX_RECORD_ID)
 
 
 class ServicePacketCreate(BaseModel):

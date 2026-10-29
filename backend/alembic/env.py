@@ -1,18 +1,21 @@
-import os
+import asyncio
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import Connection, make_url
+from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+from app.config import settings
 from app.database import Base
 from app.models import *  # noqa: F401, F403
 
 config = context.config
 
-# Override sqlalchemy.url from environment variable if available
-db_url = os.getenv("DATABASE_URL_SYNC")
-if db_url:
-    config.set_main_option("sqlalchemy.url", db_url)
+# Migrate the database the application uses. ConfigParser treats "%" in URL-encoded
+# passwords as syntax.
+database_url = settings.database_url
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
 if config.config_file_name is not None and "connection" not in config.attributes:
     fileConfig(config.config_file_name, disable_existing_loggers=False)
@@ -21,24 +24,44 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url, target_metadata=target_metadata, literal_binds=True,
+        url=database_url, target_metadata=target_metadata, literal_binds=True,
         transaction_per_migration=True,
     )
     with context.begin_transaction():
         context.run_migrations()
 
 
+def do_run_migrations(connection: Connection) -> None:
+    context.configure(
+        connection=connection, target_metadata=target_metadata,
+        transaction_per_migration=True,
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+async def run_async_migrations() -> None:
+    connectable = async_engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+    try:
+        async with connectable.connect() as connection:
+            await connection.run_sync(do_run_migrations)
+    finally:
+        await connectable.dispose()
+
+
 def run_migrations_online() -> None:
     existing_connection = config.attributes.get("connection")
     if existing_connection is not None:
-        context.configure(
-            connection=existing_connection, target_metadata=target_metadata,
-            transaction_per_migration=True,
-        )
-        with context.begin_transaction():
-            context.run_migrations()
+        do_run_migrations(existing_connection)
+        return
+    # The application's drivers (asyncpg, aiosqlite) are asynchronous.
+    if make_url(database_url).get_dialect().is_async:
+        asyncio.run(run_async_migrations())
         return
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
@@ -46,12 +69,7 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata,
-            transaction_per_migration=True,
-        )
-        with context.begin_transaction():
-            context.run_migrations()
+        do_run_migrations(connection)
 
 
 if context.is_offline_mode():

@@ -8,3 +8,14 @@ export function getErrorDetail(err: unknown): string | undefined {
   }
   return undefined;
 }
+
+/** getErrorDetail for `responseType: 'blob'` requests, whose error bodies arrive as Blobs. */
+export async function getBlobErrorDetail(err: unknown): Promise<string | undefined> {
+  const body = (err as { response?: { data?: unknown } })?.response?.data;
+  if (!(body instanceof Blob)) return getErrorDetail(err);
+  try {
+    return getErrorDetail({ response: { data: JSON.parse(await body.text()) } });
+  } catch {
+    return undefined;
+  }
+}

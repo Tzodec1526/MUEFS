@@ -11,14 +11,31 @@ const ALLOWED_PREFIXES = [
   '/favorites',
   '/clerk',
   '/agent',
+  '/admin',
+  '/courts',
+  '/notifications',
+  '/service',
 ];
+
+// eslint-disable-next-line no-control-regex -- Browsers strip these anywhere in a URL.
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
+// eslint-disable-next-line no-control-regex -- Browsers also normalize these in a path.
+const UNSAFE_PATH_CHARACTERS = /[\\\u0000-\u0020\u007f]/;
 
 export function isSafeAppPath(path: string): boolean {
   if (!path.startsWith('/')) return false;
-  if (path.includes('://') || path.startsWith('//')) return false;
-  if (path.includes('..')) return false;
+  if (path.startsWith('//') || CONTROL_CHARACTERS.test(path)) return false;
+  // A query or fragment may contain spaces; the path itself may not.
+  const rawPathname = path.split(/[?#]/, 1)[0];
+  if (UNSAFE_PATH_CHARACTERS.test(rawPathname)) return false;
+  let pathname: string;
+  try {
+    pathname = decodeURIComponent(rawPathname);
+  } catch { return false; }
+  if (UNSAFE_PATH_CHARACTERS.test(pathname)
+    || pathname.split('/').some(part => part === '..' || part === '.')) return false;
   return ALLOWED_PREFIXES.some(
-    (prefix) => path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(`${prefix}?`),
+    (prefix) => pathname === prefix || (prefix !== '/' && pathname.startsWith(`${prefix}/`)),
   );
 }
 

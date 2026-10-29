@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import AwareDatetime, BaseModel, Field, field_serializer, field_validator
 
 from app.models.payment import PaymentMethod, PaymentStatus
+from app.schemas.common import ExpectedVersion, RecordId
 from app.schemas.filing import FilingEnvelopeResponse
 
 _SIM_PAYMENT_NOTICE = (
@@ -61,7 +62,7 @@ class FilingFeeDetails(FilingFeeState):
 
 
 class FeeAssessmentRequest(BaseModel):
-    expected_version: int = Field(ge=0)
+    expected_version: ExpectedVersion
     authority_reference: str = Field(min_length=1, max_length=1000)
     reason: str = Field(min_length=1, max_length=5000)
     items: list[FeeItem] = Field(min_length=1, max_length=50)
@@ -76,13 +77,13 @@ class FeeAssessmentRequest(BaseModel):
 
 
 class FeeReviewRequest(BaseModel):
-    expected_version: int = Field(ge=0)
+    expected_version: ExpectedVersion
     reason: str = Field(min_length=1, max_length=2000)
 
 
 class PaymentProcessRequest(BaseModel):
-    envelope_id: int
-    expected_fee_version: int = Field(ge=0)
+    envelope_id: RecordId
+    expected_fee_version: ExpectedVersion
     payment_method: Literal[PaymentMethod.CREDIT_CARD, PaymentMethod.DEBIT_CARD, PaymentMethod.ACH]
     amount_cents: int = Field(gt=0)
 
@@ -102,8 +103,8 @@ class PaymentResponse(BaseModel):
 
 
 class ExternalPaymentRequest(BaseModel):
-    expected_fee_version: int = Field(ge=0)
-    expected_payment_version: int = Field(ge=0)
+    expected_fee_version: ExpectedVersion
+    expected_payment_version: ExpectedVersion
     amount_cents: int = Field(gt=0, le=100_000_000)
     receipt_system: str = Field(min_length=1, max_length=120)
     receipt_reference: str = Field(min_length=1, max_length=200)
@@ -120,7 +121,7 @@ class ExternalPaymentRequest(BaseModel):
 
 
 class ExternalPaymentReversal(BaseModel):
-    expected_payment_version: int = Field(ge=0)
+    expected_payment_version: ExpectedVersion
     reason: str = Field(min_length=1, max_length=2000)
     reviewed: Literal[True]
 

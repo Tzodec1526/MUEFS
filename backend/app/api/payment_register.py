@@ -11,9 +11,11 @@ from sqlalchemy import case, func, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user_id, lock_current_user
+from app.api.params import Page
 from app.database import get_db
 from app.models.filing import FilingEnvelope
 from app.models.filing_transaction import FilingTransaction
+from app.schemas.common import MAX_RECORD_ID
 from app.schemas.payment import PaymentActivity, PaymentRegister, PaymentRegisterTotals
 from app.services.access_service import user_has_court_administrator_assignment
 
@@ -22,12 +24,12 @@ router = APIRouter(tags=["External payment records"])
 
 @router.get("/clerk/payment-register", response_model=PaymentRegister)
 async def payment_register(
-    court_id: int = Query(ge=1),
+    court_id: int = Query(ge=1, le=MAX_RECORD_ID),
     date_from: date = Query(),
     date_to: date = Query(),
     timezone: str = Query(max_length=100),
     include_simulated: bool = False,
-    page: int = Query(1, ge=1),
+    page: Page = 1,
     output_format: Literal["json", "csv"] = Query("json", alias="format"),
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),

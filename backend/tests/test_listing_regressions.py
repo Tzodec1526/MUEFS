@@ -178,11 +178,16 @@ async def test_sealed_access_uses_explicit_grants_not_accepted_filings(db_sessio
 async def test_case_search_treats_wildcards_as_literal_text(db_session, docket, literal):
     _, _, _, court, case, _ = docket
     case.case_number = f"LITERAL{literal}CASE"
+    distractor = Case(court_id=court.id, case_type_id=case.case_type_id,
+                      case_number="DISTRACTOR", title="Unrelated", filed_date=case.filed_date)
+    db_session.add(distractor)
+    await db_session.flush()
     db_session.add_all([
         CaseParticipant(case_id=case.id, role=ParticipantRole.PLAINTIFF,
                         party_name=f"Party{literal}Name"),
-        Case(court_id=court.id, case_type_id=case.case_type_id, case_number="DISTRACTOR",
-             title="Unrelated", filed_date=case.filed_date),
+        # An unescaped % or _ would match this name too.
+        CaseParticipant(case_id=distractor.id, role=ParticipantRole.PLAINTIFF,
+                        party_name="Unrelated Party"),
     ])
     await db_session.flush()
     for params in [{"case_number": literal}, {"party_name": literal}]:

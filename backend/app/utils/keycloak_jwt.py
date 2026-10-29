@@ -13,31 +13,48 @@ from typing import Any
 import httpx
 import jwt
 from jwt.algorithms import RSAAlgorithm
+from jwt.exceptions import InvalidKeyError
 from jwt.exceptions import InvalidTokenError as JWTError
 
 from app.config import settings
 
 _jwks_cache: tuple[float, dict[str, Any]] | None = None
 _JWKS_TTL_SEC = 300.0
+# Tokens signed with an unknown key trigger at most one refetch per interval.
+_JWKS_REFRESH_SEC = 30.0
 
 # Re-export so callers can catch JWTError without importing PyJWT.
-__all__ = ["JWTError", "decode_keycloak_access_token"]
+__all__ = ["IdentityProviderUnavailableError", "JWTError", "decode_keycloak_access_token"]
 
 
-async def _fetch_jwks() -> dict[str, Any]:
+class IdentityProviderUnavailableError(Exception):
+    """The realm's signing keys could not be retrieved; the token was not judged."""
+
+
+async def _fetch_jwks(*, refresh: bool = False) -> dict[str, Any]:
     global _jwks_cache
     now = time.time()
-    if _jwks_cache is not None and now - _jwks_cache[0] < _JWKS_TTL_SEC:
-        return _jwks_cache[1]
+    if _jwks_cache is not None:
+        age = now - _jwks_cache[0]
+        if age < _JWKS_TTL_SEC and not (refresh and age >= _JWKS_REFRESH_SEC):
+            return _jwks_cache[1]
 
-    base = settings.keycloak_url.rstrip("/")
+    # The issuer stays KEYCLOAK_URL; only the key fetch may use an internal address.
+    base = (settings.keycloak_internal_url or settings.keycloak_url).rstrip("/")
     url = f"{base}/realms/{settings.keycloak_realm}/protocol/openid-connect/certs"
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.get(url)
-        response.raise_for_status()
-        data = response.json()
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            data = response.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise IdentityProviderUnavailableError("Could not retrieve the realm signing keys") from exc
     _jwks_cache = (now, data)
     return data
+
+
+def _signing_key(jwks: dict[str, Any], kid: str) -> dict[str, Any] | None:
+    return next((k for k in jwks.get("keys", []) if k.get("kid") == kid), None)
 
 
 async def decode_keycloak_access_token(token: str) -> dict[str, Any]:
@@ -51,12 +68,17 @@ async def decode_keycloak_access_token(token: str) -> dict[str, Any]:
     if not kid:
         raise JWTError("Token missing kid")
 
-    jwks = await _fetch_jwks()
-    key_dict = next((k for k in jwks.get("keys", []) if k.get("kid") == kid), None)
-    if not key_dict:
+    key_dict = _signing_key(await _fetch_jwks(), kid)
+    if key_dict is None:
+        # The realm may have rotated keys since the cached set was fetched.
+        key_dict = _signing_key(await _fetch_jwks(refresh=True), kid)
+    if key_dict is None:
         raise JWTError(f"No JWKS key for kid={kid}")
 
-    rsa_key = RSAAlgorithm.from_jwk(json.dumps(key_dict))
+    try:
+        rsa_key = RSAAlgorithm.from_jwk(json.dumps(key_dict))
+    except InvalidKeyError as exc:
+        raise JWTError("Token signing key is not an RSA key") from exc
 
     issuer = f"{settings.keycloak_url.rstrip('/')}/realms/{settings.keycloak_realm}"
     decode_kwargs: dict[str, Any] = {

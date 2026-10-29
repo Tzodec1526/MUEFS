@@ -1,17 +1,31 @@
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
 from app.models.court import Court
 from app.models.user import User, UserCourtRole, UserType
+from app.schemas.common import MAX_RECORD_ID
 from app.schemas.user import CourtAssignment, UserCreate, UserProfile, UserResponse
 from app.security.demo_auth import demo_headers_permitted
+from app.services import access_service
 from app.services.user_provision_service import provision_user_from_oidc, sync_verified_email
-from app.utils.keycloak_jwt import JWTError, decode_keycloak_access_token
+from app.utils.keycloak_jwt import (
+    IdentityProviderUnavailableError,
+    JWTError,
+    decode_keycloak_access_token,
+)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+def _identity_provider_unavailable() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Sign-in verification is temporarily unavailable. Please retry shortly.",
+        headers={"Retry-After": "30"},
+    )
 
 
 def _bearer_token(authorization: str | None) -> str | None:
@@ -38,7 +52,9 @@ async def _resolve_demo_user_id(db: AsyncSession, x_demo_user_id: int) -> int:
 async def get_current_user_id(
     db: AsyncSession = Depends(get_db, scope="function"),
     authorization: str | None = Header(None),
-    x_demo_user_id: int | None = Header(default=None, alias="X-Demo-User-Id"),
+    x_demo_user_id: int | None = Header(
+        default=None, alias="X-Demo-User-Id", le=MAX_RECORD_ID,
+    ),
     x_demo_auth_secret: str | None = Header(default=None, alias="X-Demo-Auth-Secret"),
 ) -> int:
     """Resolve the authenticated internal user id. Fail closed.
@@ -53,6 +69,8 @@ async def get_current_user_id(
     if token:
         try:
             claims = await decode_keycloak_access_token(token)
+        except IdentityProviderUnavailableError:
+            raise _identity_provider_unavailable() from None
         except JWTError:
             if (
                 settings.allow_demo_mode
@@ -103,7 +121,9 @@ async def get_current_user_id(
 async def get_optional_user_id(
     db: AsyncSession = Depends(get_db, scope="function"),
     authorization: str | None = Header(None),
-    x_demo_user_id: int | None = Header(default=None, alias="X-Demo-User-Id"),
+    x_demo_user_id: int | None = Header(
+        default=None, alias="X-Demo-User-Id", le=MAX_RECORD_ID,
+    ),
     x_demo_auth_secret: str | None = Header(default=None, alias="X-Demo-Auth-Secret"),
 ) -> int | None:
     """Resolve the user id if valid credentials are present, else return None (anonymous).
@@ -120,6 +140,9 @@ async def get_optional_user_id(
     if token:
         try:
             claims = await decode_keycloak_access_token(token)
+        except IdentityProviderUnavailableError:
+            # Answering anonymously would hide records the caller may be entitled to.
+            raise _identity_provider_unavailable() from None
         except JWTError:
             claims = None
         if claims is not None:
@@ -162,7 +185,7 @@ async def require_user_may_manage_efilings(current_user: User = Depends(get_curr
     if current_user.user_type == UserType.PUBLIC:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Public docket accounts cannot create or manage e-filings.",
+            detail=access_service.PUBLIC_ACCOUNT_REFUSAL,
         )
     return current_user
 
@@ -202,13 +225,14 @@ async def register_user(
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     # Court production: self-registration off; identities come from IdP or admin invite.
-    if not settings.allow_public_registration and not settings.allow_demo_mode:
+    # Demo mode does not imply it: the demo signs in as seeded roles.
+    if not settings.allow_public_registration:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Self-registration is disabled. Sign in through your court identity provider.",
         )
-    existing = await db.execute(select(User).where(User.email == data.email))
-    if existing.scalar_one_or_none():
+    # Addresses differing only in case would create ambiguous identities.
+    if await db.scalar(select(User.id).where(func.lower(User.email) == data.email.lower())):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="User with this email already exists",

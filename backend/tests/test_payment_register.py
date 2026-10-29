@@ -127,6 +127,10 @@ async def test_period_uses_inclusive_local_dates_and_exclusive_upper_boundary(
         "timezone": "America/Detroit",
     })).json()
     assert report["total"] == 2
+    # Local midnight is included and the next local midnight is not: [start, end).
+    assert [row["occurred_at"] for row in report["entries"]] == [
+        "2026-11-02T04:59:59+00:00", "2026-11-01T04:00:00+00:00",
+    ]
     assert report["range_start"] == "2026-11-01T04:00:00Z"
     assert report["range_end"] == "2026-11-02T05:00:00Z"  # 25-hour DST day.
 

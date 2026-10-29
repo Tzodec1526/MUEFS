@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +14,7 @@ from sqlalchemy.orm import raiseload
 
 from app.api.auth import get_current_user, lock_current_user
 from app.api.documents import DocumentResponse
+from app.api.params import Page, RecordId
 from app.config import settings
 from app.database import get_db
 from app.models.case import CaseParticipant
@@ -28,7 +29,7 @@ from app.models.notification import (
     ServiceMethod,
 )
 from app.models.service_delivery import ServiceEvent, ServicePacket, ServiceRecipient
-from app.models.user import User
+from app.models.user import User, UserType
 from app.schemas.service_delivery import ServiceFailureReport, ServicePacketCreate
 from app.services import access_service
 from app.services import service_delivery_service as service
@@ -36,7 +37,6 @@ from app.services.email_delivery_service import queue_email
 from app.services.service_contact_service import email_context, routing_issues
 
 router = APIRouter(prefix="/service", tags=["Document delivery"])
-RecordId = Annotated[int, Path(ge=1, le=2_147_483_647)]
 Db = Annotated[AsyncSession, Depends(get_db, scope="function")]
 Actor = Annotated[User, Depends(get_current_user)]
 
@@ -47,7 +47,7 @@ class RetryRequest(BaseModel):
 
 
 @router.get("/filings/{filing_id}/options")
-async def delivery_options(filing_id: RecordId, db: Db, actor: Actor, page: int = Query(1, ge=1)):
+async def delivery_options(filing_id: RecordId, db: Db, actor: Actor, page: Page = 1):
     filing, case = await service.require_sender(db, actor, filing_id)
     source = await service.current_source(db, filing)
     filters = (CaseParticipant.case_id == case.id, CaseParticipant.is_active.is_(True))
@@ -119,7 +119,7 @@ async def send_documents(
 
 
 @router.get("/deliveries")
-async def inbox(db: Db, actor: Actor, page: int = Query(1, ge=1)):
+async def inbox(db: Db, actor: Actor, page: Page = 1):
     filters = (ServiceRecipient.recipient_id == actor.id,)
     total = await db.scalar(select(func.count()).select_from(ServiceRecipient).where(*filters))
     rows = await db.execute(
@@ -151,7 +151,7 @@ async def inbox(db: Db, actor: Actor, page: int = Query(1, ge=1)):
 
 
 @router.get("/filings/{filing_id}/deliveries")
-async def sent_deliveries(filing_id: RecordId, db: Db, actor: Actor, page: int = Query(1, ge=1)):
+async def sent_deliveries(filing_id: RecordId, db: Db, actor: Actor, page: Page = 1):
     filing = await db.scalar(
         select(FilingEnvelope)
         .where(FilingEnvelope.id == filing_id)
@@ -259,7 +259,7 @@ async def delivery_events(
     db: Db,
     actor: Actor,
     kind: Literal["portal", "email"] = "portal",
-    page: int = Query(1, ge=1),
+    page: Page = 1,
 ):
     recipient, _, notice, _ = await service.require_delivery_viewer(db, actor, str(delivery_id))
     if kind == "portal":
@@ -354,6 +354,8 @@ async def retry_delivery(delivery_id: UUID, data: RetryRequest, db: Db, actor: A
     )
     if actor.id != packet.actor_id and not staff:
         raise HTTPException(403, "The sender or assigned court staff must request a retry")
+    if not staff and actor.user_type == UserType.PUBLIC:
+        raise HTTPException(403, access_service.PUBLIC_ACCOUNT_REFUSAL)
     if notice.delivery_status not in (
         DeliveryStatus.BLOCKED,
         DeliveryStatus.DISABLED,

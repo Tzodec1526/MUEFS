@@ -1,0 +1,7 @@
+# Compose builds this directory directly, so the repository root's .dockerignore does not
+# apply. The image installs its own dependencies from package-lock.json.
+node_modules/
+dist/
+.mypy_cache/
+.ruff_cache/
+.env*

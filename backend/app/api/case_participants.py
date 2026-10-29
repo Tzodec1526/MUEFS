@@ -7,11 +7,13 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user, lock_current_user
+from app.api.params import Page, RecordId
 from app.database import get_db
 from app.models.audit import AuditLog
 from app.models.case import Case, CaseParticipant
 from app.models.user import User
 from app.schemas.case_participants import ParticipantChange, PublicCaseAccessChange
+from app.schemas.common import MAX_RECORD_ID
 from app.services import access_service, audit_service
 from app.services import case_participant_service as participants
 from app.utils.http_context import client_ip, client_user_agent
@@ -21,9 +23,9 @@ router = APIRouter(tags=["Case participants"])
 
 @router.get("/clerk/cases")
 async def court_cases(
-    court_id: int,
+    court_id: int = Query(ge=1, le=MAX_RECORD_ID),
     case_number: str | None = Query(default=None, max_length=50),
-    before_id: int | None = Query(default=None, ge=1),
+    before_id: int | None = Query(default=None, ge=1, le=MAX_RECORD_ID),
     db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(get_current_user),
 ):
@@ -52,8 +54,8 @@ async def court_cases(
 
 @router.get("/cases/{case_id}/participants")
 async def participant_records(
-    case_id: int,
-    page: int = Query(1, ge=1),
+    case_id: RecordId,
+    page: Page = 1,
     db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(get_current_user),
 ):
@@ -101,7 +103,7 @@ async def participant_records(
 
 @router.post("/cases/{case_id}/participants", status_code=201)
 async def add_participant(
-    case_id: int,
+    case_id: RecordId,
     data: ParticipantChange,
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -121,8 +123,8 @@ async def add_participant(
 
 @router.put("/cases/{case_id}/participants/{participant_id}")
 async def update_participant(
-    case_id: int,
-    participant_id: int,
+    case_id: RecordId,
+    participant_id: RecordId,
     data: ParticipantChange,
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -142,7 +144,7 @@ async def update_participant(
 
 @router.put("/cases/{case_id}/public-access")
 async def change_public_access(
-    case_id: int,
+    case_id: RecordId,
     data: PublicCaseAccessChange,
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -150,6 +152,11 @@ async def change_public_access(
 ):
     actor = await lock_current_user(db, actor.id)
     await participants.require_case_staff(db, actor, case_id)
+    if await db.scalar(select(CaseParticipant.id).where(
+        CaseParticipant.case_id == case_id, CaseParticipant.user_id == actor.id,
+        CaseParticipant.is_active.is_(True),
+    ).limit(1)):
+        raise HTTPException(403, "Another court reviewer must change access to your own case")
     case = await db.scalar(select(Case).where(Case.id == case_id).with_for_update()
                            .execution_options(populate_existing=True))
     if case is None:
@@ -183,8 +190,8 @@ async def change_public_access(
 
 @router.get("/cases/{case_id}/participants/history")
 async def participant_history(
-    case_id: int,
-    page: int = Query(1, ge=1),
+    case_id: RecordId,
+    page: Page = 1,
     db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(get_current_user),
 ):

@@ -4,7 +4,7 @@
  */
 import { chromium } from 'playwright';
 
-const base = process.argv[2] || process.env.MUEFS_BASE_URL || 'http://127.0.0.1:8010';
+const base = process.argv[2] || process.env.MUEFS_BASE_URL || 'http://localhost:3000';
 const failures = [];
 
 function ok(name, cond, detail = '') {
@@ -26,7 +26,7 @@ try {
   ok('declarative section', await page.getByRole('heading', { name: 'Case search' }).isVisible());
   ok('prompts', await page.getByRole('heading', { name: 'Prompts' }).isVisible());
 
-  const form = page.locator('form[toolname="search_cases"]');
+  const form = page.locator('form[toolname="search_cases_form"]');
   ok('declarative form', await form.isVisible());
   await form.getByLabel(/Party name/i).fill('Smith');
   await form.getByRole('button', { name: /^Search$/i }).click();

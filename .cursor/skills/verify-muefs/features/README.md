@@ -8,7 +8,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Seed data is `backend/demo.db` (created by `run_demo.py`). Public search includes a Smith party (Johnson v. Smith Industries LLC).
 - Run `control-muefs doctor` and require healthy `muefs-api` plus portal HTML that names Michigan Unified E-Filing System.
 - Never drive an instance that was not started by this verification run unless `MUEFS_VERIFY_ATTACH=1` was set on purpose.
-- Demo roles live in `localStorage`. Prefer `/login?role=attorney` (or `clerk`, `srl`, `public`) over clicking among three buttons all named `Sign In`.
+- Demo roles live in `localStorage`. Prefer `/login?role=attorney` (or `clerk`, `srl`, `public`, `admin`). The role buttons are named `Sign in as Attorney`, `Sign in as Court Clerk` and so on; Public docket uses `Browse records`.
 
 ## Driving conventions
 
@@ -45,4 +45,4 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Case search](./case-search.md) covers public docket search, empty results, opening a case, and the API second view.
 - [Filing wizard](./filing-wizard.md) covers attorney/SRL new filing, court pick, existing-case (File with Court), and draft recovery.
 - [Clerk review queue](./clerk-queue.md) covers clerk sign-in, queue list, and opening a filing for review (no default accept/reject).
-- [Agent Hub](./agent-hub.md) covers `/agent`, declarative Smith search, and the Attorney · Smith motion run.
+- [Agent Hub](./agent-hub.md) covers `/agent`, the declarative Smith search, and opening a hit's docket.

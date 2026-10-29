@@ -12,11 +12,18 @@ from tests.test_filing_history import record_filing as record_filing
 from tests.test_filing_history import upload
 
 
-async def test_submission_requires_a_reviewed_version(api_client, record_filing):
+@pytest.mark.parametrize(
+    "review", [{}, {"expected_submission_token": "not-a-reviewed-token"}],
+    ids=["missing_token", "malformed_token"],
+)
+async def test_submission_requires_a_reviewed_version(api_client, record_filing, review):
     fid, *_ = record_filing
     await upload(api_client, fid, b"Complaint for review")
-    response = await api_client.post(f"/api/v1/filings/{fid}/submit")
+    # With a JSON body, validation reaches the token field; a bodiless request fails earlier.
+    response = await api_client.post(f"/api/v1/filings/{fid}/submit", json=review)
     assert response.status_code == 422, response.text
+    locations = [error["loc"] for error in response.json()["detail"]]
+    assert locations == [["body", "expected_submission_token"]]
     filing = (await api_client.get(f"/api/v1/filings/{fid}")).json()
     assert filing["status"] == "draft"
     assert filing["submission_count"] == 0

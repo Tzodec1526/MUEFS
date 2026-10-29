@@ -1,7 +1,9 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { getFilingRequirements } from '../../api/courts';
 import { getFiling, uploadDocument, removeDocument } from '../../api/filings';
 import { getErrorDetail } from '../../utils/errors';
 import { formatBytes } from '../../utils/format';
+import LoadError from '../common/LoadError';
 
 interface DocumentInfo {
   id: number;
@@ -13,6 +15,9 @@ interface DocumentInfo {
 
 interface Props {
   filingId: number;
+  courtId: number;
+  caseTypeId: number;
+  filingType: string;
   documents: DocumentInfo[];
   onDocumentsChange: (docs: DocumentInfo[]) => void;
   onBusyChange: (busy: boolean) => void;
@@ -239,6 +244,7 @@ const FILING_CATEGORIES = [
 
 // Flatten for quick lookup
 const ALL_TYPES = FILING_CATEGORIES.flatMap(cat => cat.types);
+const COURT_CATEGORY = "Listed in this court's rules";
 
 // MCR 2.119(A)(2): a motion presenting a question of law must be accompanied by a brief
 //   (the brief may be combined with the motion).
@@ -333,6 +339,9 @@ function getCompanionRequirements(uploadedTypeCodes: string[]) {
 
 function DocumentUpload({
   filingId,
+  courtId,
+  caseTypeId,
+  filingType,
   documents,
   onDocumentsChange,
   onBusyChange,
@@ -343,28 +352,51 @@ function DocumentUpload({
   const [selectedCategory, setSelectedCategory] = useState('');
   const [docType, setDocType] = useState('');
   const [docTitle, setDocTitle] = useState('');
+  // The title this form last filled in from a type; a different title is the filer's own.
+  const autoFilledTitle = useRef('');
   const [isConfidential, setIsConfidential] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { required, recommended } = getCompanionRequirements(documents.map(doc => doc.type));
+  // Validation matches the court's exact document codes; offer any the catalog lacks.
+  const [courtTypes, setCourtTypes] = useState<typeof ALL_TYPES>([]);
+  const [requirementsFailed, setRequirementsFailed] = useState(false);
+  const [requirementsAttempt, setRequirementsAttempt] = useState(0);
+  const allTypes = [...courtTypes, ...ALL_TYPES];
+
+  useEffect(() => {
+    if (filingType === 'service_only') return;
+    const controller = new AbortController();
+    getFilingRequirements(courtId, caseTypeId, filingType, controller.signal).then((requirements) => {
+      setRequirementsFailed(false);
+      setCourtTypes(requirements
+        .filter(r => !ALL_TYPES.some(t => t.code === r.document_type_code))
+        .map(r => ({ code: r.document_type_code, label: r.description, mcr: r.mcr_reference ?? '' })));
+    }).catch(() => {
+      if (!controller.signal.aborted) setRequirementsFailed(true);
+    });
+    return () => controller.abort();
+  }, [courtId, caseTypeId, filingType, requirementsAttempt]);
 
   function selectCompanion(code: string, label: string) {
     setSelectedCategory('');
     setDocType(code);
+    autoFilledTitle.current = label;
     setDocTitle(label);
     fileInputRef.current?.focus();
   }
 
-  const filteredTypes = selectedCategory
-    ? FILING_CATEGORIES.find(c => c.label === selectedCategory)?.types || []
-    : ALL_TYPES;
+  const filteredTypes = selectedCategory === COURT_CATEGORY
+    ? courtTypes
+    : FILING_CATEGORIES.find(c => c.label === selectedCategory)?.types || [];
 
-  // Auto-fill title when document type is selected
+  // Auto-fill the title from the type, and keep following the type until the filer edits it.
   const handleDocTypeChange = (code: string) => {
     setDocType(code);
-    const typeInfo = ALL_TYPES.find(t => t.code === code);
-    if (typeInfo && !docTitle) {
+    const typeInfo = allTypes.find(t => t.code === code);
+    if (typeInfo && (!docTitle || docTitle === autoFilledTitle.current)) {
+      autoFilledTitle.current = typeInfo.label;
       setDocTitle(typeInfo.label);
     }
   };
@@ -408,6 +440,7 @@ function DocumentUpload({
       await refreshDocuments();
       uploadRequest.current = undefined;
       setWarnings(result.warnings ?? []);
+      autoFilledTitle.current = '';
       setDocTitle('');
       setDocType('');
       setIsConfidential(false);
@@ -439,11 +472,11 @@ function DocumentUpload({
   };
 
   const getTypeLabel = (code: string) => {
-    return ALL_TYPES.find(t => t.code === code)?.label || code;
+    return allTypes.find(t => t.code === code)?.label || code;
   };
 
   const getTypeMcr = (code: string) => {
-    return ALL_TYPES.find(t => t.code === code)?.mcr || '';
+    return allTypes.find(t => t.code === code)?.mcr || '';
   };
 
   return (
@@ -455,6 +488,9 @@ function DocumentUpload({
       </p>
 
       {error && <div className="alert alert-error" role="alert">{error}</div>}
+      {requirementsFailed && <LoadError
+        message="Could not load the document types in this court's rules. Retry before choosing a type."
+        onRetry={() => setRequirementsAttempt(attempt => attempt + 1)} />}
 
       {warnings.length > 0 && (
         <div className="alert alert-warning" role="status">
@@ -477,6 +513,7 @@ function DocumentUpload({
               onChange={(e) => { setSelectedCategory(e.target.value); setDocType(''); }}
             >
               <option value="">All Categories</option>
+              {courtTypes.length > 0 && <option value={COURT_CATEGORY}>{COURT_CATEGORY}</option>}
               {FILING_CATEGORIES.map((cat) => (
                 <option key={cat.label} value={cat.label}>{cat.label}</option>
               ))}
@@ -500,7 +537,8 @@ function DocumentUpload({
                   </option>
                 ))
               ) : (
-                FILING_CATEGORIES.map((cat) => (
+                [{ label: COURT_CATEGORY, types: courtTypes }, ...FILING_CATEGORIES]
+                  .filter(cat => cat.types.length > 0).map((cat) => (
                   <optgroup key={cat.label} label={cat.label}>
                     {cat.types.map((dt) => (
                       <option key={dt.code} value={dt.code}>

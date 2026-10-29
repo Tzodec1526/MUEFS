@@ -24,7 +24,7 @@ Preconditions:
 - MUEFS is healthy at `http://127.0.0.1:3000`.
 - Signed in as attorney: `browser goto /login?role=attorney`.
 - `control-muefs doctor` is clean.
-- Discard an unexpected draft banner with `Discard Draft` before a fresh proof.
+- Dismiss an unexpected draft banner with `Start Fresh` before a fresh proof.
 
 - **Open wizard.** Run `node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser goto /filing/new`. Heading `New E-Filing` (or `File a Motion` / plain-language variants) is visible with `Select Court` and labelled `Search courts`.
 - **Pick court.** Run `node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser fill --label "Search courts" --value "3rd Circuit"` then `node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser click --role button --name "3rd Circuit Court"`. The court card is selected. Click `Continue`. Heading `Existing case or new case?` appears.
@@ -35,8 +35,8 @@ Do not complete payment or submit as the default proof. Those hit demo payment s
 
 ## Gotchas
 
-- Draft recovery (`Continue Draft` / `Discard Draft`) intercepts a second `/filing/new` if localStorage still has `muefs_filing_draft`. Discard for a clean court-step proof.
-- Court cards are `role=button` named with the court name. Favorite stars on the card are separate buttons (`Add court to favorites`).
+- Draft recovery (`Continue Editing` / `Start Fresh`, or `Use Saved Details` for a saved filing) intercepts `/filing/new` while this tab's sessionStorage holds a `muefs_filing_draft:v2:` entry. Choose `Start Fresh` for a clean court-step proof.
+- Each court card's select button is named with the court name. The favorite star is a separate button named `Add <court name> to favorites`.
 - `Continue` is disabled or a no-op until a court is selected.
 - Public role cannot open the wizard; they get bounced to `/`.
 - Plain-language toggle changes the H2 copy (`Start a new court filing`). Assert one of the known headings, not a single string.

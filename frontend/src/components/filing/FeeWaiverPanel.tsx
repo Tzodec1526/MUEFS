@@ -27,6 +27,8 @@ export default function FeeWaiverPanel({ filingId, waiver, onChange }: {
     const dollars = form.get('amount_dollars');
     form.delete('amount_dollars');
     if (action === 'deny_judicial') form.set('amount_due_cents', String(Math.round(Number(dollars) * 100)));
+    // The court decides the application it reviewed; a newer one returns 409.
+    form.set('expected_fee_version', String(waiver.fee_version));
     setBusy(true);
     setError(null);
     try {

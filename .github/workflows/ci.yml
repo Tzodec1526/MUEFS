@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   backend-lint:
     runs-on: ubuntu-latest
@@ -23,11 +26,11 @@ jobs:
       - name: Lint with ruff
         run: |
           cd backend
-          ruff check app/ tests/
+          ruff check app/ tests/ run_demo.py
       - name: Type check with mypy
         run: |
           cd backend
-          mypy app/
+          mypy app/ run_demo.py
 
   backend-test:
     runs-on: ubuntu-latest
@@ -44,11 +47,28 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       MUEFS_TEST_POSTGRES_URL: postgresql+asyncpg://postgres:test-only@localhost:5432/muefs_test
-      MUEFS_TEST_S3_ENDPOINT: http://127.0.0.1:9000
+      MUEFS_TEST_S3_ENDPOINT: http://127.0.0.1:7070
       MUEFS_TEST_S3_ACCESS_KEY: muefs-storage-test
       MUEFS_TEST_S3_SECRET_KEY: disposable-storage-test-password
+      MUEFS_TEST_CLAMAV_PORT: "3310"
     steps:
       - uses: actions/checkout@v4
+      - name: Start disposable storage and scanner
+        # Fixed images serve only as disposable protocol fixtures. Production storage and
+        # scanner lifecycle are deployment responsibilities. The scanner uses the image's
+        # bundled signatures; the tests need only EICAR and the configured scan limits.
+        run: |
+          docker run --rm --detach --name muefs-test-storage \
+            --publish 127.0.0.1:7070:7070 --volume muefs-test-storage:/data \
+            --env ROOT_ACCESS_KEY="$MUEFS_TEST_S3_ACCESS_KEY" \
+            --env ROOT_SECRET_KEY="$MUEFS_TEST_S3_SECRET_KEY" --env VGW_HEALTH=/health \
+            versity/versitygw:v1.8.0@sha256:30292fc2eeacc67a36993b01f7a7a5e3361a19cced0e80c1d71cfa2a4b0a2499 \
+            posix /data
+          docker run --rm --detach --name muefs-test-clamav \
+            --publish 127.0.0.1:3310:3310 --env CLAMAV_NO_FRESHCLAMD=true \
+            --volume "$PWD/clamav/clamd.conf:/etc/clamav/clamd.conf:ro" \
+            --volume "$PWD/clamav/muefs-limits.cdb:/var/lib/clamav/muefs-limits.cdb" \
+            clamav/clamav:1.4@sha256:b25d9199257ae7ef45e0cc4c7eaa60ce7e5447796f0090d5ff311d1a30980cc3
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -58,32 +78,25 @@ jobs:
         run: |
           cd backend
           pip install -e ".[dev]"
-      - name: Run tests
-        # Use a fixed image only as a disposable S3 protocol fixture.
-        # Production storage lifecycle and support are deployment responsibilities.
-        env:
-          MINIO_ROOT_USER: ${{ env.MUEFS_TEST_S3_ACCESS_KEY }}
-          MINIO_ROOT_PASSWORD: ${{ env.MUEFS_TEST_S3_SECRET_KEY }}
+      - name: Wait for storage and scanner
         run: |
-          docker run --rm --detach --name muefs-test-storage \
-            --publish 127.0.0.1:9000:9000 \
-            --env MINIO_ROOT_USER --env MINIO_ROOT_PASSWORD \
-            minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e \
-            server /data
-          for attempt in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:9000/minio/health/live; then
-              cd backend
-              pytest tests/ -v --tb=short
-              exit $?
+          for attempt in {1..180}; do
+            if curl --fail --silent --output /dev/null http://127.0.0.1:7070/health \
+                && python -c "import socket; s = socket.create_connection(('127.0.0.1', 3310), 2); s.sendall(b'zPING\0'); assert s.recv(8).startswith(b'PONG')" 2>/dev/null; then
+              exit 0
             fi
             sleep 1
           done
           docker logs muefs-test-storage
+          docker logs muefs-test-clamav
           exit 1
-      - name: Stop test storage
-        if: always()
+      - name: Run tests
         run: |
-          docker stop muefs-test-storage || true
+          cd backend
+          pytest tests/ -v --tb=short
+      - name: Stop storage and scanner
+        if: always()
+        run: docker rm --force muefs-test-storage muefs-test-clamav || true
 
   frontend-build:
     runs-on: ubuntu-latest

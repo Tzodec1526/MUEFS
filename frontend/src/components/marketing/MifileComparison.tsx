@@ -1,5 +1,5 @@
 import { Check, X, Minus } from 'lucide-react';
-import { TOOL_CATALOG } from '../../webmcp/catalog';
+import { catalogForBuild } from '../../webmcp/catalog';
 
 type Cell = 'yes' | 'no' | { partial: string } | string;
 
@@ -47,7 +47,8 @@ const ROWS: Row[] = [
   {
     feature: 'AI agent tools (WebMCP)',
     mifile: 'no',
-    muefs: `${TOOL_CATALOG.length} tools + /agent`,
+    // Tools this build can register (demo sign-in tools only exist in demo builds).
+    muefs: `${catalogForBuild().length} tools + /agent`,
     highlight: true,
   },
   {

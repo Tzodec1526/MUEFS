@@ -3,7 +3,8 @@
 # Build context is the repo root. Run target: app.demo.server:app
 #
 #   docker build -t muefs-demo .
-#   docker run -p 8000:8000 muefs-demo   # then open http://localhost:8000
+#   docker run -p 127.0.0.1:8000:8000 -e DEMO_MODE_SECRET=local-demo-only muefs-demo
+#   Then open http://localhost:8000. Hosted deployments supply their own runtime secret.
 
 # ---- Stage 1: build the React SPA ----
 FROM node:22-alpine AS frontend
@@ -12,9 +13,8 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
 # Same-origin: leave VITE_API_URL empty so the app calls /api/v1 on its own host.
-ARG DEMO_MODE_SECRET
-ENV VITE_ALLOW_DEMO_MODE=true \
-    VITE_DEMO_MODE_SECRET=${DEMO_MODE_SECRET}
+# /config.js supplies the demo secret at runtime; do not bake it into image layers.
+ENV VITE_ALLOW_DEMO_MODE=true
 RUN npm run build
 
 # ---- Stage 2: backend serving the API + the built SPA ----
@@ -49,9 +49,9 @@ ENV DEMO_ISOLATED_SESSIONS=true \
 
 EXPOSE 8000
 
-# Liveness: hit the FastAPI /health route (honors the injected $PORT).
+# Readiness includes the template database and migration version (honors $PORT).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD python -c "import os,urllib.request; urllib.request.urlopen('http://localhost:%s/health' % os.environ.get('PORT','8000'))" || exit 1
+  CMD python -c "import os,urllib.request; urllib.request.urlopen('http://localhost:%s/ready' % os.environ.get('PORT','8000'), timeout=4)" || exit 1
 
 # Render injects $PORT; default to 8000 locally.
-CMD ["sh", "-c", "uvicorn app.demo.server:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "exec uvicorn app.demo.server:app --host 0.0.0.0 --port ${PORT:-8000}"]

@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
+from app.schemas.common import ExpectedVersion, RecordId
+
 
 class PublicCopyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -24,10 +26,10 @@ class PublicCopyResponse(BaseModel):
 
 class WithholdDocument(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-    expected_version: int = Field(ge=0)
+    expected_version: ExpectedVersion
     reason: str = Field(min_length=1, max_length=2000)
 
 
 class PublishCopy(WithholdDocument):
-    copy_id: int = Field(ge=1)
+    copy_id: RecordId
     reviewed: Literal[True]

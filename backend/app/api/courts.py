@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.params import Page, RecordId
 from app.database import get_db
 from app.models.court import CaseType, Court, CourtType, FeeSchedule
 from app.schemas.court import (
@@ -22,7 +23,7 @@ async def list_courts(
     tier: str | None = None,
     q: str | None = None,
     efiling_only: bool = True,
-    page: int = Query(1, ge=1),
+    page: Page = 1,
     page_size: int = Query(25, ge=1, le=100),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
@@ -45,7 +46,9 @@ async def list_courts(
         filters.append(Court.court_type.in_(trial))
     if q:
         filters.append(
-            Court.name.icontains(q, autoescape=True) | Court.city.icontains(q, autoescape=True)
+            Court.name.icontains(q, autoescape=True)
+            | Court.city.icontains(q, autoescape=True)
+            | Court.county.icontains(q, autoescape=True)
         )
     if efiling_only:
         filters.append(Court.is_efiling_enabled.is_(True))
@@ -70,7 +73,7 @@ async def court_directory(db: AsyncSession = Depends(get_db, scope="function")):
 
 
 @router.get("/{court_id}", response_model=CourtResponse)
-async def get_court(court_id: int, db: AsyncSession = Depends(get_db, scope="function")):
+async def get_court(court_id: RecordId, db: AsyncSession = Depends(get_db, scope="function")):
     result = await db.execute(select(Court).where(Court.id == court_id))
     court = result.scalar_one_or_none()
     if not court:
@@ -80,7 +83,7 @@ async def get_court(court_id: int, db: AsyncSession = Depends(get_db, scope="fun
 
 @router.get("/{court_id}/case-types", response_model=list[CaseTypeResponse])
 async def list_case_types(
-    court_id: int, include_inactive: bool = False,
+    court_id: RecordId, include_inactive: bool = False,
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     query = select(CaseType).where(CaseType.court_id == court_id)
@@ -91,10 +94,12 @@ async def list_case_types(
 
 
 @router.get("/{court_id}/fee-schedules", response_model=list[FeeScheduleResponse])
-async def list_fee_schedules(court_id: int, db: AsyncSession = Depends(get_db, scope="function")):
+async def list_fee_schedules(
+    court_id: RecordId, db: AsyncSession = Depends(get_db, scope="function"),
+):
     result = await db.execute(
         select(FeeSchedule).where(
-            FeeSchedule.court_id == court_id, FeeSchedule.is_active == True  # noqa: E712
+            FeeSchedule.court_id == court_id, FeeSchedule.is_active.is_(True),
         )
     )
     return list(result.scalars().all())

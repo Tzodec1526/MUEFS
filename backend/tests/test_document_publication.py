@@ -15,7 +15,7 @@ from app.models.case import Case
 from app.models.document_public_copy import DocumentPublicCopy
 from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.models.filing_transaction import FilingTransaction
-from app.models.user import User, UserType
+from app.models.user import CourtRole, User, UserCourtRole, UserType
 from app.services import audit_service, document_service
 from tests.filing_requests import submission_review
 from tests.test_filing_history import filing_fixture
@@ -397,7 +397,7 @@ async def test_missing_file_is_unavailable_without_fake_document(
 
     copy, _ = await prepare_copy(api_client, public_record["document_id"])
     if storage == "s3":
-        monkeypatch.setattr(document_service, "_is_demo_mode", lambda: False)
+        monkeypatch.setattr(document_service, "uses_local_storage", lambda: False)
         monkeypatch.setattr(document_service, "get_s3_client", MissingObject)
     else:
         monkeypatch.setattr(document_service, "_local_storage_path", lambda: tmp_path / "missing")
@@ -446,3 +446,81 @@ async def test_access_history_keeps_actor_name_and_pages(public_record, api_clie
     assert len({row["id"] for row in first["events"] + second["events"]}) == 27
     assert all(row["actor_name"] == "Records Clerk" for row in first["events"] + second["events"])
     assert first["events"][0]["details"]["reason"] == "Authority 25"
+
+
+async def test_staff_cannot_decide_publication_of_their_own_filing(
+    public_record, api_client, db_session,
+):
+    record = public_record
+    did, fid = record["document_id"], record["filing_id"]
+    filing = await db_session.get(FilingEnvelope, fid)
+    # The filer also holds a clerk assignment at this court.
+    db_session.add(UserCourtRole(
+        user_id=record["filer"], court_id=filing.court_id, role=CourtRole.CLERK,
+    ))
+    await db_session.flush()
+    copy, _ = await prepare_copy(api_client, did)  # prepared by an independent clerk
+    stored_before = sorted(p.name for p in record["storage"].rglob("*") if p.is_file())
+    api_client.headers["X-Demo-User-Id"] = str(record["filer"])
+    path = f"/api/v1/clerk/documents/{did}"
+    assert (await api_client.get(path + "/publication")).status_code == 200
+    refused = [
+        await api_client.post(
+            path + "/public-copies", data={"title": "Own copy"},
+            files={"file": ("own.pdf", publication_pdf("Own copy"), "application/pdf")},
+        ),
+        await api_client.post(path + "/publication", json={
+            "copy_id": copy["id"], "expected_version": 0, "reviewed": True,
+            "reason": "Own filing REF-1",
+        }),
+        await api_client.post(path + "/withhold", json={
+            "expected_version": 0, "reason": "Own filing REF-2",
+        }),
+    ]
+    for response in refused:
+        assert response.status_code == 403, response.text
+        assert "Another court reviewer" in response.json()["detail"]
+    # The refused copy was never screened or stored.
+    assert sorted(p.name for p in record["storage"].rglob("*") if p.is_file()) == stored_before
+    history = (await api_client.get(f"/api/v1/filings/{fid}/history")).json()
+    assert history["can_manage_documents"] is False
+    api_client.headers["X-Demo-User-Id"] = str(record["clerk"])
+    assert (await api_client.get(f"/api/v1/filings/{fid}/history")).json()["can_manage_documents"]
+
+
+async def test_public_copy_downloads_fail_when_the_stored_bytes_changed(
+    public_record, api_client, db_session,
+):
+    record = public_record
+    did = record["document_id"]
+    copy, payload = await prepare_copy(api_client, did)
+    published = await api_client.post(f"/api/v1/clerk/documents/{did}/publication", json={
+        "copy_id": copy["id"], "expected_version": 0, "reviewed": True,
+        "reason": "Reviewed copy REF-9",
+    })
+    assert published.status_code == 200, published.text
+    stored = await db_session.get(DocumentPublicCopy, copy["id"])
+    (record["storage"] / stored.file_key).write_bytes(payload + b"tampered after review")
+    response = await api_client.get(
+        f"/api/v1/document-public-copies/{copy['id']}/download",
+        headers={"X-Demo-User-Id": str(record["other"])},
+    )
+    assert response.status_code == 409, response.text
+    assert b"tampered" not in response.content
+
+
+async def test_storage_outage_while_publishing_is_retryable(public_record, api_client, monkeypatch):
+    did = public_record["document_id"]
+    copy, _ = await prepare_copy(api_client, did)
+
+    def unavailable(file_key):
+        raise document_service.StorageUnavailableError("Document storage is unavailable")
+
+    monkeypatch.setattr(document_service, "stored_integrity", unavailable)
+    response = await api_client.post(f"/api/v1/clerk/documents/{did}/publication", json={
+        "copy_id": copy["id"], "expected_version": 0, "reviewed": True,
+        "reason": "Reviewed copy REF-10",
+    })
+    # The copy is intact; the clerk should retry, not prepare it again.
+    assert response.status_code == 503, response.text
+    assert response.headers["retry-after"] == "30"

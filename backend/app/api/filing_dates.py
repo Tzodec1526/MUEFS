@@ -10,11 +10,13 @@ from starlette.concurrency import run_in_threadpool
 
 from app.api.auth import get_current_user_id, lock_current_user
 from app.api.document_upload import inspect_upload
+from app.api.params import RecordId
 from app.database import get_db
 from app.models.case import Case
 from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
+from app.schemas.common import MAX_RECORD_ID
 from app.schemas.filing import FilingDocumentResponse
-from app.services import access_service, audit_service, document_service
+from app.services import access_service, audit_service, document_service, storage_intent
 from app.services.filing_record_service import record_transaction
 from app.utils.http_context import client_ip, client_user_agent
 
@@ -23,6 +25,7 @@ router = APIRouter(prefix="/clerk/filings", tags=["Filing dates"])
 
 async def _date_filing(
     db: AsyncSession, user_id: int, filing_id: int, *, for_update: bool = False,
+    decision: bool = False,
 ) -> FilingEnvelope:
     if for_update:
         await lock_current_user(db, user_id)
@@ -34,6 +37,8 @@ async def _date_filing(
         raise HTTPException(404, "Filing not found")
     if not await access_service.user_is_court_staff_for_court(db, user_id, filing.court_id):
         raise HTTPException(403, "Not authorized for this court")
+    if decision and filing.filer_id == user_id:
+        raise HTTPException(403, "Another court reviewer must decide your own filing")
     return filing
 
 
@@ -47,7 +52,7 @@ def _order_block(filing: FilingEnvelope) -> str | None:
 
 @router.get("/{filing_id}/filing-date")
 async def filing_date_state(
-    filing_id: int,
+    filing_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -75,16 +80,16 @@ async def filing_date_state(
 
 @router.post("/{filing_id}/filing-date", status_code=201)
 async def record_filing_date_order(
-    filing_id: int,
+    filing_id: RecordId,
     request: Request,
     filing_date: date = Form(...),
     order_signed_date: date = Form(...),
     authority_reference: str = Form(..., min_length=1, max_length=1000),
     reason: str = Form(..., min_length=1, max_length=5000),
     reviewed: bool = Form(...),
-    expected_version: int = Form(..., ge=0),
+    expected_version: int = Form(..., ge=0, le=MAX_RECORD_ID),
     update_case_date: bool = Form(False),
-    expected_case_version: int | None = Form(None, ge=0),
+    expected_case_version: int | None = Form(None, ge=0, le=MAX_RECORD_ID),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
@@ -94,7 +99,7 @@ async def record_filing_date_order(
         raise HTTPException(422, "Review the signed order and provide its reference and reason")
     if update_case_date and expected_case_version is None:
         raise HTTPException(422, "Refresh the case opening date before applying this order to it")
-    filing = await _date_filing(db, user_id, filing_id)
+    filing = await _date_filing(db, user_id, filing_id, decision=True)
     if blocked := _order_block(filing):
         raise HTTPException(409, blocked)
     if filing.filing_date_version != expected_version:
@@ -105,9 +110,12 @@ async def record_filing_date_order(
     payload, mime, digest, inspection = await inspect_upload(file, require_pdf=True)
     file_key = f"filings/{filing_id}/orders/{uuid4()}.pdf"
     await run_in_threadpool(document_service.upload_document, payload, file_key, mime)
+    storage_intent.track_upload(db.sync_session, file_key)
     try:
         async with db.begin_nested():
-            filing = await _date_filing(db, user_id, filing_id, for_update=True)
+            filing = await _date_filing(
+                db, user_id, filing_id, for_update=True, decision=True,
+            )
             if blocked := _order_block(filing):
                 raise HTTPException(409, blocked)
             if filing.filing_date_version != expected_version:
@@ -192,6 +200,6 @@ async def record_filing_date_order(
                 ip_address=client_ip(request), user_agent=client_user_agent(request),
             )
     except Exception:
-        await run_in_threadpool(document_service.delete_document, file_key)
+        await run_in_threadpool(storage_intent.purge_keys, {file_key})
         raise
     return {"transaction_id": transaction.id}

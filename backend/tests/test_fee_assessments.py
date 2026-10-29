@@ -1,5 +1,6 @@
 """Court assessments, retained evidence, and balances exercised through the HTTP workflow."""
 
+from copy import deepcopy
 from uuid import uuid4
 
 import pytest
@@ -112,7 +113,7 @@ async def test_review_assessment_payment_and_submission_preserve_the_basis(
         )
     ).json()["total"] == 0
     assessed = await db_session.get(FilingTransaction, fees["assessment_id"])
-    retained = assessed.details.copy()
+    retained = deepcopy(assessed.details)
     assert retained["documents"][0]["sha256_hash"] == doc.sha256_hash
     api_client.headers["X-Demo-User-Id"] = str(other)
     assert (await api_client.get(f"/api/v1/filings/{fid}/fees")).status_code == 403
@@ -163,6 +164,7 @@ async def test_review_assessment_payment_and_submission_preserve_the_basis(
     assert receipt["details"]["fee_assessment"]["paid_cents"] == total
     assert receipt["details"]["fee_assessment"]["balance_due_cents"] == 0
     assert len(receipt["details"]["payments"]) == bool(total)
+    await db_session.refresh(assessed)  # Compare the stored row, not the cached object.
     assert assessed.details == retained
 
 
@@ -177,7 +179,7 @@ async def test_changed_documents_require_reassessment_and_credit_prior_payments(
         await api_client.post(f"/api/v1/clerk/filings/{fid}/fees", json=assessment(0, 1000))
     ).json()
     first = await db_session.get(FilingTransaction, assessed["assessment_id"])
-    first_details = first.details.copy()
+    first_details = deepcopy(first.details)
     api_client.headers["X-Demo-User-Id"] = str(filer)
     paid = await api_client.post(
         "/api/v1/payments/process",
@@ -246,6 +248,7 @@ async def test_changed_documents_require_reassessment_and_credit_prior_payments(
         )
         == 0
     )
+    await db_session.refresh(first)  # Compare the stored row, not the cached object.
     assert first.details == first_details
     api_client.headers["X-Demo-User-Id"] = str(filer)
     assert (await api_client.post(

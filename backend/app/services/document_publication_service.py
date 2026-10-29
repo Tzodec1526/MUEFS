@@ -19,6 +19,7 @@ async def document_context(
     document_id: int,
     *,
     for_update: bool = False,
+    decision: bool = False,
 ) -> tuple[FilingDocument, FilingEnvelope]:
     doc = await db.get(FilingDocument, document_id)
     if doc is None:
@@ -53,6 +54,8 @@ async def document_context(
         raise HTTPException(403, "Account or filing is unavailable")
     if not await access_service.user_is_court_staff_for_court(db, actor.id, filing.court_id):
         raise HTTPException(403, "A staff assignment for this court is required")
+    if decision and filing.filer_id == actor.id:
+        raise HTTPException(403, "Another court reviewer must decide your own filing")
     return doc, filing
 
 
@@ -76,7 +79,7 @@ async def publish_copy(
     *,
     context: dict,
 ) -> None:
-    doc, filing = await document_context(db, actor, document_id)
+    doc, filing = await document_context(db, actor, document_id, decision=True)
     if doc.access_version != data.expected_version:
         raise HTTPException(409, "Document access changed. Refresh before publishing")
     copy = await db.scalar(
@@ -89,11 +92,13 @@ async def publish_copy(
         raise HTTPException(404, "Public copy not found for this document")
     try:
         digest, size = await run_in_threadpool(document_service.stored_integrity, copy.file_key)
-    except OSError as exc:
+    except FileNotFoundError as exc:
         raise HTTPException(409, "The prepared copy is unavailable. Prepare it again") from exc
     if digest != copy.sha256_hash or size != copy.file_size_bytes:
         raise HTTPException(409, "The prepared copy failed its integrity check. Prepare it again")
-    doc, filing = await document_context(db, actor, document_id, for_update=True)
+    doc, filing = await document_context(
+        db, actor, document_id, for_update=True, decision=True,
+    )
     if blocked := publication_block(doc, filing):
         raise HTTPException(409, blocked)
     if doc.access_version != data.expected_version:
@@ -151,7 +156,9 @@ async def withhold_document(
     *,
     context: dict,
 ) -> None:
-    doc, filing = await document_context(db, actor, document_id, for_update=True)
+    doc, filing = await document_context(
+        db, actor, document_id, for_update=True, decision=True,
+    )
     if doc.access_version != data.expected_version:
         raise HTTPException(409, "Document access changed. Refresh before withholding")
     if filing.status == FilingStatus.DRAFT and doc.retained_at is None:

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { listCourts, Court } from '../../api/courts';
+import { needsErrorMessage } from '../../api/client';
 import { listFavoriteCourts, addFavoriteCourt, removeFavoriteCourt } from '../../api/favorites';
 import LoadError from '../common/LoadError';
+import { useToast } from '../common/Toast';
 
 interface Props {
   selectedCourtId: number | null;
@@ -34,6 +36,7 @@ const COURT_TYPE_LABEL: Record<string, string> = {
 const APPELLATE_TYPES = new Set(['court_of_claims', 'court_of_appeals', 'supreme_court']);
 
 function CourtSelector({ selectedCourtId, onSelect }: Props) {
+  const { pushToast } = useToast();
   const [trialCourts, setTrialCourts] = useState<Court[]>([]);
   const [statewideCourts, setStatewideCourts] = useState<Court[]>([]);
   const [search, setSearch] = useState('');
@@ -43,18 +46,21 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statewideFailed, setStatewideFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
-  const [favoritedCourtIds, setFavoritedCourtIds] = useState<Set<number>>(new Set());
+  const [favoritedCourtIds, setFavoritedCourtIds] = useState<Set<number>>(() => new Set());
   const [togglingFav, setTogglingFav] = useState<number | null>(null);
 
   // Statewide/appellate forums (Court of Appeals, Supreme Court, Court of Claims) apply
   // regardless of county -- load them once and always surface them in their own group so
   // they are never buried under a county filter.
   useEffect(() => {
-    listCourts({ tier: 'appellate', page_size: 50 })
-      .then((r) => setStatewideCourts(r.courts))
-      .catch(() => setStatewideCourts([]));
-  }, []);
+    const controller = new AbortController();
+    listCourts({ tier: 'appellate', page_size: 50 }, controller.signal)
+      .then((r) => { setStatewideCourts(r.courts); setStatewideFailed(false); })
+      .catch(() => { if (!controller.signal.aborted) setStatewideFailed(true); });
+    return () => controller.abort();
+  }, [reloadKey]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -109,8 +115,8 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
         await addFavoriteCourt(courtId);
         setFavoritedCourtIds(prev => new Set(prev).add(courtId));
       }
-    } catch {
-      // ignore errors for demo
+    } catch (err) {
+      if (needsErrorMessage(err)) pushToast('Could not update the favorite court. Please try again.', 'error');
     } finally {
       setTogglingFav(null);
     }
@@ -135,33 +141,38 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
     const isFav = favoritedCourtIds.has(court.id);
     const isAppellate = APPELLATE_TYPES.has(court.court_type);
     const typeLabel = COURT_TYPE_LABEL[court.court_type] || court.court_type;
+    const detailsId = `court-card-${court.id}-details`;
+    const addressId = `court-card-${court.id}-address`;
+    // Selecting and starring are sibling buttons; the select button's click area covers the card.
     return (
-      <div
-        key={court.id}
-        className={`court-card ${selectedCourtId === court.id ? 'selected' : ''}`}
-        role="button"
-        tabIndex={0}
-        onClick={() => onSelect(court.id, court.name)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(court.id, court.name); }
-        }}
-      >
+      <div key={court.id} className={`court-card ${selectedCourtId === court.id ? 'selected' : ''}`}>
         <div className="court-card-head">
-          <h4>{court.name}</h4>
-          <button
-              className={`fav-star ${isFav ? 'active' : ''}`}
-              onClick={(e) => { e.stopPropagation(); toggleFavoriteCourt(court.id); }}
-              disabled={togglingFav === court.id}
-              title={isFav ? 'Remove from favorites' : 'Add to favorites'}
-              aria-label={isFav ? 'Remove court from favorites' : 'Add court to favorites'}
+          <h4>
+            <button
+              type="button"
+              className="court-card-select"
+              onClick={() => onSelect(court.id, court.name)}
+              aria-pressed={selectedCourtId === court.id}
+              aria-describedby={court.address ? `${detailsId} ${addressId}` : detailsId}
             >
-              {isFav ? '★' : '☆'}
+              {court.name}
+            </button>
+          </h4>
+          <button
+            type="button"
+            className={`fav-star ${isFav ? 'active' : ''}`}
+            onClick={() => toggleFavoriteCourt(court.id)}
+            disabled={togglingFav !== null}
+            title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+            aria-label={isFav ? `Remove ${court.name} from favorites` : `Add ${court.name} to favorites`}
+          >
+            {isFav ? '★' : '☆'}
           </button>
         </div>
-        <p>
+        <p id={detailsId}>
           {isAppellate ? 'Statewide jurisdiction' : `${court.county} County`} &middot; {typeLabel}
         </p>
-        {court.address && <p className="court-address">{court.address}</p>}
+        {court.address && <p id={addressId} className="court-address">{court.address}</p>}
       </div>
     );
   };
@@ -209,8 +220,10 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
         </div>
       </div>
 
-      {error ? (
-        <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />
+      {error || statewideFailed ? (
+        // Missing appellate courts would otherwise look like an empty statewide list.
+        <LoadError message={error || "We couldn't load the statewide and appellate courts. Please try again."}
+          onRetry={() => setReloadKey((k) => k + 1)} />
       ) : (
         <>
           {visibleStatewide.length > 0 && (

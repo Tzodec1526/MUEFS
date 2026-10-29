@@ -34,7 +34,31 @@ export async function searchCases(params: {
   return data;
 }
 
-export async function getCase(caseId: number) {
-  const { data } = await apiClient.get(`/cases/${caseId}`);
+export interface CaseDocket {
+  id: number;
+  court_id: number;
+  case_number: string;
+  case_type_id: number;
+  title: string;
+  is_sealed?: boolean;
+  can_manage_records: boolean;
+  can_file: boolean;
+  status: string;
+  filed_date: string;
+  filing_date: string | null;
+  judge_id: number | null;
+  participants: Array<{
+    id: number;
+    party_name: string;
+    role: string;
+    attorney_bar_number: string | null;
+    represented_party_name: string | null;
+    is_active: boolean;
+  }>;
+  created_at: string;
+}
+
+export async function getCase(caseId: number, signal?: AbortSignal): Promise<CaseDocket> {
+  const { data } = await apiClient.get(`/cases/${caseId}`, { signal });
   return data;
 }

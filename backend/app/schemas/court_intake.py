@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
+from app.schemas.common import ExpectedVersion
+
 
 class IntakeCaseTypeChange(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -31,7 +33,7 @@ class CourtIntakeResponse(CourtIntakeState):
 class CourtIntakeChange(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
-    expected_version: int = Field(ge=0)
+    expected_version: ExpectedVersion
     is_efiling_enabled: StrictBool
     public_notice: str | None = Field(max_length=2000)
     case_types: list[IntakeCaseTypeChange] = Field(max_length=500)

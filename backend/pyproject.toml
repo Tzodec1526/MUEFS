@@ -9,6 +9,10 @@ description = "Michigan Unified E-Filing System - Backend API"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.121.1",
+    # Imported directly (thread pools, cancellation shields, storage errors), not only
+    # through FastAPI and boto3.
+    "starlette>=0.40.0",
+    "anyio>=4.0.0",
     "uvicorn[standard]>=0.30.0",
     "sqlalchemy[asyncio]>=2.0.30",
     "asyncpg>=0.29.0",
@@ -20,6 +24,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "httpx>=0.27.0",
     "boto3>=1.34.0",
+    "botocore>=1.34.0",
     "redis>=5.0.0",
     "python-magic>=0.4.27",
     "pypdf>=4.0.0",
@@ -30,7 +35,6 @@ dependencies = [
 test = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
-    "pytest-cov>=5.0.0",
     "httpx>=0.27.0",
     "ruff>=0.4.0",
     "mypy>=1.10.0",
@@ -46,9 +50,15 @@ include = ["app*"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+filterwarnings = [
+    # SQLite batch migrations reflect `users`, whose lower(email) index SQLAlchemy cannot
+    # reflect; the migration keeps it (asserted in test_filing_migration).
+    "ignore:Skipped unsupported reflection of expression-based index ix_users_email_lower:sqlalchemy.exc.SAWarning",
+]
 
 [tool.ruff]
-target-version = "py312"
+# Match requires-python, so lint never demands syntax 3.11 cannot run.
+target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]
@@ -59,7 +69,7 @@ select = ["E", "F", "I", "N", "W", "UP"]
 "app/seed_data.py" = ["E501"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.11"
 ignore_missing_imports = true
 disallow_untyped_defs = false
 disallow_untyped_decorators = false

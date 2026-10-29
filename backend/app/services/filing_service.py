@@ -13,6 +13,7 @@ from app.integrations.cms_adapter import submit_filing_to_cms
 from app.models.case import Case, CaseStatus
 from app.models.court import CaseType, Court, FilingRequirement
 from app.models.filing import COURT_DOCUMENT_TYPES, FilingDocument, FilingEnvelope, FilingStatus
+from app.schemas.common import MAX_RECORD_ID
 from app.schemas.filing import (
     ClerkQueueResponse,
     FilingEnvelopeCreate,
@@ -47,15 +48,13 @@ async def verify_filing_documents(
     filing: FilingEnvelope, court_order: FilingDocument | None = None,
 ) -> None:
     """Confirm current attachment bytes before creating a receipt or accepting a filing."""
-    from botocore.exceptions import BotoCoreError, ClientError
-
     if not filing.documents:
         raise FilingDocumentError("The filing has no current documents to verify")
     documents = [*filing.documents, court_order] if court_order else filing.documents
     for doc in documents:
         try:
             digest, size = await run_in_threadpool(document_service.stored_integrity, doc.file_key)
-        except (OSError, BotoCoreError, ClientError) as exc:
+        except OSError as exc:  # Missing, or storage unavailable
             raise FilingDocumentError(
                 f"Stored document '{doc.title}' is unavailable. "
                 "Retry when storage is available, or contact the court to restore the file."
@@ -112,7 +111,8 @@ def requirements_for_filing_type(
       service (and its proof) happens *after* the case is filed and the summons
       issued (MCR 2.104 / 2.107).
     - ``subsequent`` / ``motion``: motion-related companions only; the original
-      complaint and similar initiating documents are already on file.
+      complaint and similar initiating documents are already on file. The validator
+      enforces them on a subsequent filing only when it includes a motion.
     - any other type (e.g. service-only): returned unfiltered.
     """
     if filing_type == "initial":
@@ -204,7 +204,7 @@ async def create_filing(
     *,
     creation_key: str | None = None,
 ) -> FilingEnvelope:
-    await validate_filing_destination(db, data, filer_id=filer_id)
+    case = await validate_filing_destination(db, data, filer_id=filer_id)
 
     envelope = FilingEnvelope(
         court_id=data.court_id,
@@ -214,7 +214,8 @@ async def create_filing(
         creation_key=creation_key,
         creation_sha256=creation_fingerprint(data) if creation_key else None,
         filing_type=data.filing_type,
-        case_title=data.case_title,
+        # A filing into an existing case carries the court's caption, not a client value.
+        case_title=case.title if case is not None else data.case_title,
         filing_description=data.filing_description,
         fee_waiver_requested=data.fee_waiver_requested,
         fee_waiver_reason=data.fee_waiver_reason,
@@ -340,7 +341,7 @@ async def validate_filing(
             select(FilingRequirement).where(
                 FilingRequirement.court_id == filing.court_id,
                 FilingRequirement.case_type_id == filing.case_type_id,
-                FilingRequirement.is_required == True,  # noqa: E712
+                FilingRequirement.is_required.is_(True),
             )
         )
         required_docs = list(requirements.scalars().all())
@@ -348,6 +349,11 @@ async def validate_filing(
         filed_doc_types = {doc.document_type_code for doc in filing.documents}
 
         required_docs = requirements_for_filing_type(required_docs, filing.filing_type)
+        if filing.filing_type == "subsequent" and not any(
+            dt.startswith("MOT_") or dt == "MOTION" for dt in filed_doc_types
+        ):
+            # An answer or other subsequent paper does not need motion companions.
+            required_docs = []
 
         for req in required_docs:
             code = req.document_type_code
@@ -373,7 +379,7 @@ async def validate_filing(
         if not filing.case_title and not filing.case_id:
             errors.append("Case title is required for new case filings")
 
-    # Check document sizes and types
+    # MCR 1.109 text-searchability is advisory at validation.
     for doc in filing.documents:
         if not doc.is_text_searchable and doc.mime_type == "application/pdf":
             warnings.append(
@@ -474,6 +480,7 @@ async def review_filing(
         return None
 
     ordered_date = (probe.filing_date_basis or {}).get("source") == "court_order"
+    date_version = probe.filing_date_version
     fingerprints: list[tuple[int, str, int]] | None = None
     if action == "accept":
         court_order = None
@@ -510,6 +517,12 @@ async def review_filing(
 
     case = None
     if action == "accept":
+        # A date order recorded during verification must not be replaced by the calendar.
+        if filing.filing_date_version != date_version:
+            raise StaleFilingReviewError(
+                "The filing date changed while this review was in progress. Refresh the "
+                "filing and review its date before deciding."
+            )
         case = await validate_filing_destination(db, filing, filer_id=None)
         current = [(doc.id, doc.sha256_hash, doc.file_size_bytes) for doc in filing.documents]
         if ordered_date:
@@ -631,7 +644,7 @@ async def get_clerk_queue(
     search = search.strip()
     if search.startswith("#") and search[1:].isascii() and search[1:].isdigit():
         filing_id = int(search[1:])
-        filters.append(FilingEnvelope.id == filing_id if filing_id <= 2_147_483_647 else false())
+        filters.append(FilingEnvelope.id == filing_id if filing_id <= MAX_RECORD_ID else false())
     elif search:
         filters.append(or_(
             FilingEnvelope.case_title.icontains(search, autoescape=True),

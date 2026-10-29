@@ -59,9 +59,15 @@ async def test_concurrent_administration_cannot_remove_every_admin_or_lose_a_rol
     authenticated = asyncio.Event()
     arrivals = 0
 
-    async def concurrent_actor(db=Depends(get_db), user_id=Depends(auth.get_current_user_id)):
+    async def concurrent_actor(
+        db=Depends(get_db, scope="function"), user_id=Depends(auth.get_current_user_id),
+    ):
         nonlocal arrivals
+        # The function scope shares the session that authenticated this request, as
+        # production does. Flushing its verified-email update makes each request hold its
+        # own account row before either continues, so the overlap is not left to timing.
         actor = await auth.get_current_user(db, user_id)
+        await db.flush()
         arrivals += 1
         if arrivals == 2:
             authenticated.set()

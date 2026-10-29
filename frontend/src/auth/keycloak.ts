@@ -1,4 +1,5 @@
 import type Keycloak from 'keycloak-js';
+import { clearAgentActivity } from '../webmcp/activity';
 
 export const SESSION_KEY = 'muefs_auth_session';
 const LOGIN_KEY = 'muefs_login_attempt';
@@ -26,7 +27,19 @@ export function accessToken(): string | null {
   return session?.key === sessionKey() ? session.client.token || null : null;
 }
 
+/**
+ * Drops this tab's credentials once another tab signs out or signs in a different account
+ * (the shared session marker no longer matches), so this tab continues anonymously
+ * instead of cancelling every request until reload.
+ */
+function forgetReplacedSession(): void {
+  if (!session || session.key === sessionKey()) return;
+  forgetLocalSession();
+  clearAgentActivity();
+}
+
 export function sessionSnapshot(): SessionSnapshot {
+  forgetReplacedSession();
   return { key: sessionKey(), token: accessToken(), generation };
 }
 
@@ -65,6 +78,7 @@ export function clearSession(expected?: SessionSnapshot): boolean {
     || (accessToken() && expected.token !== accessToken()))) return false;
   forgetLocalSession();
   clearProfile();
+  clearAgentActivity();
   localStorage.setItem(SESSION_KEY, JSON.stringify({ generation: crypto.randomUUID(), restore: false }));
   notifySessionChanged();
   return true;
@@ -159,6 +173,8 @@ export function handleKeycloakCallback(): Promise<string | null> {
     if (attempt.key !== sessionKey() && !sameAccount) { client.clearToken(); throw new SessionChangedError(); }
     if (!sameAccount) {
       clearProfile();
+      // The previous account's agent tool log must not follow the tab into this account.
+      clearAgentActivity();
       localStorage.setItem(SESSION_KEY, JSON.stringify({ generation: crypto.randomUUID(), restore: true, issuer, subject }));
     }
     session = { client, key: sessionKey() };
@@ -175,9 +191,9 @@ export function handleKeycloakCallback(): Promise<string | null> {
 }
 
 export async function tokenForRequest(): Promise<string | null> {
+  forgetReplacedSession();
   const current = session;
   if (!current) return null;
-  if (current.key !== sessionKey()) throw new SessionChangedError();
   const lifetime = (current.client.tokenParsed?.exp || 0) - (current.client.tokenParsed?.iat || 0);
   await withDeadline(current.client.updateToken(Math.min(30, Math.max(1, Math.floor(lifetime / 3)))));
   if (session !== current || current.key !== sessionKey()) throw new SessionChangedError();

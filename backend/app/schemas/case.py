@@ -18,7 +18,7 @@ class CaseSearchParticipantPublic(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class CaseDocketResponse(BaseModel):
+class CasePublicRecord(BaseModel):
     """Public docket and search fields with participant contact PII (email, phone, address)
     stripped — the docket is open by default, so litigant contact details are never
     served on it. Sealed-case access is gated separately."""
@@ -34,7 +34,6 @@ class CaseDocketResponse(BaseModel):
     filing_date: date | None = None
     judge_id: int | None
     participants: list[CaseSearchParticipantPublic] = []
-    can_manage_records: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -44,7 +43,14 @@ class CaseDocketResponse(BaseModel):
         return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
 
 
-class CaseSearchResult(CaseDocketResponse):
+class CaseDocketResponse(CasePublicRecord):
+    """One case, with what the current account may do on it."""
+
+    can_manage_records: bool = False
+    can_file: bool = False
+
+
+class CaseSearchResult(CasePublicRecord):
     court_name: str = Field(validation_alias=AliasPath("court", "name"))
     court_county: str = Field(validation_alias=AliasPath("court", "county"))
 

@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import ColumnElement, or_, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.auth import get_optional_user_id
+from app.api.params import Page, RecordId
 from app.database import get_db
 from app.models.case import Case, CaseStatus
 from app.models.document_public_copy import DocumentPublicCopy
@@ -14,6 +15,7 @@ from app.schemas.case import (
     CaseSearchResponse,
     CaseSearchResult,
 )
+from app.schemas.common import MAX_RECORD_ID
 from app.schemas.filing import CaseDocumentResponse, CaseFilingResponse
 from app.services import access_service, search_service
 
@@ -25,12 +27,11 @@ async def search_cases(
     case_number: str | None = None,
     party_name: str | None = None,
     attorney_bar_number: str | None = None,
-    court_id: int | None = Query(None, ge=1, le=2_147_483_647),
+    court_id: int | None = Query(None, ge=1, le=MAX_RECORD_ID),
     case_status: CaseStatus | None = Query(None, alias="status"),
-    page: int = Query(1, ge=1),
+    page: Page = 1,
     page_size: int = Query(25, ge=1, le=100),
     db: AsyncSession = Depends(get_db, scope="function"),
-    _user_id: int | None = Depends(get_optional_user_id),
 ):
     """Public court-records search — no account required. Sealed matters are excluded
     from the index and the listing strips participant contact PII."""
@@ -54,7 +55,7 @@ async def search_cases(
 
 @router.get("/{case_id}", response_model=CaseDocketResponse)
 async def get_case(
-    case_id: int,
+    case_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int | None = Depends(get_optional_user_id),
 ):
@@ -71,32 +72,46 @@ async def get_case(
             detail="Not authorized to access this case",
         )
     profile = CaseDocketResponse.model_validate(case)
-    return profile.model_copy(update={"can_manage_records":
-        await access_service.user_is_court_staff_for_court(db, user_id, case.court_id)})
+    return profile.model_copy(update={
+        "can_manage_records": await access_service.user_is_court_staff_for_court(
+            db, user_id, case.court_id,
+        ),
+        "can_file": user_id is not None and await access_service.user_may_file_on_case(
+            db, user_id, case_id,
+        ),
+    })
 
 
 @router.get("/{case_id}/filings", response_model=list[CaseFilingResponse])
 async def get_case_filings(
-    case_id: int,
-    page: int = Query(1, ge=1),
+    case_id: RecordId,
+    page: Page = 1,
     page_size: int = Query(25, ge=1, le=100),
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int | None = Depends(get_optional_user_id),
 ):
+    case = await db.get(Case, case_id)
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case not found")
     if not await access_service.user_may_read_case(db, user_id, case_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access filings for this case",
         )
-    case = await db.get(Case, case_id)
+    # Newest first by the court's filing date; filings without one (still in review)
+    # sort by submission. A draft's creation time says nothing about docket order.
     query = (
         select(FilingEnvelope)
         .where(FilingEnvelope.case_id == case_id)
-        .order_by(FilingEnvelope.created_at.desc(), FilingEnvelope.id.desc())
+        .order_by(
+            func.coalesce(
+                FilingEnvelope.filing_date, FilingEnvelope.submitted_at,
+                FilingEnvelope.created_at,
+            ).desc(),
+            FilingEnvelope.id.desc(),
+        )
     )
     # Standing on a case does not expose another filer's drafts or waiver request.
-    if case is None:
-        raise HTTPException(status_code=404, detail="Case not found")
     staff_courts = select(UserCourtRole.court_id).where(
         UserCourtRole.user_id == user_id,
         UserCourtRole.role.in_([CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]),

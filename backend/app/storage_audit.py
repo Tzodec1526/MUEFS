@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import TextIO
 from uuid import uuid4
 
-from botocore.exceptions import BotoCoreError, ClientError
 from sqlalchemy import func, or_, select, true
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncConnection
@@ -89,8 +88,11 @@ async def inspect_files(
                         result["status"] = "missing"
                     except ValueError:
                         result["status"] = "invalid_reference"
-                    except (OSError, BotoCoreError, ClientError) as exc:
-                        result.update(status="unavailable", error_type=type(exc).__name__)
+                    except OSError as exc:
+                        # Report the storage failure behind the wrapper (for example
+                        # EndpointConnectionError or PermissionError).
+                        cause = exc.__cause__ or exc
+                        result.update(status="unavailable", error_type=type(cause).__name__)
                     else:
                         result.update(sha256=digest, size_bytes=size)
                         result["status"] = (

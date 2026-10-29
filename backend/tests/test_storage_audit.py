@@ -217,6 +217,9 @@ async def test_audit_reports_discrepancies_and_never_repairs_them(
     report = [json.loads(line) for line in output.getvalue().splitlines()]
     assert report[-1]["complete"]
     assert report[-1]["results"][expected] >= 1
+    if damage == "storage_outage":
+        # The report names the storage failure, not the wrapper around it.
+        assert {r.get("error_type") for r in report} >= {"EndpointConnectionError"}
     assert data["path"].read_bytes() == before_db
     assert (path.read_bytes() if path.exists() else None) == before_file
     assert "secret" not in output.getvalue()

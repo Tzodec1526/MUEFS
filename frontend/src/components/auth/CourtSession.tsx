@@ -1,4 +1,4 @@
-import { createContext, Fragment, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { apiClient } from '../../api/client';
 import { getErrorDetail } from '../../utils/errors';
 import LoadError from '../common/LoadError';
@@ -69,12 +69,30 @@ export function CourtWorkspace({ children }: { children: ReactNode }) {
   return <Fragment key={court.court_id}>{children}</Fragment>;
 }
 
+// Set when the focused working-court select changes courts. CourtWorkspace then remounts the
+// page for the new court, replacing the select, and the replacement takes focus back.
+let refocusCourtSelect = false;
+
 export function StaffCourtSelect({ disabled = false, onChange }: { disabled?: boolean; onChange?: () => void }) {
   const { court, courts, selectCourt, refresh } = useContext(CourtContext)!;
+  const select = useRef<HTMLSelectElement>(null);
+  const courtId = court?.court_id;
+  // Runs in the commit that applies the change, for a replacement or for this same select.
+  useLayoutEffect(() => {
+    if (!refocusCourtSelect) return;
+    refocusCourtSelect = false;
+    select.current?.focus();
+  }, [courtId]);
   return <div className="staff-court-select">
     <div className="form-group"><label htmlFor="working-court">Working court</label>
-      <select id="working-court" value={court?.court_id ?? ''} disabled={disabled || !court}
-        onChange={event => { selectCourt(Number(event.target.value)); onChange?.(); }}>
+      <select id="working-court" ref={select} value={court?.court_id ?? ''} disabled={disabled || !court}
+        onChange={event => {
+          const id = Number(event.target.value);
+          refocusCourtSelect = document.activeElement === event.currentTarget
+            && id !== courtId && courts.some(item => item.court_id === id);
+          selectCourt(id);
+          onChange?.();
+        }}>
         {courts.map(item => <option key={item.court_id} value={item.court_id}>{item.court_name || `Court ${item.court_id}`}</option>)}
       </select></div>
     <button type="button" className="btn btn-secondary" disabled={disabled} onClick={refresh}>Refresh assignments</button>

@@ -11,6 +11,9 @@ on:
         required: false
         type: string
 
+# The job only posts to Render's deploy hook; it needs no repository access.
+permissions: {}
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -36,4 +39,4 @@ jobs:
           echo "POST deploy hook (ref=${REF:-latest})"
           curl -fsS -X POST "$URL"
           echo
-          echo "Poll live with: powershell -File scripts/verify-live-webmcp.ps1"
+          echo "Verify with: cd frontend && npm run smoke:webmcp -- https://demo.tomcedoz.com"

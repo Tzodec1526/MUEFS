@@ -101,10 +101,13 @@ async def user_may_read_case(db: AsyncSession, user_id: int | None, case_id: int
     )))
 
 
+PUBLIC_ACCOUNT_REFUSAL = "Public docket accounts cannot create or manage e-filings."
+
+
 async def user_may_file_on_case(db: AsyncSession, user_id: int, case_id: int) -> bool:
     """Subsequent filings require a court-reviewed participant grant, not public docket read."""
     user = await db.get(User, user_id)
-    if user is None or not user.is_active:
+    if user is None or not user.is_active or user.user_type == UserType.PUBLIC:
         return False
     counsel = (
         CaseParticipant.attorney_bar_number == user.bar_number

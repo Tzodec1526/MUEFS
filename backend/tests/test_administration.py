@@ -307,3 +307,18 @@ async def test_identity_changes_require_a_reason_and_cannot_set_verification(
             f"/api/v1/admin/users/{users[3].id}", json=account_payload(users[3], **extra)
         )
     ).status_code == 422
+
+
+async def test_account_records_helper_needs_no_court_filter(db_session):
+    from app.api import admin
+
+    court = Court(name="Helper Court", county="Kent", court_type=CourtType.CIRCUIT)
+    clerk = User(email="helper-clerk@example.com", first_name="Helper", last_name="Clerk",
+                 user_type=UserType.CLERK)
+    db_session.add_all([court, clerk])
+    await db_session.flush()
+    db_session.add(UserCourtRole(user_id=clerk.id, court_id=court.id, role=CourtRole.CLERK))
+    await db_session.flush()
+    # A plain function default must not be a FastAPI parameter object.
+    records = await admin._user_records(db_session, [clerk], include_identity=False)
+    assert [grant["court_id"] for grant in records[0]["court_roles"]] == [court.id]

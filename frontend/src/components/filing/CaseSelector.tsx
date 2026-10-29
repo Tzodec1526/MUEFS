@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { searchCases } from '../../api/cases';
 import { getCaseTypes } from '../../api/courts';
 import LoadError from '../common/LoadError';
@@ -16,12 +16,13 @@ interface Props {
   courtName: string;
   selectedCaseId: number | null;
   isNewChosen: boolean;
+  onChooseExisting: () => void;
   onSelectExisting: (c: CaseResult, caseTypeName: string) => void;
   onSelectNew: () => void;
 }
 
 function CaseSelector({
-  courtId, courtName, selectedCaseId, isNewChosen, onSelectExisting, onSelectNew,
+  courtId, courtName, selectedCaseId, isNewChosen, onChooseExisting, onSelectExisting, onSelectNew,
 }: Props) {
   const [mode, setMode] = useState<'existing' | 'new' | null>(
     selectedCaseId ? 'existing' : isNewChosen ? 'new' : null
@@ -32,12 +33,16 @@ function CaseSelector({
   const [hasSearched, setHasSearched] = useState(false);
   const [typeNames, setTypeNames] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const searchRequest = useRef<AbortController>();
+
+  useEffect(() => () => searchRequest.current?.abort(), [courtId]);
 
   // Resolve case-type names so an existing-case selection carries a readable
   // type through to the review screen (existing cases skip the case-type step).
+  // Existing cases keep types the court has since closed to new cases, so include those.
   useEffect(() => {
     let active = true;
-    getCaseTypes(courtId)
+    getCaseTypes(courtId, true)
       .then((types) => {
         if (active) setTypeNames(Object.fromEntries(types.map((t) => [t.id, t.name] as const)));
       })
@@ -49,23 +54,28 @@ function CaseSelector({
 
   const runSearch = async () => {
     if (!query.trim()) return;
+    searchRequest.current?.abort();
+    const controller = new AbortController();
+    searchRequest.current = controller;
     setSearching(true);
     setHasSearched(true);
     setError(null);
     try {
       // Search by case number AND by party name, then merge — one box, either input.
       const [byNum, byParty] = await Promise.all([
-        searchCases({ court_id: courtId, case_number: query.trim() }),
-        searchCases({ court_id: courtId, party_name: query.trim() }),
+        searchCases({ court_id: courtId, case_number: query.trim() }, controller.signal),
+        searchCases({ court_id: courtId, party_name: query.trim() }, controller.signal),
       ]);
+      if (controller.signal.aborted) return;
       const byId = new Map<number, CaseResult>();
       [...(byNum.cases || []), ...(byParty.cases || [])].forEach((c: CaseResult) => byId.set(c.id, c));
       setResults([...byId.values()]);
     } catch {
+      if (controller.signal.aborted) return;
       setError('Case search is unavailable right now. Please try again.');
       setResults([]);
     } finally {
-      setSearching(false);
+      if (!controller.signal.aborted) setSearching(false);
     }
   };
 
@@ -80,7 +90,8 @@ function CaseSelector({
         <button
           type="button"
           className={`case-choice-card ${mode === 'existing' ? 'selected' : ''}`}
-          onClick={() => setMode('existing')}
+          onClick={() => { setMode('existing'); onChooseExisting(); }}
+          aria-pressed={mode === 'existing'}
         >
           <div className="case-choice-icon">&#128269;</div>
           <h4>File into an existing case</h4>
@@ -89,7 +100,8 @@ function CaseSelector({
         <button
           type="button"
           className={`case-choice-card ${mode === 'new' ? 'selected' : ''}`}
-          onClick={() => { setMode('new'); onSelectNew(); }}
+          onClick={() => { setMode('new'); if (!isNewChosen) onSelectNew(); }}
+          aria-pressed={mode === 'new'}
         >
           <div className="case-choice-icon">+</div>
           <h4>Start a new case</h4>

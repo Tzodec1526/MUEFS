@@ -8,9 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.auth import get_current_user_id, lock_current_user, require_user_may_manage_efilings
+from app.api.params import Page, RecordId
 from app.database import get_db
 from app.models.filing import FilingEnvelope, FilingStatus
 from app.models.user import User
+from app.schemas.common import MAX_RECORD_ID
 from app.schemas.filing import FilingDocumentResponse, FilingEnvelopeResponse
 from app.schemas.payment import (
     FeeAssessmentRequest,
@@ -28,7 +30,7 @@ router = APIRouter(tags=["Fee assessments"])
 
 @router.get("/filings/{filing_id}/fees", response_model=FilingFeeDetails)
 async def current_fees(
-    filing_id: int,
+    filing_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -57,7 +59,7 @@ async def current_fees(
 
 @router.post("/filings/{filing_id}/fee-review", response_model=FilingFeeState, status_code=201)
 async def request_fee_review(
-    filing_id: int,
+    filing_id: RecordId,
     data: FeeReviewRequest,
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -121,7 +123,7 @@ async def request_fee_review(
 
 @router.post("/clerk/filings/{filing_id}/fees", response_model=FilingFeeState, status_code=201)
 async def assess_fees(
-    filing_id: int,
+    filing_id: RecordId,
     data: FeeAssessmentRequest,
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -201,8 +203,8 @@ async def assess_fees(
 
 @router.get("/clerk/fee-reviews")
 async def fee_review_queue(
-    court_id: int = Query(...),
-    page: int = Query(1, ge=1),
+    court_id: int = Query(ge=1, le=MAX_RECORD_ID),
+    page: Page = 1,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):

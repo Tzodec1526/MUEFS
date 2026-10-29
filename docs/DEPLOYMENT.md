@@ -106,9 +106,8 @@ Copy `.env.example` to `.env` and change every demo value:
 | `ALLOW_PUBLIC_REGISTRATION` | `true` | `false` |
 | `PAYMENTS_ARE_SIMULATED` | `true` | `false` |
 | `DEBUG` | `true` | `false` |
-| `SECRET_KEY` | `change-this-...` | `openssl rand -hex 32` |
-| `POSTGRES_PASSWORD` / `MINIO_ROOT_PASSWORD` / `S3_SECRET_KEY` | `*_dev` | strong, secrets-managed |
-| `KEYCLOAK_CLIENT_SECRET` / `KEYCLOAK_ADMIN_PASSWORD` | demo | strong, secrets-managed |
+| `POSTGRES_PASSWORD` / `S3_SECRET_KEY` | `*_dev` / `*_secret` | strong, secrets-managed |
+| `KEYCLOAK_ADMIN_PASSWORD` | demo | strong, secrets-managed |
 | `ALLOWED_ORIGINS` | localhost | your real front-end origin(s) |
 | `RATE_LIMIT_BACKEND` | `memory` / `redis` | `redis` |
 
@@ -180,6 +179,10 @@ the state's identity policy before enabling production access. Session iframe ch
 are disabled; provider-side revocation is observed when renewal fails, while the API
 continues to validate each access token and the current local account permissions.
 
+If the API cannot reach the browser-facing `KEYCLOAK_URL` (for example, inside a private
+container network), set `KEYCLOAK_INTERNAL_URL` to an address it can reach for the realm's
+signing keys. Tokens must still name `KEYCLOAK_URL` as their issuer.
+
 Tokens must contain `sub`, `exp`, the configured issuer, and an API audience matching
 `KEYCLOAK_CLIENT_ID` or `JWT_AUDIENCES`; set `JWT_VERIFY_AUDIENCE=true`. Configure the
 frontend client's audience mapper to include the API. Keep Keycloak's `basic`, `profile`
@@ -240,8 +243,9 @@ verify the deployed callback in a browser. See
 
 - **Database:** PostgreSQL (not the demo's SQLite). Back it up regularly (nightly `pg_dump`
   or your provider's managed snapshots) and test restores.
-- **Object storage:** MinIO or S3 with scoped credentials. Enable bucket versioning and a
-  backup/lifecycle policy for filed documents.
+- **Object storage:** an S3-compatible service with scoped credentials. Enable bucket
+  versioning and a backup/lifecycle policy for filed documents. Provision the bucket and
+  its policies yourself; only the demo seeder creates a missing bucket.
 
 The API requires FastAPI **0.121.1 or newer**. Its database dependencies explicitly use
 `Depends(get_db, scope="function")`, including authentication, so the shared transaction
@@ -281,8 +285,8 @@ docker compose --profile security up -d
 ClamAV downloads its signature database on first boot (a few minutes; it persists in the
 `clamav_data` volume). Once enabled, ClamAV failures always reject the upload with a
 retryable `503`; there is no fallback to heuristics. The deadline covers connection,
-transfer and response. Detected threats return `422`. Strict startup requires the scanner
-outside demo/debug mode. Retire the obsolete `MALWARE_SCAN_ENABLED` and
+transfer and response. Detected threats return `422`. Startup requires the scanner
+outside demo/debug mode, with or without `SECURITY_STRICT_STARTUP`. Retire the obsolete `MALWARE_SCAN_ENABLED` and
 `MALWARE_SCAN_FAIL_CLOSED` environment variables.
 
 The scanner's TCP port stays inside the Compose network. The mounted
@@ -446,10 +450,15 @@ disable demo mode and isolated sessions, and serve the built frontend with its p
 configuration. Supervise the notice worker as a separate process. Pin base images to a
 digest in the production build pipeline; `render.yaml` is a demo deployment example.
 
+Each hosted-demo sandbox keeps its uploads in its own folder under `DEMO_DATA_DIR`, deleted
+together with the sandbox. `DEMO_STORAGE_QUOTA_MB` (default 200) caps each sandbox's
+uploads, and the demo refuses uploads with HTTP 507 while less than 1 GiB of disk is free.
+
 ## Pre-launch checklist
 
 - [ ] `ALLOW_DEMO_MODE=false`, `ALLOW_PUBLIC_REGISTRATION=false`, `PAYMENTS_ARE_SIMULATED=false`, `DEBUG=false`
-- [ ] All `change-me*` / `*_dev` secrets replaced
+- [ ] Every demo credential replaced: `POSTGRES_PASSWORD` (and `DATABASE_URL`),
+      `S3_ACCESS_KEY`/`S3_SECRET_KEY`, and `KEYCLOAK_ADMIN_USER`/`KEYCLOAK_ADMIN_PASSWORD`
 - [ ] Keycloak email verification enforced; privileged accounts bound explicitly
 - [ ] TLS terminated; `ALLOWED_ORIGINS` locked to real origins
 - [ ] PostgreSQL + object-storage backups configured and a restore tested

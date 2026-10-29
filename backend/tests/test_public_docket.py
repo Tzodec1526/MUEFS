@@ -6,7 +6,7 @@ matters and confidential documents stay locked. Uses a shared in-memory SQLite d
 (StaticPool) wired in through a get_db dependency override.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 import pytest_asyncio
@@ -219,3 +219,33 @@ async def test_anonymous_blocked_from_confidential_document(public_app):
     # Access is denied before any storage read, so a 403 (not 404/500) is the contract.
     r = await client.get(f"/api/v1/documents/{ids['confidential_doc']}/download")
     assert r.status_code == 403
+
+
+async def test_docket_lists_filings_newest_first_by_filing_date(db_session, api_client):
+    filer = User(email="order@test.com", first_name="Order", last_name="Filer",
+                 user_type=UserType.ATTORNEY)
+    court = Court(name="Order Court", county="Wayne", court_type=CourtType.CIRCUIT)
+    db_session.add_all([filer, court])
+    await db_session.flush()
+    kind = CaseType(court_id=court.id, code="CIV", name="Civil", category=CaseCategory.CIVIL)
+    db_session.add(kind)
+    await db_session.flush()
+    case = Case(court_id=court.id, case_type_id=kind.id, case_number="ORDER-1",
+                title="Order v Docket", filed_date=datetime.now(UTC))
+    db_session.add(case)
+    await db_session.flush()
+    # Drafted first, filed last: the draft's age says nothing about docket order.
+    later, earlier = (
+        FilingEnvelope(court_id=court.id, case_id=case.id, case_type_id=kind.id,
+                       filer_id=filer.id, status=FilingStatus.ACCEPTED,
+                       filing_date=filed)
+        for filed in (date(2026, 9, 10), date(2026, 9, 5))
+    )
+    db_session.add(later)
+    await db_session.flush()
+    db_session.add(earlier)
+    await db_session.flush()
+    listed = await api_client.get(f"/api/v1/cases/{case.id}/filings")
+    assert [f["id"] for f in listed.json()] == [later.id, earlier.id]
+    # A missing case is not reported as sealed.
+    assert (await api_client.get("/api/v1/cases/987654/filings")).status_code == 404
