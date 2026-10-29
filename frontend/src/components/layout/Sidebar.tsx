@@ -2,6 +2,7 @@ import { useContext } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { LayoutDashboard, FilePlus2, FolderOpen, Search, Star, ClipboardCheck, Mail, ShieldCheck } from 'lucide-react';
 import { CourtContext } from '../auth/CourtSession';
+import { hasAdministrationAccess } from '../auth/LoginScreen';
 
 function Sidebar() {
   const location = useLocation();
@@ -26,7 +27,7 @@ function Sidebar() {
 
   const links = allLinks.filter((link) => {
     if (link.courtAdminOnly && !courts.some(item => item.court_id === courtId && item.role === 'admin')) return false;
-    if (link.adminOnly && role !== 'admin' && localStorage.getItem('administration_access') !== 'true') return false;
+    if (link.adminOnly && !hasAdministrationAccess()) return false;
     if (link.courtOnly) return courtId != null;
     if (!role) return link.path === '/cases/search';
     return link.roles.includes(role);

@@ -84,7 +84,7 @@ it('shows a system administrator the account directory at /admin', async () => {
   expect(screen.getByRole('button', { name: 'Provision account' })).toBeTruthy();
 });
 
-it.each(['attorney', 'srl', 'clerk', 'public'])('shows a %s no administration data at /admin', async (role) => {
+it.each(['attorney', 'srl', 'clerk', 'public'])('tells a %s that /admin needs administrator access, without asking the server', async (role) => {
   const userType = { attorney: 'attorney', srl: 'self_represented', clerk: 'clerk', public: 'public' }[role]!;
   serve(userType, {
     '/admin/access': forbidden,
@@ -94,10 +94,26 @@ it.each(['attorney', 'srl', 'clerk', 'public'])('shows a %s no administration da
 
   await settle();
 
+  expect(await screen.findByRole('heading', { name: 'Administrator access required' })).toBeTruthy();
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
   expect(screen.queryByRole('heading', { name: 'People & court access' })).toBeNull();
   expect(screen.queryByText(/Grace Hopper|grace\.hopper@example\.gov/)).toBeNull();
   expect(screen.queryByRole('button', { name: 'Provision account' })).toBeNull();
+  expect(requested('/admin/access')).toBe(false);
   expect(requested('/admin/users')).toBe(false);
+});
+
+it('shows a delegated court administrator the account directory at /admin', async () => {
+  serve('clerk', {
+    '/auth/me': { id: 2, user_type: 'clerk', court_assignments: [{ court_id: 3, role: 'admin', court_name: 'Third Circuit Court' }] },
+    '/admin/access': { system_admin: false, user_id: 2, courts: [{ id: 3, name: 'Third Circuit Court' }] },
+    '/admin/users': directory,
+  });
+  openApp('/admin', 'clerk');
+
+  expect(await screen.findByRole('heading', { name: 'People & court access' })).toBeTruthy();
+  expect(await screen.findByRole('heading', { name: 'Grace Hopper' })).toBeTruthy();
 });
 
 it('shows an administrator a failed account directory load inline and loads it again on retry', async () => {

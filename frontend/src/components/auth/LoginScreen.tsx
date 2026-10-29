@@ -14,6 +14,10 @@ export function getDemoRole(): string | null {
   return localStorage.getItem('demo_role');
 }
 
+export function hasAdministrationAccess(): boolean {
+  return getDemoRole() === 'admin' || localStorage.getItem('administration_access') === 'true';
+}
+
 export function hasSession(): boolean {
   return Boolean(accessToken() || (isDemoBuild() && !oidcSessionExpected() && getDemoRole()));
 }

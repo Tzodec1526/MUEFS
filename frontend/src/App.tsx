@@ -4,7 +4,7 @@ import { FilePlus2, FolderOpen, Search, ClipboardCheck } from 'lucide-react';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Footer from './components/layout/Footer';
-import LoginScreen, { hasSession } from './components/auth/LoginScreen';
+import LoginScreen, { hasAdministrationAccess, hasSession } from './components/auth/LoginScreen';
 import { CourtContext, CourtSession, CourtWorkspace, StaffCourtSelect } from './components/auth/CourtSession';
 import PlatformStats from './components/marketing/PlatformStats';
 import MifileComparison from './components/marketing/MifileComparison';
@@ -51,6 +51,21 @@ function RequireFiler({ children }: { children: React.ReactNode }) {
   const { role: r } = useContext(CourtContext)!;
   if (r === 'clerk' || r === 'admin' || r === 'public') {
     return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
+
+function RequireAdministration({ children }: { children: React.ReactNode }) {
+  const { loading } = useContext(CourtContext)!;
+  if (loading) return <p className="loading" role="status">Checking administrator access…</p>;
+  if (!hasAdministrationAccess()) {
+    return (
+      <div className="empty-state">
+        <h3>Administrator access required</h3>
+        <p>People and court access is managed by system and court administrators.</p>
+        <Link to="/" className="btn btn-primary">Go to dashboard</Link>
+      </div>
+    );
   }
   return <>{children}</>;
 }
@@ -247,7 +262,7 @@ function App() {
                         <Route path="/service/deliveries/:deliveryId" element={<DeliveryDetailPage key={location.pathname} />} />
                         <Route path="/filings/:filingId/deliveries" element={<DeliveriesPage key={location.pathname} />} />
                         <Route path="/filings/:filingId/deliveries/new" element={<DeliveryComposePage key={location.pathname} />} />
-                        <Route path="/admin" element={<AdministrationPage />} />
+                        <Route path="/admin" element={<RequireAdministration><AdministrationPage /></RequireAdministration>} />
                         <Route path="/cases/:caseId/participants" element={<CourtWorkspace><CaseParticipantsPage /></CourtWorkspace>} />
                         <Route path="/cases/:caseId/participants/:participantId/service-contact" element={<CourtWorkspace><ServiceContactPage /></CourtWorkspace>} />
                         <Route path="/clerk/cases" element={<CourtWorkspace><CourtCaseDirectory /></CourtWorkspace>} />
