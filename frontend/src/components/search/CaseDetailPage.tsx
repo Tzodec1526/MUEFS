@@ -10,6 +10,7 @@ import { errorMessage } from '../../utils/errors';
 import { getDemoRole } from '../auth/LoginScreen';
 import { useToast } from '../common/Toast';
 import DocumentDownload from '../common/DocumentDownload';
+import { usePageTitle } from '../../utils/pageTitle';
 
 interface CaseFiling {
   id: number;
@@ -43,6 +44,7 @@ function CaseDetailPage() {
   const [filings, setFilings] = useState<CaseFiling[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  usePageTitle(caseData?.title || 'Case docket');
   const [isFavorited, setIsFavorited] = useState(false);
   const [togglingFav, setTogglingFav] = useState(false);
   const [courtName, setCourtName] = useState('');

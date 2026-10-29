@@ -6,9 +6,11 @@ import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors'
 import { formatBytes } from '../../utils/format';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
 
 export default function DeliveryComposePage() {
   const { filingId } = useParams();
+  usePageTitle('Send documents', `Filing #${filingId}`);
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);

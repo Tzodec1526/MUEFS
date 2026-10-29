@@ -6,9 +6,11 @@ import { formatCents, parseServerDate } from '../../utils/format';
 import { getBlobErrorDetail, loadFailure, type LoadFailure } from '../../utils/errors';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
 
 export default function PaymentRegisterPage() {
   const { court, courts } = useContext(CourtContext)!;
+  usePageTitle('Receipt register', court?.court_name);
   const courtId = court!.court_id;
   const administrator = courts.some(item => item.court_id === courtId && item.role === 'admin');
   const [filters, setFilters] = useState(() => {

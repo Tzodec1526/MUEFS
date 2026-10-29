@@ -5,11 +5,13 @@ import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import { parseServerDate } from '../../utils/format';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
 
 interface Queue { total: number; page: number; filings: { id: number; case_title: string | null; filer_name: string; status: string; requested_at: string }[] }
 
 export default function FeeReviewQueue() {
   const { court } = useContext(CourtContext)!;
+  usePageTitle('Fee reviews', court?.court_name);
   const courtId = court!.court_id;
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);

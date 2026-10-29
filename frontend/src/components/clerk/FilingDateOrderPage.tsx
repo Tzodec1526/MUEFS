@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useContext, useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import type { FilingDateBasis } from '../../api/filings';
@@ -6,6 +6,8 @@ import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors'
 import { formatCourtDate, parseServerDate } from '../../utils/format';
 import FilingDateEvidence from '../filing/FilingDateEvidence';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
+import { CourtContext } from '../auth/CourtSession';
 
 interface DateState {
   filing_id: number; court_id: number; status: string; submission_count: number;
@@ -16,6 +18,8 @@ interface DateState {
 
 export default function FilingDateOrderPage() {
   const { filingId } = useParams();
+  const { court } = useContext(CourtContext)!;
+  usePageTitle(`Filing #${filingId} filing date`, court?.court_name);
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{ key: string; data?: DateState; error?: LoadFailure }>();
   const [busy, setBusy] = useState(false);

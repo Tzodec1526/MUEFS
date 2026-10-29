@@ -4,6 +4,7 @@ import { apiClient } from '../../api/client';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
 
 interface Directory {
   cases: { id: number; case_number: string; title: string; is_sealed: boolean; status: string }[];
@@ -13,6 +14,7 @@ interface Directory {
 export default function CourtCaseDirectory() {
   const { court: assignment } = useContext(CourtContext)!;
   const court = assignment!.court_id;
+  usePageTitle('Court cases', assignment!.court_name);
   const [caseNumber, setCaseNumber] = useState('');
   const [cursors, setCursors] = useState<(number | undefined)[]>([undefined]);
   const [attempt, setAttempt] = useState(0);

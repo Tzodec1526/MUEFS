@@ -12,6 +12,7 @@ import { getFilingStatusCounts, getClerkQueue } from './api/filings';
 import { oidcSessionExpected, SESSION_KEY } from './auth/keycloak';
 import LoadError from './components/common/LoadError';
 import { loadFailure, type LoadFailure } from './utils/errors';
+import { usePageTitle } from './utils/pageTitle';
 
 const FilingWizard = lazy(() => import('./components/filing/FilingWizard'));
 const MyFilings = lazy(() => import('./components/filing/MyFilings'));
@@ -57,22 +58,26 @@ function RequireFiler({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AdministrationAccessRequired() {
+  usePageTitle('Administrator access required');
+  return (
+    <div className="empty-state">
+      <h3>Administrator access required</h3>
+      <p>People and court access is managed by system and court administrators.</p>
+      <Link to="/" className="btn btn-primary">Go to dashboard</Link>
+    </div>
+  );
+}
+
 function RequireAdministration({ children }: { children: React.ReactNode }) {
   const { loading } = useContext(CourtContext)!;
   if (loading) return <p className="loading" role="status">Checking administrator access…</p>;
-  if (!hasAdministrationAccess()) {
-    return (
-      <div className="empty-state">
-        <h3>Administrator access required</h3>
-        <p>People and court access is managed by system and court administrators.</p>
-        <Link to="/" className="btn btn-primary">Go to dashboard</Link>
-      </div>
-    );
-  }
+  if (!hasAdministrationAccess()) return <AdministrationAccessRequired />;
   return <>{children}</>;
 }
 
 function FilerDashboard() {
+  usePageTitle('Your filings');
   const [draftCount, setDraftCount] = useState<number | null>(null);
   const [returnedCount, setReturnedCount] = useState<number | null>(null);
   const [countsError, setCountsError] = useState<LoadFailure | null>(null);
@@ -136,6 +141,7 @@ function FilerDashboard() {
 }
 
 function PublicDashboard() {
+  usePageTitle('Public court records');
   return (
     <div className="dashboard">
       <div className="dashboard-welcome">
@@ -162,6 +168,7 @@ function PublicDashboard() {
 function ClerkDashboard() {
   const { court } = useContext(CourtContext)!;
   const courtId = court!.court_id;
+  usePageTitle('Clerk dashboard', court!.court_name || `Court ${courtId}`);
   const [pending, setPending] = useState<number | null>(null);
   const [pendingError, setPendingError] = useState<LoadFailure | null>(null);
   const [pendingAttempt, setPendingAttempt] = useState(0);
@@ -221,6 +228,7 @@ function Dashboard() {
 }
 
 function NotFound() {
+  usePageTitle('Page not found');
   return (
     <div className="empty-state">
       <h3>Page not found</h3>

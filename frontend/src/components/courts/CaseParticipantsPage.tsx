@@ -6,6 +6,7 @@ import { participantRoles } from '../../api/cases';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { parseServerDate } from '../../utils/format';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
 
 interface Participant {
   id: number; party_name: string; role: string; account_email: string | null; user_id: number | null;
@@ -187,6 +188,7 @@ function ParticipantHistory({ caseId }: { caseId: string }) {
 }
 
 export default function CaseParticipantsPage() {
+  usePageTitle('Case access and participants');
   const { caseId = '' } = useParams<{ caseId: string }>();
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);

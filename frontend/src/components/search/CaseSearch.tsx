@@ -10,12 +10,14 @@ import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { useToast } from '../common/Toast';
 import { formatCourtDate, parseServerDate } from '../../utils/format';
+import { usePageTitle } from '../../utils/pageTitle';
 
 function searchRequestOf(params: URLSearchParams): string {
   return JSON.stringify(['case', 'party', 'court'].map(name => params.get(name) || ''));
 }
 
 function CaseSearch() {
+  usePageTitle('Case search');
   const [searchParams, setSearchParams] = useSearchParams();
   const { pushToast } = useToast();
   const demoRole = getDemoRole();

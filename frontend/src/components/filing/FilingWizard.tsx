@@ -24,6 +24,7 @@ import {
   setPlainLanguageMode,
   stepLabel,
 } from '../../utils/srlMode';
+import { usePageTitle } from '../../utils/pageTitle';
 
 const CASE_LOOKUP_FAILED = "We couldn't load the court's record for this case, so its title is missing.";
 
@@ -74,6 +75,7 @@ function FilingWizard() {
 function FilingForm({ userId }: { userId: number }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedFilingId = searchParams.get('filing_id');
+  usePageTitle(requestedFilingId ? `Filing #${requestedFilingId}` : 'New filing');
   const draftKey = filingDraftKey(userId, requestedFilingId || `new:${searchParams.toString()}`);
   const [draft] = useState(() => loadFilingDraft(draftKey));
   const [filingData, setFilingData] = useState<FilingData>(() => {

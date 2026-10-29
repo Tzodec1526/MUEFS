@@ -6,6 +6,7 @@ import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors'
 import { parseServerDate } from '../../utils/format';
 import LoadError from '../common/LoadError';
 import { CourtContext } from '../auth/CourtSession';
+import { usePageTitle } from '../../utils/pageTitle';
 
 const methods = { electronic: 'Electronic through portal', mail: 'Mail', hand_delivery: 'Hand delivery' };
 interface Contact {
@@ -109,6 +110,7 @@ function ContactHistory({ path }: { path: string }) {
 }
 
 export default function ServiceContactPage() {
+  usePageTitle('Service instructions');
   const { caseId, participantId } = useParams();
   const { courts } = useContext(CourtContext)!;
   const [attempt, setAttempt] = useState(0);

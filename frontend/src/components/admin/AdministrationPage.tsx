@@ -4,6 +4,7 @@ import { apiClient } from '../../api/client';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { parseServerDate } from '../../utils/format';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
 
 interface Access {
   system_admin: boolean; user_id: number; courts: { id: number; name: string }[];
@@ -273,6 +274,7 @@ function AccountDirectory({ access }: { access: Access }) {
 }
 
 export default function AdministrationPage() {
+  usePageTitle('People and court access');
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<Remote<Access>>();
   const key = String(attempt);

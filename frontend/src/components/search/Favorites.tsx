@@ -6,8 +6,10 @@ import { actionErrorMessage } from '../../api/client';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { useToast } from '../common/Toast';
+import { usePageTitle } from '../../utils/pageTitle';
 
 function Favorites() {
+  usePageTitle('Favorites');
   const { pushToast } = useToast();
   const [caseFavorites, setCaseFavorites] = useState<FavoriteCase[]>([]);
   const [courtFavorites, setCourtFavorites] = useState<FavoriteCourt[]>([]);

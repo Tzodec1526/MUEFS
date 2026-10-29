@@ -6,6 +6,7 @@ import LoadError from '../common/LoadError';
 import DocumentDownload from '../common/DocumentDownload';
 import { formatBytes, getDocumentLabel, parseServerDate } from '../../utils/format';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
+import { usePageTitle } from '../../utils/pageTitle';
 
 const ACTION_UNCONFIRMED = 'the request did not complete. Refresh the queue to check its current status before trying again.';
 const BATCH_UNCONFIRMED = 'Could not accept the selected filings. Refresh the queue to check their current status before trying again.';
@@ -16,6 +17,7 @@ const sameFilters = (a: ClerkQueueFilters, b: ClerkQueueFilters) =>
 
 function ReviewQueue() {
   const { court } = useContext(CourtContext)!;
+  usePageTitle('Review queue', court?.court_name);
   const courtId = court!.court_id;
   const [queue, setQueue] = useState<ClerkQueue | null>(null);
   const filings = queue?.filings ?? [];

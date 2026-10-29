@@ -236,3 +236,45 @@ it.each([
   await screen.findByText(entry === '/login' ? 'Attorney' : 'Courts accepting e-filing');
   expect(document.body.textContent).not.toMatch(/(all|any) Michigan courts?/i);
 });
+
+const clerkAtThirdCircuit = {
+  '/auth/me': { id: 2, user_type: 'clerk', court_assignments: [{ court_id: 3, role: 'clerk', court_name: 'Third Circuit Court' }] },
+};
+
+it.each([
+  ['/login', 'attorney', 'Sign in'],
+  ['/', 'attorney', 'Your filings'],
+  ['/', 'public', 'Public court records'],
+  ['/', 'clerk', 'Clerk dashboard · Third Circuit Court'],
+  ['/filing/new', 'attorney', 'New filing'],
+  ['/filings', 'attorney', 'My filings'],
+  ['/filings/7/history', 'attorney', 'Filing #7 history'],
+  ['/filings/7/fees', 'attorney', 'Filing #7 fees and payments'],
+  ['/filings/7/filing-date', 'clerk', 'Filing #7 filing date · Third Circuit Court'],
+  ['/cases/search', 'public', 'Case search'],
+  ['/cases/42', 'public', 'Case docket'],
+  ['/courts/3/calendar', 'clerk', 'Filing calendar'],
+  ['/courts/3/intake', 'clerk', 'Filing intake'],
+  ['/notifications', 'attorney', 'Notices and email status'],
+  ['/service/deliveries', 'attorney', 'Document delivery inbox'],
+  ['/service/deliveries/5', 'attorney', 'Document delivery record'],
+  ['/filings/7/deliveries', 'attorney', 'Filing #7 deliveries'],
+  ['/filings/7/deliveries/new', 'attorney', 'Send documents · Filing #7'],
+  ['/admin', 'admin', 'People and court access'],
+  ['/admin', 'attorney', 'Administrator access required'],
+  ['/cases/42/participants', 'clerk', 'Case access and participants'],
+  ['/cases/42/participants/9/service-contact', 'clerk', 'Service instructions'],
+  ['/clerk/cases', 'clerk', 'Court cases · Third Circuit Court'],
+  ['/documents/5/publication', 'clerk', 'Document public access'],
+  ['/favorites', 'attorney', 'Favorites'],
+  ['/clerk/queue', 'clerk', 'Review queue · Third Circuit Court'],
+  ['/clerk/fee-reviews', 'clerk', 'Fee reviews · Third Circuit Court'],
+  ['/clerk/payment-register', 'clerk', 'Receipt register · Third Circuit Court'],
+  ['/no-such-page', 'attorney', 'Page not found'],
+])('titles %s for a %s "%s · MUEFS"', async (entry, role, title) => {
+  serve({ srl: 'self_represented' }[role] ?? role, role === 'clerk' ? clerkAtThirdCircuit : {});
+  document.title = '';
+  openApp(entry, role);
+
+  await waitFor(() => expect(document.title).toBe(`${title} · MUEFS`));
+});

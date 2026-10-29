@@ -7,6 +7,7 @@ import { parseServerDate } from '../../utils/format';
 import { CourtContext } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import '../../styles/intake.css';
+import { usePageTitle } from '../../utils/pageTitle';
 
 interface IntakeState {
   court_id: number; court_name: string; version: number;
@@ -151,6 +152,7 @@ export default function CourtIntakePage() {
   const [showHistory, setShowHistory] = useState(false);
   const key = `${courtId}:${userId ?? 'public'}:${attempt}`;
   const current = result?.key === key ? result : undefined;
+  usePageTitle('Filing intake', current?.data?.court_name);
   useEffect(() => {
     if (loading) return;
     const controller = new AbortController();

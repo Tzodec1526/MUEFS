@@ -4,10 +4,12 @@ import { clearSession, handleKeycloakCallback, SessionChangedError, sessionSnaps
 import { applySessionFromProfile } from './LoginScreen';
 import { apiClient } from '../../api/client';
 import { errorMessage } from '../../utils/errors';
+import { usePageTitle } from '../../utils/pageTitle';
 
 function AuthCallback() {
   const navigate = useNavigate();
   const [error, setError] = useState('');
+  usePageTitle('Completing sign-in');
 
   useEffect(() => {
     const controller = new AbortController();

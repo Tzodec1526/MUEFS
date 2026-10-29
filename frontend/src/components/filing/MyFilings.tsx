@@ -4,6 +4,7 @@ import { listFilings, FilingSummary } from '../../api/filings';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { parseServerDate } from '../../utils/format';
+import { usePageTitle } from '../../utils/pageTitle';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -22,6 +23,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 function MyFilings() {
+  usePageTitle('My filings');
   const navigate = useNavigate();
   const [filings, setFilings] = useState<FilingSummary[]>([]);
   const [total, setTotal] = useState(0);

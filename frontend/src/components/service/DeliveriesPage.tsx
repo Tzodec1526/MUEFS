@@ -5,6 +5,7 @@ import { deliveryLabels } from '../../api/notifications';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { parseServerDate } from '../../utils/format';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
 
 interface DeliveryList {
   deliveries: { id: string; name?: string; email?: string; actor_name?: string; created_at: string; delivery_status: string }[];
@@ -14,6 +15,7 @@ interface DeliveryList {
 
 export default function DeliveriesPage() {
   const { filingId } = useParams();
+  usePageTitle(filingId ? `Filing #${filingId} deliveries` : 'Document delivery inbox');
   const location = useLocation();
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);

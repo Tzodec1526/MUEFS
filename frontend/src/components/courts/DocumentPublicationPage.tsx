@@ -5,6 +5,7 @@ import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors'
 import { formatBytes, parseServerDate } from '../../utils/format';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
 
 interface PublicCopy {
   id: number; document_id: number; title: string; file_size_bytes: number; sha256_hash: string;
@@ -62,6 +63,7 @@ function PublicationHistory({ documentId }: { documentId: string }) {
 }
 
 export default function DocumentPublicationPage() {
+  usePageTitle('Document public access');
   const { documentId = '' } = useParams<{ documentId: string }>();
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);

@@ -9,6 +9,7 @@ import {
   accessToken, clearSession, keycloakConfigured,
   oidcSessionExpected, safeLoginReturnPath, SessionChangedError, startKeycloakLogin,
 } from '../../auth/keycloak';
+import { usePageTitle } from '../../utils/pageTitle';
 
 export function getDemoRole(): string | null {
   return localStorage.getItem('demo_role');
@@ -118,6 +119,7 @@ function LoginScreen() {
   const [signingIn, setSigningIn] = useState(false);
   const [signInError, setSignInError] = useState('');
   const restoreAttempted = useRef(false);
+  usePageTitle('Sign in');
   const signIn = useCallback(async () => {
     setSigningIn(true);
     setSignInError('');

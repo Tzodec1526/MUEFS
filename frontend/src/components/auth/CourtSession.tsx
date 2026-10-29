@@ -6,6 +6,7 @@ import {
   applySessionFromProfile, getDemoCourtId, getDemoRole, hasSession,
   type CourtAssignment, type SessionProfile,
 } from './LoginScreen';
+import { usePageTitle } from '../../utils/pageTitle';
 
 interface CourtSessionState {
   userId?: number;
@@ -55,15 +56,20 @@ export function CourtSession({ children }: { children: ReactNode }) {
   </CourtContext.Provider>;
 }
 
-export function CourtWorkspace({ children }: { children: ReactNode }) {
-  const { court, loading, error, refresh } = useContext(CourtContext)!;
-  if (loading) return <p role="status">Loading court assignments…</p>;
-  if (error) return <LoadError failure={error} onRetry={refresh} />;
-  if (!court) return <div className="empty-state">
+function CourtAssignmentNeeded({ refresh }: { refresh: () => void }) {
+  usePageTitle('Court assignment needed');
+  return <div className="empty-state">
     <h2>Court assignment needed</h2>
     <p>A clerk, judge or administrator assignment is required to use this court workspace.</p>
     <button className="btn btn-secondary" onClick={refresh}>Refresh assignments</button>
   </div>;
+}
+
+export function CourtWorkspace({ children }: { children: ReactNode }) {
+  const { court, loading, error, refresh } = useContext(CourtContext)!;
+  if (loading) return <p role="status">Loading court assignments…</p>;
+  if (error) return <LoadError failure={error} onRetry={refresh} />;
+  if (!court) return <CourtAssignmentNeeded refresh={refresh} />;
   // Changing courts discards selections, pagination and pending reads from the prior court.
   return <Fragment key={court.court_id}>{children}</Fragment>;
 }

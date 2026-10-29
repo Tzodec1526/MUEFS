@@ -8,6 +8,7 @@ import { loadFailure, type LoadFailure } from '../../utils/errors';
 import FeeWaiverPanel, { waiverActionLabels } from './FeeWaiverPanel';
 import FilingDateEvidence from './FilingDateEvidence';
 import { formatBytes, formatCents, formatCourtDate, getDocumentLabel, parseServerDate } from '../../utils/format';
+import { usePageTitle } from '../../utils/pageTitle';
 
 const eventLabels: Record<string, string> = {
   submitted: 'Submission received', accepted: 'Accepted by the court',
@@ -37,6 +38,7 @@ function saveReceipt(filingId: number, transaction: FilingTransaction) {
 
 export default function FilingHistoryPage() {
   const { filingId } = useParams();
+  usePageTitle(`Filing #${filingId} history`);
   const [history, setHistory] = useState<FilingHistory | null>(null);
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);

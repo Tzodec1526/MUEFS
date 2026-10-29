@@ -6,6 +6,7 @@ import type { FilingDateAssessment } from '../../api/filings';
 import { formatCourtDate, parseServerDate } from '../../utils/format';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
 
 interface Calendar {
   id: number; timezone: string; valid_from: string; valid_through: string;
@@ -25,6 +26,7 @@ export default function CourtCalendarPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [assessment, setAssessment] = useState<FilingDateAssessment>();
+  usePageTitle('Filing calendar', data ? courtName : undefined);
 
   useEffect(() => {
     const controller = new AbortController();

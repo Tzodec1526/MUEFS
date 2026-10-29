@@ -6,6 +6,7 @@ import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { parseServerDate } from '../../utils/format';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
 
 interface DeliveryHistory {
   events: { id: number; attempt_number: number; outcome: string; occurred_at: string;
@@ -72,6 +73,7 @@ function DeliveryDetails({ notice, onRetry }: { notice: NotificationItem; onRetr
 }
 
 export default function NotificationsPage() {
+  usePageTitle('Notices and email status');
   const { court, loading: assignmentsLoading } = useContext(CourtContext)!;
   const courtId = court?.court_id;
   const staff = courtId != null;

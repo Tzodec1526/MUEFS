@@ -7,6 +7,7 @@ import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors'
 import { formatBytes, parseServerDate } from '../../utils/format';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
 
 interface EventList {
   events: { id: number; action: string; occurred_at: string; actor_name?: string; detail?: string;
@@ -59,6 +60,7 @@ function DeliveryHistory({ deliveryId }: { deliveryId: string }) {
 }
 
 export default function DeliveryDetailPage() {
+  usePageTitle('Document delivery record');
   const { deliveryId } = useParams();
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{ key: string; data?: DeliveryDetails; error?: LoadFailure }>();
