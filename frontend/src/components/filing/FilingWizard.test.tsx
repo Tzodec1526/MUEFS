@@ -1,8 +1,15 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { AxiosError, type AxiosResponse } from 'axios';
 import { getCase, type CaseDocket } from '../../api/cases';
-import { getCaseTypes, getCourt, type CaseType, type Court } from '../../api/courts';
+import {
+  getCaseTypes, getCourt, getFilingRequirements, listCourts, type CaseType, type Court,
+} from '../../api/courts';
+import { getFilingFees, type FilingFees } from '../../api/documents';
+import {
+  createFiling, getFiling, submitFiling, updateFiling, validateFiling, type FilingEnvelope,
+} from '../../api/filings';
 import { CourtContext } from '../auth/CourtSession';
 import { ToastProvider } from '../common/Toast';
 import FilingWizard from './FilingWizard';
@@ -17,6 +24,14 @@ vi.mock('../../api/client', async (importOriginal) => {
 });
 vi.mock('../../api/courts', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../api/courts')>(), getCourt: vi.fn(), getCaseTypes: vi.fn(),
+  listCourts: vi.fn(), getFilingRequirements: vi.fn(),
+}));
+vi.mock('../../api/filings', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../api/filings')>(),
+  createFiling: vi.fn(), getFiling: vi.fn(), updateFiling: vi.fn(), validateFiling: vi.fn(), submitFiling: vi.fn(),
+}));
+vi.mock('../../api/documents', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../api/documents')>(), getFilingFees: vi.fn(),
 }));
 vi.mock('../../api/cases', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../api/cases')>(), getCase: vi.fn(),
@@ -61,6 +76,8 @@ beforeEach(() => {
   localStorage.setItem('demo_role', 'attorney');
   vi.mocked(getCourt).mockResolvedValue(court);
   vi.mocked(getCaseTypes).mockResolvedValue([civil]);
+  vi.mocked(listCourts).mockRejectedValue(new Error('Unexpected API request in a component test'));
+  vi.mocked(getFilingRequirements).mockRejectedValue(new Error('Unexpected API request in a component test'));
 });
 
 afterEach(() => {
@@ -147,4 +164,356 @@ it("keeps a self-represented filer's choice to turn plain-language guidance off"
   expect(guidance().checked).toBe(false);
   // Let the reopened wizard (which restores the unsaved draft) finish loading.
   await screen.findByText('Third Circuit Court');
+});
+
+const SAVED_TOKEN = 'a'.repeat(64);
+const LATEST_TOKEN = 'b'.repeat(64);
+
+function savedFiling(overrides: Partial<FilingEnvelope> = {}): FilingEnvelope {
+  return {
+    id: 7, court_id: 3, case_id: null, case_type_id: 11, filer_id: 1, filing_type: 'initial', status: 'draft',
+    payment_id: null, case_title: 'Doe v. Roe', filing_description: 'Complaint for breach of contract',
+    submitted_at: null, reviewed_at: null, rejection_reason: null, fee_waiver_requested: false,
+    fee_waiver_granted: null, fee_waiver_reason: null, fee_waiver_referred_at: null, fee_waiver_decided_at: null,
+    fee_waiver_amount_due_cents: null, documents: [], created_at: '2026-09-28T12:00:00Z',
+    updated_at: '2026-09-28T12:00:00Z', submission_count: 0, filing_date: null, filing_date_basis: null,
+    submission_token: 's-7', details_token: SAVED_TOKEN, ...overrides,
+  };
+}
+
+const complaint = {
+  id: 70, document_type_code: 'COMPLAINT', title: 'Complaint', file_size_bytes: 2048, mime_type: 'application/pdf',
+  page_count: 3, sha256_hash: 'c'.repeat(64), is_confidential: false, is_text_searchable: true,
+  uploaded_at: '2026-09-28T12:00:00Z',
+};
+
+function paidFees(filing: FilingEnvelope): FilingFees & { filing: FilingEnvelope } {
+  return {
+    filing_id: filing.id, version: 1, payment_version: 1, source: 'demo', assessment_id: null,
+    authority_reference: null, items: [], total_cents: 17500, paid_cents: 17500, balance_due_cents: 0,
+    overpaid_cents: 0, review_requested_at: null, review_reason: null, assessment_stale: false,
+    can_request_review: false, can_assess: false, can_pay: false, can_request_waiver: false, obligation_met: true,
+    payments_simulated: true, can_manage_external_payments: false, can_record_external_payment: false, filing,
+  };
+}
+
+function conflictError(): AxiosError {
+  return new AxiosError('Request failed with status code 409', 'ERR_BAD_REQUEST', undefined, undefined,
+    { status: 409, data: { detail: 'This filing changed since you opened it.' } } as AxiosResponse);
+}
+
+const stepButton = (label: string) => within(screen.getByRole('navigation', { name: 'Filing progress' }))
+  .getByRole('button', { name: new RegExp(`(^|[\\d✓\\s])${label}$`) }) as HTMLButtonElement;
+const button = (name: string | RegExp) => screen.getByRole('button', { name }) as HTMLButtonElement;
+const descriptionField = () => screen.getByLabelText(/Filing Description/) as HTMLTextAreaElement;
+
+async function stepError(message: string) {
+  expect((await screen.findByRole('alert')).textContent).toBe(message);
+}
+
+function serveCourtsAndTypes() {
+  vi.mocked(listCourts).mockImplementation(async (params) =>
+    params?.tier === 'trial' ? { courts: [court], total: 1 } : { courts: [], total: 0 });
+  vi.mocked(getFilingRequirements).mockResolvedValue([]);
+}
+
+async function chooseNewCaseAndType() {
+  fireEvent.click(await screen.findByRole('button', { name: /Start a new case/ }));
+  fireEvent.click(button('Continue'));
+  fireEvent.click(await screen.findByRole('button', { name: /General Civil/ }));
+  fireEvent.click(button('Continue'));
+  await screen.findByRole('heading', { name: 'Case Details' });
+}
+
+it('walks a new case through each step, refusing to advance past an unfinished one', async () => {
+  serveCourtsAndTypes();
+  openWizard('/filing/new');
+
+  expect(stepButton('Select Court').getAttribute('aria-current')).toBe('step');
+  expect(['Case', 'Case Type & Rules', 'Case Details', 'Documents', 'Review & Submit'].map(label => stepButton(label).disabled))
+    .toEqual([true, true, true, true, true]);
+  expect(button('Back').disabled).toBe(true);
+  fireEvent.click(button('Continue'));
+  await stepError('Please select a court to continue.');
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Third Circuit Court' }));
+  fireEvent.click(button('Continue'));
+  await screen.findByRole('heading', { name: 'Existing case or new case?' });
+  expect(stepButton('Case').getAttribute('aria-current')).toBe('step');
+  expect(screen.queryByRole('alert')).toBeNull();
+  fireEvent.click(button('Continue'));
+  await stepError('Please choose an existing case or start a new case.');
+
+  fireEvent.click(screen.getByRole('button', { name: /Start a new case/ }));
+  fireEvent.click(button('Continue'));
+  await screen.findByRole('heading', { name: 'Select Case Type & Review Requirements' });
+  fireEvent.click(button('Continue'));
+  await stepError('Please select a case type to continue.');
+
+  fireEvent.click(await screen.findByRole('button', { name: /General Civil/ }));
+  fireEvent.click(button('Continue'));
+  await screen.findByRole('heading', { name: 'Case Details' });
+  fireEvent.click(button('Continue'));
+  await stepError('Please enter a case title to continue.');
+  expect(createFiling).not.toHaveBeenCalled();
+  expect([stepButton('Documents').disabled, stepButton('Review & Submit').disabled]).toEqual([true, true]);
+});
+
+it('returns to a completed step from the progress bar, and back one step with Back', async () => {
+  serveCourtsAndTypes();
+  openWizard('/filing/new?court_id=3');
+  await chooseNewCaseAndType();
+
+  fireEvent.click(button('Back'));
+  await screen.findByRole('heading', { name: 'Select Case Type & Review Requirements' });
+
+  fireEvent.click(stepButton('Select Court'));
+
+  expect(await screen.findByRole('heading', { name: 'Select Court', level: 3 })).toBeTruthy();
+  expect(stepButton('Select Court').getAttribute('aria-current')).toBe('step');
+  expect(stepButton('Case').disabled).toBe(true);
+});
+
+it('saves a new filing as a draft and locks the court and case choices', async () => {
+  serveCourtsAndTypes();
+  const created = savedFiling();
+  vi.mocked(createFiling).mockResolvedValue(created);
+  vi.mocked(getFiling).mockResolvedValue(created);
+  openWizard('/filing/new?court_id=3');
+  await chooseNewCaseAndType();
+  fireEvent.change(caption(), { target: { value: 'Doe v. Roe' } });
+  fireEvent.change(descriptionField(), { target: { value: 'Complaint for breach of contract' } });
+
+  fireEvent.click(button('Save draft'));
+
+  await screen.findByRole('heading', { name: 'Continue Filing #7' });
+  expect(createFiling).toHaveBeenCalledTimes(1);
+  const [payload, creationKey] = vi.mocked(createFiling).mock.calls[0];
+  expect(payload).toEqual({
+    court_id: 3, case_id: undefined, case_type_id: 11, filing_type: 'initial',
+    case_title: 'Doe v. Roe', filing_description: 'Complaint for breach of contract',
+  });
+  expect(creationKey).toMatch(/^[0-9a-f-]{36}$/);
+  await waitFor(() => expect(caption().value).toBe('Doe v. Roe'));
+  expect([stepButton('Select Court').disabled, stepButton('Case Type & Rules').disabled, button('Back').disabled])
+    .toEqual([true, true, true]);
+});
+
+it('saves the details and moves on to documents when the filer continues', async () => {
+  serveCourtsAndTypes();
+  const created = savedFiling();
+  vi.mocked(createFiling).mockResolvedValue(created);
+  vi.mocked(getFiling).mockResolvedValue(created);
+  openWizard('/filing/new?court_id=3');
+  await chooseNewCaseAndType();
+  fireEvent.change(caption(), { target: { value: 'Doe v. Roe' } });
+
+  fireEvent.click(button('Continue'));
+
+  expect(await screen.findByRole('heading', { name: 'Upload Documents' })).toBeTruthy();
+  expect(createFiling).toHaveBeenCalledTimes(1);
+  expect(stepButton('Documents').getAttribute('aria-current')).toBe('step');
+  fireEvent.click(button('Review Filing'));
+  await stepError('Please upload at least one document to continue.');
+});
+
+it('offers unsaved edits from this tab when a new filing is reopened', async () => {
+  serveCourtsAndTypes();
+  const first = openWizard('/filing/new?court_id=3');
+  await chooseNewCaseAndType();
+  fireEvent.change(caption(), { target: { value: 'Doe v. Roe' } });
+  first.unmount();
+
+  openWizard('/filing/new?court_id=3');
+
+  expect(await screen.findByText('Recovered unsaved edits from this tab. Save them to your account before closing the tab.'))
+    .toBeTruthy();
+  expect(screen.getByText('Case:').parentElement?.textContent).toBe('Case: Doe v. Roe');
+  expect(screen.getByText('Type:').parentElement?.textContent).toBe('Type: General Civil');
+
+  fireEvent.click(button('Continue Editing'));
+
+  expect(screen.queryByText(/Recovered unsaved edits/)).toBeNull();
+  expect(screen.getByText('Case:').parentElement?.textContent).toBe('Case: Doe v. Roe');
+});
+
+it('discards recovered edits when the filer starts fresh', async () => {
+  serveCourtsAndTypes();
+  const first = openWizard('/filing/new?court_id=3');
+  await chooseNewCaseAndType();
+  fireEvent.change(caption(), { target: { value: 'Doe v. Roe' } });
+  first.unmount();
+  const second = openWizard('/filing/new?court_id=3');
+  await screen.findByText(/Recovered unsaved edits/);
+
+  fireEvent.click(button('Start Fresh'));
+
+  expect(screen.queryByText(/Recovered unsaved edits/)).toBeNull();
+  expect(screen.queryByText('Case:')).toBeNull();
+  expect(stepButton('Select Court').getAttribute('aria-current')).toBe('step');
+  second.unmount();
+
+  openWizard('/filing/new?court_id=3');
+
+  await screen.findByRole('heading', { name: 'Existing case or new case?' });
+  expect(screen.queryByText(/Recovered unsaved edits/)).toBeNull();
+});
+
+it('recovers unsaved edits to a saved filing, and can return to the saved details', async () => {
+  vi.mocked(getFiling).mockResolvedValue(savedFiling());
+  const first = openWizard('/filing/new?filing_id=7&step=details');
+  await waitFor(() => expect(caption().value).toBe('Doe v. Roe'));
+  fireEvent.change(caption(), { target: { value: 'Doe v. Roe, amended' } });
+  first.unmount();
+
+  openWizard('/filing/new?filing_id=7&step=details');
+
+  await screen.findByText(/Recovered unsaved edits/);
+  expect(caption().value).toBe('Doe v. Roe, amended');
+
+  fireEvent.click(button('Use Saved Details'));
+
+  expect(caption().value).toBe('Doe v. Roe');
+  expect(screen.queryByText(/Recovered unsaved edits/)).toBeNull();
+});
+
+it('saves edits to a saved filing against the version it loaded', async () => {
+  vi.mocked(getFiling).mockResolvedValue(savedFiling());
+  vi.mocked(updateFiling).mockResolvedValue(savedFiling({ case_title: 'Doe v. Roe, amended', details_token: LATEST_TOKEN }));
+  openWizard('/filing/new?filing_id=7&step=details');
+  await waitFor(() => expect(caption().value).toBe('Doe v. Roe'));
+  fireEvent.change(caption(), { target: { value: 'Doe v. Roe, amended' } });
+
+  fireEvent.click(button('Save draft'));
+
+  await screen.findByText('Draft saved to your account. You can continue it from My Filings.');
+  expect(updateFiling).toHaveBeenCalledWith(7, {
+    expected_details_token: SAVED_TOKEN, case_title: 'Doe v. Roe, amended',
+    filing_description: 'Complaint for breach of contract',
+  });
+  expect(createFiling).not.toHaveBeenCalled();
+});
+
+it('saves edits to a saved filing and moves on to documents when the filer continues', async () => {
+  vi.mocked(getFiling).mockResolvedValue(savedFiling());
+  vi.mocked(getFilingRequirements).mockResolvedValue([]);
+  vi.mocked(updateFiling).mockResolvedValue(savedFiling({ case_title: 'Doe v. Roe, amended', details_token: LATEST_TOKEN }));
+  openWizard('/filing/new?filing_id=7&step=details');
+  await waitFor(() => expect(caption().value).toBe('Doe v. Roe'));
+  fireEvent.change(caption(), { target: { value: 'Doe v. Roe, amended' } });
+
+  fireEvent.click(button('Continue'));
+
+  expect(await screen.findByRole('heading', { name: 'Upload Documents' })).toBeTruthy();
+  expect(updateFiling).toHaveBeenCalledTimes(1);
+  expect(stepButton('Documents').getAttribute('aria-current')).toBe('step');
+});
+
+async function openConflict() {
+  const latest = savedFiling({ case_title: 'Doe v. Roe, Inc.', filing_description: 'Amended complaint', details_token: LATEST_TOKEN });
+  vi.mocked(getFiling).mockResolvedValueOnce(savedFiling()).mockResolvedValue(latest);
+  vi.mocked(updateFiling).mockRejectedValueOnce(conflictError());
+  openWizard('/filing/new?filing_id=7&step=details');
+  await waitFor(() => expect(caption().value).toBe('Doe v. Roe'));
+  fireEvent.change(caption(), { target: { value: 'Doe v. Roe, amended' } });
+  fireEvent.click(button('Save draft'));
+  return screen.findByRole('heading', { name: 'Compare changes before saving' });
+}
+
+it('compares the edits with the saved filing when someone else saved it first', async () => {
+  const heading = await openConflict();
+
+  const comparison = heading.closest('section')!;
+  expect(within(comparison).getByText('Doe v. Roe, amended')).toBeTruthy();
+  expect(within(comparison).getByText('Doe v. Roe, Inc.')).toBeTruthy();
+  expect(within(comparison).getByText('Amended complaint')).toBeTruthy();
+  expect(document.activeElement).toBe(heading);
+  expect([button('Save draft').disabled, button('Continue').disabled]).toEqual([true, true]);
+  expect(getFiling).toHaveBeenCalledTimes(2);
+});
+
+it('keeps the edits after a conflict and saves them against the latest version', async () => {
+  await openConflict();
+  vi.mocked(updateFiling).mockResolvedValue(savedFiling({ case_title: 'Doe v. Roe, amended', details_token: 'd'.repeat(64) }));
+
+  fireEvent.click(button('Keep my edits for next save'));
+
+  expect(screen.getByText('Your edits are ready. Save draft or Continue to save them to your account.')).toBeTruthy();
+  expect(screen.queryByRole('heading', { name: 'Compare changes before saving' })).toBeNull();
+  expect(caption().value).toBe('Doe v. Roe, amended');
+
+  fireEvent.click(button('Save draft'));
+
+  await screen.findByText('Draft saved to your account. You can continue it from My Filings.');
+  expect(vi.mocked(updateFiling).mock.lastCall).toEqual([7, {
+    expected_details_token: LATEST_TOKEN, case_title: 'Doe v. Roe, amended',
+    filing_description: 'Complaint for breach of contract',
+  }]);
+});
+
+it('replaces the edits with the saved details after a conflict when the filer chooses them', async () => {
+  await openConflict();
+
+  fireEvent.click(button('Use saved details'));
+
+  expect(screen.getByText('Showing the saved details.')).toBeTruthy();
+  expect(screen.queryByRole('heading', { name: 'Compare changes before saving' })).toBeNull();
+  expect(caption().value).toBe('Doe v. Roe, Inc.');
+  expect(descriptionField().value).toBe('Amended complaint');
+});
+
+it('submits a valid, paid filing from the review step', async () => {
+  const draft = savedFiling({ documents: [complaint] });
+  vi.mocked(getFiling).mockResolvedValue(draft);
+  vi.mocked(getFilingRequirements).mockResolvedValue([]);
+  vi.mocked(validateFiling).mockResolvedValue({ is_valid: true, errors: [], warnings: [], missing_required_documents: [] });
+  vi.mocked(getFilingFees).mockResolvedValue(paidFees(draft));
+  vi.mocked(submitFiling).mockResolvedValue({ ...draft, status: 'submitted', submission_count: 1 });
+  openWizard('/filing/new?filing_id=7');
+  await screen.findByRole('heading', { name: 'Upload Documents' });
+
+  fireEvent.click(button('Review Filing'));
+
+  await screen.findByRole('heading', { name: 'Review Your Filing' });
+  const submit = await screen.findByRole('button', { name: 'Submit Filing' }) as HTMLButtonElement;
+  await waitFor(() => expect(submit.disabled).toBe(false));
+
+  fireEvent.click(submit);
+
+  expect(await screen.findByRole('heading', { name: 'Filing Submitted Successfully' })).toBeTruthy();
+  expect(submitFiling).toHaveBeenCalledTimes(1);
+  const [filingId, token, idempotencyKey] = vi.mocked(submitFiling).mock.calls[0];
+  expect([filingId, token]).toEqual([7, 's-7']);
+  expect(idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
+  expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+});
+
+it('does not submit a filing that fails validation', async () => {
+  const draft = savedFiling({ documents: [complaint] });
+  vi.mocked(getFiling).mockResolvedValue(draft);
+  vi.mocked(getFilingRequirements).mockResolvedValue([]);
+  vi.mocked(validateFiling).mockResolvedValue({
+    is_valid: false, errors: ['A summons is required.'], warnings: [], missing_required_documents: ['Summons'],
+  });
+  vi.mocked(getFilingFees).mockResolvedValue(paidFees(draft));
+  openWizard('/filing/new?filing_id=7');
+  fireEvent.click(await screen.findByRole('button', { name: 'Review Filing' }));
+
+  expect(await screen.findByText('A summons is required.')).toBeTruthy();
+  await screen.findByText('No additional payment is required for the current filing.');
+  expect(button('Submit Filing').disabled).toBe(true);
+  expect(submitFiling).not.toHaveBeenCalled();
+});
+
+it('shows a saved filing that fails to load inline and loads it again on retry', async () => {
+  vi.mocked(getFiling).mockRejectedValueOnce(new Error('Network Error')).mockResolvedValue(savedFiling());
+  openWizard('/filing/new?filing_id=7&step=details');
+
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain('Could not load this filing. Please retry.');
+
+  fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
+
+  await waitFor(() => expect(caption().value).toBe('Doe v. Roe'));
+  expect(getFiling).toHaveBeenCalledTimes(2);
 });
