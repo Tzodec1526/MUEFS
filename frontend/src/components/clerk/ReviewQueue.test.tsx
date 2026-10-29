@@ -195,3 +195,170 @@ it('answers an agent filter submission with the same result as get_clerk_review_
   // Human submissions are never answered as the agent's.
   expect(submitFilters(false)).toEqual([]);
 });
+
+function serveQueuePage(ids: number[], total: number) {
+  vi.mocked(getClerkQueue).mockResolvedValue({
+    filings: ids.map(summary), total, submitted_count: total, under_review_count: 0,
+    waiting_48h: 0, oldest_submitted_at: null, as_of: '2026-09-28T13:00:00Z',
+  });
+}
+
+const queueOptions = () => vi.mocked(getClerkQueue).mock.lastCall?.[1];
+
+it('loads the queue for the working court with the default filters', async () => {
+  serveQueues([11, 12]);
+  openQueue();
+
+  await screen.findByText('Case 12');
+  expect(vi.mocked(getClerkQueue).mock.lastCall?.[0]).toBe(3);
+  expect(queueOptions()).toMatchObject({ status: 'all', search: '', waiting_48h_only: false, page: 1 });
+});
+
+it('applies the submitted status, search and waiting filters', async () => {
+  serveQueues([11, 12], [12]);
+  openQueue();
+  await screen.findByText('Case 11');
+
+  fireEvent.change(screen.getByLabelText('Filter'), { target: { value: 'under_review' } });
+  fireEvent.change(screen.getByLabelText('Case title, case number or #filing number'), { target: { value: ' Case 12 ' } });
+  fireEvent.click(screen.getByLabelText('Waiting at least 48 hours'));
+  fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
+
+  await waitFor(() => expect(screen.queryByText('Case 11')).toBeNull());
+  expect(screen.getByText('Case 12')).toBeTruthy();
+  expect(queueOptions()).toMatchObject({ status: 'under_review', search: 'Case 12', waiting_48h_only: true, page: 1 });
+  expect(screen.getByRole('button', { name: 'Refresh' })).toBeTruthy();
+});
+
+it('loads the queue again when unchanged filters are submitted', async () => {
+  serveQueues([11]);
+  openQueue();
+  await screen.findByText('Case 11');
+  expect(getClerkQueue).toHaveBeenCalledTimes(1);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+
+  await waitFor(() => expect(getClerkQueue).toHaveBeenCalledTimes(2));
+  expect(queueOptions()).toMatchObject({ status: 'all', search: '', waiting_48h_only: false, page: 1 });
+});
+
+it('pages through a queue longer than one page', async () => {
+  serveQueuePage([11, 12], 30);
+  openQueue();
+  await screen.findByText('Case 11');
+  expect(screen.getByText('Page 1 of 2')).toBeTruthy();
+  expect((screen.getByRole('button', { name: 'Previous' }) as HTMLButtonElement).disabled).toBe(true);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+  await screen.findByText('Page 2 of 2');
+  expect(queueOptions()).toMatchObject({ page: 2 });
+  await waitFor(() => expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(true));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+
+  await screen.findByText('Page 1 of 2');
+  expect(queueOptions()).toMatchObject({ page: 1 });
+});
+
+it('shows no pagination when the queue fits on one page', async () => {
+  serveQueuePage([11, 12], 2);
+  openQueue();
+  await screen.findByText('Case 11');
+
+  expect(screen.queryByRole('button', { name: 'Next' })).toBeNull();
+  expect(screen.queryByText(/^Page \d+ of \d+$/)).toBeNull();
+});
+
+it('opens a filing for review and closes the review back to its row', async () => {
+  serveQueues([11, 12]);
+  openQueue();
+  await openReview(12);
+
+  expect(vi.mocked(getFiling).mock.lastCall?.[0]).toBe(12);
+  expect(screen.getByRole('heading', { name: 'Review Actions' })).toBeTruthy();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Close review' }));
+
+  expect(screen.queryByRole('heading', { name: 'Filing #12' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull();
+  expect(document.activeElement).toBe(row(12));
+});
+
+it('requires a reason before a filing can be returned or rejected', async () => {
+  serveQueues([11]);
+  openQueue();
+  await openReview(11);
+
+  const returnButton = screen.getByRole('button', { name: 'Return for Correction' }) as HTMLButtonElement;
+  const rejectButton = screen.getByRole('button', { name: 'Reject' }) as HTMLButtonElement;
+  expect(returnButton.disabled).toBe(true);
+  expect(rejectButton.disabled).toBe(true);
+  expect((screen.getByRole('button', { name: 'Accept' }) as HTMLButtonElement).disabled).toBe(false);
+
+  fireEvent.change(screen.getByLabelText('Review reason'), { target: { value: 'Wrong court' } });
+
+  expect(returnButton.disabled).toBe(false);
+  expect(rejectButton.disabled).toBe(false);
+});
+
+it('sends a typed reason with a return', async () => {
+  serveQueues([11], []);
+  vi.mocked(reviewFiling).mockResolvedValue(envelope(11));
+  openQueue();
+  await openReview(11);
+  fireEvent.change(screen.getByLabelText('Review reason'), { target: { value: 'Caption is incomplete' } });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Return for Correction' }));
+
+  await waitFor(() => expect(reviewFiling).toHaveBeenCalledTimes(1));
+  expect(reviewFiling).toHaveBeenCalledWith(expect.objectContaining({ id: 11, submission_token: 's-11' }),
+    'return', 'Caption is incomplete');
+});
+
+it('does not reject a filing when the clerk cancels the confirmation', async () => {
+  serveQueues([11]);
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  openQueue();
+  await openReview(11);
+  fireEvent.change(screen.getByLabelText('Review reason'), { target: { value: 'Wrong court' } });
+
+  fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
+
+  expect(confirm).toHaveBeenCalledTimes(1);
+  expect(reviewFiling).not.toHaveBeenCalled();
+  expect(screen.getByRole('heading', { name: 'Filing #11' })).toBeTruthy();
+  confirm.mockRestore();
+});
+
+it('shows a failed queue load inline and loads it again on retry', async () => {
+  vi.mocked(getClerkQueue).mockRejectedValueOnce(new Error('Network Error'));
+  openQueue();
+
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain("We couldn't load the review queue. Please retry.");
+  expect(screen.queryByText('No filings match these filters in this court.')).toBeNull();
+  serveQueues([11]);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+  await screen.findByText('Case 11');
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
+it('shows a filing that fails to open inline in the review panel', async () => {
+  serveQueues([11]);
+  vi.mocked(getFiling).mockRejectedValueOnce({ response: { status: 404, data: { detail: 'Filing not found' } } })
+    .mockResolvedValueOnce(envelope(11));
+  openQueue();
+  fireEvent.click(await screen.findByText('Case 11'));
+
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain('Filing not found');
+  expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+  await screen.findByRole('button', { name: 'Accept' });
+  expect(getFiling).toHaveBeenCalledTimes(2);
+});
