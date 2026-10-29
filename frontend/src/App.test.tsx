@@ -211,3 +211,28 @@ it('shows that platform statistics did not load instead of hiding them, and load
   expect(await screen.findByText('Public cases indexed')).toBeTruthy();
   expect(screen.queryByRole('alert')).toBeNull();
 });
+
+it('states the number of e-filing courts the platform reports', async () => {
+  serve('public', { '/public/stats': stats });
+  openApp('/', 'public');
+
+  const card = (await screen.findByText('Courts accepting e-filing')).closest<HTMLElement>('.platform-stat-card')!;
+  expect(within(card).getByText('255')).toBeTruthy();
+  expect(screen.queryByText(/All Michigan courts/i)).toBeNull();
+});
+
+it.each([
+  ['/login', 'attorney', {}],
+  ['/', 'attorney', { '/filings/summary': { draft: 0, returned: 0 } }],
+  ['/', 'clerk', {
+    '/auth/me': { id: 2, user_type: 'clerk', court_assignments: [{ court_id: 3, role: 'clerk', court_name: 'Third Circuit Court' }] },
+    '/clerk/queue': { filings: [], total: 0, page: 1, page_size: 1 },
+  }],
+])('claims no statewide court coverage at %s for a %s', async (entry, role, answers) => {
+  serve(role, { '/public/stats': stats, ...answers });
+  localStorage.setItem('demo_role', role);
+  render(<ToastProvider><MemoryRouter initialEntries={[entry]}><App /></MemoryRouter></ToastProvider>);
+
+  await screen.findByText(entry === '/login' ? 'Attorney' : 'Courts accepting e-filing');
+  expect(document.body.textContent).not.toMatch(/(all|any) Michigan courts?/i);
+});

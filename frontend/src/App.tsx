@@ -89,7 +89,7 @@ function FilerDashboard() {
     <div className="dashboard">
       <div className="dashboard-welcome">
         <h2>Your filings</h2>
-        <p>File court documents electronically with any Michigan court.</p>
+        <p>File court documents electronically.</p>
       </div>
 
       {countsError && <LoadError failure={countsError} onRetry={() => setCountsAttempt(n => n + 1)} />}
@@ -113,7 +113,7 @@ function FilerDashboard() {
         <div className="card card-primary">
           <div className="card-icon"><FilePlus2 size={22} aria-hidden="true" /></div>
           <h3>New Filing</h3>
-          <p>File a new document with any Michigan court.</p>
+          <p>Start a new case or file in an existing one.</p>
           <Link to="/filing/new" className="btn btn-primary">Start Filing</Link>
         </div>
         <div className="card">
@@ -125,7 +125,7 @@ function FilerDashboard() {
         <div className="card">
           <div className="card-icon"><Search size={22} aria-hidden="true" /></div>
           <h3>Case Search</h3>
-          <p>Search cases across all Michigan courts.</p>
+          <p>Search court case records.</p>
           <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>
         </div>
       </div>
@@ -199,7 +199,7 @@ function ClerkDashboard() {
         <div className="card">
           <div className="card-icon"><Search size={22} aria-hidden="true" /></div>
           <h3>Case Search</h3>
-          <p>Search cases across all Michigan courts.</p>
+          <p>Search court case records.</p>
           <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>
         </div>
       </div>

@@ -57,8 +57,8 @@ function PlatformStats() {
       <div className="platform-stats-grid">
         <StatCard
           icon={<Building2 size={22} />}
-          label="Courts"
-          value="All Michigan courts"
+          label="Courts accepting e-filing"
+          value={stats.courts_efiling_enabled}
         />
         <StatCard
           icon={<FolderSearch size={22} />}

@@ -38,7 +38,7 @@ const roles: RoleOption[] = [
   {
     role: 'attorney',
     label: 'Attorney',
-    description: 'File on behalf of clients across all Michigan courts',
+    description: 'File and track cases on behalf of clients',
     icon: Scale,
   },
   {
