@@ -259,6 +259,32 @@ it('walks a new case through each step, refusing to advance past an unfinished o
   expect([stepButton('Documents').disabled, stepButton('Review & Submit').disabled]).toEqual([true, true]);
 });
 
+it('clears a step error as soon as the filer fixes the field it names', async () => {
+  serveCourtsAndTypes();
+  openWizard('/filing/new');
+
+  fireEvent.click(button('Continue'));
+  await stepError('Please select a court to continue.');
+  fireEvent.click(await screen.findByRole('button', { name: 'Third Circuit Court' }));
+  expect(screen.queryByRole('alert')).toBeNull();
+
+  fireEvent.click(button('Continue'));
+  await screen.findByRole('heading', { name: 'Existing case or new case?' });
+  fireEvent.click(button('Continue'));
+  await stepError('Please choose an existing case or start a new case.');
+  fireEvent.click(screen.getByRole('button', { name: /Start a new case/ }));
+  expect(screen.queryByRole('alert')).toBeNull();
+
+  fireEvent.click(button('Continue'));
+  fireEvent.click(await screen.findByRole('button', { name: /General Civil/ }));
+  fireEvent.click(button('Continue'));
+  await screen.findByRole('heading', { name: 'Case Details' });
+  fireEvent.click(button('Continue'));
+  await stepError('Please enter a case title to continue.');
+  fireEvent.change(caption(), { target: { value: 'Doe v. Roe' } });
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
 it('returns to a completed step from the progress bar, and back one step with Back', async () => {
   serveCourtsAndTypes();
   openWizard('/filing/new?court_id=3');

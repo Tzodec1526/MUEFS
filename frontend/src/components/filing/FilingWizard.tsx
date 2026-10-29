@@ -232,6 +232,7 @@ function FilingForm({ userId }: { userId: number }) {
 
   const updateData = (updates: Partial<FilingData>) => {
     setSaveNotice('');
+    setErrors([]);
     setFilingData((prev) => ({ ...prev, ...updates }));
   };
 
