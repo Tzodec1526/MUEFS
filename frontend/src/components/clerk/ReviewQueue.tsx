@@ -6,13 +6,9 @@ import LoadError from '../common/LoadError';
 import DocumentDownload from '../common/DocumentDownload';
 import { formatBytes, getDocumentLabel, parseServerDate } from '../../utils/format';
 import { getErrorDetail } from '../../utils/errors';
-import { trackAgentSubmission, type AgentSubmission } from '../../webmcp/declarative';
-import { apiErrorResult, toolError } from '../../webmcp/output';
-import { clerkQueueResult } from '../../webmcp/records';
 
 const ACTION_UNCONFIRMED = 'the request did not complete. Refresh the queue to check its current status before trying again.';
 const BATCH_UNCONFIRMED = 'Could not accept the selected filings. Refresh the queue to check their current status before trying again.';
-const REPLACED = toolError('A newer queue search replaced this one before it finished.', 'cancelled');
 
 const sameFilters = (a: ClerkQueueFilters, b: ClerkQueueFilters) =>
   (a.status || 'all') === (b.status || 'all') && (a.search || '') === (b.search || '')
@@ -49,8 +45,6 @@ function ReviewQueue() {
   const focusAfterRefresh = useRef<{ index: number; queue: ClerkQueue | null } | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [queueError, setQueueError] = useState<string | null>(null);
-  // An agent's submission of the filter form, answered by the load of the filters it chose.
-  const agentSubmission = useRef<{ filters: ClerkQueueFilters; report: AgentSubmission } | null>(null);
 
   const fetchQueue = useCallback(async () => {
     requestRef.current?.abort();
@@ -66,23 +60,12 @@ function ReviewQueue() {
         return;
       }
       setQueue(result);
-      const pending = agentSubmission.current;
-      if (pending && sameFilters(pending.filters, filters)) {
-        agentSubmission.current = null;
-        // What the imperative get_clerk_review_queue tool returns for the same filters.
-        pending.report(true, clerkQueueResult(courtId, filters.status || 'all', result));
-      }
       setSelectedSubmissions(previous => new Map(result.filings
         .filter(filing => previous.get(filing.id) === filing.submission_count)
         .map(filing => [filing.id, filing.submission_count])));
-    } catch (err) {
+    } catch {
       if (controller.signal.aborted) return;
       setQueueError("We couldn't load the review queue. Please retry.");
-      const pending = agentSubmission.current;
-      if (pending && sameFilters(pending.filters, filters)) {
-        agentSubmission.current = null;
-        pending.report(false, apiErrorResult(err) ?? toolError('The review queue could not be loaded.', 'unavailable'));
-      }
       setQueue(null);
       setSelectedSubmissions(new Map());
     } finally {
@@ -97,11 +80,6 @@ function ReviewQueue() {
   }, [fetchQueue]);
 
   useEffect(() => () => reviewRequestRef.current?.abort(), []);
-  // An agent submission still waiting when the page closes gets an answer too.
-  useEffect(() => () => {
-    agentSubmission.current?.report(false, REPLACED);
-    agentSubmission.current = null;
-  }, []);
   useEffect(() => {
     if (review?.filing || review?.error) reviewHeading.current?.focus();
   }, [review]);
@@ -261,22 +239,15 @@ function ReviewQueue() {
 
       <div className="queue-controls">
         <form
-          className="queue-webmcp-filter"
-          toolname="review_queue_form"
-          tooldescription="Search received filings by case title, case number or #filing number, with status and elapsed-time filters"
+          className="queue-filter"
           onSubmit={(e) => {
             e.preventDefault();
-            // The submitted fields, which an agent may have filled, not state from the last render.
             const fields = new FormData(e.currentTarget);
             const submitted: ClerkQueueFilters = {
               status: String(fields.get('status') ?? 'all'),
               search: String(fields.get('search') ?? '').trim(),
               waiting_48h_only: fields.get('waiting_48h_only') !== null,
             };
-            // Null for a human submission, which also replaces a pending agent one.
-            const report = trackAgentSubmission(e, 'review_queue_form', { ...submitted });
-            agentSubmission.current?.report(false, REPLACED);
-            agentSubmission.current = report && { filters: submitted, report };
             if (!sameFilters(submitted, filters)) {
               setLoading(true);
               setFilters(submitted);
@@ -292,7 +263,6 @@ function ReviewQueue() {
             <select
               id="statusFilter"
               name="status"
-              toolparamdescription="Queue status filter: all, submitted, or under_review"
               value={filterDraft.status}
               onChange={(e) => setFilterDraft(previous => ({ ...previous, status: e.target.value }))}
               disabled={actionInProgress}

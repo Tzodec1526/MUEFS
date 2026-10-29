@@ -13,7 +13,7 @@ Demo login lets a visitor pick Attorney, Court Clerk, Self-Represented Litigant,
 
 ## How to get to it (user POV)
 
-- Open `/login` (unauthenticated routes redirect here except `/cases/*` and `/agent`).
+- Open `/login` (unauthenticated routes redirect here except `/cases/*`).
 - Open `/login?role=attorney` (or `clerk`, `srl`, `public`, `admin`) — applies the role and navigates.
 - Choose `Sign In` on the Attorney, Court Clerk, Self-Represented Litigant or System Administrator card (accessible names `Sign in as Attorney` and so on); choose `Browse records` on Public docket.
 - Choose `Switch Role` in the header when already signed in.
@@ -37,6 +37,6 @@ Preconditions:
 ## Gotchas
 
 - Four cards show a button labelled `Sign In`; their accessible names differ (`Sign in as Attorney`). A partial `--name "Sign In"` matches all four, so use the full name with `--exact`, `/login?role=…`, or the Public `Browse records` button.
-- `/cases/search` and `/agent` are reachable without a role. That is not a failed login.
+- `/cases/search` is reachable without a role. That is not a failed login.
 - Clerk also stores `demo_court_id=3` (the 3rd Circuit Court). Switching role clears it.
 - Production sign-in (`Sign in with your court account`) is not part of the demo proof.

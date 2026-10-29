@@ -34,13 +34,12 @@ const CaseSearch = lazy(() => import('./components/search/CaseSearch'));
 const Favorites = lazy(() => import('./components/search/Favorites'));
 const CaseDetailPage = lazy(() => import('./components/search/CaseDetailPage'));
 const AuthCallback = lazy(() => import('./components/auth/AuthCallback'));
-const WebMcpAgentPage = lazy(() => import('./components/agent/WebMcpAgentPage'));
 
 function RequireRole({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   // Preserve private portal destinations while the visitor signs in.
   const isPublicPath =
-    /^\/cases\/(search|\d+)\/?$/.test(location.pathname) || location.pathname.startsWith('/agent')
+    /^\/cases\/(search|\d+)\/?$/.test(location.pathname)
     || location.pathname.startsWith('/courts/');
   if (!hasSession() && !isPublicPath && location.pathname !== '/login') {
     return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`} replace />;
@@ -220,7 +219,6 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginScreen />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route path="/agent" element={<WebMcpAgentPage />} />
         {/* Authenticated routes */}
         <Route
           path="*"

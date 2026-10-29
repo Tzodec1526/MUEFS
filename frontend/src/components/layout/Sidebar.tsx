@@ -1,24 +1,13 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, FilePlus2, FolderOpen, Search, Star, ClipboardCheck, Bot, Mail, ShieldCheck } from 'lucide-react';
-import { webMcpStatus } from '../../webmcp';
+import { LayoutDashboard, FilePlus2, FolderOpen, Search, Star, ClipboardCheck, Mail, ShieldCheck } from 'lucide-react';
 import { CourtContext } from '../auth/CourtSession';
 
 function Sidebar() {
   const location = useLocation();
   const { court, courts, role } = useContext(CourtContext)!;
   const courtId = court?.court_id;
-  const [webMcpOn, setWebMcpOn] = useState(() => webMcpStatus().available);
-
-  useEffect(() => {
-    const refresh = () => setWebMcpOn(webMcpStatus().available);
-    refresh();
-    window.addEventListener('muefs-webmcp-tools-changed', refresh);
-    return () => window.removeEventListener('muefs-webmcp-tools-changed', refresh);
-  }, []);
-
   const allLinks = [
-    { path: '/agent', label: 'Agent Hub', icon: Bot, roles: ['attorney', 'clerk', 'srl', 'public'], agentOnly: true },
     { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['attorney', 'clerk', 'srl', 'public', 'admin'] },
     { path: '/admin', label: 'People & access', icon: ShieldCheck, roles: ['attorney', 'clerk', 'srl', 'public', 'admin'], adminOnly: true },
     { path: '/filing/new', label: 'New Filing', icon: FilePlus2, roles: ['attorney', 'srl'] },
@@ -36,7 +25,6 @@ function Sidebar() {
   ];
 
   const links = allLinks.filter((link) => {
-    if (link.agentOnly && !webMcpOn) return false;
     if (link.courtAdminOnly && !courts.some(item => item.court_id === courtId && item.role === 'admin')) return false;
     if (link.adminOnly && role !== 'admin' && localStorage.getItem('administration_access') !== 'true') return false;
     if (link.courtOnly) return courtId != null;

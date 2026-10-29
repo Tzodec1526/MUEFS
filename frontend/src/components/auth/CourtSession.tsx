@@ -3,7 +3,7 @@ import { apiClient } from '../../api/client';
 import { getErrorDetail } from '../../utils/errors';
 import LoadError from '../common/LoadError';
 import {
-  applySessionFromProfile, getDemoCourtId, getDemoRole, hasSession, notifyDemoRoleChanged,
+  applySessionFromProfile, getDemoCourtId, getDemoRole, hasSession,
   type CourtAssignment, type SessionProfile,
 } from './LoginScreen';
 
@@ -47,7 +47,6 @@ export function CourtSession({ children }: { children: ReactNode }) {
     if (!courts.some(item => item.court_id === id)) return;
     localStorage.setItem('demo_court_id', String(id));
     setSelectedId(id);
-    notifyDemoRoleChanged();
   }
 
   return <CourtContext.Provider value={{ userId: signedIn ? current?.userId : undefined, role: getDemoRole(), courts, court, loading: signedIn && !current,

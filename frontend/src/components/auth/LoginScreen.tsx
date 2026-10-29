@@ -6,10 +6,9 @@ import { isDemoBuild } from '../../config/demoMode';
 import MichiganMark from '../common/MichiganMark';
 import MifileComparison from '../marketing/MifileComparison';
 import {
-  accessToken, clearSession, keycloakConfigured, notifySessionChanged as notifyDemoRoleChanged,
+  accessToken, clearSession, keycloakConfigured,
   oidcSessionExpected, safeLoginReturnPath, SessionChangedError, startKeycloakLogin,
 } from '../../auth/keycloak';
-export { notifySessionChanged as notifyDemoRoleChanged } from '../../auth/keycloak';
 
 export function getDemoRole(): string | null {
   return localStorage.getItem('demo_role');
@@ -71,7 +70,6 @@ export function applyDemoRole(role: string): void {
   } else {
     localStorage.removeItem('demo_court_id');
   }
-  notifyDemoRoleChanged();
 }
 
 export type CourtAssignment = { court_id: number; role: string; court_name?: string | null };
@@ -105,7 +103,6 @@ export function applySessionFromProfile(profile: SessionProfile): CourtAssignmen
   if (staff) {
     localStorage.setItem('demo_court_id', String(staff.court_id));
   }
-  notifyDemoRoleChanged();
   return staffCourts;
 }
 

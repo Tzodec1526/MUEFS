@@ -35,11 +35,7 @@ export default defineConfig([
       '@eslint-react/static-components': 'off',
       '@eslint-react/unsupported-syntax': 'off',
       '@eslint-react/use-memo': 'off',
-      // eslint-plugin-react's recommended set made these errors; @eslint-react leaves them off
-      // or only warns. The WebMCP declarative attributes are typed in src/vite-env.d.ts.
-      '@eslint-react/dom-no-unknown-property': ['error', {
-        ignore: ['toolname', 'tooldescription', 'toolparamdescription'],
-      }],
+      '@eslint-react/dom-no-unknown-property': 'error',
       '@eslint-react/dom-no-unsafe-target-blank': 'error',
       '@eslint-react/jsx-no-children-prop': 'error',
       '@eslint-react/jsx-no-comment-textnodes': 'error',

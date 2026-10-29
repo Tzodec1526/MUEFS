@@ -45,4 +45,3 @@ Keep implementation details out of the map. Name only user paths, stable handles
 - [Case search](./case-search.md) covers public docket search, empty results, opening a case, and the API second view.
 - [Filing wizard](./filing-wizard.md) covers attorney/SRL new filing, court pick, existing-case (File with Court), and draft recovery.
 - [Clerk review queue](./clerk-queue.md) covers clerk sign-in, queue list, and opening a filing for review (no default accept/reject).
-- [Agent Hub](./agent-hub.md) covers `/agent`, the declarative Smith search, and opening a hit's docket.

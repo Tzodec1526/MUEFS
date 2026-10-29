@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { needsErrorMessage } from '../../api/client';
 import { Link2 } from 'lucide-react';
@@ -9,17 +9,10 @@ import { getDemoRole } from '../auth/LoginScreen';
 import LoadError from '../common/LoadError';
 import { useToast } from '../common/Toast';
 import { formatCourtDate, parseServerDate } from '../../utils/format';
-import { trackAgentSubmission, type AgentSubmission } from '../../webmcp/declarative';
-import { apiErrorResult, toolError } from '../../webmcp/output';
-import { caseSearchResult } from '../../webmcp/records';
 
-/** The search these URL parameters request; an agent's form submission is reported only by it. */
 function searchRequestOf(params: URLSearchParams): string {
   return JSON.stringify(['case', 'party', 'court'].map(name => params.get(name) || ''));
 }
-
-/** The answer to an agent submission whose search never ran to completion. */
-const REPLACED = toolError('A newer search replaced this one before it finished.', 'cancelled');
 
 function CaseSearch() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -48,8 +41,6 @@ function CaseSearch() {
   const [togglingFav, setTogglingFav] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  // An agent-invoked submission of the search form, waiting for the search it requested.
-  const agentSubmission = useRef<{ request: string; report: AgentSubmission } | null>(null);
   const searchRequest = searchRequestOf(searchParams);
 
   useEffect(() => {
@@ -78,19 +69,8 @@ function CaseSearch() {
     loadFavorites();
   }, [showFavorites]);
 
-  // An agent submission still waiting when the page closes gets an answer too.
-  useEffect(() => () => {
-    agentSubmission.current?.report(false, REPLACED);
-    agentSubmission.current = null;
-  }, []);
-
   useEffect(() => {
     const controller = new AbortController();
-    // Any search that starts supersedes a pending agent submission; only the requested one reports it.
-    const pending = agentSubmission.current;
-    agentSubmission.current = null;
-    const reportAgent = pending?.request === searchRequest && page === 1 ? pending.report : null;
-    if (pending && !reportAgent) pending.report(false, REPLACED);
     async function load() {
       setSearching(true);
       setError(null);
@@ -103,7 +83,6 @@ function CaseSearch() {
         setResults([]);
         setTotal(0);
         setSearching(false);
-        reportAgent?.(false, toolError(message, 'invalid'));
         return;
       }
       try {
@@ -116,29 +95,21 @@ function CaseSearch() {
         if (controller.signal.aborted) return;
         setResults(data.cases);
         setTotal(data.total);
-        // What the imperative search_cases tool returns for the same search.
-        reportAgent?.(true, caseSearchResult(data));
-      } catch (err) {
+      } catch {
         if (controller.signal.aborted) return;
         setError("We couldn't reach the records system. Please try again.");
         setResults([]);
         setTotal(0);
-        reportAgent?.(false, apiErrorResult(err) ?? toolError('The search failed.', 'unavailable'));
       } finally {
         if (!controller.signal.aborted) setSearching(false);
       }
     }
     load();
-    return () => {
-      controller.abort();
-      // A newer search, or leaving the page, replaced this one before it settled.
-      reportAgent?.(false, REPLACED);
-    };
-  }, [submittedCaseNumber, submittedPartyName, submittedCourt, invalidCourt, page, reloadKey, searchRequest]);
+    return () => controller.abort();
+  }, [submittedCaseNumber, submittedPartyName, submittedCourt, invalidCourt, page, reloadKey]);
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // The submitted fields, which an agent may have filled, not state from the last render.
     const fields = new FormData(event.currentTarget);
     const field = (name: string) => String(fields.get(name) ?? '').trim();
     const input = { case_number: field('case_number'), party_name: field('party_name'), court_id: field('court_id') };
@@ -148,10 +119,6 @@ function CaseSearch() {
     if (input.court_id) next.set('court', input.court_id);
     const request = searchRequestOf(next);
 
-    // Null for a human submission, which also replaces a pending agent one.
-    const report = trackAgentSubmission(event, 'search_cases_form', input);
-    agentSubmission.current?.report(false, REPLACED);
-    agentSubmission.current = report && { request, report };
     // Every submission starts exactly one search: a changed search or page through the URL,
     // the search already shown on page 1 through reloadKey (the URL alone would not rerun it).
     if (request === searchRequest && page === 1) setReloadKey((key) => key + 1);
@@ -212,8 +179,6 @@ function CaseSearch() {
 
       <form
         className="search-form"
-        toolname="search_cases_form"
-        tooldescription="Search Michigan public court records by party name, case number and court"
         onSubmit={handleSearch}
       >
         <div className="form-row">
@@ -226,7 +191,6 @@ function CaseSearch() {
               value={caseNumber}
               onChange={(e) => setCaseNumber(e.target.value)}
               placeholder="e.g., 2026-000001-CZ"
-              toolparamdescription="Case number (partial match)"
             />
           </div>
           <div className="form-group">
@@ -238,14 +202,12 @@ function CaseSearch() {
               value={partyName}
               onChange={(e) => setPartyName(e.target.value)}
               placeholder="e.g., Smith"
-              toolparamdescription="Party or litigant name"
             />
           </div>
           <div className="form-group">
             <label htmlFor="searchCourt">Court</label>
             <select id="searchCourt" name="court_id" value={courtId}
-              onChange={e => setCourtId(e.target.value)}
-              toolparamdescription="Optional court ID; leave blank to search all courts">
+              onChange={e => setCourtId(e.target.value)}>
               <option value="">All courts</option>
               {courtId && !courts.some(court => String(court.id) === courtId) && (
                 <option value={courtId}>Selected court ({courtId})</option>

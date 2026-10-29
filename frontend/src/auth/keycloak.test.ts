@@ -32,7 +32,6 @@ beforeEach(async () => {
   }
   vi.stubGlobal('window', {
     location: { origin: 'https://filing.example.gov', pathname: '/filings/new', search: '?case=42', hash: '#documents', href: '' },
-    dispatchEvent: vi.fn(),
   });
   vi.stubEnv('VITE_KEYCLOAK_URL', 'https://identity.example.gov');
   vi.stubEnv('VITE_ALLOW_DEMO_MODE', 'false');
@@ -170,8 +169,6 @@ it.each([
   }],
 ])('continues anonymously after another tab %s', async (_, otherTabMarker) => {
   const client = await signIn();
-  const activity = await import('../webmcp/activity');
-  activity.logAgentActivity('search_cases', { party_name: 'Smith' }, true, 12);
   const inFlight = pendingRequest();
   const stale = api.apiClient.get('/filings', { adapter: inFlight.adapter });
   const discarded = expect(stale).rejects.toMatchObject({ code: 'ERR_CANCELED' });
@@ -190,17 +187,6 @@ it.each([
   expect(adapter.mock.calls.some(([sent]) => sent.headers.has('Authorization'))).toBe(false);
   expect(auth.accessToken()).toBeNull();
   expect(client.clearToken).toHaveBeenCalled();
-  expect(activity.getAgentActivity()).toEqual([]);
-});
-
-it("clears the agent activity log when a different account signs in, not when the same one returns", async () => {
-  const activity = await import('../webmcp/activity');
-  await signIn();
-  activity.logAgentActivity('search_cases', { party_name: 'Smith' }, true, 12);
-  await signIn();
-  expect(activity.getAgentActivity()).toHaveLength(1);
-  await signIn('account-b');
-  expect(activity.getAgentActivity()).toEqual([]);
 });
 
 it('stops a mutation when renewal fails and preserves its unsaved filing draft', async () => {

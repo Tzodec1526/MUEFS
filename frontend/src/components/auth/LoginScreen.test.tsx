@@ -19,7 +19,6 @@ describe('identity session boundaries', () => {
       clear: () => { Object.keys(store).forEach(k => delete store[k]); },
     };
     vi.stubGlobal('localStorage', mock);
-    vi.stubGlobal('window', { dispatchEvent: vi.fn() });
     localStorage.clear();
   });
 

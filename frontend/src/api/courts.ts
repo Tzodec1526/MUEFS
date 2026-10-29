@@ -82,20 +82,3 @@ export async function getFilingRequirements(
   return data;
 }
 
-export interface FilingChecklist {
-  id: number;
-  motion_type: string;
-  checklist_items: { items: Array<{ label: string; required: boolean }> };
-  help_text: string | null;
-  mcr_url: string | null;
-}
-
-export async function getFilingChecklists(
-  courtId: number,
-  caseTypeId: number
-): Promise<FilingChecklist[]> {
-  const { data } = await apiClient.get(
-    `/courts/${courtId}/case-types/${caseTypeId}/checklist`
-  );
-  return data;
-}

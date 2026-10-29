@@ -51,6 +51,4 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         )
         if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "private, no-store"
-        if not request.url.path.startswith("/api/"):
-            response.headers["Cross-Origin-Embedder-Policy"] = "credentialless"
         return response

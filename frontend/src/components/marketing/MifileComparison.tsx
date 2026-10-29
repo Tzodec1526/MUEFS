@@ -1,5 +1,4 @@
 import { Check, X, Minus } from 'lucide-react';
-import { catalogForBuild } from '../../webmcp/catalog';
 
 type Cell = 'yes' | 'no' | { partial: string } | string;
 
@@ -43,13 +42,6 @@ const ROWS: Row[] = [
     feature: 'Clerk review tools',
     mifile: { partial: 'Queue tools vary by court' },
     muefs: 'Batch accept, age badges, quick reject reasons',
-  },
-  {
-    feature: 'AI agent tools (WebMCP)',
-    mifile: 'no',
-    // Tools this build can register (demo sign-in tools only exist in demo builds).
-    muefs: `${catalogForBuild().length} tools + /agent`,
-    highlight: true,
   },
   {
     feature: 'Case favorites',

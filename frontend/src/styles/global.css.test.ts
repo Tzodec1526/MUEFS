@@ -5,10 +5,8 @@ const fsModule = 'node:fs';
 const { readFileSync } = await import(/* @vite-ignore */ fsModule);
 const css: string = readFileSync(new URL('./global.css', import.meta.url), 'utf8');
 
-// Everything that can put a class on a page: app sources (not tests), the smoke script, the shell.
 const corpus = Object.values({
   ...import.meta.glob<string>(['../**/*.{ts,tsx}', '!../**/*.test.{ts,tsx}'], { query: '?raw', import: 'default', eager: true }),
-  ...import.meta.glob<string>('../../scripts/*.mjs', { query: '?raw', import: 'default', eager: true }),
   ...import.meta.glob<string>('../../index.html', { query: '?raw', import: 'default', eager: true }),
 }).join('\n');
 

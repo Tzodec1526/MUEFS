@@ -3,14 +3,11 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import ErrorBoundary from './components/common/ErrorBoundary';
-import WebMcpNavigateBridge from './components/agent/WebMcpNavigateBridge';
 import { ToastProvider } from './components/common/Toast';
-import { initMuefsWebMcp } from './webmcp';
 import { handleKeycloakCallback, migrateStoredToken } from './auth/keycloak';
 import './styles/global.css';
 
 migrateStoredToken();
-initMuefsWebMcp();
 
 const root = ReactDOM.createRoot(document.getElementById('root')!);
 function renderApp() {
@@ -19,7 +16,6 @@ function renderApp() {
       <ToastProvider>
         <BrowserRouter>
           <ErrorBoundary>
-            <WebMcpNavigateBridge />
             <App />
           </ErrorBoundary>
         </BrowserRouter>

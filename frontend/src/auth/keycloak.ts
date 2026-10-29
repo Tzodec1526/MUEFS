@@ -1,5 +1,4 @@
 import type Keycloak from 'keycloak-js';
-import { clearAgentActivity } from '../webmcp/activity';
 
 export const SESSION_KEY = 'muefs_auth_session';
 const LOGIN_KEY = 'muefs_login_attempt';
@@ -35,7 +34,6 @@ export function accessToken(): string | null {
 function forgetReplacedSession(): void {
   if (!session || session.key === sessionKey()) return;
   forgetLocalSession();
-  clearAgentActivity();
 }
 
 export function sessionSnapshot(): SessionSnapshot {
@@ -53,10 +51,6 @@ export function keycloakConfigured(): boolean {
 
 export function oidcSessionExpected(): boolean {
   return marker()?.restore === true;
-}
-
-export function notifySessionChanged(): void {
-  window.dispatchEvent(new Event('muefs-demo-role-changed'));
 }
 
 function forgetLocalSession(): void {
@@ -78,9 +72,7 @@ export function clearSession(expected?: SessionSnapshot): boolean {
     || (accessToken() && expected.token !== accessToken()))) return false;
   forgetLocalSession();
   clearProfile();
-  clearAgentActivity();
   localStorage.setItem(SESSION_KEY, JSON.stringify({ generation: crypto.randomUUID(), restore: false }));
-  notifySessionChanged();
   return true;
 }
 
@@ -108,9 +100,10 @@ function initialize(): Promise<Keycloak> {
     let canceled = false;
     initialized = withDeadline((async () => {
       const { default: Client } = await import('keycloak-js');
-      if (!keycloakConfigured()) throw new Error('Court identity sign-in is not configured.');
+      const url = import.meta.env.VITE_KEYCLOAK_URL;
+      if (!url) throw new Error('Court identity sign-in is not configured.');
       const client = new Client({
-        url: import.meta.env.VITE_KEYCLOAK_URL,
+        url,
         realm: import.meta.env.VITE_KEYCLOAK_REALM || 'muefs',
         clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'muefs-frontend',
       });
@@ -173,13 +166,10 @@ export function handleKeycloakCallback(): Promise<string | null> {
     if (attempt.key !== sessionKey() && !sameAccount) { client.clearToken(); throw new SessionChangedError(); }
     if (!sameAccount) {
       clearProfile();
-      // The previous account's agent tool log must not follow the tab into this account.
-      clearAgentActivity();
       localStorage.setItem(SESSION_KEY, JSON.stringify({ generation: crypto.randomUUID(), restore: true, issuer, subject }));
     }
     session = { client, key: sessionKey() };
     login = null;
-    notifySessionChanged();
     return safeLoginReturnPath(attempt.path);
   })().catch(error => {
     if (!(error instanceof SessionChangedError) && typeof attempt?.key === 'string') {

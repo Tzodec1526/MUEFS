@@ -1,11 +1,11 @@
 ---
 name: verify-muefs
-description: Drive the MUEFS demo filing portal (web UI at http://127.0.0.1:3000) the way a user does — launch the SQLite demo stack, doctor the instance, and prove login, public case search, the filing wizard, the clerk review queue, and the Agent Hub. Use when verifying MUEFS UI or API user-facing behavior after a change, or when a proof of the real user path is required.
+description: Drive the MUEFS demo filing portal (web UI at http://127.0.0.1:3000) the way a user does — launch the SQLite demo stack, doctor the instance, and prove login, public case search, the filing wizard, and the clerk review queue. Use when verifying MUEFS UI or API user-facing behavior after a change, or when a proof of the real user path is required.
 ---
 
 # Verify MUEFS
 
-MUEFS is a Michigan e-filing demo. The surface an agent must drive is the **Filing Portal** (React + Vite) at `http://127.0.0.1:3000`, talking to the FastAPI demo API at `http://127.0.0.1:8000`. Secondary surfaces: `/docs` OpenAPI, HTTP `/api/v1/*`, WebMCP tools on `/agent`. Production Docker/Keycloak is out of scope for this skill.
+MUEFS is a Michigan e-filing demo. The surface an agent must drive is the **Filing Portal** (React + Vite) at `http://127.0.0.1:3000`, talking to the FastAPI demo API at `http://127.0.0.1:8000`. Secondary surfaces: `/docs` OpenAPI and HTTP `/api/v1/*`. Production Docker/Keycloak is out of scope for this skill.
 
 Read `features/README.md` before driving, then the matching feature file. A proof that hits one convenient entry point is incomplete when the map lists others.
 

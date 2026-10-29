@@ -6,8 +6,7 @@ MUEFS is an open-source e-filing prototype for Michigan courts. The aim is one p
 filing, court review and public records. [State implementation evaluation](docs/STATE_READINESS.md)
 tracks the evidence for the implementation and the state requirements that remain.
 
-Try the live demo at https://demo.tomcedoz.com. The agent tools are described in
-[docs/WEBMCP.md](docs/WEBMCP.md).
+Try the live demo at https://demo.tomcedoz.com.
 
 ## Why this exists
 
@@ -33,7 +32,6 @@ interface for filing in Michigan's courts.
 | Clerk review tools | Queue tools vary by court | Batch accept, age badges and quick reject reasons |
 | Case participants and access | Depends on the court | Assigned staff record roles and explicit access grants, and changes are kept |
 | Reviewed public copies | Depends on the court | Prepare, check, publish and withdraw a separate PDF; the filed original is kept |
-| AI agent tools (WebMCP) | Not available | 19 tools that change with the user's role (17 without demo sign-in), plus the `/agent` hub |
 | Cost and license | Per-transaction vendor fees | AGPL-3.0 (no license fee) |
 
 Status: this is an open-source demo. Filing, clerk review, public records, self-represented
@@ -268,15 +266,6 @@ npm run build             # Production build
 ```
 
 From the repo root you can also run `npm run dev` (full demo stack), `npm test`, and `npm run lint`.
-
-#### WebMCP
-
-- `/agent` shows the tool catalog, workflows, activity feed and example prompts.
-- Workflows: `attorney_motion_workflow` and `clerk_triage_workflow`.
-- Demo builds have 19 tools (17 without demo sign-in). The tools depend on the role: 14 for
-  the public, 18 for filers and 15 for clerks.
-
-The guide is in [docs/WEBMCP.md](docs/WEBMCP.md).
 
 ## Security and compliance
 

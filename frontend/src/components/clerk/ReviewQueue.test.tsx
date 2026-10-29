@@ -158,44 +158,6 @@ it('returns focus to the open review when an action fails', async () => {
   expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Filing #11' }));
 });
 
-it('names its declarative filter form apart from the imperative queue tool', async () => {
-  serveQueues([11]);
-  const { container } = openQueue();
-  await screen.findByText('Case 11');
-
-  expect(container.querySelector('form[toolname="review_queue_form"]')).not.toBeNull();
-  expect(container.querySelector('form[toolname="get_clerk_review_queue"]')).toBeNull();
-});
-
-/** Submit the filter form as an agent would, with SubmitEvent.respondWith() available. */
-function submitFilters(agentInvoked: boolean) {
-  const form = document.querySelector('form[toolname="review_queue_form"]') as HTMLFormElement;
-  const event = new Event('submit', { bubbles: true, cancelable: true });
-  const answers: Promise<unknown>[] = [];
-  if (agentInvoked) {
-    Object.defineProperty(event, 'agentInvoked', { value: true });
-    Object.defineProperty(event, 'respondWith', { value: (answer: Promise<unknown>) => answers.push(answer) });
-  }
-  fireEvent(form, event);
-  return answers;
-}
-
-it('answers an agent filter submission with the same result as get_clerk_review_queue', async () => {
-  serveQueues([11, 12], [12]);
-  openQueue();
-  await waitFor(() => expect(row(12)).not.toBeNull());
-  // An agent fills the field directly, without input events.
-  (document.getElementById('queueSearch') as HTMLInputElement).value = 'Case 12';
-  const answers = submitFilters(true);
-  expect(answers).toHaveLength(1);
-  const answer = JSON.parse(await answers[0] as string);
-  expect(answer.ok).toBe(true);
-  expect(answer.filings.map((f: { id: number }) => f.id)).toEqual([12]);
-  expect(vi.mocked(getClerkQueue).mock.lastCall?.[1]).toMatchObject({ search: 'Case 12', page: 1 });
-  // Human submissions are never answered as the agent's.
-  expect(submitFilters(false)).toEqual([]);
-});
-
 function serveQueuePage(ids: number[], total: number) {
   vi.mocked(getClerkQueue).mockResolvedValue({
     filings: ids.map(summary), total, submitted_count: total, under_review_count: 0,

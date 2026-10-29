@@ -39,4 +39,4 @@ jobs:
           echo "POST deploy hook (ref=${REF:-latest})"
           curl -fsS -X POST "$URL"
           echo
-          echo "Verify with: cd frontend && npm run smoke:webmcp -- https://demo.tomcedoz.com"
+          echo "Verify with: curl -fsS https://demo.tomcedoz.com/ready"

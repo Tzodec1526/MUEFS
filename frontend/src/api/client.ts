@@ -40,7 +40,7 @@ function expireSession(expected: SessionSnapshot): void {
   if (!clearSession(expected)) return;
   const { pathname, search, hash } = window.location;
   const publicPath = /^\/cases\/(search|\d+)\/?$/.test(pathname)
-    || pathname.startsWith('/courts/') || pathname.startsWith('/agent');
+    || pathname.startsWith('/courts/');
   if (!publicPath && pathname !== '/login' && !pathname.startsWith('/auth/')) {
     window.location.href = `/login?reason=expired&next=${encodeURIComponent(pathname + search + hash)}`;
   }

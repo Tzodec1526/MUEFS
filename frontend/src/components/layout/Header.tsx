@@ -6,7 +6,6 @@ import { signOut } from '../../auth/keycloak';
 import { CourtContext } from '../auth/CourtSession';
 import MichiganMark from '../common/MichiganMark';
 import NotificationBell from './NotificationBell';
-import WebMcpHeaderLink from './WebMcpHeaderLink';
 
 function Header() {
   const navigate = useNavigate();
@@ -51,7 +50,6 @@ function Header() {
         </div>
       </div>
       <nav className="header-nav">
-        <WebMcpHeaderLink />
         {role && <Link to="/">Dashboard</Link>}
         {(role === 'attorney' || role === 'srl') && <Link to="/filing/new">New Filing</Link>}
         <Link to="/cases/search">Case Search</Link>
