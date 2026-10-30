@@ -10,6 +10,7 @@ import PlatformStats from './components/marketing/PlatformStats';
 import MifileComparison from './components/marketing/MifileComparison';
 import { getFilingStatusCounts, getClerkQueue } from './api/filings';
 import { oidcSessionExpected, SESSION_KEY } from './auth/keycloak';
+import { isPublicPath } from './auth/publicPath';
 import LoadError from './components/common/LoadError';
 import { loadFailure, type LoadFailure } from './utils/errors';
 import { usePageTitle } from './utils/pageTitle';
@@ -42,11 +43,7 @@ const AuthCallback = lazy(() => import('./components/auth/AuthCallback'));
 
 function RequireRole({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  // Preserve private portal destinations while the visitor signs in.
-  const isPublicPath =
-    /^\/cases\/(search|\d+)\/?$/.test(location.pathname)
-    || location.pathname.startsWith('/courts/');
-  if (!hasSession() && !isPublicPath && location.pathname !== '/login') {
+  if (!hasSession() && !isPublicPath(location.pathname) && location.pathname !== '/login') {
     return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`} replace />;
   }
   return <>{children}</>;
