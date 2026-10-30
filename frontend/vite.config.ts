@@ -8,6 +8,15 @@ const nodeTests = ['src/styles/global.css.test.ts'];
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [{ name: 'vendor', test: /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/ }],
+        },
+      },
+    },
+  },
   test: {
     projects: [
       {
