@@ -1,7 +1,6 @@
 import { configDefaults, defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
-// The Compose stack runs the API in another container.
 const apiTarget = process.env.API_PROXY_TARGET || 'http://localhost:8000';
 
 const nodeTests = ['src/styles/global.css.test.ts'];
@@ -30,7 +29,6 @@ export default defineConfig({
     ],
   },
   server: {
-    // Listen on this computer only; the container image opts in to other interfaces.
     port: 3000,
     proxy: {
       '/api': {
