@@ -4,7 +4,7 @@ export const FILING_STATUS_LABELS: Record<string, string> = {
 };
 
 const FILING_TYPE_LABELS: Record<string, string> = {
-  initial: 'New case', subsequent: 'Existing case', motion: 'Existing case', service_only: 'Service only',
+  initial: 'New case', subsequent: 'Existing case', motion: 'Motion', service_only: 'Service only',
 };
 
 const FEE_SOURCE_LABELS: Record<string, string> = {
