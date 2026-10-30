@@ -23,7 +23,6 @@ const PLAIN_STEP_LABELS: Record<string, string> = {
   review: 'Check and send',
 };
 
-export function stepLabel(key: string, defaultLabel: string): string {
-  if (!isPlainLanguageMode()) return defaultLabel;
+export function plainStepLabel(key: string, defaultLabel: string): string {
   return PLAIN_STEP_LABELS[key] || defaultLabel;
 }

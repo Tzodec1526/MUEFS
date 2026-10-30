@@ -22,7 +22,7 @@ import {
   hasPlainLanguagePreference,
   isPlainLanguageMode,
   setPlainLanguageMode,
-  stepLabel,
+  plainStepLabel,
 } from '../../utils/srlMode';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
@@ -156,11 +156,11 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
     }));
   }, []);
   const isMotionMode = filingData.filingType !== 'initial';
-  const [plainLanguage, setPlainLanguage] = useState(() => {
-    // Self-represented filers start in plain language, but a filer who turned it off keeps it off.
+  const [plainLanguage, setPlainLanguage] = useState(() =>
+    (role === 'srl' && !hasPlainLanguagePreference()) || isPlainLanguageMode());
+  useEffect(() => {
     if (role === 'srl' && !hasPlainLanguagePreference()) setPlainLanguageMode(true);
-    return isPlainLanguageMode();
-  });
+  }, [role]);
   // Why a case-linked filing has no caption yet: the court's case record did not load.
   const [caseLookupError, setCaseLookupError] = useState<LoadFailure | null>(null);
 
@@ -261,7 +261,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
 
   const steps = buildSteps(filingData.filingType).map((s) => ({
     ...s,
-    label: plainLanguage ? stepLabel(s.key, s.label) : s.label,
+    label: plainLanguage ? plainStepLabel(s.key, s.label) : s.label,
   }));
   const currentStepIndex = steps.findIndex((s) => s.key === currentStep);
   const detailsStepIndex = steps.findIndex((s) => s.key === 'details');
