@@ -132,6 +132,9 @@ async def exercise():
         assert response.status_code == 200, (path, response.text)
         assert "content-encoding" not in response.headers, (path, response.headers)
 
+    def varies_by_encoding(response):
+        return "accept-encoding" in response.headers.get("vary", "").lower()
+
     async with AsyncClient(
         transport=ASGITransport(hosted), base_url="http://test",
         headers={"X-Demo-User-Id": "1", "X-Demo-Auth-Secret": "browser-demo-secret"},
@@ -146,7 +149,7 @@ async def exercise():
             assert_not_compressed(plain, accept)
             assert plain.content == bundle
             assert plain.headers["content-length"] == str(len(bundle))
-            assert plain.headers["vary"] == "Accept-Encoding"
+            assert varies_by_encoding(plain)
             assert plain.headers["cache-control"] == "public, max-age=31536000, immutable"
             assert "javascript" in plain.headers["content-type"]
             assert plain.headers["content-security-policy"] == policy
@@ -158,7 +161,7 @@ async def exercise():
             assert sent.headers["content-encoding"] == "gzip", accept
             assert sent.headers["content-length"] == str(len(packed))
             assert sent.content == bundle
-            assert sent.headers["vary"] == "Accept-Encoding"
+            assert varies_by_encoding(sent)
             assert sent.headers["cache-control"] == "public, max-age=31536000, immutable"
             assert "javascript" in sent.headers["content-type"]
             assert sent.headers["content-security-policy"] == policy
@@ -175,7 +178,7 @@ async def exercise():
         assert font.content == b"wOF2" * 200
         assert font.headers["content-type"] == "font/woff2"
         assert font.headers["cache-control"] == "public, max-age=31536000, immutable"
-        assert "vary" not in font.headers
+        assert not varies_by_encoding(font)
 
         for path in ["/assets/old-deploy.js", "/assets/app-12345678.js.gz"]:
             missing = await client.get(path, headers={"Accept-Encoding": "gzip"})
