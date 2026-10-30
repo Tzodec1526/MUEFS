@@ -1,3 +1,5 @@
+import { CanceledError } from 'axios';
+import { isCurrentSession, sessionSnapshot, type SessionSnapshot } from '../auth/keycloak';
 import { apiClient } from './client';
 
 export interface Court {
@@ -17,9 +19,47 @@ export interface Court {
 
 export type CourtDirectoryEntry = Pick<Court, 'id' | 'name' | 'county'>;
 
-export async function listCourtDirectory(signal?: AbortSignal): Promise<CourtDirectoryEntry[]> {
-  const { data } = await apiClient.get('/courts/directory', { signal });
-  return data;
+interface DirectoryRequest {
+  session: SessionSnapshot;
+  controller: AbortController;
+  callers: number;
+  loaded: boolean;
+  entries: Promise<CourtDirectoryEntry[]>;
+}
+
+let directory: DirectoryRequest | undefined;
+
+function requestDirectory(): DirectoryRequest {
+  directory?.controller.abort();
+  const controller = new AbortController();
+  const session = sessionSnapshot();
+  const request: DirectoryRequest = {
+    session, controller, callers: 0, loaded: false,
+    entries: apiClient.get<CourtDirectoryEntry[]>('/courts/directory', { signal: controller.signal }).then(({ data }) => {
+      request.loaded = true;
+      return data;
+    }),
+  };
+  request.entries.catch(() => { if (directory === request) directory = undefined; });
+  directory = request;
+  return request;
+}
+
+export function listCourtDirectory(signal?: AbortSignal): Promise<CourtDirectoryEntry[]> {
+  if (signal?.aborted) return Promise.reject(new CanceledError());
+  const request = directory && isCurrentSession(directory.session) ? directory : requestDirectory();
+  request.callers += 1;
+  return new Promise((resolve, reject) => {
+    const leave = () => {
+      reject(new CanceledError());
+      request.callers -= 1;
+      if (request.loaded || request.callers > 0) return;
+      request.controller.abort();
+      if (directory === request) directory = undefined;
+    };
+    signal?.addEventListener('abort', leave, { once: true });
+    request.entries.then(resolve, reject).finally(() => signal?.removeEventListener('abort', leave));
+  });
 }
 
 export interface CaseType {
