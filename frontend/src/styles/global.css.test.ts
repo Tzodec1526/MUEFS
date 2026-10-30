@@ -13,7 +13,7 @@ const corpus = Object.values({
 // Classes built at run time: `toast-${tone}`, and badge modifiers
 // that come from API data (`status-badge ${filing.status}`, `age-badge ${age.level}`).
 const DYNAMIC_PREFIXES = ['toast-'];
-const DATA_MODIFIED = new Set(['status-badge', 'age-badge', 'flag-badge', 'req-badge']);
+const DATA_MODIFIED = new Set(['status-badge', 'age-badge', 'flag-badge']);
 // Filing statuses (backend FilingStatus) and case statuses (backend CaseStatus) shown on status badges.
 const BADGE_STATUSES = [
   'draft', 'submitted', 'under_review', 'accepted', 'rejected', 'returned', 'served',

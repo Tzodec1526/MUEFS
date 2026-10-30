@@ -41,6 +41,38 @@ function getRuleUrl(ref: string): string | null {
   return null;
 }
 
+const RULES = 'https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702';
+const COURT_RULE_LINKS = [
+  [`${RULES}/chapter-1-applicability-and-definitions/rule-1109-court-records-defined-documents`, 'MCR 1.109 - E-Filing & Document Standards'],
+  [`${RULES}/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2111-general-rules-of-pleading`, 'MCR 2.111 - General Rules of Pleading'],
+  [`${RULES}/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2116-summary-disposition`, 'MCR 2.116 - Summary Disposition'],
+  [`${RULES}/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2119-motion-practice`, 'MCR 2.119 - Motion Practice'],
+  [`${RULES}/chapter-2-civil-procedure/subchapter-2500-discovery/rule-2506-subpoena-order-to-attend`, 'MCR 2.506 - Subpoenas'],
+  ['http://www.legislature.mi.gov/doc.aspx?mcl-600-2163a', 'MCL 600.2163a - Uniform Interstate Depositions Act'],
+  [RULES, 'Full Michigan Court Rules'],
+];
+
+function RequirementList({ requirements }: { requirements: FilingRequirement[] }) {
+  return (
+    <ul className="requirement-list">
+      {requirements.map((req) => {
+        const url = req.mcr_reference && getRuleUrl(req.mcr_reference);
+        return (
+          <li key={req.id}>
+            {req.description}
+            {req.mcr_reference && <> ({url
+              ? <a href={url} target="_blank" rel="noopener noreferrer">{req.mcr_reference}</a>
+              : req.mcr_reference})</>}
+            {req.page_limit && <p className="req-detail">Page limit: {req.page_limit} pages</p>}
+            {req.format_notes && <p className="req-detail">{req.format_notes}</p>}
+            {req.local_rule_reference && <p className="req-detail">Local Rule: {req.local_rule_reference}</p>}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 interface Props {
   courtId: number;
   selectedCaseTypeId: number | null;
@@ -103,11 +135,7 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
 
   const filtered = caseTypes.filter(ct => {
     if (categoryFilter && ct.category !== categoryFilter) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return ct.name.toLowerCase().includes(q) || ct.code.toLowerCase().includes(q);
-    }
-    return true;
+    return !searchQuery || ct.name.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   const requiredDocs = requirements.filter(r => r.is_required);
@@ -151,34 +179,27 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
       {loading && <p>Loading case types…</p>}
       {error && <LoadError failure={error} onRetry={() => setReloadKey((k) => k + 1)} />}
 
-      <div className="case-type-list">
+      <fieldset className="case-type-list">
+        <legend className="sr-only">Case type</legend>
         {filtered.map((ct) => (
-          <div
-            key={ct.id}
-            className={`case-type-card ${selectedCaseTypeId === ct.id ? 'selected' : ''}`}
-            onClick={() => onSelect(ct.id, ct.name)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(ct.id, ct.name); } }}
-            aria-pressed={selectedCaseTypeId === ct.id}
-          >
-            <div className="case-type-header">
-              <h4>{ct.name}</h4>
-              <span className={`case-type-fee ${ct.filing_fee_cents === 0 ? 'fee-free' : ''}`}>
-                {formatFee(ct.filing_fee_cents)}
-              </span>
-            </div>
-            <div className="case-type-meta">
-              <span className="case-type-category">{ct.category}</span>
-              <span className="case-type-code">{ct.code}</span>
-            </div>
-            {ct.description && <p className="case-type-desc">{ct.description}</p>}
-          </div>
+          <label key={ct.id} className={`case-type-option ${selectedCaseTypeId === ct.id ? 'selected' : ''}`}>
+            <input
+              type="radio"
+              name="caseType"
+              checked={selectedCaseTypeId === ct.id}
+              onChange={() => onSelect(ct.id, ct.name)}
+            />
+            <span>{ct.name}</span>
+            <span className={`case-type-fee ${ct.filing_fee_cents === 0 ? 'fee-free' : ''}`}>
+              {formatFee(ct.filing_fee_cents)}
+            </span>
+            {ct.description && <span className="case-type-desc">{ct.description}</span>}
+          </label>
         ))}
-        {!loading && !error && filtered.length === 0 && (
-          <p className="no-results">No case types match your filters.</p>
-        )}
-      </div>
+      </fieldset>
+      {!loading && !error && filtered.length === 0 && (
+        <p className="no-results">No case types match your filters.</p>
+      )}
 
       {/* Filing Requirements - shown after selecting a case type */}
       {selectedCaseTypeId && !currentRequirements && <p role="status">Loading filing requirements…</p>}
@@ -192,98 +213,21 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
             clerk to return your filing for correction.
           </p>
 
-          {requiredDocs.length > 0 && (
-            <div className="requirements-group">
-              <h5 className="req-group-header req-required">Required documents ({requiredDocs.length})</h5>
-              <div className="requirements-cards">
-                {requiredDocs.map((req) => (
-                  <div key={req.id} className="requirement-card required">
-                    <div className="req-card-header">
-                      <span className="req-badge required">Required</span>
-                      {req.mcr_reference && (() => {
-                        const url = getRuleUrl(req.mcr_reference);
-                        return url ? (
-                          <a href={url} target="_blank" rel="noopener noreferrer" className="mcr-ref mcr-link">
-                            {req.mcr_reference}
-                          </a>
-                        ) : (
-                          <span className="mcr-ref">{req.mcr_reference}</span>
-                        );
-                      })()}
-                    </div>
-                    <h5>{req.description}</h5>
-                    <code className="req-code">{req.document_type_code}</code>
-                    {req.page_limit && (
-                      <p className="req-detail">Page limit: {req.page_limit} pages</p>
-                    )}
-                    {req.format_notes && (
-                      <p className="req-detail">{req.format_notes}</p>
-                    )}
-                    {req.local_rule_reference && (
-                      <p className="req-detail">Local Rule: {req.local_rule_reference}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {requiredDocs.length > 0 && <>
+            <h5>Required documents ({requiredDocs.length})</h5>
+            <RequirementList requirements={requiredDocs} />
+          </>}
+          {optionalDocs.length > 0 && <>
+            <h5>Optional documents ({optionalDocs.length})</h5>
+            <RequirementList requirements={optionalDocs} />
+          </>}
 
-          {optionalDocs.length > 0 && (
-            <div className="requirements-group">
-              <h5 className="req-group-header req-optional">Optional documents ({optionalDocs.length})</h5>
-              <div className="requirements-cards">
-                {optionalDocs.map((req) => (
-                  <div key={req.id} className="requirement-card optional">
-                    <div className="req-card-header">
-                      <span className="req-badge optional">Optional</span>
-                      {req.mcr_reference && (() => {
-                        const url = getRuleUrl(req.mcr_reference);
-                        return url ? (
-                          <a href={url} target="_blank" rel="noopener noreferrer" className="mcr-ref mcr-link">
-                            {req.mcr_reference}
-                          </a>
-                        ) : (
-                          <span className="mcr-ref">{req.mcr_reference}</span>
-                        );
-                      })()}
-                    </div>
-                    <h5>{req.description}</h5>
-                    <code className="req-code">{req.document_type_code}</code>
-                    {req.format_notes && (
-                      <p className="req-detail">{req.format_notes}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {/* Court Rules Quick Reference */}
-          <div className="court-rules-reference">
-            <h5>Michigan Court Rules - Quick Reference</h5>
-            <div className="rules-links">
-              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-1-applicability-and-definitions/rule-1109-court-records-defined-documents" target="_blank" rel="noopener noreferrer">
-                MCR 1.109 - E-Filing & Document Standards
-              </a>
-              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2111-general-rules-of-pleading" target="_blank" rel="noopener noreferrer">
-                MCR 2.111 - General Rules of Pleading
-              </a>
-              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2116-summary-disposition" target="_blank" rel="noopener noreferrer">
-                MCR 2.116 - Summary Disposition
-              </a>
-              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2119-motion-practice" target="_blank" rel="noopener noreferrer">
-                MCR 2.119 - Motion Practice
-              </a>
-              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2500-discovery/rule-2506-subpoena-order-to-attend" target="_blank" rel="noopener noreferrer">
-                MCR 2.506 - Subpoenas
-              </a>
-              <a href="http://www.legislature.mi.gov/doc.aspx?mcl-600-2163a" target="_blank" rel="noopener noreferrer">
-                MCL 600.2163a - Uniform Interstate Depositions Act
-              </a>
-              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702" target="_blank" rel="noopener noreferrer">
-                Full Michigan Court Rules
-              </a>
-            </div>
-          </div>
+          <h5>Michigan Court Rules</h5>
+          <ul className="requirement-list">
+            {COURT_RULE_LINKS.map(([href, label]) => (
+              <li key={href}><a href={href} target="_blank" rel="noopener noreferrer">{label}</a></li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

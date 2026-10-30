@@ -280,7 +280,7 @@ function serveCourtsAndTypes() {
 async function chooseNewCaseAndType() {
   fireEvent.click(await screen.findByRole('button', { name: /Start a new case/ }));
   fireEvent.click(button('Continue'));
-  fireEvent.click(await screen.findByRole('button', { name: /General Civil/ }));
+  fireEvent.click(await screen.findByRole('radio', { name: /General Civil/ }));
   fireEvent.click(button('Continue'));
   await screen.findByRole('heading', { name: 'Case Details' });
 }
@@ -310,7 +310,7 @@ it('walks a new case through each step, refusing to advance past an unfinished o
   fireEvent.click(button('Continue'));
   await stepError('Please select a case type to continue.');
 
-  fireEvent.click(await screen.findByRole('button', { name: /General Civil/ }));
+  fireEvent.click(await screen.findByRole('radio', { name: /General Civil/ }));
   fireEvent.click(button('Continue'));
   await screen.findByRole('heading', { name: 'Case Details' });
   fireEvent.click(button('Continue'));
@@ -336,7 +336,7 @@ it('clears a step error as soon as the filer fixes the field it names', async ()
   expect(screen.queryByRole('alert')).toBeNull();
 
   fireEvent.click(button('Continue'));
-  fireEvent.click(await screen.findByRole('button', { name: /General Civil/ }));
+  fireEvent.click(await screen.findByRole('radio', { name: /General Civil/ }));
   fireEvent.click(button('Continue'));
   await screen.findByRole('heading', { name: 'Case Details' });
   fireEvent.click(button('Continue'));
