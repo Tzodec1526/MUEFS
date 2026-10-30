@@ -19,7 +19,7 @@ establish state approval or production readiness.
 | Screen incoming documents | Every upload uses the shared inspected path. Enabled ClamAV scanning requires a complete verdict within one deadline; failures/cancellation cannot store a document. Production startup, private scanner networking, explicit limits and a guard against oversized compressed members are implemented and tested against ClamAV 1.4.6. | Court-approved file/complexity policy, current signature operations, legacy-document review, representative load and independent security validation. A clean verdict does not certify a document safe. |
 | Protect private material | Private envelopes and receipts require filer or court-staff access. Dockets exclude waiver application data, confidential document metadata, superseded documents and other filers' drafts. Fee-waiver documents are nonpublic even if the filer omits the checkbox. | Full classification/retention policy for every case and document type; independent security assessment. |
 | Control case participation and access | Assigned staff record participants, counsel representation and explicit restricted-case grants with retained reasons, before/after history, stale-edit checks and revocation. Filing acceptance no longer assigns party roles or grants case access. | Court-approved access rules, review of legacy records, CMS appearance/withdrawal synchronization, limited-scope representation and service enrollment. |
-| Record the correct legal filing date | Receipt instants and filing dates are separate. Published calendars establish business dates. Assigned staff can record a signed order establishing a different date, with retained before/after evidence and explicit case opening date changes. Acceptance honors the order without rewriting the receipt. | Court verification of calendars and signed orders, motion/adjudication procedures, downstream CMS synchronization and review of closures published after acceptance. Correcting a document does not automatically preserve its legal filing date. |
+| Record the correct legal filing date | Receipt instants and filing dates are separate. Published calendars establish business dates. Assigned staff can record a signed order establishing a different date, with retained before/after evidence and explicit case opening date changes. Acceptance honors the order without rewriting the receipt. A correction keeps the filing date, and an order stays on the filing. | Court verification of calendars and signed orders, motion/adjudication procedures, downstream CMS synchronization and review of closures published after acceptance. |
 | Resolve fee waivers correctly | A completed application accompanies the filing. Clerk waivers, referral and judicial decisions are separate court-scoped actions. Signed decision PDFs and denial amounts remain in private history; a filer can pay after denial without resubmitting. | Actual notice delivery, de novo review and judicial assignment, deadline calculation, case-wide continuation and reinstatement, court verification of signed forms and prisoner-specific procedures. |
 | Establish fees and account for payments | Assigned staff record itemized assessments. Separately assigned court administrators can credit verified external receipts, reverse erroneous credits and retain the source evidence. Balances preserve partial payments and expose overpayments after reassessment. A private court receipt register provides period totals, recorded activity and bounded CSV exports. | Court validation of assessments and source receipts, independent reconciliation and correction review, a hosted payment processor, signed webhooks, refunds and accounting-system mappings. |
 | Deliver electronic service | Staff review service instructions. Senders explicitly select retained subsequent documents and eligible recipients; immutable packages retain contents and addresses. An opt-in SMTP outbox queues protected links, rechecks instructions and records failures/retries. Recipients download only selected, verified bytes and can acknowledge the package. | Court-approved enrollment, consent and confidential-document policy; additional/delegated recipients; bounce feedback and failed-service remedies; non-electronic evidence and certified proof. Relay acceptance and download requests do not establish legally sufficient service. |
@@ -545,8 +545,9 @@ coverage or a timezone change before the next business day produces an unresolve
 The calculation loads the relevant revisions in one query, with no database query per day.
 
 Submission preserves the UTC receipt instant and calendar assessment, including revision
-IDs and skipped dates. A resubmission records its own receipt but keeps the filing date.
-Unless a court order has established the date, acceptance reassesses the first receipt
+IDs and skipped dates. The envelope stores the first receipt in `filed_at`, and `submitted_at`
+holds the latest receipt for the queue. A resubmission records its own receipt but keeps the
+filing date. Unless a court order has established the date, acceptance reassesses the first receipt
 against the published calendar and records a separate event if the assessment changed.
 New cases keep the first receipt instant in `filed_date` and the civil date in `filing_date`;
 neither uses the clerk's acceptance time or a later resubmission. Date-only fields display consistently across viewer timezones. Search and docket
@@ -600,8 +601,8 @@ filing attachments and preserves the ordered date; the CMS acceptance boundary s
 Staff must explicitly select applying the same order to an existing case's opening date.
 The case's original `filed_date` instant stays unchanged. No relationship to a historical
 initiating filing is guessed. Acceptance of a new case uses its envelope's ordered filing
-date. A later corrected submission receives a fresh calendar assessment; the prior order
-stays attached to its original submission attempt and is not silently carried forward.
+date. A later corrected submission keeps that date: the order stays on the filing, and neither
+the resubmission nor acceptance recomputes it.
 
 Filing and case date versions reject stale decisions, including a form opened before
 acceptance creates a case. Account and court authority are checked again after PDF inspection,
