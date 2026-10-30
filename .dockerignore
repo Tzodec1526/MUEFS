@@ -16,5 +16,4 @@ frontend/dist/
 .audit/
 .cursor/
 .claude/
-# Draft MCR extraction work product stays local (see .gitignore).
 backend/app/data/

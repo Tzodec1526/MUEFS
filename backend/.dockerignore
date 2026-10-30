@@ -1,5 +1,3 @@
-# Compose builds this directory directly, so the repository root's .dockerignore does not
-# apply. Keep local environments, data, caches and draft work product out of images.
 .venv*/
 **/__pycache__
 **/*.py[cod]
