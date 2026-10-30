@@ -1,7 +1,7 @@
 import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { apiClient } from '../../api/client';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
-import LoadError from '../common/LoadError';
+import PageLoadError from '../common/PageLoadError';
 import {
   applySessionFromProfile, getDemoCourtId, getDemoRole, hasSession, setDemoCourtId,
   type CourtAssignment, type SessionProfile,
@@ -66,10 +66,23 @@ function CourtAssignmentNeeded({ refresh }: { refresh: () => void }) {
   </div>;
 }
 
+function CourtWorkspaceLoading() {
+  usePageTitle('Loading court workspace');
+  return <>
+    <h1>Loading court workspace</h1>
+    <p role="status">Loading court assignments…</p>
+  </>;
+}
+
+function CourtWorkspaceUnavailable({ failure, onRetry }: { failure: LoadFailure; onRetry: () => void }) {
+  usePageTitle('Court workspace not loaded');
+  return <PageLoadError heading="Court workspace not loaded" failure={failure} onRetry={onRetry} />;
+}
+
 export function CourtWorkspace({ children }: { children: ReactNode }) {
   const { court, loading, error, refresh } = useContext(CourtContext)!;
-  if (loading) return <p role="status">Loading court assignments…</p>;
-  if (error) return <LoadError failure={error} onRetry={refresh} />;
+  if (loading) return <CourtWorkspaceLoading />;
+  if (error) return <CourtWorkspaceUnavailable failure={error} onRetry={refresh} />;
   if (!court) return <CourtAssignmentNeeded refresh={refresh} />;
   // Changing courts discards selections, pagination and pending reads from the prior court.
   return <Fragment key={court.court_id}>{children}</Fragment>;
