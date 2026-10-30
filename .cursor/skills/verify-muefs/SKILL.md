@@ -43,6 +43,8 @@ node .cursor/skills/verify-muefs/helpers/control-muefs.mjs doctor
 
 Pass means: API health JSON is `muefs-api` / `healthy`, the portal HTML identifies MUEFS, and either this run owns the demo PID or attach was explicit. Fail means do not drive.
 
+Doctor does not check the browser. If every `browser` command fails with `Target page, context or browser has been closed`, Chromium died while the helper stayed up. Run `cleanup`, then `launch`.
+
 ## Drive
 
 Use Playwright through `control-muefs browser`, not coordinates. Prefer ARIA roles, accessible names, and `label`/`htmlFor` over CSS. Demo auth is `localStorage.demo_role`; the stable way to set it is `/login?role=attorney|clerk|srl|public|admin` (auto-applies and navigates).
