@@ -288,7 +288,7 @@ async def test_resubmission_and_a_case_date_order_on_the_same_filing_both_finish
         events = (await db.execute(
             select(FilingTransaction.event_type, FilingTransaction.submission_number)
             .where(FilingTransaction.filing_id == fid)
-        )).tuples().all()
+        )).all()
     assert filing.status == FilingStatus.SUBMITTED and filing.submission_count == 2
     assert filing.filing_date == date(2026, 9, 3)
     assert filing.filing_date_version == state["version"] + 2

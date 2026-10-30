@@ -310,11 +310,12 @@ async def inspect_service_packets(
         .order_by(ServicePacket.id).limit(25)
     )).mappings().all():
         ids = [packet["id"] for packet in packets]
-        counts = dict((await connection.execute(
+        counted = await connection.execute(
             select(ServiceRecipient.packet_id, func.count())
             .where(ServiceRecipient.packet_id.in_(ids)).group_by(ServiceRecipient.packet_id)
-        )).tuples().all())
-        eligible = [packet_id for packet_id in ids if 1 <= counts.get(packet_id, 0) <= 100]
+        )
+        counts = {packet_id: count for packet_id, count in counted}
+        eligible =[packet_id for packet_id in ids if 1 <= counts.get(packet_id, 0) <= 100]
         recipients: dict[str, list] = {packet_id: [] for packet_id in ids}
         if eligible:
             rows = (await connection.execute(

@@ -356,7 +356,7 @@ async def get_filing_status_counts(db: AsyncSession, filer_id: int) -> dict[Fili
         .where(FilingEnvelope.filer_id == filer_id)
         .group_by(FilingEnvelope.status)
     )
-    return dict.fromkeys(FilingStatus, 0) | dict(result.tuples().all())
+    return dict.fromkeys(FilingStatus, 0) | {status: count for status, count in result}
 
 
 async def validate_filing(

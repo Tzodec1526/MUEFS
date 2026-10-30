@@ -157,7 +157,7 @@ async def list_filings(
         courts = await db.execute(
             select(Court.id, Court.name).where(Court.id.in_({f.court_id for f in filings}))
         )
-        court_names = dict(courts.tuples().all())
+        court_names = {court_id: name for court_id, name in courts}
     return MyFilingsResponse(
         filings=filings,
         total=total, page=page, page_size=page_size,
