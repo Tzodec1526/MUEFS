@@ -68,7 +68,7 @@ function LoginScreen() {
         Michigan Unified E-Filing System
       </p>
       <PageHeading>Sign in</PageHeading>
-      {demo && <p className="login-demo-note">Demo — not for real filings.</p>}
+      {demo && <p className="login-demo-note">Demo: not for real filings.</p>}
 
       {demo && <ul className="login-roles">
         {roles.map((option) => (

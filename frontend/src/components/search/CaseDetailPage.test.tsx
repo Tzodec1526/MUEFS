@@ -271,6 +271,17 @@ it.each([
   expect(row.firstElementChild?.textContent).toMatch(shown);
 });
 
+it("names a filing's status in words for a filer", async () => {
+  localStorage.setItem('demo_role', 'attorney');
+  showCase(docket(false), [civil], [{
+    id: 1, status: 'under_review', case_title: 'Smith v. Jones', filing_description: 'Complaint', submitted_at: '2026-03-02T12:00:00Z',
+    filing_date: null, reviewed_at: null, rejection_reason: null, documents: [],
+  }]);
+
+  expect(await screen.findByText('Under review')).toBeTruthy();
+  expect(document.body.textContent).not.toMatch(/under_review|under review/);
+});
+
 it('explains why more filings could not load when the server limits requests', async () => {
   localStorage.setItem('demo_role', 'public');
   const firstPage = Array.from({ length: 25 }, (_, index) => ({

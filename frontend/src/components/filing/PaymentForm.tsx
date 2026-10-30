@@ -143,7 +143,7 @@ export default function PaymentForm({ filingId, headingLevel = 3, onFeesChange }
       </div>}
       {fees.can_pay && fees.payments_simulated && <p className="info-text">Payment records are simulated. No card or bank information is collected and no money is charged.</p>}
       <button className="btn btn-primary" disabled={busy || (selectedMethod === 'waiver' ? !fees.can_request_waiver : !fees.can_pay)} onClick={pay}>
-        {busy ? 'Recording…' : selectedMethod === 'waiver' ? 'Attach waiver request to filing' : `Record simulated payment — ${formatCents(fees.balance_due_cents ?? 0)}`}
+        {busy ? 'Recording…' : selectedMethod === 'waiver' ? 'Attach waiver request to filing' : `Record simulated payment of ${formatCents(fees.balance_due_cents ?? 0)}`}
       </button>
     </>}
     {fees.can_assess && <>

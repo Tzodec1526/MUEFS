@@ -276,7 +276,7 @@ function DocumentUpload({
 
       {warnings.length > 0 && (
         <div className="alert alert-warning" role="status">
-          <strong>Possible PII detected (MCR 1.109)</strong> — review and redact before submitting.
+          <strong>Possible personal information detected (MCR 1.109)</strong>. Review and redact it before submitting.
           <ul className="pii-warning-list">
             {warnings.map((w, i) => <li key={i}>{w}</li>)}
           </ul>
@@ -311,7 +311,7 @@ function DocumentUpload({
               value={docType}
               onChange={(e) => handleDocTypeChange(e.target.value)}
             >
-              <option value="">-- Select document type --</option>
+              <option value="">Select a document type</option>
               {selectedCategory ? (
                 filteredTypes.map((dt) => (
                   <option key={dt.code} value={dt.code}>
@@ -374,7 +374,7 @@ function DocumentUpload({
               disabled={busy || docType === 'FEE_WAIVER'}
               onChange={(e) => setIsConfidential(e.target.checked)}
             />
-            {docType === 'FEE_WAIVER' ? 'Fee waiver request — nonpublic' : 'Mark as confidential (not public)'}
+            {docType === 'FEE_WAIVER' ? 'Fee waiver request (nonpublic)' : 'Mark as confidential (not public)'}
           </label>
         </div>
         <button
@@ -432,7 +432,7 @@ function DocumentUpload({
               <ul>
                 {required.map(r => (
                   <li key={r.code}>
-                    <strong>{r.label}</strong> &mdash; {r.rule}
+                    <strong>{r.label}:</strong> {r.rule}
                     {' '}<button type="button" className="btn btn-small btn-secondary" disabled={busy}
                       onClick={() => selectCompanion(r.code, r.label)}>Add {r.label}</button>
                     {r.code === 'BRIEF_SUPPORT' && (
@@ -449,7 +449,7 @@ function DocumentUpload({
               <ul>
                 {recommended.map(r => (
                   <li key={r.code}>
-                    {r.label} &mdash; {r.rule}
+                    {r.label}: {r.rule}
                     {' '}<button type="button" className="btn btn-small btn-secondary" disabled={busy}
                       onClick={() => selectCompanion(r.code, r.label)}>Add {r.label}</button>
                     {r.code === 'BRIEF_SUPPORT' && (

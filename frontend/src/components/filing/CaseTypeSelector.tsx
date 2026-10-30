@@ -65,7 +65,7 @@ function RequirementList({ requirements }: { requirements: FilingRequirement[] }
               : req.mcr_reference})</>}
             {req.page_limit && <p className="req-detail">Page limit: {req.page_limit} pages</p>}
             {req.format_notes && <p className="req-detail">{req.format_notes}</p>}
-            {req.local_rule_reference && <p className="req-detail">Local Rule: {req.local_rule_reference}</p>}
+            {req.local_rule_reference && <p className="req-detail">Local rule: {req.local_rule_reference}</p>}
           </li>
         );
       })}

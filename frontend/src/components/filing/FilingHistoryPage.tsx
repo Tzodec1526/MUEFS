@@ -86,7 +86,7 @@ export default function FilingHistoryPage() {
         <Link to={`/filings/${filingId}/deliveries`}>Document deliveries</Link>
       </div>
       <p className="info-text">A receipt records what this system received. Court acceptance is a separate decision.
-        Times below are recorded in UTC. Service-only records do not prove delivery to another party.</p>
+        Times below are in your local time zone. Service-only records do not prove delivery to another party.</p>
       <div className="review-card">
         <h2 className="card-heading">Filing date: {formatCourtDate(history.filing_date)}</h2>
         {history.filing_date_basis && <FilingDateEvidence basis={history.filing_date_basis} />}
@@ -109,7 +109,7 @@ export default function FilingHistoryPage() {
           <div className="receipt-heading">
             <h2 className="card-heading">{eventLabels[transaction.event_type] || transaction.event_type}</h2>
             <span>{transaction.submission_number ? `Submission ${transaction.submission_number}`
-              : ['payment_recorded', 'fee_payment_recorded', 'fee_payment_reversed', 'fee_review_requested', 'fee_assessed'].includes(transaction.event_type) ? 'Before submission' : 'Legacy filing'}</span>
+              : ['payment_recorded', 'fee_payment_recorded', 'fee_payment_reversed', 'fee_review_requested', 'fee_assessed'].includes(transaction.event_type) ? 'Before submission' : 'Older filing'}</span>
           </div>
           <p><time dateTime={parseServerDate(transaction.occurred_at).toISOString()}>
             {formatDateTime(transaction.occurred_at)}

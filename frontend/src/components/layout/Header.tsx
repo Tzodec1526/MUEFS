@@ -34,7 +34,7 @@ function Header() {
     <>
       {isDemoBuild() && (
         <p className="demo-stakeholder-banner">
-          Demo — not for real filings.
+          Demo: not for real filings.
           <a href="/login" className="demo-banner-link">
             Roles
           </a>

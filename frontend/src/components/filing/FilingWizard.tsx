@@ -421,7 +421,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
           {filingData.caseTitle && (
             <span><strong>Case:</strong> {filingData.caseTitle}</span>
           )}
-          <span><strong>Docs:</strong> {filingData.documents.length}</span>
+          <span><strong>Documents:</strong> {filingData.documents.length}</span>
         </div>
       )}
 

@@ -59,7 +59,7 @@ function ReviewQueue() {
 
   async function handleReview(filing: FilingEnvelope, action: 'accept' | 'reject' | 'return') {
     if (action === 'reject' && !window.confirm(
-      'Reject is final — the filer cannot resubmit under this envelope. If they should fix and re-file, use "Return for correction" instead. Reject this filing?'
+      'Reject is final. The filer cannot resubmit this filing. If they should fix it and file again, use "Return for correction" instead. Reject this filing?'
     )) {
       return;
     }

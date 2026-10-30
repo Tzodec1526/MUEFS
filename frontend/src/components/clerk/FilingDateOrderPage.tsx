@@ -4,6 +4,7 @@ import { apiClient } from '../../api/client';
 import type { FilingDateBasis } from '../../api/filings';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { formatCourtDate, formatDateTime } from '../../utils/format';
+import { filingStatusLabel } from '../../utils/filingStatus';
 import FilingDateEvidence from '../filing/FilingDateEvidence';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
@@ -70,7 +71,7 @@ export default function FilingDateOrderPage() {
     {data && <>
       <div className="review-card">
         <h2 className="card-heading">Current record</h2>
-        <p>Submission {data.submission_count || 'not recorded'} · {data.status.replace(/_/g, ' ')}</p>
+        <p>Submission {data.submission_count || 'not recorded'} · {filingStatusLabel(data.status)}</p>
         <p>Receipt time: {formatDateTime(data.submitted_at)}</p>
         <p>Filing date: <strong>{formatCourtDate(data.filing_date)}</strong></p>
         {data.filing_date_basis && <FilingDateEvidence basis={data.filing_date_basis} />}

@@ -52,8 +52,8 @@ function AccountForm({ user, self, onSaved }: {
     finally { setBusy(false); }
   }
   return <form onSubmit={save} className="admin-account-form">
-    <h3>{user ? 'Account identity' : 'Provision an account'}</h3>
-    <p>Use the exact subject from the approved identity provider. Provisioning an account does not assign court access.</p>
+    <h3>{user ? 'Account identity' : 'Set up an account'}</h3>
+    <p>Use the exact subject from the approved identity provider. Setting up an account does not assign court access.</p>
     <div className="admin-form-grid">
       <div className="form-group"><label htmlFor="account-first">First name</label>
         <input id="account-first" name="first_name" maxLength={100} required defaultValue={user?.first_name} /></div>
@@ -78,7 +78,7 @@ function AccountForm({ user, self, onSaved }: {
     <div className="form-group"><label htmlFor="account-reason">Reason and authority or reference for this change</label>
       <textarea id="account-reason" name="reason" rows={2} required maxLength={1000} /></div>
     {error && <p className="alert alert-error" role="alert">{error}</p>}
-    <button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : user ? 'Save account' : 'Provision account'}</button>
+    <button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : user ? 'Save account' : 'Set up account'}</button>
   </form>;
 }
 
@@ -142,10 +142,10 @@ interface History {
   } }[];
 }
 const historyLabels: Record<string, string> = {
-  'identity.account_created': 'Account provisioned', 'identity.account_updated': 'Account changed',
+  'identity.account_created': 'Account set up', 'identity.account_updated': 'Account changed',
   'identity.role_granted': 'Court role granted', 'identity.role_revoked': 'Court role revoked',
-  'identity.bootstrap': 'Initial administrator provisioned',
-  'identity.duplicate_role_removed': 'Duplicate historical grant archived',
+  'identity.bootstrap': 'First administrator set up',
+  'identity.duplicate_role_removed': 'Duplicate earlier grant archived',
 };
 const fieldLabels: Record<string, string> = {
   first_name: 'First name', last_name: 'Last name', email: 'Email address', user_type: 'Account type',
@@ -224,8 +224,8 @@ function AccountDirectory({ access }: { access: Access }) {
   }
   return <>
     <div className="page-header"><div><PageHeading>People and court access</PageHeading>
-      <p>{access.system_admin ? 'Provision identities and delegate court access.' : 'Manage staff access for your assigned courts.'}</p></div>
-      {access.system_admin && <button className="btn btn-primary" onClick={() => setEditor('new')}>Provision account</button>}</div>
+      <p>{access.system_admin ? 'Set up accounts and assign court access.' : 'Manage staff access for your assigned courts.'}</p></div>
+      {access.system_admin && <button className="btn btn-primary" onClick={() => setEditor('new')}>Set up account</button>}</div>
     <form className="admin-directory-filter" onSubmit={event => {
       event.preventDefault(); setEmail(String(new FormData(event.currentTarget).get('email') || '').trim()); setPage(1); setEditor(null);
       setAttempt(n => n + 1); setMessage('');
@@ -240,7 +240,7 @@ function AccountDirectory({ access }: { access: Access }) {
       <button className="btn btn-secondary">Find accounts</button>
     </form>
     {court > 0 && <p><Link to={`/courts/${court}/intake`}>Manage this court&apos;s filing intake</Link></p>}
-    {!access.system_admin && <p>Search the exact email of a known staff member to assign access. A system administrator must provision their identity first.</p>}
+    {!access.system_admin && <p>Search the exact email of a known staff member to assign access. A system administrator must set up their account first.</p>}
     {message && <p className="alert alert-success" role="status">{message}</p>}
     <div className={`admin-workspace${editor ? ' editor-open' : ''}`}>
       <section aria-label="Account directory">

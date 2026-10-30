@@ -83,7 +83,7 @@ export default function DeliveryComposePage() {
             <label className="checkbox-label"><input type="checkbox" checked={selection.documents.includes(doc.id)}
               onChange={event => { setReviewed(false); setSelection(s => ({ ...s, documents: event.target.checked ? [...s.documents, doc.id] : s.documents.filter(id => id !== doc.id) })); }} />
               <span><strong>{doc.title}</strong> · {formatBytes(doc.file_size_bytes)}
-                {doc.is_confidential && <span className="status-badge">Confidential — review recipient authority</span>}</span></label>
+                {doc.is_confidential && <span className="status-badge">Confidential: review recipient authority</span>}</span></label>
             <DocumentDownload id={doc.id} title={doc.title} />
           </div>)}
           <h2 className="card-heading">Recipients and service instructions</h2>

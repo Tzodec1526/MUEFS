@@ -291,7 +291,7 @@ function CaseSearch() {
               {searching
                 ? 'Searching…'
                 : hasSearched
-                  ? 'No cases found. Check the number or name — partial matches work.'
+                  ? 'No cases found. Check the number or name. Partial matches work.'
                   : 'No public filings to show yet.'}
             </p>
           )}

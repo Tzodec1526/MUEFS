@@ -59,7 +59,7 @@ function FilingReviewPanel({
       </p>}
       <div className="detail-section">
         <h3>Case information</h3>
-        <p>{selectedFiling.submission_count ? `Reviewing submission ${selectedFiling.submission_count}` : 'Reviewing a legacy submission without a recorded submission number'}</p>
+        <p>{selectedFiling.submission_count ? `Reviewing submission ${selectedFiling.submission_count}` : 'Reviewing an older submission without a recorded submission number'}</p>
         <Link to={`/filings/${selectedFiling.id}/history`} className="btn btn-secondary btn-small">Receipts &amp; history</Link>
         {selectedFiling.fee_waiver_requested && <p>
           Fee waiver: {selectedFiling.fee_waiver_granted === true ? 'granted'
@@ -110,13 +110,13 @@ function FilingReviewPanel({
         <h3>Review actions</h3>
 
         <div className="form-group">
-          <label htmlFor="quickReason">Reason (required for reject/return)</label>
+          <label htmlFor="quickReason">Reason (required to reject or return)</label>
           <select
             id="quickReason"
             value={reviewReason}
             onChange={(e) => setReviewReason(e.target.value)}
           >
-            <option value="">-- Select common reason --</option>
+            <option value="">Select a common reason</option>
             {COMMON_REASONS.map((reason, i) => (
               <option key={i} value={reason}>{reason}</option>
             ))}
@@ -127,7 +127,7 @@ function FilingReviewPanel({
             value={reviewReason}
             onChange={(e) => setReviewReason(e.target.value)}
             rows={3}
-            placeholder="Or type a custom reason..."
+            placeholder="Or type your own reason"
             aria-label="Review reason"
           />
         </div>
@@ -158,8 +158,8 @@ function FilingReviewPanel({
           </button>
         </div>
         <p className="info-text review-action-note">
-          <strong>Return for correction</strong> sends it back so the filer can fix and
-          re-file; the earlier submission remains in their history. <strong>Reject</strong> is final.
+          <strong>Return for correction</strong> sends it back so the filer can fix it and
+          file again. The earlier submission stays in their history. <strong>Reject</strong> is final.
         </p>
       </div>
       </>}

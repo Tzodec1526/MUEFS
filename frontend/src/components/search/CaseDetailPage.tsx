@@ -6,6 +6,7 @@ import { addFavorite, removeFavorite, listFavorites } from '../../api/favorites'
 import { getCaseTypes } from '../../api/courts';
 import { getDocumentLabel } from '../../utils/documentTypes';
 import { formatBytes, formatCourtDate, formatShortDate, plural } from '../../utils/format';
+import { filingStatusLabel } from '../../utils/filingStatus';
 import { errorMessage } from '../../utils/errors';
 import { CourtContext } from '../auth/CourtSession';
 import { useToast } from '../common/Toast';
@@ -173,7 +174,7 @@ function CaseDetailPage() {
   // Public dockets show register-of-actions language, not the internal e-filing
   // review pipeline. Filers and court staff see the true status.
   const docketStatus = (status: string): { label: string; cls: string } => {
-    if (!isPublicViewer) return { label: status.replace('_', ' '), cls: status };
+    if (!isPublicViewer) return { label: filingStatusLabel(status), cls: status };
     switch (status) {
       case 'accepted': return { label: 'Filed', cls: 'accepted' };
       case 'served': return { label: 'Service documents recorded', cls: 'pending' };

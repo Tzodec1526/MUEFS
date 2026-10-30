@@ -77,8 +77,7 @@ function Favorites() {
         <Link to="/cases/search" className="btn btn-secondary">Search cases</Link>
       </div>
       <p className="info-text">
-        Your bookmarked cases for quick access. Add cases from the Case search page
-        by clicking the star icon.
+        Your saved cases. Add a case from Case search by clicking its star.
       </p>
 
       {loading && <p className="loading" role="status">Loading favorites...</p>}
@@ -129,13 +128,13 @@ function Favorites() {
         <Link to="/filing/new" className="btn btn-secondary">New filing</Link>
       </div>
       <p className="info-text">
-        Your frequently used courts (attorneys often practice across many). Star courts in the court selector during filing.
+        The courts you use most. Star a court in the court selector when you file.
       </p>
 
       {!loading && !error && courtFavorites.length === 0 && (
         <div className="empty-state">
           <h3>No favorite courts yet</h3>
-          <p>When filing, use the court selector and star your common courts for quick access.</p>
+          <p>When you file, star a court in the court selector.</p>
           <Link to="/filing/new" className="btn btn-primary">Start a filing</Link>
         </div>
       )}

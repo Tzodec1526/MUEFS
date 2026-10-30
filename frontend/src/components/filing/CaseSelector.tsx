@@ -109,7 +109,7 @@ function CaseSelector({
           aria-pressed={mode === 'new'}
         >
           <h3>Start a new case</h3>
-          <p>Initiate a new matter, e.g. a complaint or petition.</p>
+          <p>Open a new matter, such as a complaint or petition.</p>
         </button>
       </div>
 
@@ -158,7 +158,7 @@ function CaseSelector({
                 </tbody>
               </table>
             ) : (
-              <p className="info-text">No matching cases found. Check the number/name, or start a new case.</p>
+              <p className="info-text">No matching cases found. Check the number or name, or start a new case.</p>
             )
           )}
         </div>

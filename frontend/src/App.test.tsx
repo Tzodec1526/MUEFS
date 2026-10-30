@@ -115,7 +115,7 @@ it('shows a system administrator the account directory at /admin', async () => {
   expect(await screen.findByRole('heading', { name: 'People and court access' })).toBeTruthy();
   expect(await screen.findByRole('button', { name: 'Manage Grace Hopper' })).toBeTruthy();
   expect(screen.getByText('grace.hopper@example.gov')).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'Provision account' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Set up account' })).toBeTruthy();
 });
 
 it.each(['attorney', 'srl', 'clerk', 'public'])('tells a %s that /admin needs administrator access, without asking the server', async (role) => {
@@ -133,7 +133,7 @@ it.each(['attorney', 'srl', 'clerk', 'public'])('tells a %s that /admin needs ad
   expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
   expect(screen.queryByRole('heading', { name: 'People and court access' })).toBeNull();
   expect(screen.queryByText(/Grace Hopper|grace\.hopper@example\.gov/)).toBeNull();
-  expect(screen.queryByRole('button', { name: 'Provision account' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Set up account' })).toBeNull();
   expect(requested('/admin/access')).toBe(false);
   expect(requested('/admin/users')).toBe(false);
 });

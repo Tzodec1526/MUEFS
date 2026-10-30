@@ -58,7 +58,7 @@ function ParticipantForm({ caseId, record, version, onSaved }: {
   }
   return <form className="admin-account-form" onSubmit={save}>
     <h2 className="card-heading">{record ? 'Edit participant' : 'Add participant'}</h2>
-    {record && !record.reviewed_at && <p className="alert alert-info">This legacy record requires court review before it can grant restricted-case access.</p>}
+    {record && !record.reviewed_at && <p className="alert alert-info">This older record requires court review before it can grant restricted-case access.</p>}
     <div className="admin-form-grid">
       <div className="form-group"><label htmlFor="participant-name">Participant name</label>
         <input id="participant-name" name="party_name" required maxLength={255} defaultValue={record?.party_name} /></div>
@@ -81,7 +81,7 @@ function ParticipantForm({ caseId, record, version, onSaved }: {
     }} /> Active participant</label>
     <label className="checkbox-label"><input type="checkbox" checked={access} disabled={!active} onChange={event => setAccess(event.target.checked)} />
       Grant restricted-case access through this record</label>
-    <p>Retire a participant by clearing “Active participant.” Other active grants or court roles can still allow access. Filers keep access to their own envelopes.</p>
+    <p>Retire a participant by clearing “Active participant.” Other active grants or court roles can still allow access. Filers keep access to their own filings.</p>
     <div className="form-group"><label htmlFor="participant-reason">Reason and court authority or record reference</label>
       <textarea id="participant-reason" name="reason" required maxLength={1000} rows={3} /></div>
     {error && <p className="alert alert-error" role="alert">{error}</p>}
@@ -168,7 +168,7 @@ function ParticipantHistory({ caseId }: { caseId: string }) {
       <ol className="admin-history">{current.data.events.map(event => <li key={event.id}>
         <strong>{event.action === 'case.participant_created' ? 'Participant added'
           : event.action === 'case.participant_changed' ? 'Participant changed'
-          : event.action === 'case.public_access_changed' ? 'Public case access changed' : 'Legacy records require review'}
+          : event.action === 'case.public_access_changed' ? 'Public case access changed' : 'Older records require review'}
           {event.details.after?.party_name ? ` · ${event.details.after.party_name}` : ''}</strong>
         <p>{formatDateTime(event.occurred_at)} · {event.details.actor_name || 'Database migration'}</p>
         <p>{event.details.reason}</p>
@@ -235,7 +235,7 @@ export default function CaseParticipantsPage() {
           {' · '}{item.access_enabled ? 'Access granted through this record' : 'No access grant'}</p>
           {item.represented_party_name && <p>Represents {item.represented_party_name}</p>}
           {item.account_email && <p>{item.account_email}</p>}
-          {!item.reviewed_at && <p>Legacy record · court review needed</p>}</div>
+          {!item.reviewed_at && <p>Older record · court review needed</p>}</div>
         {item.user_id === current.data?.actor_id ? <span>Another staff member must edit your record.</span>
           : <button className="btn btn-secondary btn-small" onClick={() => { setSelection(item.id); setNotice(''); }}
             aria-label={`Edit ${item.party_name}`}>Edit</button>}

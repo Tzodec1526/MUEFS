@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import type { FilingFees } from '../../api/documents';
 import type { PaymentRecord, PaymentRecords } from '../../api/payments';
-import { formatCents, formatDateTime } from '../../utils/format';
+import { formatCents, formatDateTime, plural } from '../../utils/format';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
 
@@ -111,7 +111,7 @@ export default function PaymentRecordsPanel({ fees, Heading, onChanged, onBusyCh
     {!current && <p role="status">Loading payment records…</p>}
     {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.records && <>
-      <p>{current.records.total} payment records</p>
+      <p>{plural(current.records.total, 'payment record')}</p>
       {current.records.total === 0 && <p>No payments have been recorded for this filing.</p>}
       <ol className="payment-record-list">{current.records.payments.map(payment => <li key={payment.id}>
         <div className="page-header"><strong>{formatCents(payment.amount_cents)}</strong>

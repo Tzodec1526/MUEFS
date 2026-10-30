@@ -138,7 +138,7 @@ it('says when a search finds no cases', async () => {
   serveResults([]);
   openSearch('/cases/search?case=9999');
 
-  expect(await screen.findByText('No cases found. Check the number or name — partial matches work.')).toBeTruthy();
+  expect(await screen.findByText('No cases found. Check the number or name. Partial matches work.')).toBeTruthy();
   expect(screen.getByRole('heading', { name: 'Results (0)' })).toBeTruthy();
   expect(screen.queryByRole('table')).toBeNull();
 });

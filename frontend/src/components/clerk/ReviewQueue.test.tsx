@@ -92,7 +92,7 @@ it.each([
   const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
   openQueue();
   await openReview(11);
-  fireEvent.change(screen.getByLabelText('Reason (required for reject/return)'),
+  fireEvent.change(screen.getByLabelText('Reason (required to reject or return)'),
     { target: { value: 'Missing required documents' } });
   const button = screen.getByRole('button', { name: buttonName });
   button.focus();
