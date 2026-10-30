@@ -1,16 +1,12 @@
-# Render Blueprint for the public hosted demo.
-# In Render: New > Blueprint, point it at this repo, and it provisions the service below.
-# Then add the custom domain demo.tomcedoz.com in the service settings.
 services:
   - type: web
     name: muefs-demo
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: standard        # 2 GB / always-on (~$25/mo). Use "starter" for a cheaper 512 MB box.
+    plan: standard
     region: oregon
     healthCheckPath: /ready
-    autoDeploy: false     # deploy deliberately: Manual Deploy or the "Deploy demo" workflow
-    # Single instance only — the per-session sandboxes live on this box's local disk.
+    autoDeploy: false
     envVars:
       - key: DEMO_ISOLATED_SESSIONS
         value: "true"
@@ -29,10 +25,6 @@ services:
         value: "true"
       - key: RATE_LIMIT_BACKEND
         value: memory
-      # Render's load balancers reach the service from private addresses. Trusting them
-      # lets rate limits and audit records use the visitor's address from
-      # X-Forwarded-For instead of one shared proxy address. After deploying, check that
-      # the audit log's ip_address values differ between visitors.
       - key: TRUSTED_PROXY_IPS
         value: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,fc00::/7
       - key: PAYMENTS_ARE_SIMULATED
