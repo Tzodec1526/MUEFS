@@ -30,9 +30,17 @@ export function parseServerDate(d: string): Date {
   return new Date(d);
 }
 
-export function formatServerDateTime(d: string | null): string {
-  if (!d) return 'N/A';
-  return parseServerDate(d).toLocaleString();
+const DATE_TIME: Intl.DateTimeFormatOptions = {
+  year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+};
+
+export function formatDateTime(value: string | null, timeZone?: string): string {
+  if (!value) return 'Not recorded';
+  return parseServerDate(value).toLocaleString('en-US', { ...DATE_TIME, timeZone });
+}
+
+export function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : pluralForm}`;
 }
 
 /** Format an ISO date string as a short US date, e.g. "Jun 7, 2026". */

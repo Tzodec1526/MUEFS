@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import type { FilingDateBasis } from '../../api/filings';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
-import { formatCourtDate, parseServerDate } from '../../utils/format';
+import { formatCourtDate, formatDateTime } from '../../utils/format';
 import FilingDateEvidence from '../filing/FilingDateEvidence';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
@@ -71,7 +71,7 @@ export default function FilingDateOrderPage() {
       <div className="review-card">
         <h3>Current record</h3>
         <p>Submission {data.submission_count || 'not recorded'} · {data.status.replace(/_/g, ' ')}</p>
-        <p>Receipt time: {data.submitted_at ? parseServerDate(data.submitted_at).toISOString().replace('T', ' ').replace('Z', ' UTC') : 'Not recorded'}</p>
+        <p>Receipt time: {formatDateTime(data.submitted_at)}</p>
         <p>Filing date: <strong>{formatCourtDate(data.filing_date)}</strong></p>
         {data.filing_date_basis && <FilingDateEvidence basis={data.filing_date_basis} />}
         {data.case_id && <p>Case {data.case_number}: opening date <strong>{formatCourtDate(data.case_filing_date)}</strong></p>}

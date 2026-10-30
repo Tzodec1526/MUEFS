@@ -2,7 +2,7 @@ import { useContext, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
-import { parseServerDate } from '../../utils/format';
+import { formatDateTime } from '../../utils/format';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
@@ -37,7 +37,7 @@ export default function FeeReviewQueue() {
       {!current.data.total && <p className="empty-state">No fee review requests are waiting.</p>}
       {current.data.filings.map(filing => <article className="review-card" key={filing.id}>
         <h3>Filing #{filing.id}: {filing.case_title || 'Untitled filing'}</h3>
-        <p>{filing.filer_name} · {filing.status.replace(/_/g, ' ')} · Requested {parseServerDate(filing.requested_at).toLocaleString()}</p>
+        <p>{filing.filer_name} · {filing.status.replace(/_/g, ' ')} · Requested {formatDateTime(filing.requested_at)}</p>
         <Link className="btn btn-primary" to={`/filings/${filing.id}/fees`}>Review fees</Link>
       </article>)}
       {current.data.total > 25 && <nav className="pagination" aria-label="Fee review pages">

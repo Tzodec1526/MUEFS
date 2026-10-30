@@ -3,7 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { deliveryLabels } from '../../api/notifications';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
-import { parseServerDate } from '../../utils/format';
+import { formatDateTime } from '../../utils/format';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
@@ -46,7 +46,7 @@ export default function DeliveriesPage() {
       <ul className="service-list">{data.deliveries.map(item => <li className="review-card" key={item.id}>
         <h3><Link to={`/service/deliveries/${item.id}`}>{item.name || `Documents from ${item.actor_name}`}</Link></h3>
         {item.email && <p>{item.email}</p>}
-        <p><time dateTime={item.created_at}>{parseServerDate(item.created_at).toLocaleString()}</time></p>
+        <p><time dateTime={item.created_at}>{formatDateTime(item.created_at)}</time></p>
         <p>{deliveryLabels[item.delivery_status] || item.delivery_status}</p>
       </li>)}</ul>
       {data.total > data.page_size && <nav className="pagination" aria-label="Delivery pages">

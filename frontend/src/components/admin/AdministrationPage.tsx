@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
-import { parseServerDate } from '../../utils/format';
+import { formatDateTime } from '../../utils/format';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
@@ -175,7 +175,7 @@ function AccountHistory({ userId, courtId, access }: { userId: number; courtId?:
         const { before, after } = event.details;
         return <li key={event.id}>
           <strong>{historyLabels[event.action] || event.action}</strong>
-          <p>{parseServerDate(event.occurred_at).toISOString().replace('T', ' ').replace('Z', ' UTC')} · {event.details.actor_name || 'Database operator'}</p>
+          <p>{formatDateTime(event.occurred_at)} · {event.details.actor_name || 'Database operator'}</p>
           {event.details.court_id && <p>{access.courts.find(court => court.id === event.details.court_id)?.name || `Court ${event.details.court_id}`}</p>}
           <p>{event.details.reason}</p>
           {Array.isArray(after) ? <p>Before: {Array.isArray(before) ? before.map(role => courtRoles[role] || role).join(', ') || 'No roles' : 'No roles'}.

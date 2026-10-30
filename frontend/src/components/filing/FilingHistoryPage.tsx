@@ -8,7 +8,7 @@ import { loadFailure, type LoadFailure } from '../../utils/errors';
 import FeeWaiverPanel, { waiverActionLabels } from './FeeWaiverPanel';
 import FilingDateEvidence from './FilingDateEvidence';
 import { getDocumentLabel } from '../../utils/documentTypes';
-import { formatBytes, formatCents, formatCourtDate, parseServerDate } from '../../utils/format';
+import { formatBytes, formatCents, formatCourtDate, formatDateTime, parseServerDate } from '../../utils/format';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
 
@@ -112,7 +112,7 @@ export default function FilingHistoryPage() {
               : ['payment_recorded', 'fee_payment_recorded', 'fee_payment_reversed', 'fee_review_requested', 'fee_assessed'].includes(transaction.event_type) ? 'Before submission' : 'Legacy filing'}</span>
           </div>
           <p><time dateTime={parseServerDate(transaction.occurred_at).toISOString()}>
-            {parseServerDate(transaction.occurred_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}
+            {formatDateTime(transaction.occurred_at)}
           </time> · {transaction.actor_name}</p>
           <p className="receipt-reference">Transaction <code>{transaction.id}</code></p>
           {transaction.details.reason && <div className="alert alert-warning">{transaction.details.reason}</div>}
@@ -141,7 +141,7 @@ export default function FilingHistoryPage() {
           </p>}
           {transaction.details.payment?.external_receipt && <p>
             External receipt: {transaction.details.payment.external_receipt.system} · {transaction.details.payment.external_receipt.reference}.
-            {' '}Received {parseServerDate(transaction.details.payment.external_receipt.received_at).toLocaleString()}.
+            {' '}Received {formatDateTime(transaction.details.payment.external_receipt.received_at)}.
             {transaction.event_type === 'fee_payment_reversed' && ' This credit was reversed; the portal did not issue a refund.'}
           </p>}
           {transaction.details.court_name && <dl className="receipt-details">

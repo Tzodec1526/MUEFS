@@ -4,7 +4,7 @@ import type { FilingEnvelope } from '../../api/filings';
 import LoadError from '../common/LoadError';
 import DocumentDownload from '../common/DocumentDownload';
 import { getDocumentLabel } from '../../utils/documentTypes';
-import { formatBytes, formatServerDateTime } from '../../utils/format';
+import { formatBytes, formatDateTime } from '../../utils/format';
 import type { LoadFailure } from '../../utils/errors';
 
 const COMMON_REASONS = [
@@ -68,7 +68,7 @@ function FilingReviewPanel({
         </p>}
         <div className="detail-grid">
           <div><label>Title</label><span>{selectedFiling.case_title || 'N/A'}</span></div>
-          <div><label>Submitted</label><span>{formatServerDateTime(selectedFiling.submitted_at)}</span></div>
+          <div><label>Submitted</label><span>{formatDateTime(selectedFiling.submitted_at)}</span></div>
           <div><label>Filer ID</label><span>#{selectedFiling.filer_id}</span></div>
         </div>
         {selectedFiling.filing_description && (

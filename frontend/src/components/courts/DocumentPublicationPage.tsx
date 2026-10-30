@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
-import { formatBytes, parseServerDate } from '../../utils/format';
+import { formatBytes, formatDateTime } from '../../utils/format';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
@@ -48,7 +48,7 @@ function PublicationHistory({ documentId }: { documentId: string }) {
       {!current.data.total && <p>No access changes recorded.</p>}
       <ol className="admin-history">{current.data.events.map(event => <li key={event.id}>
         <strong>{labels[event.action] || event.action}</strong>
-        <p>{parseServerDate(event.occurred_at).toISOString().replace('T', ' ').replace('Z', ' UTC')} · {event.actor_name}</p>
+        <p>{formatDateTime(event.occurred_at)} · {event.actor_name}</p>
         {event.details.title && <p>{event.details.title}</p>}
         {event.details.reason && <p>{event.details.reason}</p>}
         {event.details.before && <p>Before this change: original {event.details.before.original_restricted ? 'restricted' : 'available through the case docket'}

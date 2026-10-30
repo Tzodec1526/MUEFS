@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { participantRoles } from '../../api/cases';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
-import { parseServerDate } from '../../utils/format';
+import { formatDateTime } from '../../utils/format';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
@@ -170,7 +170,7 @@ function ParticipantHistory({ caseId }: { caseId: string }) {
           : event.action === 'case.participant_changed' ? 'Participant changed'
           : event.action === 'case.public_access_changed' ? 'Public case access changed' : 'Legacy records require review'}
           {event.details.after?.party_name ? ` · ${event.details.after.party_name}` : ''}</strong>
-        <p>{parseServerDate(event.occurred_at).toISOString().replace('T', ' ').replace('Z', ' UTC')} · {event.details.actor_name || 'Database migration'}</p>
+        <p>{formatDateTime(event.occurred_at)} · {event.details.actor_name || 'Database migration'}</p>
         <p>{event.details.reason}</p>
         {event.details.authority_reference && <p>Authority: {event.details.authority_reference}</p>}
         {event.details.after && <details><summary>View recorded changes</summary><dl className="admin-changes">{Object.entries(fields).filter(([field]) =>

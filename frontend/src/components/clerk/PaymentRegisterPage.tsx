@@ -2,7 +2,7 @@ import { useContext, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import type { PaymentRegister } from '../../api/payments';
-import { formatCents, parseServerDate } from '../../utils/format';
+import { formatCents, formatDateTime } from '../../utils/format';
 import { getBlobErrorDetail, loadFailure, type LoadFailure } from '../../utils/errors';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
@@ -107,7 +107,7 @@ export default function PaymentRegisterPage() {
       {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
       {report && <>
         <h3>{report.date_from} through {report.date_to} · {report.timezone}</h3>
-        <p>{report.total} recorded {report.total === 1 ? 'entry' : 'entries'} · Generated {parseServerDate(report.generated_at).toLocaleString(undefined, { timeZone: report.timezone })} ({report.timezone})</p>
+        <p>{report.total} recorded {report.total === 1 ? 'entry' : 'entries'} · Generated {formatDateTime(report.generated_at, report.timezone)} ({report.timezone})</p>
         <dl className="register-totals">
           <div><dt>External credits</dt><dd>{formatCents(report.totals.credits_cents)}</dd></div>
           <div><dt>Reversals</dt><dd>{formatCents(report.totals.reversals_cents)}</dd></div>
@@ -124,8 +124,8 @@ export default function PaymentRegisterPage() {
             {entry.is_simulated && <span>Simulated</span>}</div>
           <p><Link to={`/filings/${entry.filing_id}/fees`}>Filing #{entry.filing_id}</Link> · Payment #{entry.payment_id}</p>
           <p>{entry.receipt_system} · Receipt {entry.receipt_reference}</p>
-          <p>Recorded {parseServerDate(entry.occurred_at).toLocaleString(undefined, { timeZone: report.timezone })} ({report.timezone}) by {entry.actor_name}</p>
-          <p>Source received {parseServerDate(entry.received_at).toLocaleString(undefined, { timeZone: report.timezone })}</p>
+          <p>Recorded {formatDateTime(entry.occurred_at, report.timezone)} ({report.timezone}) by {entry.actor_name}</p>
+          <p>Source received {formatDateTime(entry.received_at, report.timezone)}</p>
           <details><summary>Reason and retained event</summary><p>{entry.reason}</p><p>Event {entry.event_id}</p>
             <Link to={`/filings/${entry.filing_id}/history`}>View filing history</Link></details>
         </li>)}</ol>

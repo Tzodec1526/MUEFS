@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { listFavorites, removeFavorite, FavoriteCase, listFavoriteCourts, removeFavoriteCourt, FavoriteCourt } from '../../api/favorites';
-import { parseServerDate } from '../../utils/format';
+import { formatShortDate } from '../../utils/format';
 import { actionErrorMessage } from '../../api/client';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
@@ -104,7 +104,7 @@ function Favorites() {
                 </div>
                 {fav.notes && <p className="favorite-card-notes">{fav.notes}</p>}
                 <span className="favorite-card-date">
-                  Added {parseServerDate(fav.created_at).toLocaleDateString()}
+                  Added {formatShortDate(fav.created_at)}
                 </span>
               </div>
               <div className="favorite-card-actions">
@@ -152,7 +152,7 @@ function Favorites() {
                 </div>
                 {fav.notes && <p className="favorite-card-notes">{fav.notes}</p>}
                 <span className="favorite-card-date">
-                  Added {parseServerDate(fav.created_at).toLocaleDateString()}
+                  Added {formatShortDate(fav.created_at)}
                 </span>
               </div>
               <div className="favorite-card-actions">

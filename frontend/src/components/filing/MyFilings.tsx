@@ -4,7 +4,7 @@ import { listFilings, FilingSummary } from '../../api/filings';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { FILING_STATUS_LABELS, filingStatusLabel } from '../../utils/filingStatus';
-import { parseServerDate } from '../../utils/format';
+import { formatDateTime } from '../../utils/format';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
 
@@ -64,17 +64,6 @@ function MyFilings() {
     fetchFilings();
     return () => controller.abort();
   }, [statusFilter, page, reloadKey]);
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '--';
-    return parseServerDate(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   return (
     <div className="my-filings">
@@ -143,7 +132,7 @@ function MyFilings() {
                 <div className="filing-card-meta">
                   <span>{courtNames[filing.court_id] || `Court #${filing.court_id}`}</span>
                   <span>{filing.document_count} document(s)</span>
-                  <span>{formatDate(filing.submitted_at || filing.created_at)}</span>
+                  <span>{formatDateTime(filing.submitted_at || filing.created_at)}</span>
                 </div>
                 {filing.rejection_reason && (
                   <div className="filing-card-reason">

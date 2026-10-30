@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useContext } from 'react';
 import { batchReview, getFiling, reviewFiling, FilingEnvelope, FilingSummary, ClerkQueue } from '../../api/filings';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
-import { formatServerDateTime, parseServerDate } from '../../utils/format';
+import { formatDateTime, parseServerDate } from '../../utils/format';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
@@ -189,7 +189,7 @@ function ReviewQueue() {
           onRefresh={() => void fetchQueue()}
         />
         {queue && <span className="queue-meta">
-          Measured: {formatServerDateTime(queue.as_of)}. {queue.oldest_submitted_at && <>Oldest matching receipt: {formatServerDateTime(queue.oldest_submitted_at)}. </>}
+          Measured: {formatDateTime(queue.as_of)}. {queue.oldest_submitted_at && <>Oldest matching receipt: {formatDateTime(queue.oldest_submitted_at)}. </>}
           Ages are elapsed time since receipt.
         </span>}
       </div>
@@ -271,7 +271,7 @@ function ReviewQueue() {
                     </td>
                     <td className="filing-num">#{filing.id}</td>
                     <td className="filing-title">{filing.case_title || 'Untitled'}</td>
-                    <td className="filing-date">{formatServerDateTime(filing.submitted_at)}</td>
+                    <td className="filing-date">{formatDateTime(filing.submitted_at)}</td>
                     <td>
                       <span className={`age-badge ${age.level}`}>{age.text}</span>
                     </td>

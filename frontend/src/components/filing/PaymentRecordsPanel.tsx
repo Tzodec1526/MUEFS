@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import type { FilingFees } from '../../api/documents';
 import type { PaymentRecord, PaymentRecords } from '../../api/payments';
-import { formatCents, parseServerDate } from '../../utils/format';
+import { formatCents, formatDateTime } from '../../utils/format';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
 
@@ -118,7 +118,7 @@ export default function PaymentRecordsPanel({ fees, onChanged, onBusyChange }: {
           <span>{payment.status === 'reversed' ? 'Credit reversed' : payment.status === 'completed' ? 'Completed' : payment.status}{payment.is_simulated && ' · Simulated'}</span></div>
         {payment.external_receipt ? <>
           <p>{payment.external_receipt.system} · Receipt {payment.external_receipt.reference}</p>
-          <p>Received {parseServerDate(payment.external_receipt.received_at).toLocaleString()} · Recorded by {payment.external_receipt.recorded_by_name}</p>
+          <p>Received {formatDateTime(payment.external_receipt.received_at)} · Recorded by {payment.external_receipt.recorded_by_name}</p>
           <details><summary>Verification</summary><p>{payment.external_receipt.reason}</p></details>
         </> : <p>{payment.transaction_ref || 'No transaction reference retained'}</p>}
         {fees.can_manage_external_payments && !stale && payment.external_receipt && payment.status === 'completed' && !editing &&

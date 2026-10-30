@@ -3,7 +3,7 @@ import { isAxiosError } from 'axios';
 import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
-import { parseServerDate } from '../../utils/format';
+import { formatDateTime } from '../../utils/format';
 import { CourtContext } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import '../../styles/intake.css';
@@ -122,7 +122,7 @@ function IntakeHistory({ courtId }: { courtId: number }) {
         const typeChanges = change.after.case_types.filter(item => previous.get(item.id) !== item.is_active);
         return <article className="review-card" key={change.id}>
           <h4>Revision {change.after.version} · {change.actor_name}</h4>
-          <p>{parseServerDate(change.timestamp).toLocaleString()}</p>
+          <p>{formatDateTime(change.timestamp)}</p>
           <p><strong>Reason:</strong> {change.reason}</p>
           <p><strong>Authority:</strong> {change.authority_reference}</p>
           {change.before.is_efiling_enabled !== change.after.is_efiling_enabled && <p>

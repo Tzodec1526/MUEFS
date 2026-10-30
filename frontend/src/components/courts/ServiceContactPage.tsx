@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { participantRoles } from '../../api/cases';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
-import { parseServerDate } from '../../utils/format';
+import { formatDateTime } from '../../utils/format';
 import LoadError from '../common/LoadError';
 import { CourtContext } from '../auth/CourtSession';
 import { usePageTitle } from '../../utils/pageTitle';
@@ -93,7 +93,7 @@ function ContactHistory({ path }: { path: string }) {
     {current?.data && <>
       {!current.data.total && <p>No service instructions have been recorded.</p>}
       <ul className="court-case-list">{current.data.events.map(event => <li key={event.id}>
-        <div><strong>{parseServerDate(event.occurred_at).toLocaleString()} · {event.details.actor_name}</strong>
+        <div><strong>{formatDateTime(event.occurred_at)} · {event.details.actor_name}</strong>
           <p>{event.details.reason}</p>
           {event.details.before && <p>Previous: {methods[event.details.before.method]} · {event.details.before.email || event.details.before.address}
             {' · '}{event.details.before.is_active ? 'Active' : 'Inactive'}</p>}

@@ -4,7 +4,7 @@ import { apiClient } from '../../api/client';
 import { deliveryLabels } from '../../api/notifications';
 import type { DeliveryDetails } from '../../api/serviceDeliveries';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
-import { formatBytes, parseServerDate } from '../../utils/format';
+import { formatBytes, formatDateTime } from '../../utils/format';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
@@ -41,7 +41,7 @@ function DeliveryHistory({ deliveryId }: { deliveryId: string }) {
     {current?.data && <>
       {!current.data.events.length && <p>No events of this type recorded.</p>}
       <ol>{current.data.events.map(event => <li key={event.id}>
-        <strong>{event.action.replace(/_/g, ' ')}</strong> · <time dateTime={event.occurred_at}>{parseServerDate(event.occurred_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}</time>
+        <strong>{event.action.replace(/_/g, ' ')}</strong> · <time dateTime={event.occurred_at}>{formatDateTime(event.occurred_at)}</time>
         {event.actor_name && <span> · {event.actor_name}</span>}
         {event.attempt_number != null && <span> · Attempt {event.attempt_number}</span>}
         {event.smtp_code != null && <span> · SMTP {event.smtp_code}</span>}
@@ -49,7 +49,7 @@ function DeliveryHistory({ deliveryId }: { deliveryId: string }) {
         {(event.detail || event.details?.reason) && <p>{event.detail || event.details?.reason}</p>}
         {event.details?.description && <p>{event.details.description}</p>}
         {event.details?.source_reference && <p>{event.details.source?.replace(/_/g, ' ')} · {event.details.source_reference}</p>}
-        {event.details?.observed_at && <p>Reported observation: {parseServerDate(event.details.observed_at).toLocaleString()}</p>}
+        {event.details?.observed_at && <p>Reported observation: {formatDateTime(event.details.observed_at)}</p>}
       </li>)}</ol>
       {current.data.total > current.data.page_size && <nav className="pagination" aria-label="Delivery history pages">
         <button className="btn btn-secondary" disabled={page === 1} onClick={() => setPage(n => n - 1)}>Previous events</button>
@@ -123,7 +123,7 @@ export default function DeliveryDetailPage() {
     {data && <>
       <div className="review-card"><h3>{data.court_name}</h3><p>{data.case_number} · {data.case_title}</p>
         <p>From {data.sender} to {data.contact.name} · {data.contact.email}</p>
-        <p>Recorded {parseServerDate(data.created_at).toLocaleString()}</p>
+        <p>Recorded {formatDateTime(data.created_at)}</p>
         <p>Service authority: {data.contact.authority}</p>
         <p className="receipt-reference">Delivery reference: <code>{data.id}</code></p>
       </div>
@@ -133,7 +133,7 @@ export default function DeliveryDetailPage() {
           <DocumentDownload id={doc.id} title={doc.title} deliveryId={data.id} />
           <details><summary>Retained document fingerprint</summary><code>{doc.sha256_hash}</code></details>
         </li>)}</ul>
-        {data.acknowledged_at ? <p className="alert alert-success">Recipient acknowledged this package on {parseServerDate(data.acknowledged_at).toLocaleString()}.</p>
+        {data.acknowledged_at ? <p className="alert alert-success">Recipient acknowledged this package on {formatDateTime(data.acknowledged_at)}.</p>
           : <p>No recipient acknowledgment recorded.</p>}
         {data.can_acknowledge && <button className="btn btn-primary" disabled={busy} onClick={() => void act('acknowledge')}>Acknowledge receipt of this package</button>}
         <p>An acknowledgment records the recipient&apos;s statement. A download request records a request, and does not establish that the transfer completed.</p>

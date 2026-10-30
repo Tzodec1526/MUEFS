@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { getFilingFees, processPayment, type FilingFees } from '../../api/documents';
 import { updateFiling, uploadDocument, type FilingEnvelope } from '../../api/filings';
-import { formatCents, parseServerDate } from '../../utils/format';
+import { formatCents, formatDateTime } from '../../utils/format';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
 
@@ -97,7 +97,7 @@ export default function PaymentForm({ filingId, onFeesChange }: {
     {fees.assessment_stale && <p className="alert alert-warning">The documents or fee-review request changed after the last assessment. A current court assessment is required.</p>}
     {fees.source === 'court' && <p>Court assessment #{fees.assessment_id} · {fees.authority_reference}</p>}
     {fees.source === 'waiver' && <p>The fee waiver decision controls the amount due. Read the signed decision in filing history.</p>}
-    {fees.review_requested_at && <p className="alert alert-info" role="status">Awaiting court fee review, requested {parseServerDate(fees.review_requested_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}.</p>}
+    {fees.review_requested_at && <p className="alert alert-info" role="status">Awaiting court fee review, requested {formatDateTime(fees.review_requested_at)}.</p>}
     {fees.total_cents === null ? <p>A fee has not been established for the current documents.</p>
       : <div className="fee-summary">
         {fees.items.map((item, index) => <div className="fee-item" key={index}><span>{item.description}</span><span>{formatCents(item.amount_cents)}</span></div>)}

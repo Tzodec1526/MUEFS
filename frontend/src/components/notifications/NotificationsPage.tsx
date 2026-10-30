@@ -4,7 +4,7 @@ import { apiClient } from '../../api/client';
 import { deliveryLabels, listNotifications, type NotificationItem } from '../../api/notifications';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
-import { parseServerDate } from '../../utils/format';
+import { formatDateTime } from '../../utils/format';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
@@ -53,7 +53,7 @@ function DeliveryDetails({ notice, onRetry }: { notice: NotificationItem; onRetr
       {history.events.length === 0 && <p>No email attempts have been recorded.</p>}
       <ol>{history.events.map(event => <li key={event.id}>
         <strong>{event.outcome.replace(/_/g, ' ')}</strong> · Attempt {event.attempt_number} ·{' '}
-        <time dateTime={event.occurred_at}>{parseServerDate(event.occurred_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}</time>
+        <time dateTime={event.occurred_at}>{formatDateTime(event.occurred_at)}</time>
         {event.smtp_code != null && <span> · SMTP {event.smtp_code}</span>}
         {event.detail && <p>{event.detail}</p>}
       </li>)}</ol>
@@ -149,8 +149,8 @@ export default function NotificationsPage() {
         <p><strong>{deliveryLabels[notice.delivery_status] || notice.delivery_status}</strong> · {notice.attempt_count} email attempt{notice.attempt_count === 1 ? '' : 's'}</p>
         {notice.email_recipient && <p>Recipient: {notice.email_recipient}</p>}
         {notice.last_error && <p className="alert alert-warning">{notice.last_error}</p>}
-        {notice.delivery_status === 'sent' && notice.sent_at && <p>Relay acceptance recorded: {parseServerDate(notice.sent_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}</p>}
-        {notice.next_attempt_at && <p>Next attempt: {parseServerDate(notice.next_attempt_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}</p>}
+        {notice.delivery_status === 'sent' && notice.sent_at && <p>Relay acceptance recorded: {formatDateTime(notice.sent_at)}</p>}
+        {notice.next_attempt_at && <p>Next attempt: {formatDateTime(notice.next_attempt_at)}</p>}
         <div className="history-summary">
           {notice.delivery_id ? <Link to={`/service/deliveries/${notice.delivery_id}`}>Open document delivery</Link>
             : notice.filing_envelope_id && <Link to={`/filings/${notice.filing_envelope_id}/history`}>View filing history</Link>}
