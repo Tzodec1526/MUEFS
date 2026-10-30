@@ -52,6 +52,20 @@ function buildSteps(filingType: string): { key: WizardStep; label: string }[] {
   ];
 }
 
+const STEP_ERRORS: Record<WizardStep, { plain: string; standard: string }> = {
+  court: { plain: 'Choose the court where you want to file.', standard: 'Please select a court to continue.' },
+  case: { plain: 'Pick an existing case or start a new one.', standard: 'Please choose an existing case or start a new case.' },
+  'case-type': { plain: 'Select what kind of case this is.', standard: 'Please select a case type to continue.' },
+  details: { plain: 'Add a short title describing your filing.', standard: 'Please enter a case title to continue.' },
+  documents: { plain: 'Upload at least one PDF or document.', standard: 'Please upload at least one document to continue.' },
+  review: { plain: 'Finish this step to continue.', standard: 'Please complete this step to continue.' },
+};
+
+const CAPTION_MISSING_ERROR = {
+  plain: 'We could not load your case yet. Try again, or go Back and pick your case.',
+  standard: "The case title comes from the court's case record, which has not loaded. Retry loading it, or go Back to choose the case.",
+};
+
 const defaultFilingData: FilingData = {
   courtId: null,
   courtName: '',
@@ -416,28 +430,8 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
   };
 
   const getStepError = (): string => {
-    if (plainLanguage) {
-      switch (currentStep) {
-        case 'court': return 'Choose the court where you want to file.';
-        case 'case': return 'Pick an existing case or start a new one.';
-        case 'case-type': return 'Select what kind of case this is.';
-        case 'details': return captionMissing
-          ? 'We could not load your case yet. Try again, or go Back and pick your case.'
-          : 'Add a short title describing your filing.';
-        case 'documents': return 'Upload at least one PDF or document.';
-        default: return 'Finish this step to continue.';
-      }
-    }
-    switch (currentStep) {
-      case 'court': return 'Please select a court to continue.';
-      case 'case': return 'Please choose an existing case or start a new case.';
-      case 'case-type': return 'Please select a case type to continue.';
-      case 'details': return captionMissing
-        ? "The case title comes from the court's case record, which has not loaded. Retry loading it, or go Back to choose the case."
-        : 'Please enter a case title to continue.';
-      case 'documents': return 'Please upload at least one document to continue.';
-      default: return 'Please complete this step to continue.';
-    }
+    const messages = currentStep === 'details' && captionMissing ? CAPTION_MISSING_ERROR : STEP_ERRORS[currentStep];
+    return plainLanguage ? messages.plain : messages.standard;
   };
 
   const handleDiscardDraft = () => {
