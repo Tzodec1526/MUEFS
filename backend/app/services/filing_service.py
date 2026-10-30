@@ -157,6 +157,7 @@ def requirements_for_filing_type(
 
 async def validate_filing_destination(
     db: AsyncSession, data: FilingEnvelopeCreate | FilingEnvelope, *, filer_id: int | None,
+    lock: bool = True,
 ) -> Case | None:
     """Court review checks routing; intake also checks availability and filer access."""
     if data.filing_type not in ("initial", "subsequent", "motion", "service_only"):
@@ -173,12 +174,14 @@ async def validate_filing_destination(
         )
     # Read current scalar values, even if a caller previously loaded these records.
     # Shared locks keep configuration and case access stable until the receipt commits.
-    target = (await db.execute(
+    target_query = (
         select(Court.is_efiling_enabled, Court.intake_notice, CaseType.court_id, CaseType.is_active)
         .select_from(Court).join(CaseType, CaseType.id == data.case_type_id)
         .where(Court.id == data.court_id)
-        .with_for_update(read=True, of=(Court, CaseType))
-    )).one_or_none()
+    )
+    if lock:
+        target_query = target_query.with_for_update(read=True, of=(Court, CaseType))
+    target = (await db.execute(target_query)).one_or_none()
     if target is None:
         raise FilingDestinationError(404, "The selected court or case type was not found")
     if target.court_id != data.court_id:
@@ -195,11 +198,13 @@ async def validate_filing_destination(
         )
     case = None
     if data.case_id is not None:
-        case = await db.scalar(
+        case_query = (
             select(Case).where(Case.id == data.case_id)
-            .with_for_update(read=True)
             .execution_options(populate_existing=True)
         )
+        if lock:
+            case_query = case_query.with_for_update(read=True)
+        case = await db.scalar(case_query)
         if case is None:
             raise FilingDestinationError(404, "Case not found")
         filer = await db.get(User, filer_id) if filer_id is not None else None
@@ -523,7 +528,7 @@ async def submit_filing(
         )
     if not probe or probe.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
         return None
-    await validate_filing_destination(db, probe, filer_id=probe.filer_id)
+    await validate_filing_destination(db, probe, filer_id=probe.filer_id, lock=False)
     await verify_filing_documents(probe)
     fingerprints = [(doc.id, doc.sha256_hash, doc.file_size_bytes) for doc in probe.documents]
 

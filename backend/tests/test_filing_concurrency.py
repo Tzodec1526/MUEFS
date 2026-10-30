@@ -226,15 +226,15 @@ async def test_intake_change_waits_for_submission_to_commit(
     async with postgres_sessions() as db:
         filing = await db.get(FilingEnvelope, fid)
         court_id, case_type_id = filing.court_id, filing.case_type_id
-    reached_storage, release, changing = asyncio.Event(), asyncio.Event(), asyncio.Event()
-    verify = filing_service.verify_filing_documents
+    reached_receipt, release, changing = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    assess = filing_service.filing_date_for_receipt
 
-    async def pause_after_intake(filing):
-        await verify(filing)
-        reached_storage.set()
+    async def pause_after_intake(db, court_id, received_at):
+        reached_receipt.set()
         await release.wait()
+        return await assess(db, court_id, received_at)
 
-    monkeypatch.setattr(filing_service, "verify_filing_documents", pause_after_intake)
+    monkeypatch.setattr(filing_service, "filing_date_for_receipt", pause_after_intake)
 
     async def database():
         async with postgres_sessions.begin() as db:
@@ -268,7 +268,7 @@ async def test_intake_change_waits_for_submission_to_commit(
                 )
             )
             pending.append(submission)
-            await asyncio.wait_for(reached_storage.wait(), 5)
+            await asyncio.wait_for(reached_receipt.wait(), 5)
             closure = asyncio.create_task(close_intake())
             pending.append(closure)
             await asyncio.wait_for(changing.wait(), 5)
