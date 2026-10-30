@@ -39,7 +39,6 @@ interface CaseFiling {
 function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const { pushToast } = useToast();
-  // Read-only viewers: the signed-in 'public' role and anonymous guests (no role).
   const { role } = useContext(CourtContext)!;
   const isPublicViewer = role === 'public' || !role;
   const isFiler = role === 'attorney' || role === 'srl';
@@ -84,7 +83,6 @@ function CaseDetailPage() {
         setCaseData(caseRes.data);
         setFilings(filingsRes.data);
         setHasMoreFilings(filingsRes.data.length === 25);
-        // Fetch court name + case type label for a credible docket header
         const report = (err: unknown, fallback: string) => {
           const message = !controller.signal.aborted && actionErrorMessage(err, fallback);
           if (message) pushToast(message, 'error');
@@ -96,7 +94,6 @@ function CaseDetailPage() {
               report(err, "Could not load the court's name.");
               return `Court #${caseRes.data.court_id}`;
             }),
-          // Include types the court has closed to new cases: existing dockets still carry them.
           getCaseTypes(caseRes.data.court_id, true).catch((err: unknown) => {
             report(err, 'Could not load the case type name.');
             return [];
@@ -171,8 +168,6 @@ function CaseDetailPage() {
     } finally { setTogglingFav(false); }
   };
 
-  // Public dockets show register-of-actions language, not the internal e-filing
-  // review pipeline. Filers and court staff see the true status.
   const docketStatus = (status: string): { label: string; cls: string } => {
     if (!isPublicViewer) return { label: filingStatusLabel(status), cls: status };
     switch (status) {
@@ -192,7 +187,6 @@ function CaseDetailPage() {
 
   return (
     <div className="case-detail-page">
-      {/* Case Header */}
       <div className="case-detail-header">
         <div>
           <PageHeading>{caseData.title}</PageHeading>
@@ -237,7 +231,6 @@ function CaseDetailPage() {
         Contact the court to confirm your access.
       </p>}
 
-      {/* Case Info */}
       <div className="case-detail-grid">
         <div className="case-detail-card">
           <h2>Case information</h2>
@@ -249,7 +242,6 @@ function CaseDetailPage() {
           </div>
         </div>
 
-        {/* Parties */}
         <div className="case-detail-card">
           <h2>Participants ({caseData.participants.length})</h2>
           <div className="parties-list">
@@ -270,7 +262,6 @@ function CaseDetailPage() {
         </div>
       </div>
 
-      {/* Filing History / Docket */}
       <div className="case-detail-card">
         <h2>Docket</h2>
 

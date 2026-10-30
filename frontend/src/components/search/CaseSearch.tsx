@@ -129,8 +129,6 @@ function CaseSearch() {
     if (input.court_id) next.set('court', input.court_id);
     const request = searchRequestOf(next);
 
-    // Every submission starts exactly one search: a changed search or page through the URL,
-    // the search already shown on page 1 through reloadKey (the URL alone would not rerun it).
     if (request === searchRequest && page === 1) setReloadKey((key) => key + 1);
     else setSearchParams(next);
   };

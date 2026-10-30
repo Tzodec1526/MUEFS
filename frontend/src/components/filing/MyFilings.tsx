@@ -69,7 +69,6 @@ function MyFilings() {
         <Link to="/filing/new" className="btn btn-primary">New filing</Link>
       </div>
 
-      {/* Filters */}
       <div className="filings-controls">
         <div className="form-group">
           <label htmlFor="filingStatus">Filter by status</label>
@@ -138,7 +137,6 @@ function MyFilings() {
         </div>
       )}
 
-      {/* Pagination */}
       {total > 25 && (
         <div className="pagination">
           <button

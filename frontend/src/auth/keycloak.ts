@@ -26,11 +26,6 @@ export function accessToken(): string | null {
   return session?.key === sessionKey() ? session.client.token || null : null;
 }
 
-/**
- * Drops this tab's credentials once another tab signs out or signs in a different account
- * (the shared session marker no longer matches), so this tab continues anonymously
- * instead of cancelling every request until reload.
- */
 function forgetReplacedSession(): void {
   if (!session || session.key === sessionKey()) return;
   forgetLocalSession();
@@ -77,7 +72,6 @@ export function clearSession(expected?: SessionSnapshot): boolean {
 }
 
 export function migrateStoredToken(): void {
-  // Older versions persisted access tokens. Keep only a sign-in hint on upgrade.
   if (!localStorage.getItem('auth_token')) return;
   localStorage.removeItem('auth_token');
   if (!localStorage.getItem(SESSION_KEY)) {
@@ -111,7 +105,6 @@ function initialize(): Promise<Keycloak> {
       if (canceled || started !== generation) { client.clearToken(); throw new SessionChangedError(); }
       return client;
     })()).catch(error => {
-      // A timed-out initializer must never become a usable session later.
       canceled = true;
       if (started !== generation) throw new SessionChangedError();
       throw error;

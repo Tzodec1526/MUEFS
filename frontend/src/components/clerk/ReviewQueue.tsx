@@ -37,7 +37,6 @@ function ReviewQueue() {
   const reviewRequestRef = useRef<AbortController | null>(null);
   const reviewHeading = useRef<HTMLHeadingElement>(null);
   const queueHeading = useRef<HTMLHeadingElement>(null);
-  // Where the processed filings were, so focus can follow the queue once it reloads.
   const focusAfterRefresh = useRef<{ index: number; queue: ClerkQueue | null } | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
 
@@ -46,8 +45,6 @@ function ReviewQueue() {
     if (review?.filing || review?.error) reviewHeading.current?.focus();
   }, [review]);
 
-  // An action removes the control that had focus. Once the queue reloads, focus the row that
-  // took the first processed filing's place (the next one), or the heading if none remain.
   useEffect(() => {
     const pending = focusAfterRefresh.current;
     if (!pending || loading || queue === pending.queue) return;
@@ -73,7 +70,6 @@ function ReviewQueue() {
       await fetchQueue();
     } catch (err) {
       setReviewError(`Failed to ${action} filing #${filing.id}: ${errorMessage(err, ACTION_UNCONFIRMED)}`);
-      // The browser drops focus from a button disabled while the action ran; return it to the review.
       if (!document.activeElement || document.activeElement === document.body) reviewHeading.current?.focus();
     } finally {
       setActionInProgress(false);
@@ -96,7 +92,6 @@ function ReviewQueue() {
     } catch (err) {
       setReviewError(errorMessage(err, BATCH_UNCONFIRMED));
     } finally {
-      // Clearing the selection removes the batch bar and its focused button.
       focusAfterRefresh.current = { index: firstSelected, queue };
       setSelectedSubmissions(new Map());
       setActionInProgress(false);
@@ -195,7 +190,6 @@ function ReviewQueue() {
 
       {queueError && <LoadError failure={queueError} onRetry={fetchQueue} />}
 
-      {/* Batch actions */}
       {selectedSubmissions.size > 0 && statusFilter !== 'waivers' && (
         <div className="batch-actions">
           <span>{plural(selectedSubmissions.size, 'filing')} selected</span>
@@ -216,7 +210,6 @@ function ReviewQueue() {
       )}
 
       <div className={`queue-layout${review ? ' review-open' : ''}`} aria-busy={loading}>
-        {/* Filing List */}
         <div className="queue-list">
           <table>
             <thead>

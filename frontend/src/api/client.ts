@@ -8,9 +8,6 @@ import {
 import { isPublicPath } from '../auth/publicPath';
 import { demoUserId } from '../auth/session';
 
-// Same-origin by default: the hosted demo serves the API and UI together, and the
-// Vite dev proxy forwards /api to the backend. Set VITE_API_URL only for a split
-// deployment (separate frontend host + backend host).
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 type SessionConfig = InternalAxiosRequestConfig & { muefsSession?: SessionSnapshot };
 

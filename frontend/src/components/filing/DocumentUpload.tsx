@@ -24,23 +24,15 @@ interface Props {
   onBusyChange: (busy: boolean) => void;
 }
 
-// Flatten for quick lookup
 const ALL_TYPES = FILING_CATEGORIES.flatMap(cat => cat.types);
 const COURT_CATEGORY = "Listed in this court's rules";
 
-// MCR 2.119(A)(2): a motion presenting a question of law must be accompanied by a brief
-//   (the brief may be combined with the motion).
-// MCR 2.313(A): discovery motions require a meet-and-confer certification.
-// A proposed order is NOT required at filing (MCR 2.602 governs entry of orders) — it is
-//   recommended best practice, not a prerequisite.
 const COMPANION_RULES: {
   trigger: string[];
   required: { code: string; label: string; rule: string }[];
   recommended: { code: string; label: string; rule: string }[];
 }[] = [
   {
-    // MCR 2.119(A)(2) calls for a brief on motions raising a question of law, but the
-    // brief may be combined with the motion itself -- so it is recommended, not a blocker.
     trigger: [
       'MOT_SD', 'MOT_DISMISS', 'MOT_COMPEL', 'MOT_PROTECTIVE', 'MOT_SANCTIONS',
       'MOT_DEFAULT', 'MOT_SJ', 'MOT_LIMINE', 'MOT_RECONSIDER', 'MOT_RELIEF',
@@ -57,10 +49,6 @@ const COMPANION_RULES: {
     ],
   },
   {
-    // Discovery motions: a good-faith effort to resolve is a factor in awarding motion
-    // expenses (MCR 2.313(A)(5)) -- a certification is recommended best practice, not a
-    // required filing. (A non-party motion to compel must include the subpoena + proof of
-    // service, MCR 2.313(A)(2)(c).)
     trigger: ['MOT_COMPEL', 'MOT_PROTECTIVE', 'MOT_SANCTIONS'],
     required: [],
     recommended: [
@@ -68,7 +56,6 @@ const COMPANION_RULES: {
     ],
   },
   {
-    // Summary disposition motions benefit from affidavits
     trigger: ['MOT_SD', 'MOT_SJ'],
     required: [],
     recommended: [
@@ -76,7 +63,6 @@ const COMPANION_RULES: {
     ],
   },
   {
-    // Default judgment motions
     trigger: ['MOT_DEFAULT'],
     required: [
       { code: 'AFF_DEFAULT', label: getDocumentLabel('AFF_DEFAULT'), rule: 'MCR 2.603(A)' },
@@ -84,7 +70,6 @@ const COMPANION_RULES: {
     recommended: [],
   },
   {
-    // TRO/Preliminary injunction
     trigger: ['MOT_TRO', 'MOT_PRELIM_INJ'],
     required: [
       { code: 'AFFIDAVIT', label: 'Verified Complaint or Affidavit', rule: 'MCR 3.310(B)' },
@@ -134,14 +119,12 @@ function DocumentUpload({
   const [selectedCategory, setSelectedCategory] = useState('');
   const [docType, setDocType] = useState('');
   const [docTitle, setDocTitle] = useState('');
-  // The title this form last filled in from a type; a different title is the filer's own.
   const autoFilledTitle = useRef('');
   const [isConfidential, setIsConfidential] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { required, recommended } = getCompanionRequirements(documents.map(doc => doc.type));
-  // Validation matches the court's exact document codes; offer any the catalog lacks.
   const [courtTypes, setCourtTypes] = useState<typeof ALL_TYPES>([]);
   const [requirementsFailed, setRequirementsFailed] = useState<LoadFailure | null>(null);
   const [requirementsAttempt, setRequirementsAttempt] = useState(0);
@@ -175,7 +158,6 @@ function DocumentUpload({
     ? courtTypes
     : FILING_CATEGORIES.find(c => c.label === selectedCategory)?.types || [];
 
-  // Auto-fill the title from the type, and keep following the type until the filer edits it.
   const handleDocTypeChange = (code: string) => {
     setDocType(code);
     const typeInfo = allTypes.find(t => t.code === code);
@@ -230,7 +212,6 @@ function DocumentUpload({
       setIsConfidential(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: unknown) {
-      // Surface the backend detail (e.g. malware 422 "Rejected: ...", unsupported-type 415).
       setError(errorMessage(err, 'Could not confirm the upload. Retry with the same file, or refresh this filing to check its saved documents.'));
     } finally {
       setPendingAction(null);
@@ -283,7 +264,6 @@ function DocumentUpload({
         </div>
       )}
 
-      {/* Upload Form */}
       <div className="upload-form">
         <div className="form-row">
           <div className="form-group">
@@ -386,7 +366,6 @@ function DocumentUpload({
         </button>
       </div>
 
-      {/* Uploaded Documents List */}
       {documents.length > 0 && (
         <div className="uploaded-documents">
           <h3>Documents in this filing ({documents.length})</h3>
@@ -423,7 +402,6 @@ function DocumentUpload({
         </div>
       )}
 
-      {/* MCR Companion Document Requirements */}
       {(required.length > 0 || recommended.length > 0) && (
         <div className="companion-requirements">
           {required.length > 0 && (

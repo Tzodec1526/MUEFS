@@ -4,7 +4,6 @@ import { formatFee } from '../../utils/format';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 
-// Maps MCR/MCL references to official Michigan Courts URLs
 function getRuleUrl(ref: string): string | null {
   const base = 'https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702';
   const rules: Record<string, string> = {
@@ -25,14 +24,11 @@ function getRuleUrl(ref: string): string | null {
     'MCR 2.114': `${base}/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2114-signing-of-pleadings-affidavits-and-other-papers-representations-to-court-sanctions`,
   };
 
-  // Direct match
   if (rules[ref]) return rules[ref];
 
-  // Match base rule (e.g., "MCR 2.119(A)(2)" -> "MCR 2.119")
   const baseRef = ref.replace(/\(.*/, '').trim();
   if (rules[baseRef]) return rules[baseRef];
 
-  // MCL references go to legislature
   if (ref.startsWith('MCL ')) {
     const section = ref.replace('MCL ', '').replace(/\s/g, '');
     return `http://www.legislature.mi.gov/doc.aspx?mcl-${section}`;
@@ -149,7 +145,6 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
         requirements below to ensure you have all necessary documents.
       </p>
 
-      {/* Filters */}
       <div className="filter-row">
         <div className="form-group">
           <label htmlFor="categoryFilter">Category</label>
@@ -201,7 +196,6 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
         <p className="no-results">No case types match your filters.</p>
       )}
 
-      {/* Filing Requirements - shown after selecting a case type */}
       {selectedCaseTypeId && !currentRequirements && <p role="status">Loading filing requirements…</p>}
       {currentRequirements?.error && <LoadError failure={currentRequirements.error}
         onRetry={() => setRequirementsAttempt(attempt => attempt + 1)} />}

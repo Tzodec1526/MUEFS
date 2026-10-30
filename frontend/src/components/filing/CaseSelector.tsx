@@ -40,9 +40,6 @@ function CaseSelector({
 
   useEffect(() => () => searchRequest.current?.abort(), [courtId]);
 
-  // Resolve case-type names so an existing-case selection carries a readable
-  // type through to the review screen (existing cases skip the case-type step).
-  // Existing cases keep types the court has since closed to new cases, so include those.
   useEffect(() => {
     let active = true;
     getCaseTypes(courtId, true)
@@ -67,7 +64,6 @@ function CaseSelector({
     setHasSearched(true);
     setError(null);
     try {
-      // Search by case number AND by party name, then merge — one box, either input.
       const [byNum, byParty] = await Promise.all([
         searchCases({ court_id: courtId, case_number: query.trim() }, controller.signal),
         searchCases({ court_id: courtId, party_name: query.trim() }, controller.signal),

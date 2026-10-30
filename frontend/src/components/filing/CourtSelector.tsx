@@ -44,9 +44,6 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
   const [favoritedCourtIds, setFavoritedCourtIds] = useState<Set<number>>(() => new Set());
   const [togglingFav, setTogglingFav] = useState<number | null>(null);
 
-  // Statewide/appellate forums (Court of Appeals, Supreme Court, Court of Claims) apply
-  // regardless of county -- load them once and always surface them in their own group so
-  // they are never buried under a county filter.
   useEffect(() => {
     const controller = new AbortController();
     listCourts({ tier: 'appellate', page_size: 50 }, controller.signal)
@@ -125,8 +122,6 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
     }
   };
 
-  // The statewide group is small; filter it client-side by search + type. County filter
-  // does NOT hide it (these courts have statewide jurisdiction).
   const q = search.trim().toLowerCase();
   const visibleStatewide = statewideCourts.filter((c) =>
     (!typeFilter || c.court_type === typeFilter) &&
@@ -146,7 +141,6 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
     const typeLabel = courtTypeLabel(court.court_type);
     const detailsId = `court-card-${court.id}-details`;
     const addressId = `court-card-${court.id}-address`;
-    // Selecting and starring are sibling buttons; the select button's click area covers the card.
     return (
       <div key={court.id} className={`court-card ${selectedCourtId === court.id ? 'selected' : ''}`}>
         <div className="court-card-head">
@@ -224,7 +218,6 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
       </div>
 
       {error || statewideFailed ? (
-        // Missing appellate courts would otherwise look like an empty statewide list.
         <LoadError failure={(error || statewideFailed)!}
           onRetry={() => setReloadKey((k) => k + 1)} />
       ) : (

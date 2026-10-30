@@ -1,4 +1,3 @@
-/** Pull the FastAPI/axios error detail string out of an unknown error, if present. */
 export function getErrorDetail(err: unknown): string | undefined {
   const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
   if (typeof detail === 'string') return detail;
@@ -28,7 +27,6 @@ export function loadFailure(err: unknown, fallback: string): LoadFailure {
   return { message: errorMessage(err, fallback), retry: status !== 401 && status !== 403 };
 }
 
-/** getErrorDetail for `responseType: 'blob'` requests, whose error bodies arrive as Blobs. */
 export async function getBlobErrorDetail(err: unknown): Promise<string | undefined> {
   const body = (err as { response?: { data?: unknown } })?.response?.data;
   if (!(body instanceof Blob)) return getErrorDetail(err);

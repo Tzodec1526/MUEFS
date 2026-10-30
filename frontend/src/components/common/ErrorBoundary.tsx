@@ -9,10 +9,6 @@ interface State {
   hasError: boolean;
 }
 
-/**
- * Top-level boundary so an unexpected render error shows a recoverable message
- * instead of a blank white screen.
- */
 function ErrorFallback() {
   usePageTitle('Something went wrong');
   return (

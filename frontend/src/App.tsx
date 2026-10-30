@@ -123,7 +123,6 @@ function App() {
       <Routes>
         <Route path="/login" element={<LoginScreen />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
-        {/* Authenticated routes */}
         <Route
           path="*"
           element={

@@ -99,10 +99,8 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
     setSaveErrorStep(currentStep);
     setSaveError('');
   }
-  // Why a case-linked filing has no caption yet: the court's case record did not load.
   const [caseLookupError, setCaseLookupError] = useState<LoadFailure | null>(null);
 
-  // Load the saved envelope, or resolve display labels for a new filing's URL prefill.
   useEffect(() => {
     const filingId = requestedFilingId;
     if (filingId) {
@@ -114,7 +112,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
           const envelope = await getFiling(Number(filingId), controller.signal);
           const [court, types, linkedCase] = await Promise.all([
             getCourt(envelope.court_id),
-            getCaseTypes(envelope.court_id, true), // Preserve disabled case-type labels on saved records.
+            getCaseTypes(envelope.court_id, true),
             envelope.case_id ? getCase(envelope.case_id).catch((err: unknown) => {
               const message = !controller.signal.aborted && actionErrorMessage(err, 'Could not load the case number.');
               if (message) emitToast(message, 'error');
@@ -179,12 +177,10 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
         report(err, "Could not load the court's name.");
         return { name: `Court #${courtId}` };
       }),
-      // A display label for an existing case: keep it after the court closes the type to new cases.
       caseTypeId ? getCaseTypes(Number(courtId), true).catch((err: unknown) => {
         report(err, 'Could not load the case type name.');
         return [];
       }) : Promise.resolve([]),
-      // The court's case record, not the link, names the case being filed into.
       caseId
         ? getCase(Number(caseId)).then(
           (docket): CaseLookup => ({ docket }),
@@ -222,7 +218,6 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
         creationKey ??= crypto.randomUUID();
         const pending = { ...filingData, creationKey };
         setFilingData(pending);
-        // Persist before sending: a response can be lost even when the server commits.
         setRecoveryAvailable(saveFilingDraft(draftKey, pending));
       }
       const filing = filingData.filingId
@@ -235,7 +230,6 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
           case_type_id: filingData.caseTypeId!, filing_type: filingData.filingType,
           case_title: filingData.caseTitle, filing_description: filingData.filingDescription,
         }, creationKey!);
-      // Leaving the workspace must not clear recovery or navigate a different account.
       if (!mounted.current) return false;
       setLoadedFiling(filing);
       setFilingData(previous => ({ ...previous, filingId: filing.id, detailsToken: filing.details_token }));
@@ -268,7 +262,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
           const latest = await getFiling(filingData.filingId);
           if (mounted.current) { setConflict(latest); setSaveError(''); }
         }
-        catch { /* Keep the edits and original precondition if comparison cannot load. */ }
+        catch {}
       }
       return false;
     } finally { if (mounted.current) setSaving(false); }
@@ -369,7 +363,6 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
         </label>
       </div>
 
-      {/* Draft Recovery Banner */}
       {showDraftBanner && !conflict && (
         <div className="draft-banner">
           <span>Recovered unsaved edits from this tab. Save them to your account before closing the tab.</span>
@@ -412,7 +405,6 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
         onSelect={goToStep}
       />
 
-      {/* Filing Summary Sidebar */}
       {filingData.courtId && currentStep !== 'review' && (
         <div className="filing-summary-bar">
           <span><strong>Court:</strong> {filingData.courtName}</span>
@@ -426,7 +418,6 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
         </div>
       )}
 
-      {/* Validation Errors */}
       {(errors.length > 0 || saveError) && (
         <div className="alert alert-error" role="alert" ref={saveErrorBox} tabIndex={-1}>
           {errors.map((e, i) => <p key={i}>{e}</p>)}
@@ -434,14 +425,12 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
         </div>
       )}
 
-      {/* Step Content */}
       <div className="wizard-content">
         {currentStep === 'court' && (
           <CourtSelector
             selectedCourtId={filingData.courtId}
             onSelect={(courtId, courtName) => {
               if (courtId === filingData.courtId) return;
-              // Changing court invalidates any case picked in another court.
               updateData({
                 courtId, courtName,
                 caseTypeId: null, caseTypeName: '',
@@ -534,7 +523,6 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
         )}
       </div>
 
-      {/* Navigation */}
       {!submission && (
         <div className="wizard-nav">
           <button

@@ -26,6 +26,5 @@ function renderApp() {
 
 if (window.location.pathname === '/auth/callback') {
   root.render(<p className="loading" role="status">Completing sign-in…</p>);
-  // The adapter consumes OAuth parameters before the router reads the URL.
   void handleKeycloakCallback().catch(() => {}).finally(renderApp);
 } else renderApp();

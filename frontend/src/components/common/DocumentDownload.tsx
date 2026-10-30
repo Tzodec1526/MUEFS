@@ -10,7 +10,6 @@ export default function DocumentDownload({ id, title, copyId, deliveryId }: { id
     setBusy(true);
     setError(null);
     try {
-      // Use the authenticated client: ordinary links cannot carry an OIDC bearer token.
       const path = deliveryId ? `/service/deliveries/${deliveryId}/documents/${id}`
         : copyId ? `/document-public-copies/${copyId}/download` : `/documents/${id}/download`;
       const { data, headers } = await apiClient.get<Blob>(path, { responseType: 'blob' });
@@ -22,7 +21,6 @@ export default function DocumentDownload({ id, title, copyId, deliveryId }: { id
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
-      // A failed integrity check is permanent; do not present it as a transient error.
       setError(await getBlobErrorDetail(err) || errorMessage(err, 'Download unavailable. Please retry.'));
     } finally {
       setBusy(false);

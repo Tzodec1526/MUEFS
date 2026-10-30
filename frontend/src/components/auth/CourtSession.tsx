@@ -90,19 +90,15 @@ export function CourtWorkspace({ children }: { children: ReactNode }) {
   if (loading) return <CourtWorkspaceLoading />;
   if (error) return <CourtWorkspaceUnavailable failure={error} onRetry={refresh} />;
   if (!court) return <CourtAssignmentNeeded refresh={refresh} />;
-  // Changing courts discards selections, pagination and pending reads from the prior court.
   return <Fragment key={court.court_id}>{children}</Fragment>;
 }
 
-// Set when the focused working-court select changes courts. CourtWorkspace then remounts the
-// page for the new court, replacing the select, and the replacement takes focus back.
 let refocusCourtSelect = false;
 
 export function StaffCourtSelect({ disabled = false, onChange }: { disabled?: boolean; onChange?: () => void }) {
   const { court, courts, selectCourt, refresh } = useContext(CourtContext)!;
   const select = useRef<HTMLSelectElement>(null);
   const courtId = court?.court_id;
-  // Runs in the commit that applies the change, for a replacement or for this same select.
   useLayoutEffect(() => {
     if (!refocusCourtSelect) return;
     refocusCourtSelect = false;

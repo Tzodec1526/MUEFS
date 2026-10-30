@@ -57,7 +57,6 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
     setFees({ key, token: updated.submission_token, obligationMet });
     setResult(previous => {
       const reviewed = previous?.filing;
-      // Payment changes the submission token, but does not invalidate unchanged filing content.
       if (previous?.key !== key || !reviewed
         || reviewed.details_token !== updated.details_token
         || reviewed.court_id !== updated.court_id
@@ -155,7 +154,6 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
         This filing is now {filingStatusInSentence(filing.status)}. <Link to={`/filings/${filingId}/history`}>View its receipt and current status</Link>.
       </p>}
 
-      {/* Filing Summary */}
       <div className="review-card review-summary">
         <h3>Court and case information</h3>
         <div className="review-grid">
@@ -180,7 +178,6 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
         )}
       </div>
 
-      {/* Documents */}
       <div className="review-card review-summary">
         <h3>Documents ({filing.documents.length})</h3>
         {filing.documents.length > 0 ? (
@@ -222,7 +219,6 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
         />
       )}
 
-      {/* Validation Results */}
       {validation && (
         <div className={`validation-results ${validation.is_valid ? 'valid' : 'invalid'}`} role="alert">
           <h3>{validation.is_valid ? 'Checks passed' : 'Issues found'}</h3>

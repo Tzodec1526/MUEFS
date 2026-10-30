@@ -17,8 +17,6 @@ function NotificationBell() {
   const toggleRef = useRef<HTMLButtonElement>(null);
   const panelId = useId();
 
-  // A disclosure: it closes on Escape (returning focus to its button), on a click outside,
-  // and when keyboard focus moves outside it (see onBlur below).
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: MouseEvent) => {
@@ -65,8 +63,6 @@ function NotificationBell() {
       className="notification-bell"
       ref={rootRef}
       onBlur={(event) => {
-        // Focus that moves to another control outside closes the panel; a click on the panel's
-        // own text (no new focus target) does not.
         const next = event.relatedTarget as Node | null;
         if (open && next && !event.currentTarget.contains(next)) setOpen(false);
       }}
