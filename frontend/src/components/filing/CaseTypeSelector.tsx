@@ -30,8 +30,8 @@ function getRuleUrl(ref: string): string | null {
   if (rules[baseRef]) return rules[baseRef];
 
   if (ref.startsWith('MCL ')) {
-    const section = ref.replace('MCL ', '').replace(/\s/g, '');
-    return `http://www.legislature.mi.gov/doc.aspx?mcl-${section}`;
+    const section = baseRef.replace('MCL ', '').replace(/\s*et seq\.?$/, '').replace('.', '-');
+    return `https://www.legislature.mi.gov/Laws/MCL?objectName=mcl-${section}`;
   }
 
   return null;

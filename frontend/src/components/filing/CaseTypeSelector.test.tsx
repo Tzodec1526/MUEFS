@@ -76,6 +76,23 @@ it('writes requirements as a plain checklist with the rule cited as text and no 
   expect(document.body.textContent).not.toMatch(/COMPLAINT|EXHIBIT/);
 });
 
+it('links statutes to the section page and court rules to the rule page', async () => {
+  const citing = (id: number, mcr_reference: string): FilingRequirement => ({ ...complaint, id, mcr_reference });
+  vi.mocked(getFilingRequirements).mockResolvedValue([
+    citing(1, 'MCL 600.2201 et seq.'), citing(2, 'MCL 600.2912d'), citing(3, 'MCL 600.2950(3)'), citing(4, 'MCR 2.111'),
+  ]);
+  render(<Harness />);
+
+  fireEvent.click(await screen.findByRole('radio', { name: /General Civil/ }));
+
+  const hrefFor = async (name: string) => (await screen.findByRole('link', { name })).getAttribute('href');
+  const statute = 'https://www.legislature.mi.gov/Laws/MCL?objectName=mcl-';
+  expect(await hrefFor('MCL 600.2201 et seq.')).toBe(`${statute}600-2201`);
+  expect(await hrefFor('MCL 600.2912d')).toBe(`${statute}600-2912d`);
+  expect(await hrefFor('MCL 600.2950(3)')).toBe(`${statute}600-2950`);
+  expect(await hrefFor('MCR 2.111')).toMatch(/rule-2111-general-rules-of-pleading$/);
+});
+
 it('finds case types by name, not by internal code', async () => {
   render(<Harness />);
   await screen.findByRole('radio', { name: /General Civil/ });
