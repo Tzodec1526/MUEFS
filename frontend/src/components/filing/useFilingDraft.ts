@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { FilingEnvelope } from '../../api/filings';
 import {
   filingDraftKey, loadFilingDraft, saveFilingDraft, clearFilingDraft, type FilingDraft,
@@ -42,6 +42,23 @@ function initialFilingData(draft: FilingDraft | null, requestedFilingId: string 
   };
 }
 
+function createRecoveryStatus() {
+  let available = true;
+  const listeners = new Set<() => void>();
+  return {
+    isAvailable: () => available,
+    report(next: boolean) {
+      if (next === available) return;
+      available = next;
+      listeners.forEach(listener => listener());
+    },
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+  };
+}
+
 export function useFilingDraft(userId: number, searchParams: URLSearchParams, { loadedFiling, submission, paused }: {
   loadedFiling: FilingEnvelope | null; submission: FilingEnvelope | undefined; paused: boolean;
 }) {
@@ -49,7 +66,8 @@ export function useFilingDraft(userId: number, searchParams: URLSearchParams, { 
   const draftKey = filingDraftKey(userId, requestedFilingId || `new:${searchParams.toString()}`);
   const [draft] = useState(() => loadFilingDraft(draftKey));
   const [filingData, setFilingData] = useState<FilingData>(() => initialFilingData(draft, requestedFilingId, searchParams));
-  const [recoveryAvailable, setRecoveryAvailable] = useState(true);
+  const [recovery] = useState(createRecoveryStatus);
+  const recoveryAvailable = useSyncExternalStore(recovery.subscribe, recovery.isAvailable);
   const dirty = !submission && (filingData.filingId
     ? loadedFiling !== null && (filingData.caseTitle !== (loadedFiling.case_title ?? '')
       || filingData.filingDescription !== (loadedFiling.filing_description ?? ''))
@@ -58,12 +76,11 @@ export function useFilingDraft(userId: number, searchParams: URLSearchParams, { 
   useEffect(() => {
     if (paused) return;
     if (dirty) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- expose whether external recovery storage accepted the current edit
-      setRecoveryAvailable(saveFilingDraft(draftKey, filingData));
+      recovery.report(saveFilingDraft(draftKey, filingData));
     } else {
       clearFilingDraft(draftKey);
     }
-  }, [draftKey, filingData, dirty, paused]);
+  }, [draftKey, filingData, dirty, paused, recovery]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -75,5 +92,8 @@ export function useFilingDraft(userId: number, searchParams: URLSearchParams, { 
     return () => window.removeEventListener('beforeunload', warnBeforeClose);
   }, [dirty]);
 
-  return { draftKey, draft, filingData, setFilingData, dirty, recoveryAvailable, setRecoveryAvailable };
+  return {
+    draftKey, draft, filingData, setFilingData, dirty, recoveryAvailable,
+    setRecoveryAvailable: recovery.report,
+  };
 }
