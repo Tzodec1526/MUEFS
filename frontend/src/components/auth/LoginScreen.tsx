@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Scale, ClipboardCheck, UserRound, BookOpen, ShieldCheck } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import { isDemoBuild } from '../../config/demoMode';
 import MichiganMark from '../common/MichiganMark';
 import {
@@ -15,38 +13,14 @@ interface RoleOption {
   role: string;
   label: string;
   description: string;
-  icon: LucideIcon;
 }
 
 const roles: RoleOption[] = [
-  {
-    role: 'attorney',
-    label: 'Attorney',
-    description: 'File and track cases on behalf of clients',
-    icon: Scale,
-  },
-  {
-    role: 'clerk',
-    label: 'Court Clerk',
-    description: 'Review filings, manage the court queue, process orders',
-    icon: ClipboardCheck,
-  },
-  {
-    role: 'srl',
-    label: 'Self-Represented Litigant',
-    description: 'File your own case with step-by-step, plain-language guidance',
-    icon: UserRound,
-  },
-  {
-    role: 'public',
-    label: 'Public docket',
-    description: 'Search non-sealed cases and read public filings — no sign-in or account needed',
-    icon: BookOpen,
-  },
-  {
-    role: 'admin', label: 'System Administrator', icon: ShieldCheck,
-    description: 'Provision accounts, manage court access, and inspect retained changes in this demo',
-  },
+  { role: 'attorney', label: 'Attorney', description: 'File and track cases for clients' },
+  { role: 'clerk', label: 'Court clerk', description: 'Review filings, manage the court queue and process orders' },
+  { role: 'srl', label: 'Self-represented litigant', description: 'File your own case with step-by-step guidance' },
+  { role: 'public', label: 'Public docket', description: 'Search non-sealed cases and read public filings without an account' },
+  { role: 'admin', label: 'System administrator', description: 'Manage accounts, court access and retained changes' },
 ];
 
 function LoginScreen() {
@@ -88,72 +62,55 @@ function LoginScreen() {
   };
 
   return (
-    <div className="login-screen">
-      <main className="login-container">
-        <div className="login-branding">
-          <div className="state-seal">
-            <MichiganMark size={30} />
-            STATE OF MICHIGAN
-          </div>
-          <p className="login-product">Michigan Unified E-Filing System</p>
-          <p className="login-subtitle">{demo ? 'Demo · ' : ''}Statewide Electronic Filing Portal</p>
-        </div>
-        <div className="login-heading"><PageHeading>Sign in</PageHeading></div>
+    <main className="login-screen">
+      <p className="login-product">
+        <MichiganMark size={30} />
+        Michigan Unified E-Filing System
+      </p>
+      <PageHeading>Sign in</PageHeading>
+      {demo && <p className="login-demo-note">Demo — not for real filings.</p>}
 
-        {demo && <div className="login-cards">
-          {roles.map((option) => (
-            <div
-              key={option.role}
-              className="login-card"
-            >
-              <div className="login-card-icon">
-                <option.icon size={26} strokeWidth={1.75} aria-hidden="true" />
-              </div>
-              <div className="login-card-role">
-                {option.label}
-              </div>
-              <div className="login-card-desc">{option.description}</div>
-              <button
-                className="btn btn-primary login-card-btn"
-                onClick={() => handleSignIn(option)}
-                // Four cards share the visible "Sign In"; the name says which role each opens.
-                aria-label={option.role === 'public' ? undefined : `Sign in as ${option.label}`}
-              >
-                {option.role === 'public' ? 'Browse records' : 'Sign In'}
-              </button>
+      {demo && <ul className="login-roles">
+        {roles.map((option) => (
+          <li key={option.role}>
+            <div>
+              <strong>{option.label}</strong>
+              <span>{option.description}</span>
             </div>
-          ))}
-        </div>}
-
-        {keycloakConfigured() && (
-          <div className="login-keycloak">
             <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => void signIn()}
-              disabled={signingIn}
+              className="btn btn-primary btn-small"
+              onClick={() => handleSignIn(option)}
+              aria-label={option.role === 'public' ? undefined : `Sign in as ${option.label}`}
             >
-              {signingIn ? 'Connecting to court sign-in…' : 'Sign in with your court account'}
+              {option.role === 'public' ? 'Browse records' : 'Sign in'}
             </button>
-            {signInError && <p className="login-message" role="alert">{signInError}</p>}
-            {searchParams.get('reason') === 'expired' && <p className="login-message" role="status">Your court sign-in expired. Sign in again to continue. Unsaved filing drafts are still on this device.</p>}
-            <p className="login-keycloak-note">
-              Use the identity account approved by your court or state.
-            </p>
-          </div>
-        )}
+          </li>
+        ))}
+      </ul>}
 
-        {!demo && <div className="login-keycloak">
-          {!keycloakConfigured() && <p className="login-message" role="alert">Sign-in is not configured for this deployment. Contact the court&apos;s support team.</p>}
-          <Link className="btn btn-secondary" to="/cases/search">Browse public records</Link>
-        </div>}
-      </main>
-      {isDemoBuild() && (
-        <div className="demo-stakeholder-banner demo-stakeholder-banner--login" role="status">
-          Demo — not for real filings.
+      {keycloakConfigured() && (
+        <div className="login-keycloak">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => void signIn()}
+            disabled={signingIn}
+          >
+            {signingIn ? 'Connecting to court sign-in…' : 'Sign in with your court account'}
+          </button>
+          {signInError && <p role="alert">{signInError}</p>}
+          {searchParams.get('reason') === 'expired' && <p role="status">Your court sign-in expired. Sign in again to continue. Unsaved filing drafts are still on this device.</p>}
+          <p>Use the identity account approved by your court or state.</p>
         </div>
       )}
-    </div>
+
+      {!demo && <div className="login-keycloak">
+        {!keycloakConfigured() && <p role="alert">Sign-in is not configured for this deployment. Contact the court&apos;s support team.</p>}
+        <Link className="btn btn-secondary" to="/cases/search">Browse public records</Link>
+      </div>}
+
+      <p className="login-about"><Link to="/about">About MUEFS</Link></p>
+    </main>
   );
 }
 

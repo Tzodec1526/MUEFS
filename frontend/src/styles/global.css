@@ -58,12 +58,6 @@ h1, h2 {
   font-size: 1.5em;
 }
 
-.login-heading h1 {
-  color: var(--white);
-  font-size: 1.25rem;
-  margin-bottom: 1rem;
-}
-
 @media (prefers-reduced-motion: reduce) {
 }
 
@@ -79,12 +73,6 @@ h1, h2 {
   gap: 1rem;
   flex-wrap: wrap;
   text-align: center;
-}
-
-.demo-stakeholder-banner--login {
-  margin-top: 1.5rem;
-  background: none;
-  color: var(--white);
 }
 
 .demo-stakeholder-banner .demo-banner-link {
@@ -231,23 +219,6 @@ h1, h2 {
   gap: 0.35rem;
   font-size: 0.85rem;
   color: var(--muted);
-}
-
-.login-keycloak {
-  margin: 1.25rem 0;
-  text-align: center;
-}
-
-.login-keycloak-note {
-  margin: 0.5rem 0 0;
-  font-size: 0.8rem;
-  color: var(--field);
-}
-
-.login-message {
-  max-width: 42rem;
-  margin: 1rem auto;
-  color: var(--rule);
 }
 
 .app-body {
@@ -1914,8 +1885,7 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 }
 
 .app-header :focus-visible,
-.app-footer :focus-visible,
-.login-screen :focus-visible {
+.app-footer :focus-visible {
   outline-color: var(--white);
 }
 
@@ -2382,113 +2352,71 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
    ============================================ */
 
 .login-screen {
+  max-width: 40rem;
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: var(--accent-dark);
-  padding: 2rem;
-}
-
-.login-container {
-  width: 100%;
-  max-width: 1280px;
-  text-align: center;
-}
-
-.login-branding {
-  color: var(--white);
-  margin-bottom: 2.5rem;
-}
-
-.state-seal {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--on-dark-muted);
-  margin-bottom: 1rem;
+  margin-inline: auto;
+  padding: 3rem 1.5rem;
 }
 
 .login-product {
-  line-height: 1.25;
-  font-size: 2.5rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-}
-
-.login-subtitle {
-  font-size: 1.1rem;
-  color: var(--on-dark-muted);
-}
-
-.login-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 1.25rem;
-  margin-bottom: 2rem;
-}
-
-.login-card {
-  background: var(--white);
-  border-radius: var(--radius);
-  padding: 2rem 1.5rem 1.5rem;
-  text-align: center;
-  cursor: default;
   display: flex;
-  flex-direction: column;
   align-items: center;
-}
-
-.login-card-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  background: var(--tint);
-  border: 1px solid var(--rule);
+  gap: 0.6rem;
+  margin-bottom: 2rem;
   color: var(--accent);
-  font-size: 1.6rem;
-  margin-bottom: 0.9rem;
-}
-
-.login-card-role {
-  font-size: 0.78rem;
-  color: var(--ink);
+  font-size: 1.1rem;
   font-weight: 700;
-  margin-bottom: 0.5rem;
 }
 
-.login-card-desc {
-  font-size: 0.82rem;
+.login-screen h1 {
+  font-size: 1.5rem;
+}
+
+.login-demo-note {
+  margin-top: 0.25rem;
   color: var(--muted);
-  line-height: 1.55;
-  margin-bottom: 1.25rem;
-  flex: 1;
 }
 
-.login-card-btn {
-  width: 100%;
-  padding: 0.6rem 1rem;
-  font-size: 0.95rem;
-  font-weight: 600;
+.login-roles {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+  list-style: none;
 }
 
-@media (max-width: 768px) {
-  .login-cards {
-    grid-template-columns: 1fr;
-    max-width: 360px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-  .login-product {
-    font-size: 1.6rem;
-  }
+.login-roles li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.login-roles strong,
+.login-roles span {
+  display: block;
+}
+
+.login-roles span {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.login-roles .btn {
+  flex-shrink: 0;
+}
+
+.login-keycloak {
+  margin-top: 2rem;
+}
+
+.login-keycloak p {
+  margin-top: 0.5rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.login-about {
+  margin-top: 2rem;
 }
 
 /* ============================================

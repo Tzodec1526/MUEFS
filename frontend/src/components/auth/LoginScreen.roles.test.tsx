@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import LoginScreen from './LoginScreen';
@@ -19,10 +19,37 @@ it('gives each demo role button a name that says which role it opens', () => {
 
   // getByRole fails on duplicates, so each name must identify exactly one button.
   for (const name of [
-    'Sign in as Attorney', 'Sign in as Court Clerk', 'Sign in as Self-Represented Litigant',
-    'Sign in as System Administrator', 'Browse records',
+    'Sign in as Attorney', 'Sign in as Court clerk', 'Sign in as Self-represented litigant',
+    'Sign in as System administrator', 'Browse records',
   ]) expect(screen.getByRole('button', { name })).toBeTruthy();
-  expect(screen.queryAllByRole('button', { name: 'Sign In' })).toEqual([]);
+  expect(screen.queryAllByRole('button', { name: 'Sign in' })).toEqual([]);
   // The visible text stays as it was and is part of each name.
-  expect(screen.getByRole('button', { name: 'Sign in as Court Clerk' }).textContent).toBe('Sign In');
+  expect(screen.getByRole('button', { name: 'Sign in as Court clerk' }).textContent).toBe('Sign in');
+});
+
+it('lists each demo role with one line of description and no decoration', () => {
+  render(<MemoryRouter initialEntries={['/login']}><LoginScreen /></MemoryRouter>);
+
+  const items = within(screen.getByRole('list')).getAllByRole('listitem');
+  expect(items.map(item => item.querySelector('strong')?.textContent)).toEqual([
+    'Attorney', 'Court clerk', 'Self-represented litigant', 'Public docket', 'System administrator',
+  ]);
+  expect(items.every(item => item.querySelector('span')?.textContent)).toBe(true);
+  expect(screen.queryByText(/State of Michigan/i)).toBeNull();
+  expect(screen.queryByText(/Statewide Electronic Filing Portal/i)).toBeNull();
+  expect(document.querySelector('svg:not(.michigan-outline)')).toBeNull();
+});
+
+it('signs in with the chosen role', () => {
+  render(<MemoryRouter initialEntries={['/login']}><LoginScreen /></MemoryRouter>);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Sign in as Court clerk' }));
+
+  expect(localStorage.getItem('demo_role')).toBe('clerk');
+});
+
+it('links to the About page', () => {
+  render(<MemoryRouter initialEntries={['/login']}><LoginScreen /></MemoryRouter>);
+
+  expect(screen.getByRole('link', { name: 'About MUEFS' }).getAttribute('href')).toBe('/about');
 });
