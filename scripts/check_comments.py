@@ -14,6 +14,7 @@ SCRIPT_SCANNER = ROOT / "scripts" / "check-comments.cjs"
 SCRIPT_SUFFIXES = {".ts", ".tsx", ".js", ".mjs", ".cjs"}
 NO_COMMENT_SYNTAX = {".md", ".pdf", ".woff2", ".cdb", ".txt"}
 NO_COMMENT_NAMES = {"LICENSE"}
+PIP_FILE_NAMES = {"constraints.txt"}
 LINE_START_NAMES = {".gitignore", ".dockerignore", ".gitattributes"}
 LINE_START_SUFFIXES = {".conf"}
 SHELL_WORD_BREAKS = " \t;&|("
@@ -339,6 +340,8 @@ def is_ignore_file(path):
 
 def scan_file(name, path, scripts):
     suffix = path.suffix
+    if path.name in PIP_FILE_NAMES:
+        return env_findings(path.read_text(encoding="utf-8"))
     if path.name in NO_COMMENT_NAMES or suffix in NO_COMMENT_SYNTAX:
         return []
     if suffix in SCRIPT_SUFFIXES:

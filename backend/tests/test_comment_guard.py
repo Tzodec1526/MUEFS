@@ -13,6 +13,25 @@ def comments_in(source: str) -> list[str]:
     return [text for _, text in check_comments.yaml_findings(source)]
 
 
+@pytest.mark.parametrize(("source", "comment"), [
+    ("# refresh with pip freeze\nfastapi==0.162.0\n", "# refresh with pip freeze"),
+    ("fastapi==0.162.0  # keep\n", "# keep"),
+])
+def test_a_comment_in_the_constraints_file_is_found(tmp_path, source, comment) -> None:
+    pins = tmp_path / "constraints.txt"
+    pins.write_text(source, encoding="utf-8")
+    assert [text for _, text in check_comments.scan_file("constraints.txt", pins, [])] == [comment]
+
+
+def test_plain_pins_and_other_text_files_pass(tmp_path) -> None:
+    pins = tmp_path / "constraints.txt"
+    pins.write_text('anyio==4.13.0\nuvloop==0.22.1; sys_platform != "win32"\n', encoding="utf-8")
+    licence = tmp_path / "OFL.txt"
+    licence.write_text("# Not a comment in a licence", encoding="utf-8")
+    assert check_comments.scan_file("constraints.txt", pins, []) == []
+    assert check_comments.scan_file("OFL.txt", licence, []) == []
+
+
 @pytest.mark.parametrize(("line", "comment"), [
     ("run: echo hi # comment", "# comment"),
     ('run: echo "hello # world"', '# world"'),
