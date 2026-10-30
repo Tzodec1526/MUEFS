@@ -12,6 +12,7 @@ import WizardStepper from './WizardStepper';
 import DraftConflict from './DraftConflict';
 import DetailsStep from './DetailsStep';
 import { defaultFilingData, useFilingDraft, type FilingData } from './useFilingDraft';
+import { useWizardSteps } from './useWizardSteps';
 import { emitToast } from '../../utils/toastBus';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { createFiling, getFiling, updateFiling, type FilingEnvelope } from '../../api/filings';
@@ -22,45 +23,12 @@ import {
   hasPlainLanguagePreference,
   isPlainLanguageMode,
   setPlainLanguageMode,
-  plainStepLabel,
 } from '../../utils/srlMode';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
 import PageLoadError from '../common/PageLoadError';
 
 const CASE_LOOKUP_FAILED = "We couldn't load the court's record for this case, so its title is missing.";
-
-type WizardStep = 'court' | 'case' | 'case-type' | 'details' | 'documents' | 'review';
-
-// Steps adapt to the filing: a new case adds Case Type + Case Details; filing into an
-// existing case skips Case Type (it's known from the case).
-function buildSteps(filingType: string): { key: WizardStep; label: string }[] {
-  const isNewCase = filingType === 'initial';
-  return [
-    { key: 'court', label: 'Select Court' },
-    { key: 'case', label: 'Case' },
-    ...(isNewCase
-      ? [{ key: 'case-type' as WizardStep, label: 'Case Type & Rules' }]
-      : []),
-    { key: 'details', label: isNewCase ? 'Case Details' : 'Filing Details' },
-    { key: 'documents', label: 'Documents' },
-    { key: 'review', label: 'Review & Submit' },
-  ];
-}
-
-const STEP_ERRORS: Record<WizardStep, { plain: string; standard: string }> = {
-  court: { plain: 'Choose the court where you want to file.', standard: 'Please select a court to continue.' },
-  case: { plain: 'Pick an existing case or start a new one.', standard: 'Please choose an existing case or start a new case.' },
-  'case-type': { plain: 'Select what kind of case this is.', standard: 'Please select a case type to continue.' },
-  details: { plain: 'Add a short title describing your filing.', standard: 'Please enter a case title to continue.' },
-  documents: { plain: 'Upload at least one PDF or document.', standard: 'Please upload at least one document to continue.' },
-  review: { plain: 'Finish this step to continue.', standard: 'Please complete this step to continue.' },
-};
-
-const CAPTION_MISSING_ERROR = {
-  plain: 'We could not load your case yet. Try again, or go Back and pick your case.',
-  standard: "The case title comes from the court's case record, which has not loaded. Retry loading it, or go Back to choose the case.",
-};
 
 function FilingWizard() {
   const { userId, role, loading, error, refresh } = useContext(CourtContext)!;
@@ -89,14 +57,10 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
   } = useFilingDraft(userId, searchParams, {
     loadedFiling, submission, paused: loadingExisting || Boolean(loadError) || readOnly || Boolean(submission),
   });
-  const [currentStep, setCurrentStep] = useState<WizardStep>(() =>
-    draft?.creationKey ? 'details' : draft ? 'court' : filingData.caseId ? 'details' : filingData.courtId ? 'case' : 'court'
-  );
   const [showDraftBanner, setShowDraftBanner] = useState(!!draft);
   const [saving, setSaving] = useState(false);
   usePageTitle(loadError ? `Filing #${requestedFilingId} not loaded` : requestedFilingId ? `Filing #${requestedFilingId}` : 'New filing');
   const [reloadKey, setReloadKey] = useState(0);
-  const [errors, setErrors] = useState<string[]>([]);
   const [saveError, setSaveError] = useState('');
   const conflictHeading = useRef<HTMLHeadingElement>(null);
   const [conflict, setConflict] = useState<FilingEnvelope | null>(null);
@@ -123,6 +87,10 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
   useEffect(() => {
     if (role === 'srl' && !hasPlainLanguagePreference()) setPlainLanguageMode(true);
   }, [role]);
+  const captionMissing = isMotionMode && !filingData.caseTitle.trim();
+  const {
+    currentStep, setCurrentStep, errors, setErrors, steps, currentStepIndex, detailsStepIndex, goNext, goBack, goToStep,
+  } = useWizardSteps({ draft, filingData, plainLanguage, destinationLocked, captionMissing, saveDetails });
   // Why a case-linked filing has no caption yet: the court's case record did not load.
   const [caseLookupError, setCaseLookupError] = useState<LoadFailure | null>(null);
 
@@ -219,14 +187,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
       setCaseLookupError(failure ?? null);
     });
     return () => { active = false; };
-  }, [searchParams, requestedFilingId, draft, reloadKey, userId, setFilingData]);
-
-  const steps = buildSteps(filingData.filingType).map((s) => ({
-    ...s,
-    label: plainLanguage ? plainStepLabel(s.key, s.label) : s.label,
-  }));
-  const currentStepIndex = steps.findIndex((s) => s.key === currentStep);
-  const detailsStepIndex = steps.findIndex((s) => s.key === 'details');
+  }, [searchParams, requestedFilingId, draft, reloadKey, userId, setFilingData, setCurrentStep]);
 
   const updateData = (updates: Partial<FilingData>) => {
     setSaveNotice('');
@@ -311,69 +272,10 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
     setSaveNotice(keepEdits ? 'Your edits are ready. Save draft or Continue to save them to your account.' : 'Showing the saved details.');
   }
 
-  const canProceed = (): boolean => {
-    switch (currentStep) {
-      case 'court':
-        return filingData.courtId !== null;
-      case 'case':
-        return filingData.caseChoiceMade;
-      case 'case-type':
-        return filingData.caseTypeId !== null;
-      case 'details':
-        return filingData.caseTitle.trim().length > 0;
-      case 'documents':
-        return filingData.documents.length > 0;
-      default:
-        return true;
-    }
-  };
-
-  const goNext = async () => {
-    setErrors([]);
-    if (!canProceed()) {
-      setErrors([getStepError()]);
-      return;
-    }
-
-    if (currentStep === 'details' && !await saveDetails(true)) return;
-
-    if (currentStepIndex < steps.length - 1) {
-      setCurrentStep(steps[currentStepIndex + 1].key);
-      window.scrollTo(0, 0);
-      document.getElementById('main-content')?.focus();
-    }
-  };
-
-  const goBack = () => {
-    setErrors([]);
-    if (currentStepIndex > 0) {
-      setCurrentStep(steps[currentStepIndex - 1].key);
-      window.scrollTo(0, 0);
-      document.getElementById('main-content')?.focus();
-    }
-  };
-
-  const goToStep = (step: WizardStep) => {
-    const targetIndex = steps.findIndex((s) => s.key === step);
-    if (destinationLocked && targetIndex < detailsStepIndex) return;
-    // Only allow going back to completed steps
-    if (targetIndex <= currentStepIndex) {
-      setCurrentStep(step);
-      setErrors([]);
-    }
-  };
-
-  // In an existing case the caption is read-only: it comes from the court's case record.
-  const captionMissing = isMotionMode && !filingData.caseTitle.trim();
   const retryCaseLookup = () => {
     setCaseLookupError(null);
     setErrors([]);
     setReloadKey((key) => key + 1);
-  };
-
-  const getStepError = (): string => {
-    const messages = currentStep === 'details' && captionMissing ? CAPTION_MISSING_ERROR : STEP_ERRORS[currentStep];
-    return plainLanguage ? messages.plain : messages.standard;
   };
 
   const handleDiscardDraft = () => {
