@@ -551,6 +551,24 @@ it('returns to a completed step from the progress bar, and back one step with Ba
   expect(stepButton('Case').disabled).toBe(true);
 });
 
+it('warns when this browser cannot keep a recovery copy, until a later edit is kept', async () => {
+  serveCourtsAndTypes();
+  const setItem = Storage.prototype.setItem;
+  const refused = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
+    if (this === sessionStorage) throw new Error('Quota exceeded');
+    setItem.call(this, key, value);
+  });
+  openWizard('/filing/new?court_id=3');
+  await screen.findByText(/could not keep a recovery copy/);
+  await chooseNewCaseAndType();
+  expect(screen.getByText(/could not keep a recovery copy/)).toBeTruthy();
+
+  refused.mockRestore();
+  fireEvent.change(caption(), { target: { value: 'Doe v. Roe' } });
+
+  await waitFor(() => expect(screen.queryByText(/could not keep a recovery copy/)).toBeNull());
+});
+
 it('saves a new filing as a draft and locks the court and case choices', async () => {
   serveCourtsAndTypes();
   const created = savedFiling();
