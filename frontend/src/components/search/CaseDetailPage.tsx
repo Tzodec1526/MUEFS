@@ -128,8 +128,8 @@ function CaseDetailPage() {
       setFilings((previous) => [...previous, ...data]);
       setDocketPage((previous) => previous + 1);
       setHasMoreFilings(data.length === 25);
-    } catch {
-      if (!signal?.aborted) setDocketError('Could not load more filings. Please try again.');
+    } catch (err) {
+      if (!signal?.aborted) setDocketError(errorMessage(err, 'Could not load more filings. Please try again.'));
     } finally {
       if (!signal?.aborted) setLoadingMore(false);
     }

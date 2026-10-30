@@ -123,3 +123,19 @@ it("reports once that the filer's favorite cases could not load", async () => {
   expect(await screen.findAllByText('Could not load your favorite cases.')).toHaveLength(1);
   expect(screen.getByRole('button', { name: '☆ Favorite' })).toBeTruthy();
 });
+
+it('explains why more filings could not load when the server limits requests', async () => {
+  localStorage.setItem('demo_role', 'public');
+  const firstPage = Array.from({ length: 25 }, (_, index) => ({
+    id: index + 1, status: 'accepted', case_title: 'Smith v. Jones', filing_description: `Filing ${index + 1}`,
+    submitted_at: '2026-03-02T12:00:00Z', filing_date: '2026-03-02', reviewed_at: null, rejection_reason: null, documents: [],
+  }));
+  get.mockResolvedValueOnce({ data: docket(false) }).mockResolvedValueOnce({ data: firstPage });
+  showCase(docket(false));
+  const loadMore = await screen.findByRole('button', { name: 'Load more filings' });
+  get.mockRejectedValueOnce({ response: { status: 429, data: {} } });
+
+  fireEvent.click(loadMore);
+
+  expect((await screen.findByRole('alert')).textContent).toBe('Too many requests. Please wait a moment and try again.');
+});

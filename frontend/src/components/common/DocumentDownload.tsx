@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { apiClient } from '../../api/client';
-import { getBlobErrorDetail } from '../../utils/errors';
+import { errorMessage, getBlobErrorDetail } from '../../utils/errors';
 
 export default function DocumentDownload({ id, title, copyId, deliveryId }: { id: number; title: string; copyId?: number | null; deliveryId?: string }) {
   const [busy, setBusy] = useState(false);
@@ -23,7 +23,7 @@ export default function DocumentDownload({ id, title, copyId, deliveryId }: { id
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
       // A failed integrity check is permanent; do not present it as a transient error.
-      setError(await getBlobErrorDetail(err) || 'Download unavailable. Please retry.');
+      setError(await getBlobErrorDetail(err) || errorMessage(err, 'Download unavailable. Please retry.'));
     } finally {
       setBusy(false);
     }
