@@ -8,8 +8,8 @@ from sqlalchemy import Enum, ForeignKey, Index, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
-    from app.models.case import Case  # noqa: F401
-    from app.models.court import Court  # noqa: F401
+    from app.models.case import Case
+    from app.models.court import Court
 
 from app.database import Base, UTCDateTime
 

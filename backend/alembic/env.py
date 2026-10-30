@@ -7,8 +7,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 from app.config import settings
-from app.database import Base
-from app.models import *  # noqa: F401, F403
+from app.models import User
 
 config = context.config
 
@@ -20,7 +19,7 @@ config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 if config.config_file_name is not None and "connection" not in config.attributes:
     fileConfig(config.config_file_name, disable_existing_loggers=False)
 
-target_metadata = Base.metadata
+target_metadata = User.metadata
 
 
 def run_migrations_offline() -> None:

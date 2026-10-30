@@ -21,8 +21,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.database import Base
-from app.models import *  # noqa: F401, F403
+from app.models import User
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -52,7 +51,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(User.metadata.create_all)
 
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
