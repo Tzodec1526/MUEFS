@@ -4,7 +4,7 @@ import { batchReview, getFiling, reviewFiling, FilingEnvelope, FilingSummary, Cl
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import DocumentDownload from '../common/DocumentDownload';
-import { formatBytes, getDocumentLabel, parseServerDate } from '../../utils/format';
+import { formatBytes, formatServerDateTime, getDocumentLabel, parseServerDate } from '../../utils/format';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
@@ -147,11 +147,6 @@ function ReviewQueue() {
     }
   };
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return 'N/A';
-    return parseServerDate(dateStr).toLocaleString();
-  };
-
   const ageAsOf = queue ? parseServerDate(queue.as_of).getTime() : 0;
   const getAge = (dateStr: string | null): { text: string; level: string } => {
     if (!dateStr) return { text: 'N/A', level: '' };
@@ -206,7 +201,7 @@ function ReviewQueue() {
           onRefresh={() => void fetchQueue()}
         />
         {queue && <span className="queue-meta">
-          Measured: {formatDate(queue.as_of)}. {queue.oldest_submitted_at && <>Oldest matching receipt: {formatDate(queue.oldest_submitted_at)}. </>}
+          Measured: {formatServerDateTime(queue.as_of)}. {queue.oldest_submitted_at && <>Oldest matching receipt: {formatServerDateTime(queue.oldest_submitted_at)}. </>}
           Ages are elapsed time since receipt.
         </span>}
       </div>
@@ -288,7 +283,7 @@ function ReviewQueue() {
                     </td>
                     <td className="filing-num">#{filing.id}</td>
                     <td className="filing-title">{filing.case_title || 'Untitled'}</td>
-                    <td className="filing-date">{formatDate(filing.submitted_at)}</td>
+                    <td className="filing-date">{formatServerDateTime(filing.submitted_at)}</td>
                     <td>
                       <span className={`age-badge ${age.level}`}>{age.text}</span>
                     </td>
@@ -359,7 +354,7 @@ function ReviewQueue() {
               </p>}
               <div className="detail-grid">
                 <div><label>Title</label><span>{selectedFiling.case_title || 'N/A'}</span></div>
-                <div><label>Submitted</label><span>{formatDate(selectedFiling.submitted_at)}</span></div>
+                <div><label>Submitted</label><span>{formatServerDateTime(selectedFiling.submitted_at)}</span></div>
                 <div><label>Filer ID</label><span>#{selectedFiling.filer_id}</span></div>
               </div>
               {selectedFiling.filing_description && (

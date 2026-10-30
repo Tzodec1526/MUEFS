@@ -30,6 +30,11 @@ export function parseServerDate(d: string): Date {
   return new Date(d);
 }
 
+export function formatServerDateTime(d: string | null): string {
+  if (!d) return 'N/A';
+  return parseServerDate(d).toLocaleString();
+}
+
 /** Format an ISO date string as a short US date, e.g. "Jun 7, 2026". */
 export function formatShortDate(d: string | null): string {
   if (!d) return '--';
