@@ -77,7 +77,7 @@ it('queries the case number, party, court and page that the URL names', async ()
 it('puts the submitted case number, party and court in the URL and searches for them', async () => {
   serveResults([]);
   openSearch();
-  await screen.findByRole('option', { name: 'Washtenaw — Twenty-Second Circuit Court' });
+  await screen.findByRole('option', { name: 'Washtenaw: Twenty-Second Circuit Court' });
 
   fireEvent.change(field('Case number'), { target: { value: ' 2026-000042 ' } });
   fireEvent.change(field('Party name'), { target: { value: 'Smith' } });

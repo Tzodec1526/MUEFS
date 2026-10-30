@@ -141,7 +141,7 @@ export default function CourtCalendarPage() {
         <p>Authority: {calendar.authority_reference}</p>
         <p>Published: {formatDateTime(calendar.published_at)}</p>
         <ul>{Object.entries(calendar.closed_dates).sort(([a], [b]) => a.localeCompare(b)).map(([day, reason]) =>
-          <li key={day}>{formatCourtDate(day)} — {reason}</li>)}</ul>
+          <li key={day}>{formatCourtDate(day)}: {reason}</li>)}</ul>
         {Object.keys(calendar.closed_dates).length === 0 && <p>No additional closed dates in this revision. Weekends remain excluded.</p>}
       </article>)}
       {data.total > 25 && <nav className="pagination" aria-label="Calendar revisions">

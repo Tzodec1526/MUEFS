@@ -218,7 +218,7 @@ function CaseSearch() {
                 <option value={courtId}>Selected court ({courtId})</option>
               )}
               {courts.map(court => (
-                <option key={court.id} value={court.id}>{court.county} — {court.name}</option>
+                <option key={court.id} value={court.id}>{court.county}: {court.name}</option>
               ))}
             </select>
             {courtId && <Link to={`/courts/${courtId}/intake`}>Court intake status and instructions</Link>}

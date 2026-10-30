@@ -57,7 +57,7 @@ export default function CourtCaseDirectory() {
     {current?.data && <>
       {!current.data.cases.length && <p>No cases match this court and case number.</p>}
       <ul className="court-case-list">{current.data.cases.map(item => <li key={item.id}>
-        <div><Link to={`/cases/${item.id}`}><strong>{item.case_number}</strong> — {item.title}</Link>
+        <div><Link to={`/cases/${item.id}`}><strong>{item.case_number}</strong>: {item.title}</Link>
           <p>{item.status} {item.is_sealed && '· Sealed'}</p></div>
         <Link className="btn btn-secondary btn-small" to={`/cases/${item.id}/participants`}>Manage case access</Link>
       </li>)}</ul>
