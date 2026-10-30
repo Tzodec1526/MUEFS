@@ -80,8 +80,8 @@ export default function FilingDateOrderPage() {
       </div>
       {data.order_block ? <p className="alert alert-warning">{data.order_block}</p> : <form className="review-card" key={key} onSubmit={record}>
         <h2 className="card-heading">Signed court order</h2>
-        <p>Record the date exactly as ordered. This decision applies to the current submission and preserves its receipt time and status.
-          A later corrected submission requires its own date review.</p>
+        <p>Record the date exactly as ordered. This decision keeps the filing&apos;s receipt time and status.
+          A later corrected submission keeps this date.</p>
         <fieldset disabled={busy}>
           <div className="form-group"><label htmlFor="ordered-date">Filing date established by the order</label>
             <input id="ordered-date" name="filing_date" type="date" required /></div>
