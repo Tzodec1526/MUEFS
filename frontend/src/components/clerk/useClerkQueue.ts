@@ -7,45 +7,53 @@ export const focusQueueRow = (filingId: number) =>
 
 export function useClerkQueue(courtId: number, autoRefreshPaused: boolean) {
   const [queue, setQueue] = useState<ClerkQueue | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [selectedSubmissions, setSelectedSubmissions] = useState<Map<number, number>>(() => new Map());
   const [filters, setFilters] = useState<ClerkQueueFilters>({ status: 'all', search: '', waiting_48h_only: false });
   const [page, setPage] = useState(1);
   const requestRef = useRef<AbortController | null>(null);
   const [queueError, setQueueError] = useState<LoadFailure | null>(null);
 
-  const fetchQueue = useCallback(async () => {
+  const startLoading = useCallback(() => {
+    setLoading(true);
+    setQueueError(null);
+  }, []);
+
+  const loadQueue = useCallback(() => {
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
-    setLoading(true);
-    setQueueError(null);
-    try {
-      const result = await getClerkQueue(courtId, { ...filters, page, signal: controller.signal });
+    return getClerkQueue(courtId, { ...filters, page, signal: controller.signal }).then(result => {
       if (controller.signal.aborted) return;
       if (page > 1 && result.filings.length === 0) {
-        setPage(Math.max(1, Math.ceil(result.total / result.page_size)));
+        const lastPage = Math.max(1, Math.ceil(result.total / result.page_size));
+        setPage(lastPage);
+        setLoading(lastPage !== page);
         return;
       }
       setQueue(result);
       setSelectedSubmissions(previous => new Map(result.filings
         .filter(filing => previous.get(filing.id) === filing.submission_count)
         .map(filing => [filing.id, filing.submission_count])));
-    } catch (err) {
+      setLoading(false);
+    }).catch(err => {
       if (controller.signal.aborted) return;
       setQueueError(loadFailure(err, "We couldn't load the review queue. Please retry."));
       setQueue(null);
       setSelectedSubmissions(new Map());
-    } finally {
-      if (!controller.signal.aborted) setLoading(false);
-    }
+      setLoading(false);
+    });
   }, [courtId, page, filters]);
 
+  const fetchQueue = useCallback(() => {
+    startLoading();
+    return loadQueue();
+  }, [startLoading, loadQueue]);
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- existing pattern; fetchQueue performs the setState for loading/data
-    fetchQueue();
+    loadQueue();
     return () => requestRef.current?.abort();
-  }, [fetchQueue]);
+  }, [loadQueue]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -55,7 +63,7 @@ export function useClerkQueue(courtId: number, autoRefreshPaused: boolean) {
   }, [fetchQueue, autoRefreshPaused]);
 
   return {
-    queue, loading, setLoading, queueError, filters, setFilters, page, setPage,
+    queue, loading, startLoading, queueError, filters, setFilters, page, setPage,
     selectedSubmissions, setSelectedSubmissions, fetchQueue,
   };
 }

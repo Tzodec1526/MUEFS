@@ -23,7 +23,7 @@ function ReviewQueue() {
   } | null>(null);
   const [actionInProgress, setActionInProgress] = useState(false);
   const {
-    queue, loading, setLoading, queueError, filters, setFilters, page, setPage,
+    queue, loading, startLoading, queueError, filters, setFilters, page, setPage,
     selectedSubmissions, setSelectedSubmissions, fetchQueue,
   } = useClerkQueue(courtId, Boolean(review) || actionInProgress);
   const filings = queue?.filings ?? [];
@@ -171,7 +171,7 @@ function ReviewQueue() {
           loading={loading}
           actionInProgress={actionInProgress}
           onApply={(submitted) => {
-            setLoading(true);
+            startLoading();
             setFilters(submitted);
             setPage(1);
             setSelectedSubmissions(new Map());
@@ -295,12 +295,12 @@ function ReviewQueue() {
           {pageCount > 1 && (
             <div className="pagination">
               <button className="btn btn-secondary btn-small" disabled={page <= 1 || loading || actionInProgress}
-                onClick={() => { setLoading(true); setPage((p) => p - 1); setSelectedSubmissions(new Map()); closeReview(); }}>
+                onClick={() => { startLoading(); setPage((p) => p - 1); setSelectedSubmissions(new Map()); closeReview(); }}>
                 Previous
               </button>
               <span>Page {page} of {pageCount}</span>
               <button className="btn btn-secondary btn-small" disabled={page >= pageCount || loading || actionInProgress}
-                onClick={() => { setLoading(true); setPage((p) => p + 1); setSelectedSubmissions(new Map()); closeReview(); }}>
+                onClick={() => { startLoading(); setPage((p) => p + 1); setSelectedSubmissions(new Map()); closeReview(); }}>
                 Next
               </button>
             </div>
