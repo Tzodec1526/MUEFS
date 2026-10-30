@@ -48,7 +48,8 @@ These rules explain why the checklists, the validator and the seed data behave a
   go to district courts, which have limited jurisdiction.
 - **Court of Claims.** Statewide jurisdiction over claims against the State of Michigan,
   administratively part of the 30th Circuit Court in Ingham County (MCL 600.6401 et seq.).
-- **Domesticating subpoena.** Michigan Uniform Depositions Act, MCL 600.2163a.
+- **Domesticating subpoena.** Uniform Interstate Depositions and Discovery Act, MCL 600.2201
+  et seq.
 - **Supreme Court application fee.** $375, the same as the Court of Appeals (MCL 600.321).
 
 ## Fees and case numbers

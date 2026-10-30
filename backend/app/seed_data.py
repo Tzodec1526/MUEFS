@@ -295,7 +295,7 @@ CIRCUIT_CIVIL_CASE_TYPES = [
     ("CIV-BUS", "Business Court (MCL 600.8031 et seq.)", CaseCategory.CIVIL, 15000),
     ("CIV-GARN", "Garnishment", CaseCategory.CIVIL, 1500),
     ("CIR-APP", "Appeal from District/Probate/Agency", CaseCategory.APPEALS, 15000),
-    ("CIV-SUBP", "Domesticating Subpoena - MI Uniform Depositions Act", CaseCategory.CIVIL, 15000),
+    ("CIV-SUBP", "Domesticating Subpoena - Uniform Interstate Depositions and Discovery Act", CaseCategory.CIVIL, 15000),
 ]
 
 DISTRICT_CIVIL_CASE_TYPES = [
@@ -306,7 +306,7 @@ DISTRICT_CIVIL_CASE_TYPES = [
     ("LT-SP", "Landlord-Tenant / Summary Proceedings", CaseCategory.CIVIL, 4500),
     ("SM-CLM", "Small Claims (up to $7,000)", CaseCategory.SMALL_CLAIMS, 4500),
     ("CIV-GARN", "Garnishment", CaseCategory.CIVIL, 1500),
-    ("CIV-SUBP", "Domesticating Subpoena - MI Uniform Depositions Act", CaseCategory.CIVIL, 15000),
+    ("CIV-SUBP", "Domesticating Subpoena - Uniform Interstate Depositions and Discovery Act", CaseCategory.CIVIL, 15000),
 ]
 
 FAMILY_CASE_TYPES = [
@@ -356,7 +356,7 @@ CIVIL_FILING_REQUIREMENTS = [
 ]
 
 SUBPOENA_FILING_REQUIREMENTS = [
-    ("SUBPOENA", True, "Out-of-State Subpoena (authenticated copy)", "MCL 600.2163a", None,
+    ("SUBPOENA", True, "Out-of-State Subpoena (authenticated copy)", "MCL 600.2201 et seq.", None,
      "Must be issued by court of record in another state"),
     ("COVER_LETTER", True, "Cover Letter / Request to Domesticate", None, None,
      "Letter requesting issuance of Michigan subpoena"),
@@ -1331,8 +1331,8 @@ def _populate(bind: Engine | Connection) -> None:
                     case_title="In re: Subpoena from State of Ohio, Case No. CV-2025-4412",
                     filing_description=(
                         "Domesticating out-of-state subpoena"
-                        " per Michigan Uniform Depositions"
-                        " Act (MCL 600.2163a)"
+                        " per the Uniform Interstate Depositions"
+                        " and Discovery Act (MCL 600.2201 et seq.)"
                     ),
                     status=FilingStatus.SUBMITTED,
                     submitted_at=now,

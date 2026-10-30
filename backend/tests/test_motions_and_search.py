@@ -51,7 +51,7 @@ async def create_court_with_case(db_session):
     subp_type = CaseType(
         court_id=court.id,
         code="CIV-SUBP",
-        name="Domesticating Subpoena - MI Uniform Depositions Act",
+        name="Domesticating Subpoena - Uniform Interstate Depositions and Discovery Act",
         category=CaseCategory.CIVIL,
         filing_fee_cents=15000,
     )
@@ -191,7 +191,7 @@ async def test_domesticating_subpoena_filing(db_session, stored_document):
         court_id=court.id,
         case_type_id=subp_type.id,
         case_title="In re: Subpoena from State of Ohio, Case No. OH-2024-12345",
-        filing_description="Request to domesticate out-of-state subpoena per MCL 600.2163a",
+        filing_description="Request to domesticate out-of-state subpoena per MCL 600.2201 et seq.",
     )
     filing = await filing_service.create_filing(db_session, user.id, data)
 

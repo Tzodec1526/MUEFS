@@ -44,7 +44,7 @@ const COURT_RULE_LINKS = [
   [`${RULES}/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2116-summary-disposition`, 'MCR 2.116 - Summary Disposition'],
   [`${RULES}/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2119-motion-practice`, 'MCR 2.119 - Motion Practice'],
   [`${RULES}/chapter-2-civil-procedure/subchapter-2500-discovery/rule-2506-subpoena-order-to-attend`, 'MCR 2.506 - Subpoenas'],
-  ['http://www.legislature.mi.gov/doc.aspx?mcl-600-2163a', 'MCL 600.2163a - Uniform Interstate Depositions Act'],
+  ['https://www.legislature.mi.gov/Laws/MCL?objectName=mcl-600-2201', 'MCL 600.2201 et seq. - Uniform Interstate Depositions and Discovery Act'],
   [RULES, 'Full Michigan Court Rules'],
 ];
 

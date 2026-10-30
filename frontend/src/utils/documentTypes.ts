@@ -61,7 +61,7 @@ export const FILING_CATEGORIES = [
       { code: 'DISC_DEPO_NOT', label: 'Notice of Deposition', mcr: 'MCR 2.306' },
       { code: 'DISC_DEPO_TR', label: 'Deposition Transcript', mcr: 'MCR 2.306' },
       { code: 'DISC_SUBPOENA', label: 'Subpoena / Subpoena Duces Tecum', mcr: 'MCR 2.506' },
-      { code: 'DISC_DOM_SUBP', label: 'Domesticating Out-of-State Subpoena', mcr: 'MCL 600.2163a' },
+      { code: 'DISC_DOM_SUBP', label: 'Domesticating Out-of-State Subpoena', mcr: 'MCL 600.2201 et seq.' },
       { code: 'DISC_IME', label: 'Request for Independent Medical Exam', mcr: 'MCR 2.311' },
       { code: 'DISC_INITIAL', label: 'Initial Disclosure', mcr: 'MCR 2.302(A)' },
       { code: 'DISC_SUPPL', label: 'Supplemental Disclosure', mcr: 'MCR 2.302(A)' },
