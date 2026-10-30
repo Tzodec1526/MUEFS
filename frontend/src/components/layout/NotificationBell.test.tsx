@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { listNotifications } from '../../api/notifications';
+import { CourtContext } from '../auth/CourtSession';
 import NotificationBell from './NotificationBell';
 
 vi.mock('../../api/notifications', async (importOriginal) => ({
@@ -27,7 +28,12 @@ afterEach(() => {
 });
 
 function renderBell() {
-  render(<MemoryRouter><NotificationBell /><button type="button">Elsewhere</button></MemoryRouter>);
+  render(<MemoryRouter>
+    <CourtContext.Provider value={{ role: localStorage.getItem('demo_role'), courts: [], court: undefined, loading: false, selectCourt: () => {}, refresh: () => {} }}>
+      <NotificationBell />
+    </CourtContext.Provider>
+    <button type="button">Elsewhere</button>
+  </MemoryRouter>);
   return screen.getByRole('button', { name: 'Notifications' });
 }
 

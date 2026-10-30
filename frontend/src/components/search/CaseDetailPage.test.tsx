@@ -5,6 +5,7 @@ import { apiClient } from '../../api/client';
 import type { CaseDocket } from '../../api/cases';
 import { getCaseTypes, type CaseType } from '../../api/courts';
 import { addFavorite, listFavorites } from '../../api/favorites';
+import { CourtContext } from '../auth/CourtSession';
 import { ToastProvider } from '../common/Toast';
 import CaseDetailPage from './CaseDetailPage';
 
@@ -45,7 +46,9 @@ function showCase(caseRecord: CaseDocket, caseTypes: CaseType[] = [civil]) {
   render(
     <MemoryRouter initialEntries={['/cases/42']}>
       <ToastProvider>
-        <Routes><Route path="/cases/:caseId" element={<CaseDetailPage />} /></Routes>
+        <CourtContext.Provider value={{ role: localStorage.getItem('demo_role'), courts: [], court: undefined, loading: false, selectCourt: () => {}, refresh: () => {} }}>
+          <Routes><Route path="/cases/:caseId" element={<CaseDetailPage />} /></Routes>
+        </CourtContext.Provider>
       </ToastProvider>
     </MemoryRouter>,
   );

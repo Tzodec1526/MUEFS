@@ -60,7 +60,7 @@ function openWizard(entry: string) {
     <ToastProvider>
       <MemoryRouter initialEntries={[entry]}>
         <CourtContext.Provider value={{
-          userId: 1, role: 'attorney', courts: [], court: undefined, loading: false,
+          userId: 1, role: localStorage.getItem('demo_role'), courts: [], court: undefined, loading: false,
           selectCourt: () => {}, refresh: () => {},
         }}>
           <FilingWizard />

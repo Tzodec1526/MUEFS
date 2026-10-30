@@ -1,11 +1,11 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useContext, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { actionErrorMessage } from '../../api/client';
 import { Link2 } from 'lucide-react';
 import { CaseSearchResult, searchCases } from '../../api/cases';
 import { CourtDirectoryEntry, listCourtDirectory } from '../../api/courts';
 import { listFavorites, addFavorite, removeFavorite } from '../../api/favorites';
-import { getDemoRole } from '../../auth/session';
+import { CourtContext } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { useToast } from '../common/Toast';
@@ -21,7 +21,7 @@ function CaseSearch() {
   usePageTitle('Case search');
   const [searchParams, setSearchParams] = useSearchParams();
   const { pushToast } = useToast();
-  const demoRole = getDemoRole();
+  const { role: demoRole } = useContext(CourtContext)!;
   const showFavorites = demoRole === 'attorney' || demoRole === 'srl';
 
   const submittedPartyName = searchParams.get('party') || '';

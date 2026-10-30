@@ -1,13 +1,13 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useContext, useEffect, useId, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { deliveryLabels, listNotifications, type NotificationItem } from '../../api/notifications';
-import { getDemoRole } from '../../auth/session';
+import { CourtContext } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 
 function NotificationBell() {
-  const role = getDemoRole();
+  const { role } = useContext(CourtContext)!;
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);

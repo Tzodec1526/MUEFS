@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Link2 } from 'lucide-react';
 import { actionErrorMessage, apiClient } from '../../api/client';
@@ -7,7 +7,7 @@ import { addFavorite, removeFavorite, listFavorites } from '../../api/favorites'
 import { getCaseTypes } from '../../api/courts';
 import { formatBytes, formatCourtDate, formatShortDate, getDocumentLabel } from '../../utils/format';
 import { errorMessage } from '../../utils/errors';
-import { getDemoRole } from '../../auth/session';
+import { CourtContext } from '../auth/CourtSession';
 import { useToast } from '../common/Toast';
 import DocumentDownload from '../common/DocumentDownload';
 import { usePageTitle } from '../../utils/pageTitle';
@@ -39,7 +39,7 @@ function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const { pushToast } = useToast();
   // Read-only viewers: the signed-in 'public' role and anonymous guests (no role).
-  const role = getDemoRole();
+  const { role } = useContext(CourtContext)!;
   const isPublicViewer = role === 'public' || !role;
   const isFiler = role === 'attorney' || role === 'srl';
   const [caseData, setCaseData] = useState<CaseDocket | null>(null);

@@ -18,7 +18,6 @@ import { actionErrorMessage } from '../../api/client';
 import LoadError from '../common/LoadError';
 import { getCase, type CaseDocket } from '../../api/cases';
 import { getCourt, getCaseTypes } from '../../api/courts';
-import { getDemoRole } from '../../auth/session';
 import {
   hasPlainLanguagePreference,
   isPlainLanguageMode,
@@ -69,12 +68,12 @@ const defaultFilingData: FilingData = {
 };
 
 function FilingWizard() {
-  const { userId, loading, error, refresh } = useContext(CourtContext)!;
+  const { userId, role, loading, error, refresh } = useContext(CourtContext)!;
   if (loading) return <p role="status">Loading your filing workspace…</p>;
   if (!userId) {
     return <FilingWorkspaceUnavailable failure={error ?? { message: 'Could not verify your account.', retry: true }} onRetry={refresh} />;
   }
-  return <FilingForm key={userId} userId={userId} />;
+  return <FilingForm key={userId} userId={userId} role={role} />;
 }
 
 function FilingWorkspaceUnavailable({ failure, onRetry }: { failure: LoadFailure; onRetry: () => void }) {
@@ -82,7 +81,7 @@ function FilingWorkspaceUnavailable({ failure, onRetry }: { failure: LoadFailure
   return <PageLoadError heading="Filing workspace not loaded" failure={failure} onRetry={onRetry} />;
 }
 
-function FilingForm({ userId }: { userId: number }) {
+function FilingForm({ userId, role }: { userId: number; role: string | null }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedFilingId = searchParams.get('filing_id');
   const draftKey = filingDraftKey(userId, requestedFilingId || `new:${searchParams.toString()}`);
@@ -145,7 +144,7 @@ function FilingForm({ userId }: { userId: number }) {
   const isMotionMode = filingData.filingType !== 'initial';
   const [plainLanguage, setPlainLanguage] = useState(() => {
     // Self-represented filers start in plain language, but a filer who turned it off keeps it off.
-    if (getDemoRole() === 'srl' && !hasPlainLanguagePreference()) setPlainLanguageMode(true);
+    if (role === 'srl' && !hasPlainLanguagePreference()) setPlainLanguageMode(true);
     return isPlainLanguageMode();
   });
   // Why a case-linked filing has no caption yet: the court's case record did not load.

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { searchCases, type CaseSearchResult } from '../../api/cases';
 import { listCourtDirectory } from '../../api/courts';
 import { listFavorites } from '../../api/favorites';
+import { CourtContext } from '../auth/CourtSession';
 import { ToastProvider } from '../common/Toast';
 import CaseSearch from './CaseSearch';
 
@@ -32,7 +33,9 @@ function openSearch(entry = '/cases/search') {
   return render(
     <ToastProvider>
       <MemoryRouter initialEntries={[entry]}>
-        <CaseSearch />
+        <CourtContext.Provider value={{ role: localStorage.getItem('demo_role'), courts: [], court: undefined, loading: false, selectCourt: () => {}, refresh: () => {} }}>
+          <CaseSearch />
+        </CourtContext.Provider>
         <CurrentSearch />
       </MemoryRouter>
     </ToastProvider>,

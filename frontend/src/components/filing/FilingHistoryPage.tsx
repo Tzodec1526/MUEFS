@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getFilingHistory, type FilingHistory, type FilingTransaction } from '../../api/filings';
-import { getDemoRole } from '../../auth/session';
+import { CourtContext } from '../auth/CourtSession';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
@@ -45,7 +45,7 @@ export default function FilingHistoryPage() {
   const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<LoadFailure | null>(null);
-  const role = getDemoRole();
+  const { role } = useContext(CourtContext)!;
   const backTo = role === 'admin' ? '/admin' : role === 'clerk' ? '/clerk/queue' : '/filings';
 
   useEffect(() => {
