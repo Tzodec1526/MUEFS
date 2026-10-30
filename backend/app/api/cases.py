@@ -22,7 +22,14 @@ from app.services import access_service, search_service
 router = APIRouter(prefix="/cases", tags=["Cases"])
 
 
-@router.get("/search", response_model=CaseSearchResponse)
+@router.get(
+    "/search",
+    response_model=CaseSearchResponse,
+    description=(
+        "Public court-records search. No account is required. Sealed matters are excluded "
+        "from the index and the listing strips participant contact PII."
+    ),
+)
 async def search_cases(
     case_number: str | None = None,
     party_name: str | None = None,
@@ -33,8 +40,6 @@ async def search_cases(
     page_size: int = Query(25, ge=1, le=100),
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
-    """Public court-records search — no account required. Sealed matters are excluded
-    from the index and the listing strips participant contact PII."""
     cases, total = await search_service.search_cases(
         db,
         case_number=case_number,
@@ -53,13 +58,16 @@ async def search_cases(
     )
 
 
-@router.get("/{case_id}", response_model=CaseDocketResponse)
+@router.get(
+    "/{case_id}",
+    response_model=CaseDocketResponse,
+    description="Public docket for a single case. Non-sealed: open to anyone; sealed: restricted.",
+)
 async def get_case(
     case_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User | None = Depends(get_optional_user),
 ):
-    """Public docket for a single case. Non-sealed: open to anyone; sealed: restricted."""
     result = await db.execute(
         select(Case).options(selectinload(Case.participants)).where(Case.id == case_id)
     )

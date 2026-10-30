@@ -14,6 +14,16 @@ async def test_health_returns_ok() -> None:
     assert r.json() == {"status": "healthy", "service": "muefs-api"}
 
 
+def test_the_public_record_rules_stay_in_the_api_description() -> None:
+    paths = app.openapi()["paths"]
+    search = paths["/api/v1/cases/search"]["get"]["description"]
+    docket = paths["/api/v1/cases/{case_id}"]["get"]["description"]
+    assert "No account is required" in search
+    assert "Sealed matters are excluded from the index" in search
+    assert "strips participant contact PII" in search
+    assert "Non-sealed: open to anyone; sealed: restricted." in docket
+
+
 @pytest.mark.asyncio
 async def test_openapi_docs_available() -> None:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
