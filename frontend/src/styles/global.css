@@ -15,8 +15,6 @@
   --navy-50: #eef4fb;
 
   --primary: var(--navy-700);
-  --primary-light: var(--navy-600);
-  --primary-dark: var(--navy-800);
   --accent: #2264ad;
   --accent-dark: #1a539a;
 
@@ -2284,8 +2282,6 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 .fav-btn:hover { color: var(--gold-500); transform: scale(1.15); }
 .fav-btn.favorited { color: var(--gold-500); }
 .fav-btn:disabled { opacity: 0.5; cursor: wait; }
-
-.favorites-page { }
 
 .favorites-list {
   display: grid;
