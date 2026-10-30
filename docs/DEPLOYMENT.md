@@ -26,12 +26,22 @@ storage outages in the worker. Monitor the pending queue and follow the
 [storage lifecycle and recovery procedure](STORAGE_RECOVERY.md) for retention boundaries,
 operator runs and backups.
 
-This is the operational companion to [SECURITY.md](../SECURITY.md) — how to run MUEFS as a
+This is the operational companion to [SECURITY.md](../SECURITY.md): how to run MUEFS as a
 real (non-demo) deployment. SECURITY.md explains *why* each setting matters; this document
 explains *how* to configure it.
 
 > The hosted demo (`render.yaml`, the root `Dockerfile`, `run_demo.py`) is intentionally
 > open and single-instance. A production court deployment differs in the ways below.
+
+Three API behaviors matter to external clients. None of them needs a migration.
+
+- Every timestamp in an API response carries a UTC offset. Do not treat a timestamp as
+  local time.
+- An invalid review `action` returns HTTP 422, not 400, on
+  `POST /api/v1/clerk/filings/{id}/review` and `POST /api/v1/clerk/queue/batch-review`.
+  The single route takes `accept`, `reject` or `return`. The batch route takes `accept` only.
+- All nine JSON routes under `/api/v1/service/` declare response models, so the OpenAPI schema
+  now describes them. Their JSON did not change.
 
 Deploy the review client and API together. Single review requests now require
 `expected_submission_count`; batch requests require a `filings` list containing each
@@ -98,7 +108,8 @@ and elapsed-age display use those fields. See [clerk queue search and waiting ti
 
 ## 1. Configuration & secrets
 
-Copy `.env.example` to `.env` and change every demo value:
+Copy `.env.example` to `.env` and change every demo value. `.env.example` carries no notes;
+the tables in this section are the reference.
 
 | Variable | Demo | Production |
 | --- | --- | --- |
@@ -112,13 +123,13 @@ Copy `.env.example` to `.env` and change every demo value:
 | `RATE_LIMIT_BACKEND` | `memory` / `redis` | `redis` |
 
 Generate secrets with `openssl rand -hex 32` and store them in your platform's secret
-manager — never in the repo.
+manager, never in the repo.
 
 ### Environment variables
 
-`.env.example` (Michigan Unified E-Filing System - Environment Configuration) lists these
-variables in this order, with no notes of its own. "(empty)" means
-the line has no value, which selects the default.
+`.env.example` lists these variables in this order, with no notes of its own. This table is
+the reference for what each one does. "(empty)" means the line has no value, which selects
+the default.
 
 | Group | Variable | `.env.example` value | Note |
 | --- | --- | --- | --- |
@@ -213,7 +224,7 @@ label. Leave the feature disabled until the court evaluates the workflow. Demo-m
 credits are marked simulated and will not satisfy a production balance. See
 [external receipt behavior and verification](STATE_READINESS.md#court-fee-assessments-and-payment-balances).
 
-The private **Receipt Register** supports period review and CSV export by administrators
+The private **Receipt register** supports period review and CSV export by administrators
 assigned to the selected court. Apply migration `c39f64dbea05` for its payment-activity
 index. PostgreSQL builds the index concurrently; an interrupted invalid build is repaired
 when the migration is retried. Downgrade removes only the index and preserves all records.
@@ -286,7 +297,7 @@ create an IdP identity, password, verified email or court assignment. Protect da
 operator access, including use of this command for recovery when no bound administrator
 remains active.
 
-Sign in and open **People & access** to provision further identities, including a second
+Sign in and open **People and court access** to provision further identities, including a second
 system administrator for access changes and recovery. Only system administrators can
 edit identity bindings, account types, active status and manually verified bar numbers,
 or delegate court administration. Delegated administrators can grant and revoke clerk
@@ -315,6 +326,10 @@ Content-Security-Policy with the exact API and IdP origins in `connect-src`; kee
 `'self'` blocks cross-origin sign-in. A stricter proxy policy can also block this flow, so
 verify the deployed callback in a browser. See
 [the browser connection policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/connect-src).
+
+The same policy sets `font-src 'self'`, because the build self-hosts Public Sans as WOFF2 and
+contacts no font host. A separately hosted frontend serves those files with the rest of the
+build. Its policy needs to allow them, and its server needs to send them as `font/woff2`.
 
 ## 4. Data & object storage
 
@@ -487,7 +502,7 @@ decision from a role inferred by filing acceptance. A per-case audit event recor
 review is needed; the migration does not invent approval or delete the old records.
 
 Before opening an upgraded portal to users, assigned court staff must review the affected
-records through **Court Cases → Manage case access**, using the court's authorized source.
+records through **Court cases → Manage case access**, using the court's authorized source.
 Record the reason/reference, correct the role, link the intended existing account and
 explicitly grant access where authorized. Counsel grants also require a matching verified
 bar number. Ambiguous case-insensitive email matches must be resolved by identity
@@ -526,6 +541,12 @@ SQLite sessions. A court deployment must run `app.main:app` against its PostgreS
 disable demo mode and isolated sessions, and serve the built frontend with its production
 configuration. Supervise the notice worker as a separate process. Pin base images to a
 digest in the production build pipeline; `render.yaml` is a demo deployment example.
+
+Both frontend builds use `node:22.23.4-alpine`, and CI uses the same Node version. The build
+puts React and the router in a `vendor` chunk, so a deploy that changes only app code keeps
+that file's name. The demo server caches `assets/` as immutable, answers a missing asset with
+404 and sends `index.html` with `no-store`. A court deployment's static server should do the
+same, so that a page from the previous deploy cannot get `index.html` in place of a script.
 
 Each hosted-demo sandbox keeps its uploads in its own folder under `DEMO_DATA_DIR`, deleted
 together with the sandbox. `DEMO_STORAGE_QUOTA_MB` (default 200) caps each sandbox's
@@ -655,9 +676,12 @@ for the distinction between generic and parameter-specific plans.
 
 The API enforces `courts.is_efiling_enabled` and `case_types.is_active` for new drafts
 and submissions. Treat changes to these flags as intake changes, with a court-approved
-process and filing alternatives communicated to users. An in-flight PostgreSQL
-submission holds shared locks until its receipt commits; a concurrent configuration
-change waits, then applies to subsequent attempts. Previously committed receipts remain
+process and filing alternatives communicated to users. Submission reads stored documents
+before it takes a lock, so a configuration change during that read does not wait, and the
+recheck under the filing lock then refuses the submission with the same destination error.
+Once submission holds the filing lock, it holds shared court, case-type and case locks until
+its receipt commits, and a concurrent configuration change waits, then applies to subsequent
+attempts. Previously committed receipts remain
 available and idempotent retries remain valid. Closing intake does not block staff from
 finishing valid filings already received.
 
@@ -684,7 +708,7 @@ contact table. Schedule the schema change with normal database migration control
 Legacy contact rows remain intact, inactive and unlinked. Reconcile them against court
 records before entering current instructions; no address is automatically enrolled.
 
-Assigned staff use **Case participants → Service instructions**. Establish procedures
+Assigned staff use **Manage case access → Service instructions**. Establish procedures
 for reviewing registrations, exemptions, agreements, recipient identity and changes.
 The current workflow supports one primary destination per participant. Service contacts
 and their before/after history are included in private case archives; access and retention
@@ -705,8 +729,8 @@ and existing notice worker. This also requires `EMAIL_DELIVERY_ENABLED=true` and
 SMTP/portal configuration in section 7. Compose shares both flags between those services.
 The separate flag defaults to false; ordinary filing alerts do not enable document delivery.
 
-The filer or assigned staff opens **Filing history → Document deliveries → Select documents
-& recipients**. The sender must have a verified account and, for ordinary filers, current
+The filer or assigned staff opens **Receipts and history → Document deliveries → Select
+documents & recipients**. The sender must have a verified account and, for ordinary filers, current
 court-reviewed case participation. This workflow accepts subsequent, motion and service-only
 documents with a retained current receipt on an existing case. Case-initiating service uses
 the applicable procedure outside this workflow. Each request requires explicit contents,
@@ -795,6 +819,7 @@ docker run -p 127.0.0.1:8000:8000 -e DEMO_MODE_SECRET=local-demo-only muefs-demo
 
 Then open `http://localhost:8000`. Hosted deployments supply their own runtime secret. The
 image leaves `VITE_API_URL` empty so the app calls `/api/v1` on its own host, and `/config.js`
-supplies the demo secret at runtime, so the secret is never baked into an image layer. Render
-injects `$PORT`; locally it defaults to 8000. The health check calls `/ready`, which covers
-the template database and the migration version.
+supplies the demo secret at runtime, so the secret is never baked into an image layer.
+`index.html` loads `/config.js` with `defer`, and the app reads the value when it sends a
+request, after that script has run. Render injects `$PORT`; locally it defaults to 8000. The
+health check calls `/ready`, which covers the template database and the migration version.
