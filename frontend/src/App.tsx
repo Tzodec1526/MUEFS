@@ -13,7 +13,7 @@ import { oidcSessionExpected, SESSION_KEY } from './auth/keycloak';
 import LoadError from './components/common/LoadError';
 import { loadFailure, type LoadFailure } from './utils/errors';
 import { usePageTitle } from './utils/pageTitle';
-import PageHeading from './components/common/PageHeading';
+import PageHeading, { HeadingFocusScope } from './components/common/PageHeading';
 import PageLoadError from './components/common/PageLoadError';
 
 const FilingWizard = lazy(() => import('./components/filing/FilingWizard'));
@@ -265,6 +265,7 @@ function App() {
     return () => window.removeEventListener('storage', sessionChanged);
   }, []);
   return (
+    <HeadingFocusScope>
     <Suspense fallback={<p className="loading" role="status">Loading page...</p>}>
       <Routes>
         <Route path="/login" element={<LoginScreen />} />
@@ -320,6 +321,7 @@ function App() {
         />
       </Routes>
     </Suspense>
+    </HeadingFocusScope>
   );
 }
 

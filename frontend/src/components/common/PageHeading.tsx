@@ -1,22 +1,50 @@
-import { useContext, useEffect, useRef, type ReactNode, type RefObject } from 'react';
-import { UNSAFE_NavigationContext, useLocation, useNavigationType, type Navigator } from 'react-router-dom';
+import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { useLocation, useNavigationType, type NavigationType } from 'react-router-dom';
 
-const lastNavigation = new WeakMap<Navigator, { key: string; pathname: string }>();
+interface HeadingMemory {
+  last?: { key: string; pathname: string };
+  focusKey?: string;
+  focusedKey?: string;
+}
+
+type ClaimFocus = (key: string, pathname: string, navigationType: NavigationType) => boolean;
+
+const HeadingFocusContext = createContext<ClaimFocus | null>(null);
+
+function recordNavigation(memory: HeadingMemory, key: string, pathname: string, navigationType: NavigationType, heading: boolean) {
+  if (memory.last?.key === key || (!memory.last && !heading)) return;
+  const focus = memory.last ? memory.last.pathname !== pathname : navigationType === 'PUSH';
+  memory.last = { key, pathname };
+  memory.focusKey = focus ? key : undefined;
+}
+
+export function HeadingFocusScope({ children }: { children: ReactNode }) {
+  const memory = useRef<HeadingMemory>({});
+  const { key, pathname } = useLocation();
+  const navigationType = useNavigationType();
+  useEffect(() => {
+    recordNavigation(memory.current, key, pathname, navigationType, false);
+  }, [key, pathname, navigationType]);
+  const claimFocus = useCallback<ClaimFocus>((headingKey, headingPathname, headingNavigationType) => {
+    const state = memory.current;
+    recordNavigation(state, headingKey, headingPathname, headingNavigationType, true);
+    if (state.focusKey !== headingKey || state.focusedKey === headingKey) return false;
+    state.focusedKey = headingKey;
+    return true;
+  }, []);
+  return <HeadingFocusContext.Provider value={claimFocus}>{children}</HeadingFocusContext.Provider>;
+}
 
 export default function PageHeading({ children, headingRef }: {
   children: ReactNode; headingRef?: RefObject<HTMLHeadingElement>;
 }) {
   const ownRef = useRef<HTMLHeadingElement>(null);
   const ref = headingRef ?? ownRef;
-  const { navigator } = useContext(UNSAFE_NavigationContext);
+  const claimFocus = useContext(HeadingFocusContext);
   const { key, pathname } = useLocation();
   const navigationType = useNavigationType();
   useEffect(() => {
-    const previous = lastNavigation.get(navigator);
-    if (previous?.key === key) return;
-    lastNavigation.set(navigator, { key, pathname });
-    if (previous ? previous.pathname === pathname : navigationType !== 'PUSH') return;
-    ref.current?.focus();
-  }, [navigator, ref, key, pathname, navigationType]);
+    if (claimFocus?.(key, pathname, navigationType)) ref.current?.focus();
+  }, [claimFocus, ref, key, pathname, navigationType]);
   return <h1 ref={ref} tabIndex={-1}>{children}</h1>;
 }
