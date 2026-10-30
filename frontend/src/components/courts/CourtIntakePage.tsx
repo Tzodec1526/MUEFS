@@ -9,6 +9,7 @@ import LoadError from '../common/LoadError';
 import '../../styles/intake.css';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
+import PageLoadError from '../common/PageLoadError';
 
 interface IntakeState {
   court_id: number; court_name: string; version: number;
@@ -163,7 +164,10 @@ export default function CourtIntakePage() {
     return () => controller.abort();
   }, [courtId, key, loading]);
   if (loading || !current) return <p role="status">Loading court intake…</p>;
-  if (!current.data) return <LoadError failure={current.error ?? { message: 'Could not load intake.', retry: true }} onRetry={() => setAttempt(n => n + 1)} />;
+  if (!current.data) {
+    return <PageLoadError heading="Filing intake not loaded"
+      failure={current.error ?? { message: 'Could not load intake.', retry: true }} onRetry={() => setAttempt(n => n + 1)} />;
+  }
   const data = current.data;
   return <section className="court-intake-page">
     <div className="page-header"><div><PageHeading>{data.court_name}: electronic filing intake</PageHeading>

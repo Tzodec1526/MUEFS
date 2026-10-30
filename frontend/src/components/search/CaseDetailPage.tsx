@@ -12,6 +12,7 @@ import { useToast } from '../common/Toast';
 import DocumentDownload from '../common/DocumentDownload';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
+import PageLoadError from '../common/PageLoadError';
 
 interface CaseFiling {
   id: number;
@@ -44,7 +45,7 @@ function CaseDetailPage() {
   const [caseData, setCaseData] = useState<CaseDocket | null>(null);
   const [filings, setFilings] = useState<CaseFiling[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ heading: string; message: string } | null>(null);
   usePageTitle(caseData?.title || 'Case docket');
   const [isFavorited, setIsFavorited] = useState(false);
   const [togglingFav, setTogglingFav] = useState(false);
@@ -102,11 +103,11 @@ function CaseDetailPage() {
         if (controller.signal.aborted) return;
         const status = (err as { response?: { status?: number } })?.response?.status;
         if (status === 403) {
-          setError('This case is sealed or confidential and is not available for public viewing.');
+          setError({ heading: 'Case not available', message: 'This case is sealed or confidential and is not available for public viewing.' });
         } else if (status === 404) {
-          setError('Case not found.');
+          setError({ heading: 'Case not found', message: 'Case not found.' });
         } else {
-          setError(errorMessage(err, 'Failed to load case details.'));
+          setError({ heading: 'Case not loaded', message: errorMessage(err, 'Failed to load case details.') });
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -176,7 +177,10 @@ function CaseDetailPage() {
   };
 
   if (loading) return <div className="loading">Loading case...</div>;
-  if (error || !caseData) return <div className="alert alert-error">{error || 'Case not found.'}</div>;
+  if (error || !caseData) {
+    const failure = error ?? { heading: 'Case not found', message: 'Case not found.' };
+    return <PageLoadError heading={failure.heading} failure={{ message: failure.message, retry: false }} />;
+  }
 
   return (
     <div className="case-detail-page">

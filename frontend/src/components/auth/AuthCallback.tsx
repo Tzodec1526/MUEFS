@@ -5,6 +5,7 @@ import { applySessionFromProfile } from './LoginScreen';
 import { apiClient } from '../../api/client';
 import { errorMessage } from '../../utils/errors';
 import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 function AuthCallback() {
   const navigate = useNavigate();
@@ -43,6 +44,7 @@ function AuthCallback() {
     return (
       <div className="login-screen">
         <main className="login-container">
+          <div className="login-heading"><PageHeading>Sign-in not completed</PageHeading></div>
           <p className="login-message" role="alert">{error}</p>
           <button type="button" className="btn btn-primary" onClick={() => navigate('/login')}>
             Back to login
@@ -55,6 +57,7 @@ function AuthCallback() {
   return (
     <div className="login-screen">
       <main className="login-container">
+        <div className="login-heading"><PageHeading>Completing sign-in</PageHeading></div>
         <p className="login-message" role="status">Completing sign-in…</p>
       </main>
     </div>

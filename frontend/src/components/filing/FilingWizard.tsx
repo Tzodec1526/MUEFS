@@ -27,6 +27,7 @@ import {
 } from '../../utils/srlMode';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
+import PageLoadError from '../common/PageLoadError';
 
 const CASE_LOOKUP_FAILED = "We couldn't load the court's record for this case, so its title is missing.";
 
@@ -70,7 +71,10 @@ const defaultFilingData: FilingData = {
 function FilingWizard() {
   const { userId, loading, error, refresh } = useContext(CourtContext)!;
   if (loading) return <p role="status">Loading your filing workspace…</p>;
-  if (!userId) return <LoadError failure={error ?? { message: 'Could not verify your account.', retry: true }} onRetry={refresh} />;
+  if (!userId) {
+    return <PageLoadError heading="Filing workspace not loaded"
+      failure={error ?? { message: 'Could not verify your account.', retry: true }} onRetry={refresh} />;
+  }
   return <FilingForm key={userId} userId={userId} />;
 }
 
@@ -475,7 +479,10 @@ function FilingForm({ userId }: { userId: number }) {
       </section>;
 
   if (loadingExisting) return <p className="loading" role="status">Loading filing...</p>;
-  if (loadError) return <LoadError failure={loadError} onRetry={() => setReloadKey((key) => key + 1)} />;
+  if (loadError) {
+    return <PageLoadError heading={`Filing #${requestedFilingId} not loaded`} failure={loadError}
+      onRetry={() => setReloadKey((key) => key + 1)} />;
+  }
   if (readOnly) {
     return (
       <div className="filing-wizard">

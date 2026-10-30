@@ -14,6 +14,7 @@ import LoadError from './components/common/LoadError';
 import { loadFailure, type LoadFailure } from './utils/errors';
 import { usePageTitle } from './utils/pageTitle';
 import PageHeading from './components/common/PageHeading';
+import PageLoadError from './components/common/PageLoadError';
 
 const FilingWizard = lazy(() => import('./components/filing/FilingWizard'));
 const MyFilings = lazy(() => import('./components/filing/MyFilings'));
@@ -72,12 +73,7 @@ function AdministrationAccessRequired() {
 
 function AdministrationAccessUnchecked({ failure, onRetry }: { failure: LoadFailure; onRetry: () => void }) {
   usePageTitle('Administrator access not checked');
-  return (
-    <div className="empty-state">
-      <PageHeading>Administrator access not checked</PageHeading>
-      <LoadError failure={failure} onRetry={onRetry} />
-    </div>
-  );
+  return <PageLoadError heading="Administrator access not checked" failure={failure} onRetry={onRetry} />;
 }
 
 function RequireAdministration({ children }: { children: React.ReactNode }) {

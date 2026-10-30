@@ -331,6 +331,29 @@ it.each([
   expect(screen.queryByRole('heading', { name: 'Michigan Unified E-Filing System' })).toBeNull();
 });
 
+const refused = (status: number) => () => {
+  throw { response: { status, data: {} } };
+};
+
+it.each([
+  ['/auth/callback', 'attorney', {}, 'Sign-in not completed', 'Sign-in failed. Return to the login page and try again.'],
+  ['/cases/42', 'public', { '/cases/42': refused(404) }, 'Case not found', 'Case not found.'],
+  ['/cases/42', 'public', { '/cases/42': refused(403) }, 'Case not available',
+    'This case is sealed or confidential and is not available for public viewing.'],
+  ['/cases/42', 'public', { '/cases/42': failsOnce({}) }, 'Case not loaded', 'Failed to load case details.'],
+  ['/filing/new?filing_id=7', 'attorney', { '/filings/7': failsOnce({}) }, 'Filing #7 not loaded',
+    'Could not load this filing. Please retry.'],
+  ['/filing/new', 'attorney', { '/auth/me': failsOnce({}) }, 'Filing workspace not loaded', 'Could not verify court assignments.'],
+  ['/courts/3/intake', 'clerk', { ...clerkAtThirdCircuit, '/courts/3/intake': failsOnce({}) }, 'Filing intake not loaded',
+    'Could not load court intake information.'],
+])('heads a failed %s for a %s with one h1 and an alert', async (entry, role, answers, heading, message) => {
+  serve(role, { '/cases/42/filings': [], ...answers });
+  openApp(entry, role);
+
+  await waitFor(() => expect(screen.getAllByRole('heading', { level: 1 }).map(h1 => h1.textContent)).toEqual([heading]));
+  expect(screen.getByRole('alert').textContent).toContain(message);
+});
+
 it('heads the administration page and a case docket with their own names once their data loads', async () => {
   serve('admin', {
     '/admin/access': { system_admin: true, user_id: 3, courts: [] },
