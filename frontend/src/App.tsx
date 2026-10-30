@@ -91,11 +91,16 @@ function FilerDashboard() {
   const [countsError, setCountsError] = useState<LoadFailure | null>(null);
   const [countsAttempt, setCountsAttempt] = useState(0);
   useEffect(() => {
+    let current = true;
     getFilingStatusCounts().then((counts) => {
+      if (!current) return;
       setCountsError(null);
       setDraftCount(counts.draft);
       setReturnedCount(counts.returned);
-    }).catch((err) => setCountsError(loadFailure(err, 'Could not load your filing counts.')));
+    }).catch((err) => {
+      if (current) setCountsError(loadFailure(err, 'Could not load your filing counts.'));
+    });
+    return () => { current = false; };
   }, [countsAttempt]);
 
   return (

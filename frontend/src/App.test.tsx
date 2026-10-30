@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi, type Mock } from 'vitest';
 import { apiClient } from './api/client';
@@ -228,6 +228,33 @@ it('shows that platform statistics did not load instead of hiding them, and load
 
   expect(await screen.findByText('Public cases indexed')).toBeTruthy();
   expect(screen.queryByRole('alert')).toBeNull();
+});
+
+function holdCall(url: string, call: number) {
+  const served = get.getMockImplementation()!;
+  let reject!: (reason: unknown) => void;
+  const held = new Promise<never>((_, fail) => { reject = fail; });
+  get.mockImplementation(async (requested) =>
+    requested === url && get.mock.calls.filter(([called]) => called === url).length === call ? held : served(requested));
+  return reject;
+}
+
+it.each([
+  ['the filing counts', 'attorney', '/filings/summary', /drafts in progress/],
+  ['the platform statistics', 'public', '/public/stats', /Public cases indexed/],
+])('keeps %s from the latest retry when an earlier retry fails later', async (_name, role, url, loaded) => {
+  serve(role, { '/public/stats': stats, [url]: failsOnce(url === '/public/stats' ? stats : { draft: 2, returned: 1 }) });
+  const failEarlierRetry = holdCall(url, 2);
+  openApp('/', role);
+  const retry = within(await screen.findByRole('alert')).getByRole('button', { name: 'Retry' });
+
+  fireEvent.click(retry);
+  fireEvent.click(retry);
+  expect(await screen.findByText(loaded)).toBeTruthy();
+  await act(async () => failEarlierRetry(new Error('Network Error')));
+
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(screen.getByText(loaded)).toBeTruthy();
 });
 
 it('states the number of e-filing courts the platform reports', async () => {

@@ -30,9 +30,11 @@ function PlatformStats() {
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    let current = true;
     getPublicStats()
-      .then(stats => setResult({ stats }))
-      .catch(err => setResult({ error: loadFailure(err, 'Platform statistics are unavailable right now.') }));
+      .then(stats => { if (current) setResult({ stats }); })
+      .catch(err => { if (current) setResult({ error: loadFailure(err, 'Platform statistics are unavailable right now.') }); });
+    return () => { current = false; };
   }, [attempt]);
 
   if (!result) return null;
