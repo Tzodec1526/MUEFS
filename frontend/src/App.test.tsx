@@ -669,6 +669,13 @@ it('lets the filter on the filings page change the status it asks for', async ()
   await waitFor(() => expect(lastFilingsRequest()).toMatchObject({ status: undefined }));
 });
 
+it('counts a single pending filing in the singular', async () => {
+  serve('clerk', { ...clerkAtThirdCircuit, '/clerk/queue': { ...queueOverview, total: 1 } });
+  openApp('/', 'clerk');
+
+  expect(await screen.findByText('1 filing pending review')).toBeTruthy();
+});
+
 it('leads a clerk with the queue counts and the way into the queue', async () => {
   serve('clerk', { ...clerkAtThirdCircuit, '/clerk/queue': queueOverview });
   openApp('/', 'clerk');

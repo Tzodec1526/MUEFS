@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
-import { formatBytes, formatDateTime } from '../../utils/format';
+import { formatBytes, formatDateTime, plural } from '../../utils/format';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
@@ -138,7 +138,7 @@ export default function DocumentPublicationPage() {
         </section>
         <section className="review-card"><h2 className="card-heading">Active public copy</h2>
           {current.data.current_copy ? <><p><strong>{current.data.current_copy.title}</strong></p>
-            <p>{formatBytes(current.data.current_copy.file_size_bytes)} · {current.data.current_copy.page_count} page{current.data.current_copy.page_count === 1 ? '' : 's'}</p>
+            <p>{formatBytes(current.data.current_copy.file_size_bytes)} · {plural(current.data.current_copy.page_count, 'page')}</p>
             <DocumentDownload id={current.data.document.id} copyId={current.data.current_copy.id} title={current.data.current_copy.title} />
           </> : <p>No public copy is active.</p>}
           <p>Case restrictions still apply. Earlier copies and the original are retained.</p>
@@ -162,7 +162,7 @@ export default function DocumentPublicationPage() {
           <button className="btn btn-secondary" disabled={busy}>{busy ? 'Working…' : 'Prepare copy for review'}</button>
         </form>
         {selected && <form className="review-card" key={`review:${documentId}:${selected.id}:${current.data.version}`} onSubmit={event => change(event, true)}>
-          <h2 className="card-heading" ref={reviewHeading} tabIndex={-1}>Review prepared copy</h2><p><strong>{selected.title}</strong> · {selected.page_count} page{selected.page_count === 1 ? '' : 's'} · {formatBytes(selected.file_size_bytes)}</p>
+          <h2 className="card-heading" ref={reviewHeading} tabIndex={-1}>Review prepared copy</h2><p><strong>{selected.title}</strong> · {plural(selected.page_count, 'page')} · {formatBytes(selected.file_size_bytes)}</p>
           <DocumentDownload id={current.data.document.id} copyId={selected.id} title={selected.title} />
           <details><summary>Prepared copy fingerprint</summary><code>{selected.sha256_hash}</code></details>
           {selected.pii_warnings.length > 0 && <div className="alert alert-warning"><strong>Review these scan warnings before publishing:</strong>
@@ -178,7 +178,7 @@ export default function DocumentPublicationPage() {
       <details className="review-card" open={copiesOpen} onToggle={event => setCopiesOpen(event.currentTarget.open)}>
         <summary>Prepared and earlier copies ({current.data.total})</summary>
         <ul className="court-case-list">{current.data.copies.map(copy => <li key={copy.id}>
-          <div><strong>{copy.title}</strong><p>Copy {copy.id} · {copy.page_count} page{copy.page_count === 1 ? '' : 's'} · {formatBytes(copy.file_size_bytes)}
+          <div><strong>{copy.title}</strong><p>Copy {copy.id} · {plural(copy.page_count, 'page')} · {formatBytes(copy.file_size_bytes)}
             {copy.id === current.data?.current_copy?.id && ' · Active'}</p></div>
           <div className="participant-actions"><DocumentDownload id={Number(documentId)} copyId={copy.id} title={copy.title} />
             {!current.data?.publication_block && <button className="btn btn-secondary btn-small" disabled={busy} onClick={() => { setCandidate(copy); setError(''); }}>Review this copy</button>}</div>

@@ -2,7 +2,7 @@ import { useContext, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import type { PaymentRegister } from '../../api/payments';
-import { formatCents, formatDateTime } from '../../utils/format';
+import { formatCents, formatDateTime, plural } from '../../utils/format';
 import { getBlobErrorDetail, loadFailure, type LoadFailure } from '../../utils/errors';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
@@ -107,7 +107,7 @@ export default function PaymentRegisterPage() {
       {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
       {report && <>
         <h2 className="card-heading">{report.date_from} through {report.date_to} · {report.timezone}</h2>
-        <p>{report.total} recorded {report.total === 1 ? 'entry' : 'entries'} · Generated {formatDateTime(report.generated_at, report.timezone)} ({report.timezone})</p>
+        <p>{plural(report.total, 'recorded entry', 'recorded entries')} · Generated {formatDateTime(report.generated_at, report.timezone)} ({report.timezone})</p>
         <dl className="register-totals">
           <div><dt>External credits</dt><dd>{formatCents(report.totals.credits_cents)}</dd></div>
           <div><dt>Reversals</dt><dd>{formatCents(report.totals.reversals_cents)}</dd></div>

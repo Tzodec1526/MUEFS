@@ -4,6 +4,7 @@ import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import { getClerkQueue, type ClerkQueue } from '../../api/filings';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
+import { plural } from '../../utils/format';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
 
@@ -33,7 +34,7 @@ function ClerkDashboard() {
         <div>
           <PageHeading>{court!.court_name || `Court ${courtId}`}</PageHeading>
           <p className="dashboard-summary">
-            {queue ? `${queue.total} filing${queue.total === 1 ? '' : 's'} pending review` : 'Clerk dashboard'}
+            {queue ? `${plural(queue.total, 'filing')} pending review` : 'Clerk dashboard'}
           </p>
         </div>
         <Link to="/clerk/queue" className="btn btn-primary">Open review queue</Link>

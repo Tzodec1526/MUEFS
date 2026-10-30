@@ -36,7 +36,7 @@ const document = {
   id: 2, title: 'Complaint', document_type_code: 'COMPLAINT', file_size_bytes: 2048, sha256_hash: 'abc', is_confidential: false,
   page_count: 2, pii_warnings: [], created_at: time,
 };
-const copy = { id: 9, document_id: 2, title: 'Complaint', file_size_bytes: 2048, sha256_hash: 'def', page_count: 2, pii_warnings: [], created_at: time };
+const copy = { id: 9, document_id: 2, title: 'Complaint', file_size_bytes: 2048, sha256_hash: 'def', page_count: 1, pii_warnings: [], created_at: time };
 const intake = {
   court_id: 3, court_name: '3rd Circuit Court', version: 2, is_efiling_enabled: false, public_notice: 'Closed today.',
   case_types: [{ id: 1, code: 'CZ', name: 'General Civil', is_active: true }],
@@ -98,7 +98,7 @@ const responses: Record<string, unknown> = {
   },
   '/clerk/payment-register': {
     court_id: 3, date_from: '2026-03-01', date_to: '2026-03-31', timezone: 'America/Detroit', range_start: time, range_end: time,
-    generated_at: time, include_simulated: false, total: 0, page: 1, entries: [],
+    generated_at: time, include_simulated: false, total: 1, page: 1, entries: [],
     totals: { credits_cents: 0, reversals_cents: 0, net_cents: 0 }, simulated_totals: { credits_cents: 0, reversals_cents: 0, net_cents: 0 },
   },
   '/filings/2/fees': fees,
@@ -215,4 +215,22 @@ it('keeps the fees heading a level under the wizard step when no level is passed
   expect(heading.tagName).toBe('H3');
   expect(screen.getByRole('heading', { name: 'Payment or waiver' }).tagName).toBe('H4');
   expect(skips()).toEqual([]);
+});
+
+it.each([
+  ['notices', '/notifications', '/notifications', <NotificationsPage key="p" />, '1 notice'],
+  ['email attempts', '/notifications', '/notifications', <NotificationsPage key="p" />, /· 1 email attempt$/],
+  ['submissions', '/filings/2/history', '/filings/:filingId/history', <FilingHistoryPage key="p" />, '1 recorded submission'],
+  ['public copy pages', '/documents/2/publication', '/documents/:documentId/publication', <DocumentPublicationPage key="p" />, /· 1 page$/],
+  ['register entries', '/clerk/payment-register', '/clerk/payment-register', <PaymentRegisterPage key="p" />, /^1 recorded entry · /],
+  ['participants', '/filings/2/deliveries/new', '/filings/:filingId/deliveries/new', <DeliveryComposePage key="p" />, /^1 active case participant\. /],
+])('counts %s in the singular', async (_name, url, path, page, count) => {
+  show(url, path, page);
+  expect(await screen.findByText(count)).toBeTruthy();
+});
+
+it('counts a selected delivery in the singular', async () => {
+  show('/filings/2/deliveries/new', '/filings/:filingId/deliveries/new', <DeliveryComposePage />);
+  for (const box of await screen.findAllByRole('checkbox')) fireEvent.click(box);
+  expect(await screen.findByText('1 document · 1 recipient')).toBeTruthy();
 });

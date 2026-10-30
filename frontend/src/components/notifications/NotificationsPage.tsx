@@ -4,7 +4,7 @@ import { apiClient } from '../../api/client';
 import { deliveryLabels, listNotifications, type NotificationItem } from '../../api/notifications';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
-import { formatDateTime } from '../../utils/format';
+import { formatDateTime, plural } from '../../utils/format';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
@@ -142,11 +142,11 @@ export default function NotificationsPage() {
     {error && <LoadError failure={error} onRetry={() => setAttempt(n => n + 1)} />}
     {!loading && !error && data && <>
       {!data.email_enabled && <p className="alert alert-warning">Email delivery is not enabled. These notices are available in the portal.</p>}
-      <p>{data.total} notice{data.total === 1 ? '' : 's'}</p>
+      <p>{plural(data.total, 'notice')}</p>
       {data.notifications.map(notice => <article className="review-card notice-card" key={notice.id}>
         <h2 className="card-heading">{notice.subject}</h2>
         <p className="notice-body">{notice.body}</p>
-        <p><strong>{deliveryLabels[notice.delivery_status] || notice.delivery_status}</strong> · {notice.attempt_count} email attempt{notice.attempt_count === 1 ? '' : 's'}</p>
+        <p><strong>{deliveryLabels[notice.delivery_status] || notice.delivery_status}</strong> · {plural(notice.attempt_count, 'email attempt')}</p>
         {notice.email_recipient && <p>Recipient: {notice.email_recipient}</p>}
         {notice.last_error && <p className="alert alert-warning">{notice.last_error}</p>}
         {notice.delivery_status === 'sent' && notice.sent_at && <p>Relay acceptance recorded: {formatDateTime(notice.sent_at)}</p>}

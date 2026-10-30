@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import type { DeliveryContact, DeliveryOptions } from '../../api/serviceDeliveries';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
-import { formatBytes } from '../../utils/format';
+import { formatBytes, plural } from '../../utils/format';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
@@ -87,7 +87,7 @@ export default function DeliveryComposePage() {
             <DocumentDownload id={doc.id} title={doc.title} />
           </div>)}
           <h2 className="card-heading">Recipients and service instructions</h2>
-          <p>{data.total} active case participant{data.total === 1 ? '' : 's'}. Review every page for people who need another service method.</p>
+          <p>{plural(data.total, 'active case participant')}. Review every page for people who need another service method.</p>
           {data.recipients.map(contact => <div className="service-choice" key={contact.participant_id}>
             <label className="checkbox-label"><input type="checkbox" disabled={contact.issues.length > 0}
               checked={selection.contacts.some(c => c.contact_id === contact.contact_id && c.participant_id === contact.participant_id)}
@@ -104,7 +104,7 @@ export default function DeliveryComposePage() {
             <button type="button" className="btn btn-secondary" disabled={page * data.page_size >= data.total} onClick={() => setPage(n => n + 1)}>Next participants</button>
           </nav>}
           <div className="review-card"><h2 className="card-heading">Review this delivery</h2>
-            <p>{selection.documents.length} document{selection.documents.length === 1 ? '' : 's'} · {selection.contacts.length} recipient{selection.contacts.length === 1 ? '' : 's'}</p>
+            <p>{plural(selection.documents.length, 'document')} · {plural(selection.contacts.length, 'recipient')}</p>
             <ul>{selection.contacts.map(contact => <li key={contact.contact_id}>{contact.name} · {contact.email}
               {' '}<button type="button" className="btn btn-small btn-secondary" onClick={() => { setReviewed(false); setSelection(s => ({ ...s, contacts: s.contacts.filter(c => c.contact_id !== contact.contact_id) })); }}>Remove {contact.name}</button>
             </li>)}</ul>

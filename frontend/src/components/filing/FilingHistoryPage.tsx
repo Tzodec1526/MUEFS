@@ -8,7 +8,7 @@ import { loadFailure, type LoadFailure } from '../../utils/errors';
 import FeeWaiverPanel, { waiverActionLabels } from './FeeWaiverPanel';
 import FilingDateEvidence from './FilingDateEvidence';
 import { getDocumentLabel } from '../../utils/documentTypes';
-import { formatBytes, formatCents, formatCourtDate, formatDateTime, parseServerDate } from '../../utils/format';
+import { formatBytes, formatCents, formatCourtDate, formatDateTime, parseServerDate, plural } from '../../utils/format';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
 
@@ -80,7 +80,7 @@ export default function FilingHistoryPage() {
     {!loading && !error && history && <>
       <div className="history-summary">
         <span className={`status-badge ${history.status}`}>{history.status === 'served' ? 'Service documents recorded' : history.status.replace(/_/g, ' ')}</span>
-        <span>{history.submission_count} recorded submission{history.submission_count === 1 ? '' : 's'}</span>
+        <span>{plural(history.submission_count, 'recorded submission')}</span>
         <button className="btn btn-secondary btn-small" onClick={() => window.print()}>Print this page</button>
         <Link to={`/filings/${filingId}/fees`}>View fees &amp; payments</Link>
         <Link to={`/filings/${filingId}/deliveries`}>Document deliveries</Link>
