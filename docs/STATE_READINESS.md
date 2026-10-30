@@ -34,7 +34,7 @@ establish state approval or production readiness.
 
 On the details step, **Save draft** saves the title and description to the filer's account.
 **Continue** also saves before advancing. New saves acquire a filing ID; later saves use
-that same filing. **My Filings → Continue Filing** resumes the account's saved record,
+that same filing. **My filings → Continue filing** resumes the account's saved record,
 including from a browser with no local recovery data.
 
 Creation requires a UUID `Idempotency-Key` on `POST /api/v1/filings`. The browser saves
@@ -79,7 +79,7 @@ Recovery is limited to the browser's tab session. Save to the account before clo
 the tab or switching devices. The interface warns about unsaved changes and storage
 refusal; browser recovery cannot guarantee survival of crashes, cleared data or closed
 sessions. Failed saves retain the form text and creation key. If that recovery is gone,
-check My Filings before starting a separate draft; a new request key means a new filing.
+check My filings before starting a separate draft; a new request key means a new filing.
 
 Verification reproduced a stale tab overwriting a newer save before the fix, and a live
 tab retaining the previous account's editor after a cross-tab identity change. API tests
@@ -99,7 +99,7 @@ comparison.
 
 ## Court service instructions
 
-Assigned court staff open **Case participants → Service instructions** to record one
+Assigned court staff open **Manage case access → Service instructions** to record one
 current destination and method for a reviewed participant. An electronic instruction
 requires the linked account's current verified email and active identity. Counsel also
 need a matching verified bar number; restricted cases require the participant's access
@@ -247,7 +247,7 @@ independent accessibility conformance.
    notice together before sending a successful HTTP response. The receipt preserves the
    submitted document metadata and payment reference rather than reading those fields
    from the subsequently edited envelope.
-2. The filer opens **Receipts & history** from My Filings, the submission confirmation or
+2. The filer opens **Receipts and history** from My filings, the submission confirmation or
    a notification. Court staff can open the same history from the review queue.
 3. A returned filing can be corrected. Removing a previously submitted document removes
    it from the next attempt, while keeping its stored bytes and original receipt private.
@@ -273,8 +273,9 @@ selected the filing. `POST /api/v1/clerk/filings/{id}/review` requires
 {"action": "accept", "expected_submission_count": 2}
 ```
 
-The service compares that number with the refreshed envelope while holding its row lock,
-before document verification, CMS submission, or decision records. If another reviewer
+The service compares that number before it reads stored documents, and again with the
+refreshed envelope while holding its row lock, before CMS submission or decision records. An
+invalid `action` returns HTTP 422. If another reviewer
 returned the filing and the filer resubmitted it, the stale decision receives HTTP 409
 even though the envelope is again pending. Close the old review, refresh the queue, and
 inspect the corrected submission before deciding. Accept, return, and reject all use this
@@ -337,7 +338,7 @@ The required free-text hardship question has been removed. A pending request mus
 an application attachment before submission; the system does not verify the form's
 contents or signature. The application and signed decision PDFs are nonpublic.
 
-Court staff can select **Pending Fee Waivers** in the review queue, including waivers on
+Court staff can select **Pending fee waivers** in the review queue, including waivers on
 filings that were already accepted. The private history page exposes only actions allowed
 by the viewer's assignment to that court:
 
@@ -387,7 +388,7 @@ filing as a motion, infers charges from fee labels, sums overlapping schedule ro
 adds a guessed electronic filing charge.
 
 The filer can request fee review from the fee screen. This retains the current document
-manifest and reason, and places the request in the court's **Fee Reviews** queue. It does
+manifest and reason, and places the request in the court's **Fee reviews** queue. It does
 not submit a draft, establish its filing date, or accept a filing. An assigned court clerk,
 judge or court administrator can inspect the private originals and record an itemized
 assessment with an authority reference, reason and explicit review confirmation. They
@@ -411,7 +412,7 @@ records as they existed at submission. Signed waiver decisions remain the basis 
 amounts, and a pending application can accompany a submission for court review.
 
 With `EXTERNAL_PAYMENTS_ENABLED=true`, an administrator explicitly assigned to the filing's
-court can record an external receipt through **Fees & payments → View payment records**.
+court can record an external receipt through **View fees and payments → View payment records**.
 The administrator must be someone other than the filer. A clerk/judge assignment or a
 system-administrator account without that court's administrator grant cannot create or
 reverse credits. The operator records the source system, receipt reference, received time,
@@ -480,7 +481,7 @@ also tests duplicate requests, simultaneous document edits, consistent reads and
 
 ## Court receipt register
 
-**Receipt Register** in the court workspace lets an active administrator assigned to the
+**Receipt register** in the court workspace lets an active administrator assigned to the
 selected court review external credits and reversals across filings. A system-wide role
 without that court's administrator assignment is insufficient. The register remains readable
 when external payment recording is disabled, so disabling new entries does not hide retained
@@ -695,7 +696,7 @@ decision deadline trigger. Those court procedures remain separate implementation
 
 ## Identity administration and court access
 
-**People & access** provides a paginated identity directory, provisioning, identity-subject
+**People and court access** provides a paginated identity directory, provisioning, identity-subject
 binding, account deactivation and court grants. System administrators manage identities
 and delegate administration for named courts. Court administrators see only their courts'
 assignments and change history. An exact-email lookup can find an already provisioned
@@ -736,7 +737,7 @@ Database ownership and TRUNCATE privileges must remain outside the runtime role.
 Directory pages fetch court grants in one batch. System statistics now use one database
 round trip for five counts. The administration page loads only when opened. Production
 login no longer displays demo identities or invents a court assignment for unassigned
-staff; production tool discovery also excludes unavailable demo sign-in tools. The browser
+staff. The browser
 security policy allows token exchange with the configured IdP origin while retaining the
 separate restrictive API policy.
 
@@ -794,7 +795,7 @@ measures response size, not production latency or statewide load capacity.
 
 ## Court-managed participants and restricted-case access
 
-**Court Cases** lists public and sealed matters only for a staff member's assigned court,
+**Court cases** lists public and sealed matters only for a staff member's assigned court,
 with an exact case-number lookup and 25-record pages. The case docket links assigned staff
 to **Manage case access**. Staff can record a party or counsel, identify a represented
 party, link an existing account and explicitly grant restricted-case access. Generic
@@ -946,7 +947,8 @@ bytes and the median of five warmed samples, measured:
 These are synthetic local-filesystem measurements, not production load or S3 latency
 evidence. Integrity reads use 64 KiB chunks in worker threads. A shared actor lock keeps
 authority stable during the transition while allowing unrelated filings and foreign-key
-references; ordered envelope locks avoid reversed batch lock acquisition. Account and
+references; ordered envelope locks avoid reversed batch lock acquisition. The README's
+[row-lock order](../README.md#row-lock-order) lists the order every path follows. Account and
 court-role administration remain serialized with these transitions. PostgreSQL's
 [row-lock conflict rules](https://www.postgresql.org/docs/16/explicit-locking.html#LOCKING-ROWS)
 inform that choice; concurrency tests exercise the actual request behavior.
@@ -1016,7 +1018,7 @@ remain separate requirements.
 
 ## Filing-list scale and detail loading
 
-My Filings and the clerk queue select summary columns and count only current attachments.
+My filings and the clerk queue select summary columns and count only current attachments.
 Removed documents and court-generated waiver/date orders are excluded from that count,
 matching the full envelope. Attachment manifests, waiver explanations and filing-date
 evidence load through the authorized detail endpoint when the user opens a filing.
@@ -1037,8 +1039,8 @@ measurements, not deployment capacity targets.
 
 | First page, 25 rows | Median before | Median after | Response bytes before → after |
 | --- | ---: | ---: | ---: |
-| My Filings, all statuses | 27.92 ms | 6.79 ms | 121,629 → 35,282 |
-| My Filings, returned | 20.15 ms | 6.92 ms | 121,628 → 35,282 |
+| My filings, all statuses | 27.92 ms | 6.79 ms | 121,629 → 35,282 |
+| My filings, returned | 20.15 ms | 6.92 ms | 121,628 → 35,282 |
 | Clerk queue, all pending | 12.00 ms | 8.20 ms | 120,759 → 34,993 |
 | Clerk queue, submitted | 9.46 ms | 4.62 ms | 120,759 → 34,963 |
 | Pending waivers | 11.82 ms | 6.16 ms | 141,518 → 34,948 |
@@ -1080,11 +1082,8 @@ counts. SQLite uses an ordinary partial index.
 A separate PostgreSQL 16 service profile on 2026-09-06 used 50,000 synthetic filings,
 20,000 pending records and 600,000 document rows. The same vacuumed/analyzed dataset
 served both implementations; each run discarded one warm-up and measured nine calls.
-The 25-row queue page improved from 10.59 to 6.29 ms median. The clerk-triage tool improved
-from 6.52 to 5.93 ms, replacing two queue requests with one and four service SELECTs with
-two. It fetches five summaries instead of fifty and uses database receipt ordering,
-removing the client-side merge and sort. The old and new paths returned the same IDs.
-These service timings exclude HTTP/authentication and deployment network costs.
+The 25-row queue page improved from 10.59 to 6.29 ms median. The old and new paths returned
+the same IDs. These service timings exclude HTTP/authentication and deployment network costs.
 
 The first combined implementation regressed because it sorted both pending statuses;
 the replacement index removed that sort. Substring searches, exact counts and deep
