@@ -54,9 +54,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Start disposable storage and scanner
-        # Fixed images serve only as disposable protocol fixtures. Production storage and
-        # scanner lifecycle are deployment responsibilities. The scanner uses the image's
-        # bundled signatures; the tests need only EICAR and the configured scan limits.
         run: |
           docker run --rm --detach --name muefs-test-storage \
             --publish 127.0.0.1:7070:7070 --volume muefs-test-storage:/data \

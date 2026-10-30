@@ -1,14 +1,12 @@
 name: Security Scan
 
-# Block merges on HIGH/CRITICAL findings in backend deps and repo filesystem.
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
   schedule:
-    - cron: "0 6 * * 1" # weekly, Mondays 06:00 UTC
+    - cron: "0 6 * * 1"
 
 permissions:
   contents: read
@@ -23,7 +21,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Trivy filesystem scan (SARIF)
-        # A released scanner image, pinned by digest; update both together.
         run: |
           docker run --rm --volume "$PWD:/src" --workdir /src \
             aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
