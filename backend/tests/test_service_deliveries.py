@@ -473,10 +473,10 @@ async def test_concurrent_delivery_replays_once_and_database_protects_evidence(
     one, two = await asyncio.wait_for(asyncio.gather(submit(), submit()), 15)
     assert one == two
     async with postgres_sessions.begin() as db:
-        from app.api.service_deliveries import sent_deliveries
+        from app.services.service_delivery_service import sent
 
-        result = await sent_deliveries(f["fid"], db, await db.get(User, f["sender"]), page=1)
-        assert result["total"] == 1 and result["deliveries"][0]["email"] == "other@test.com"
+        result = await sent(db, await db.get(User, f["sender"]), f["fid"], page=1)
+        assert result.total == 1 and result.deliveries[0].email == "other@test.com"
         assert await db.scalar(select(func.count()).select_from(ServiceRecipient)) == 1
         recipient = await db.scalar(select(ServiceRecipient))
         db.add(

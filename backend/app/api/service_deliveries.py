@@ -10,31 +10,38 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import raiseload
 
 from app.api.auth import get_current_user, lock_current_user
 from app.api.documents import DocumentResponse
 from app.api.params import Page, RecordId
 from app.config import settings
 from app.database import get_db
-from app.models.case import CaseParticipant
-from app.models.court import Court
-from app.models.filing import PRIVATE_DOCUMENT_TYPES, FilingDocument, FilingEnvelope
+from app.models.filing import PRIVATE_DOCUMENT_TYPES, FilingDocument
 from app.models.notification import (
     DeliveryStatus,
     Notification,
     NotificationDeliveryEvent,
     NotificationType,
-    ServiceContact,
-    ServiceMethod,
 )
-from app.models.service_delivery import ServiceEvent, ServicePacket, ServiceRecipient
+from app.models.service_delivery import ServiceEvent
 from app.models.user import User, UserType
-from app.schemas.service_delivery import ServiceFailureReport, ServicePacketCreate
+from app.schemas.service_delivery import (
+    DeliveryAcknowledged,
+    DeliveryCreated,
+    DeliveryDetails,
+    DeliveryEvents,
+    DeliveryFailureRecorded,
+    DeliveryOptions,
+    DeliveryRetryQueued,
+    ReceivedDeliveries,
+    SentDeliveries,
+    ServiceFailureReport,
+    ServicePacketCreate,
+)
 from app.services import access_service
 from app.services import service_delivery_service as service
 from app.services.email_delivery_service import queue_email
-from app.services.service_contact_service import email_context, routing_issues
+from app.services.service_contact_service import email_context
 
 router = APIRouter(prefix="/service", tags=["Document delivery"])
 Db = Annotated[AsyncSession, Depends(get_db, scope="function")]
@@ -46,65 +53,12 @@ class RetryRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=1000)
 
 
-@router.get("/filings/{filing_id}/options")
+@router.get("/filings/{filing_id}/options", response_model=DeliveryOptions)
 async def delivery_options(filing_id: RecordId, db: Db, actor: Actor, page: Page = 1):
-    filing, case = await service.require_sender(db, actor, filing_id)
-    source = await service.current_source(db, filing)
-    filters = (CaseParticipant.case_id == case.id, CaseParticipant.is_active.is_(True))
-    total = await db.scalar(select(func.count()).select_from(CaseParticipant).where(*filters))
-    rows = await db.execute(
-        select(CaseParticipant, ServiceContact, User)
-        .outerjoin(ServiceContact, ServiceContact.participant_id == CaseParticipant.id)
-        .outerjoin(User, User.id == CaseParticipant.user_id)
-        .where(*filters)
-        .order_by(CaseParticipant.id)
-        .offset((page - 1) * 25)
-        .limit(25)
-    )
-    recipients = []
-    for participant, contact, account in rows:
-        issues = (
-            routing_issues(case, participant, account, contact)
-            if contact
-            else [
-                "The court has not reviewed service instructions for this participant.",
-            ]
-        )
-        if contact and contact.case_id != case.id:
-            issues = ["The contact's case destination needs court review."]
-        if contact and contact.method != ServiceMethod.ELECTRONIC:
-            issues.append("Follow these service instructions outside the portal.")
-        if account and account.id == actor.id:
-            issues.append("This is your own account.")
-        recipients.append(
-            {
-                "participant_id": participant.id,
-                "name": participant.party_name,
-                "role": participant.role,
-                "represented_party_name": participant.represented_party_name,
-                "contact_id": contact.id if contact else None,
-                "version": contact.version if contact else None,
-                "method": contact.method if contact else None,
-                "email": contact.email if contact else None,
-                "address": contact.address if contact else None,
-                "authority": contact.authority if contact else None,
-                "issues": issues,
-            }
-        )
-    return {
-        "enabled": settings.service_delivery_enabled and settings.email_delivery_enabled,
-        "source_transaction_id": source.id,
-        "case_number": case.case_number,
-        "case_title": case.title,
-        "court_name": await db.scalar(select(Court.name).where(Court.id == case.court_id)),
-        "documents": service.source_documents(source),
-        "recipients": recipients,
-        "total": total,
-        "page_size": 25,
-    }
+    return await service.options(db, actor, filing_id, page)
 
 
-@router.post("/filings/{filing_id}/deliveries", status_code=201)
+@router.post("/filings/{filing_id}/deliveries", status_code=201, response_model=DeliveryCreated)
 async def send_documents(
     filing_id: RecordId,
     data: ServicePacketCreate,
@@ -118,74 +72,17 @@ async def send_documents(
     return {"packet_id": packet.id}
 
 
-@router.get("/deliveries")
+@router.get("/deliveries", response_model=ReceivedDeliveries)
 async def inbox(db: Db, actor: Actor, page: Page = 1):
-    filters = (ServiceRecipient.recipient_id == actor.id,)
-    total = await db.scalar(select(func.count()).select_from(ServiceRecipient).where(*filters))
-    rows = await db.execute(
-        select(
-            ServiceRecipient.id,
-            ServicePacket.actor_name,
-            ServicePacket.created_at,
-            Notification.delivery_status,
-        )
-        .join(ServicePacket, ServicePacket.id == ServiceRecipient.packet_id)
-        .join(Notification, Notification.id == ServiceRecipient.notification_id)
-        .where(*filters)
-        .order_by(ServicePacket.created_at.desc(), ServiceRecipient.id.desc())
-        .offset((page - 1) * 25)
-        .limit(25)
-    )
-    # An inbox entry persists after access revocation, but discloses no case title or documents.
-    return {
-        "deliveries": [dict(row) for row in rows.mappings()],
-        "total": total,
-        "page_size": 25,
-    }
+    return await service.inbox(db, actor, page)
 
 
-@router.get("/filings/{filing_id}/deliveries")
+@router.get("/filings/{filing_id}/deliveries", response_model=SentDeliveries)
 async def sent_deliveries(filing_id: RecordId, db: Db, actor: Actor, page: Page = 1):
-    filing = await db.scalar(
-        select(FilingEnvelope)
-        .where(FilingEnvelope.id == filing_id)
-        .options(raiseload(FilingEnvelope.documents))
-    )
-    if filing is None:
-        raise HTTPException(404, "Filing not found")
-    if filing.filer_id != actor.id and not await access_service.user_is_court_staff_for_court(
-        db,
-        actor.id,
-        filing.court_id,
-    ):
-        raise HTTPException(403, "Filer or assigned court staff required")
-    query = (
-        select(
-            ServiceRecipient.id,
-            ServiceRecipient.packet_id,
-            ServiceRecipient.contact_snapshot["name"].as_string().label("name"),
-            ServiceRecipient.contact_snapshot["email"].as_string().label("email"),
-            ServicePacket.created_at,
-            Notification.delivery_status,
-        )
-        .join(ServicePacket, ServicePacket.id == ServiceRecipient.packet_id)
-        .join(Notification, Notification.id == ServiceRecipient.notification_id)
-        .where(ServicePacket.filing_id == filing.id)
-    )
-    total = await db.scalar(select(func.count()).select_from(query.subquery()))
-    rows = await db.execute(
-        query.order_by(ServicePacket.created_at.desc(), ServiceRecipient.id.desc())
-        .offset((page - 1) * 25)
-        .limit(25)
-    )
-    return {
-        "deliveries": [dict(row) for row in rows.mappings()],
-        "total": total,
-        "page_size": 25,
-    }
+    return await service.sent(db, actor, filing_id, page)
 
 
-@router.get("/deliveries/{delivery_id}")
+@router.get("/deliveries/{delivery_id}", response_model=DeliveryDetails)
 async def delivery_details(delivery_id: UUID, db: Db, actor: Actor):
     recipient, packet, notice, staff = await service.require_delivery_viewer(
         db, actor, str(delivery_id)
@@ -239,7 +136,7 @@ async def delivery_details(delivery_id: UUID, db: Db, actor: Actor):
     }
 
 
-@router.get("/deliveries/{delivery_id}/events")
+@router.get("/deliveries/{delivery_id}/events", response_model=DeliveryEvents)
 async def delivery_events(
     delivery_id: UUID,
     db: Db,
@@ -303,7 +200,7 @@ async def download_delivery_document(
     return DocumentResponse(doc, integrity=(saved["sha256_hash"], saved["file_size_bytes"]))
 
 
-@router.post("/deliveries/{delivery_id}/acknowledge")
+@router.post("/deliveries/{delivery_id}/acknowledge", response_model=DeliveryAcknowledged)
 async def acknowledge_delivery(delivery_id: UUID, db: Db, actor: Actor):
     recipient, _, _, _ = await service.require_delivery_viewer(
         db, actor, str(delivery_id), lock=True
@@ -323,7 +220,7 @@ async def acknowledge_delivery(delivery_id: UUID, db: Db, actor: Actor):
     return {"acknowledged": True}
 
 
-@router.post("/deliveries/{delivery_id}/retry")
+@router.post("/deliveries/{delivery_id}/retry", response_model=DeliveryRetryQueued)
 async def retry_delivery(delivery_id: UUID, data: RetryRequest, db: Db, actor: Actor):
     actor = await lock_current_user(db, actor.id)
     recipient, packet, notice, staff = await service.require_delivery_viewer(
@@ -363,7 +260,10 @@ async def retry_delivery(delivery_id: UUID, data: RetryRequest, db: Db, actor: A
     return {"delivery_status": notice.delivery_status}
 
 
-@router.post("/deliveries/{delivery_id}/failure-reports", status_code=201)
+@router.post(
+    "/deliveries/{delivery_id}/failure-reports", status_code=201,
+    response_model=DeliveryFailureRecorded,
+)
 async def report_delivery_failure(
     delivery_id: UUID,
     data: ServiceFailureReport,

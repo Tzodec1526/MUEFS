@@ -203,52 +203,10 @@ async def update_filing(
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     filing = await _owned_filing(db, filing_id, current_user.id, for_update=True)
-    if (
-        data.expected_details_token is not None
-        and data.expected_details_token != filing.details_token
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail="This filing changed after you opened it. Compare the saved details "
-            "with your edits before saving again.",
-        )
-    if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Can only update draft or returned filings",
-        )
-
-    if filing.submitted_at is not None and (
-        (data.fee_waiver_requested is not None
-         and data.fee_waiver_requested != filing.fee_waiver_requested)
-        or (data.fee_waiver_reason is not None
-            and data.fee_waiver_reason != filing.fee_waiver_reason)
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail="A submitted fee waiver request cannot be changed through draft editing",
-        )
-
-    if data.case_title is not None and data.case_title != filing.case_title:
-        if filing.case_id is not None:
-            raise HTTPException(
-                status_code=409,
-                detail="A filing in an existing case uses the court's case title.",
-            )
-        filing.case_title = data.case_title
-    if data.filing_description is not None:
-        filing.filing_description = data.filing_description
-    if data.fee_waiver_requested is not None:
-        filing.fee_waiver_requested = data.fee_waiver_requested
-        if data.fee_waiver_requested:
-            filing.fee_review_requested_at = None
-    if data.fee_waiver_reason is not None:
-        filing.fee_waiver_reason = data.fee_waiver_reason
-
-    await db.flush()
-    await db.refresh(filing)
-    await db.refresh(filing, ["documents"])
-    return filing
+    try:
+        return await filing_service.update_details(db, filing, data)
+    except filing_service.FilingUpdateError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.post("/{filing_id}/validate", response_model=FilingValidationResult)

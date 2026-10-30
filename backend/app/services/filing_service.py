@@ -20,6 +20,7 @@ from app.schemas.common import MAX_RECORD_ID
 from app.schemas.filing import (
     ClerkQueueResponse,
     FilingEnvelopeCreate,
+    FilingEnvelopeUpdate,
     FilingSummary,
     FilingValidationResult,
 )
@@ -49,6 +50,13 @@ class StaleFilingReviewError(Exception):
 
 
 class FilingSubmissionError(Exception):
+    def __init__(self, status_code: int, detail: str):
+        self.status_code = status_code
+        self.detail = detail
+        super().__init__(detail)
+
+
+class FilingUpdateError(Exception):
     def __init__(self, status_code: int, detail: str):
         self.status_code = status_code
         self.detail = detail
@@ -245,6 +253,52 @@ async def create_filing(
     await db.refresh(envelope)
     await db.refresh(envelope, ["documents"])
     return envelope
+
+
+async def update_details(
+    db: AsyncSession, filing: FilingEnvelope, data: FilingEnvelopeUpdate,
+) -> FilingEnvelope:
+    if (
+        data.expected_details_token is not None
+        and data.expected_details_token != filing.details_token
+    ):
+        raise FilingUpdateError(
+            409,
+            "This filing changed after you opened it. Compare the saved details "
+            "with your edits before saving again.",
+        )
+    if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
+        raise FilingUpdateError(400, "Can only update draft or returned filings")
+
+    if filing.submitted_at is not None and (
+        (data.fee_waiver_requested is not None
+         and data.fee_waiver_requested != filing.fee_waiver_requested)
+        or (data.fee_waiver_reason is not None
+            and data.fee_waiver_reason != filing.fee_waiver_reason)
+    ):
+        raise FilingUpdateError(
+            409, "A submitted fee waiver request cannot be changed through draft editing",
+        )
+
+    if data.case_title is not None and data.case_title != filing.case_title:
+        if filing.case_id is not None:
+            raise FilingUpdateError(
+                409, "A filing in an existing case uses the court's case title.",
+            )
+        filing.case_title = data.case_title
+    if data.filing_description is not None:
+        filing.filing_description = data.filing_description
+    if data.fee_waiver_requested is not None:
+        filing.fee_waiver_requested = data.fee_waiver_requested
+        if data.fee_waiver_requested:
+            filing.fee_review_requested_at = None
+    if data.fee_waiver_reason is not None:
+        filing.fee_waiver_reason = data.fee_waiver_reason
+
+    await db.flush()
+    await db.refresh(filing)
+    await db.refresh(filing, ["documents"])
+    return filing
 
 
 async def get_filing(
