@@ -218,7 +218,7 @@ export async function getFilingHistory(filingId: number, page: number, signal?: 
   return data;
 }
 
-export interface DocumentUploadResult {
+interface DocumentUploadResult {
   id: number;
   title: string;
   file_size_bytes: number;

@@ -24,7 +24,7 @@ export interface PaymentRecords {
   payment_version: number;
 }
 
-export interface PaymentActivity {
+interface PaymentActivity {
   event_id: string;
   filing_id: number;
   event_type: 'fee_payment_recorded' | 'fee_payment_reversed';

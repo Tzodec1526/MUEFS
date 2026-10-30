@@ -9,7 +9,7 @@ export function getErrorDetail(err: unknown): string | undefined {
   return undefined;
 }
 
-export function errorStatus(err: unknown): number | undefined {
+function errorStatus(err: unknown): number | undefined {
   const status = (err as { response?: { status?: unknown } })?.response?.status;
   return typeof status === 'number' ? status : undefined;
 }

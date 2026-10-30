@@ -14,7 +14,7 @@ export function setPlainLanguageMode(on: boolean): void {
 }
 
 /** Step labels in plain language for self-represented litigants. */
-export const PLAIN_STEP_LABELS: Record<string, string> = {
+const PLAIN_STEP_LABELS: Record<string, string> = {
   court: 'Pick your court',
   case: 'Your case',
   'case-type': 'What kind of case',

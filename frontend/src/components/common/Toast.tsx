@@ -3,7 +3,7 @@ import { onToast } from '../../utils/toastBus';
 
 export type ToastTone = 'info' | 'success' | 'error';
 
-export interface Toast {
+interface Toast {
   id: number;
   message: string;
   tone: ToastTone;
