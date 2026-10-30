@@ -563,6 +563,20 @@ it('warns when this browser cannot keep a recovery copy, until a later edit is k
   await waitFor(() => expect(screen.queryByText(/could not keep a recovery copy/)).toBeNull());
 });
 
+it('never renders the recovery warning while storage works, not even before the first save', async () => {
+  serveCourtsAndTypes();
+  const observer = new MutationObserver(() => {});
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  openWizard('/filing/new?court_id=3');
+
+  const shown = observer.takeRecords().flatMap(record => [...record.addedNodes, ...record.removedNodes]);
+  observer.disconnect();
+  expect(shown.map(node => node.textContent ?? '').filter(text => text.includes('could not keep a recovery copy'))).toEqual([]);
+  await chooseNewCaseAndType();
+  expect(screen.queryByText(/could not keep a recovery copy/)).toBeNull();
+});
+
 it('saves a new filing as a draft and locks the court and case choices', async () => {
   serveCourtsAndTypes();
   const created = savedFiling();
