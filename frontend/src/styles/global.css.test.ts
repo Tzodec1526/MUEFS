@@ -71,6 +71,13 @@ it('keeps no rules for classes that nothing renders', () => {
   expect(unused).toEqual([]);
 });
 
+it('stacks the case search rows below 600 px instead of scrolling them sideways', () => {
+  const below600 = css.slice(css.indexOf('@media (max-width: 599px) {\n  .case-search-table table'));
+  expect(below600).toMatch(/\.case-search-table tr \{\s+display: block;/);
+  expect(below600).toMatch(/\.case-search-table td\[data-label\]::before \{\s+content: attr\(data-label\);/);
+  expect(css).toMatch(/@media \(min-width: 600px\) and \(max-width: 760px\) \{\s+\.search-results table,/);
+});
+
 it('hides the outline of a focused page heading only when the browser would not show a focus ring', () => {
   const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)]
     .filter(([, , body]) => /outline:\s*(none|0)/.test(body))

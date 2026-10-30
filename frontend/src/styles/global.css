@@ -913,6 +913,7 @@ tr.selected {
 .status-badge {
   display: inline-block;
   align-self: flex-start;
+  justify-self: start;
   padding: 0.18rem 0.6rem;
   border-radius: var(--radius);
   font-size: 0.8rem;
@@ -1113,7 +1114,7 @@ tr.selected {
    ============================================ */
 
 .case-search h1 {
-  margin-bottom: 1rem;
+  margin-bottom: 0.35rem;
 }
 
 .search-form {
@@ -1146,7 +1147,8 @@ tr.selected {
   padding: 1rem;
 }
 
-.search-results h3 {
+.search-results h2 {
+  font-size: 1.17rem;
   margin-bottom: 0.75rem;
 }
 
@@ -2368,12 +2370,66 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 
 /* --- Responsive refinements: fluid tables on small screens --- */
 @media (max-width: 760px) {
-  .search-results table,
-  .queue-list table,
   .review-table {
     display: block;
     overflow-x: auto;
     white-space: nowrap;
+  }
+}
+
+@media (min-width: 600px) and (max-width: 760px) {
+  .search-results table,
+  .queue-list table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 599px) {
+  .case-search-table table,
+  .case-search-table tbody,
+  .case-search-table tr {
+    display: block;
+    min-width: 0;
+  }
+
+  .case-search-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .case-search-table tbody tr {
+    position: relative;
+    padding-block: 0.6rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .case-search-table td {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    gap: 0.5rem;
+    padding: 0.1rem 0;
+    border-bottom: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .case-search-table td[data-label]::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .case-search-table .td-fav {
+    display: block;
+    position: absolute;
+    top: 0.5rem;
+    right: 0;
+    width: auto;
   }
 }
 
@@ -2492,21 +2548,6 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
     content: attr(data-label) ': ';
     font-weight: 600;
   }
-}
-
-.case-search-hero {
-  margin-bottom: 1rem;
-}
-
-.case-search-hero h1 {
-  margin-bottom: 0.35rem;
-}
-
-.btn-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.55rem 0.75rem;
 }
 
 /* Toast notifications */

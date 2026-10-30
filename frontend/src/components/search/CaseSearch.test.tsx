@@ -169,6 +169,56 @@ it('counts result pages with the page size the search reports', async () => {
   expect(await screen.findByText('Page 1 of 3')).toBeTruthy();
 });
 
+it('labels every result cell with its column, so a row still reads when it stacks on a phone', async () => {
+  localStorage.setItem('demo_role', 'attorney');
+  serveResults([smith]);
+  openSearch('/cases/search?party=Smith');
+
+  const table = await screen.findByRole('table');
+  const columns = within(table).getAllByRole('columnheader').map(cell => cell.textContent);
+  const cells = within(within(table).getAllByRole('row')[1]).getAllByRole('cell');
+  expect(columns).toEqual(['', 'Case number', 'Court', 'Title', 'Status', 'Filed date', 'Parties']);
+  expect(cells.map(cell => cell.getAttribute('data-label'))).toEqual([null, ...columns.slice(1)]);
+  expect(cells[5].textContent).toBe('Mar 2, 2026');
+});
+
+it('says in plain words when the court has not confirmed a filed date', async () => {
+  serveResults([{ ...smith, filing_date: null, filed_date: '2026-03-02T12:00:00Z' }]);
+  openSearch('/cases/search?party=Smith');
+
+  expect(await screen.findByText('Mar 2, 2026 (not yet confirmed by the court)')).toBeTruthy();
+  expect(screen.queryByText(/unverified/)).toBeNull();
+});
+
+it('offers a labeled Copy link once there is a search to share', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+  serveResults([smith]);
+  openSearch('/cases/search?party=Smith');
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Copy link' }));
+
+  await screen.findByText('Search link copied to clipboard');
+  expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/cases/search?party=Smith`);
+});
+
+it('has no link to copy before a search', async () => {
+  serveResults([]);
+  openSearch('/cases/search');
+
+  await screen.findByRole('heading', { name: 'Recent public filings' });
+  expect(screen.queryByRole('button', { name: 'Copy link' })).toBeNull();
+});
+
+it('introduces the search in one plain line', async () => {
+  serveResults([]);
+  openSearch('/cases/search');
+
+  expect((await screen.findByRole('heading', { level: 1 })).textContent).toBe('Case search');
+  expect(screen.getByText('Partial names and case numbers work. Sealed cases are not listed.')).toBeTruthy();
+  expect(document.body.textContent).not.toMatch(/Statewide|vendor portal|file motions/);
+});
+
 it("links each result's case number to its docket", async () => {
   serveResults([smith, { ...smith, id: 43, case_number: '2026-000043-CZ', title: 'Doe v. Roe' }]);
   openSearch('/cases/search?party=Smith');

@@ -1,7 +1,6 @@
 import { useState, useEffect, useContext, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { actionErrorMessage } from '../../api/client';
-import { Link2 } from 'lucide-react';
 import { CaseSearchResult, searchCases } from '../../api/cases';
 import { CourtDirectoryEntry, listCourtDirectory } from '../../api/courts';
 import { listFavorites, addFavorite, removeFavorite } from '../../api/favorites';
@@ -9,7 +8,7 @@ import { CourtContext } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { useToast } from '../common/Toast';
-import { formatCourtDate, parseServerDate } from '../../utils/format';
+import { formatCourtDate, formatShortDate } from '../../utils/format';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
 
@@ -180,14 +179,8 @@ function CaseSearch() {
 
   return (
     <div className="case-search">
-      <div className="case-search-hero">
-        <PageHeading>Statewide case search</PageHeading>
-        <p className="info-text">
-          One search across Michigan courts — no account, no vendor portal hopping. Sealed matters
-          stay off the index. Partial names and case numbers work.
-          {showFavorites ? ' Star cases to file motions faster.' : ''}
-        </p>
-      </div>
+      <PageHeading>Case search</PageHeading>
+      <p className="info-text">Partial names and case numbers work. Sealed cases are not listed.</p>
 
       <form
         className="search-form"
@@ -234,15 +227,7 @@ function CaseSearch() {
             {searching ? 'Searching...' : 'Search'}
           </button>
           {(hasSearched || page > 1) && (
-            <button
-              type="button"
-              className="btn btn-secondary btn-icon"
-              onClick={copyShareLink}
-              title="Copy results link"
-            >
-              <Link2 size={16} aria-hidden="true" />
-              <span className="sr-only">Copy results link</span>
-            </button>
+            <button type="button" className="btn btn-secondary" onClick={copyShareLink}>Copy link</button>
           )}
         </div>
       </form>
@@ -254,7 +239,7 @@ function CaseSearch() {
         <LoadError failure={error} onRetry={() => setReloadKey((key) => key + 1)} />
       ) : (
         <div className="search-results">
-          <h3>{hasSearched ? `Results (${total})` : 'Recent public filings'}</h3>
+          <h2>{hasSearched ? `Results (${total})` : 'Recent public filings'}</h2>
           {results.length > 0 ? (
             <div className="case-search-table" role="region" aria-label="Case search results" tabIndex={0}>
               <table>
@@ -285,15 +270,15 @@ function CaseSearch() {
                           </button>
                         </td>
                       )}
-                      <td><Link to={`/cases/${c.id}`}>{c.case_number}</Link></td>
-                      <td>{c.court_name}<br /><small>{c.court_county}</small></td>
-                      <td>{c.title}</td>
-                      <td>
+                      <td data-label="Case number"><Link to={`/cases/${c.id}`}>{c.case_number}</Link></td>
+                      <td data-label="Court"><span>{c.court_name}<br /><small>{c.court_county}</small></span></td>
+                      <td data-label="Title">{c.title}</td>
+                      <td data-label="Status">
                         <span className={`status-badge ${c.status}`}>{c.status}</span>
                       </td>
-                      <td>{c.filing_date ? formatCourtDate(c.filing_date)
-                        : `${parseServerDate(c.filed_date).toLocaleDateString()} (unverified)`}</td>
-                      <td>
+                      <td data-label="Filed date">{c.filing_date ? formatCourtDate(c.filing_date)
+                        : `${formatShortDate(c.filed_date)} (not yet confirmed by the court)`}</td>
+                      <td data-label="Parties">
                         {c.participants.map((p) => `${p.party_name} (${p.role})`).join(', ')}
                       </td>
                     </tr>

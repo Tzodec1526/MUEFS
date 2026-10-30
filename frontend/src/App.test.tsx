@@ -364,7 +364,7 @@ it.each([
   ['/filings/7/history', 'attorney', 'Filing #7: receipts & history'],
   ['/filings/7/fees', 'attorney', 'Filing #7: fees & payments'],
   ['/filings/7/filing-date', 'clerk', 'Filing #7: record a filing-date order'],
-  ['/cases/search', 'public', 'Statewide case search'],
+  ['/cases/search', 'public', 'Case search'],
   ['/notifications', 'attorney', 'Notices & email status'],
   ['/service/deliveries', 'attorney', 'Document delivery inbox'],
   ['/service/deliveries/5', 'attorney', 'Document delivery record'],
@@ -689,7 +689,7 @@ it('leads the public home with a case search that opens the matching results', a
   fireEvent.change(await screen.findByLabelText('Party name'), { target: { value: ' Smith ' } });
   fireEvent.click(screen.getByRole('button', { name: 'Search cases' }));
 
-  expect(await screen.findByRole('heading', { level: 1, name: 'Statewide case search' })).toBeTruthy();
+  expect(await screen.findByRole('heading', { level: 1, name: 'Case search' })).toBeTruthy();
   expect((screen.getByLabelText('Party Name') as HTMLInputElement).value).toBe('Smith');
 });
 
