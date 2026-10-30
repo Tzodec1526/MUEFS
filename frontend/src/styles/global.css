@@ -898,7 +898,11 @@ td {
 
 td > a,
 p > a:only-child,
-.court-case-list a {
+.court-case-list a,
+.filing-wizard > a,
+.document-publication-page > a,
+.participant-actions a,
+.docket-doc a {
   display: inline-block;
   padding-block: 0.2rem;
 }
