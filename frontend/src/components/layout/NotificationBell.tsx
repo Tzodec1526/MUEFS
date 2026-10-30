@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { deliveryLabels, listNotifications, type NotificationItem } from '../../api/notifications';
-import { getDemoRole } from '../auth/LoginScreen';
+import { getDemoRole } from '../../auth/session';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 

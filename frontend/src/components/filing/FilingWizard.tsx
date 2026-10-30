@@ -18,7 +18,7 @@ import { actionErrorMessage } from '../../api/client';
 import LoadError from '../common/LoadError';
 import { getCase, type CaseDocket } from '../../api/cases';
 import { getCourt, getCaseTypes } from '../../api/courts';
-import { getDemoRole } from '../auth/LoginScreen';
+import { getDemoRole } from '../../auth/session';
 import {
   hasPlainLanguagePreference,
   isPlainLanguageMode,

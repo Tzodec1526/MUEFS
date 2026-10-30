@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getFilingHistory, type FilingHistory, type FilingTransaction } from '../../api/filings';
-import { getDemoRole } from '../auth/LoginScreen';
+import { getDemoRole } from '../../auth/session';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';

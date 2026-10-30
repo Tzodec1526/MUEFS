@@ -5,7 +5,7 @@ import LoadError from '../common/LoadError';
 import {
   applySessionFromProfile, getDemoCourtId, getDemoRole, hasSession,
   type CourtAssignment, type SessionProfile,
-} from './LoginScreen';
+} from '../../auth/session';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
 

@@ -2,7 +2,7 @@ import { useContext } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { LayoutDashboard, FilePlus2, FolderOpen, Search, Star, ClipboardCheck, Mail, ShieldCheck } from 'lucide-react';
 import { CourtContext } from '../auth/CourtSession';
-import { hasAdministrationAccess } from '../auth/LoginScreen';
+import { hasAdministrationAccess } from '../../auth/session';
 
 function Sidebar() {
   const location = useLocation();

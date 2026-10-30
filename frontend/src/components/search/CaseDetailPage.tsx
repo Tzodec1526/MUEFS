@@ -7,7 +7,7 @@ import { addFavorite, removeFavorite, listFavorites } from '../../api/favorites'
 import { getCaseTypes } from '../../api/courts';
 import { formatBytes, formatCourtDate, formatShortDate, getDocumentLabel } from '../../utils/format';
 import { errorMessage } from '../../utils/errors';
-import { getDemoRole } from '../auth/LoginScreen';
+import { getDemoRole } from '../../auth/session';
 import { useToast } from '../common/Toast';
 import DocumentDownload from '../common/DocumentDownload';
 import { usePageTitle } from '../../utils/pageTitle';

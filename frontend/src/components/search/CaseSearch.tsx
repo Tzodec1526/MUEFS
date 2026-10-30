@@ -5,7 +5,7 @@ import { Link2 } from 'lucide-react';
 import { CaseSearchResult, searchCases } from '../../api/cases';
 import { CourtDirectoryEntry, listCourtDirectory } from '../../api/courts';
 import { listFavorites, addFavorite, removeFavorite } from '../../api/favorites';
-import { getDemoRole } from '../auth/LoginScreen';
+import { getDemoRole } from '../../auth/session';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { useToast } from '../common/Toast';

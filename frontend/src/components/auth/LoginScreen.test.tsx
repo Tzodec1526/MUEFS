@@ -6,7 +6,7 @@ import {
   getDemoCourtId,
   getDemoRole,
   hasSession,
-} from './LoginScreen';
+} from '../../auth/session';
 
 describe('identity session boundaries', () => {
   beforeEach(() => {

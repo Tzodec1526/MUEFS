@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clearSession, handleKeycloakCallback, SessionChangedError, sessionSnapshot } from '../../auth/keycloak';
-import { applySessionFromProfile } from './LoginScreen';
+import { applySessionFromProfile } from '../../auth/session';
 import { apiClient } from '../../api/client';
 import { errorMessage } from '../../utils/errors';
 import { usePageTitle } from '../../utils/pageTitle';
