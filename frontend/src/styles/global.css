@@ -4,6 +4,7 @@
   --accent: #1c3f6e;
   --accent-dark: #122c50;
   --tint: #eef2f7;
+  --info-tint: #dce8f5;
   --rule: #dde3ea;
   --field: #7a8699;
   --star: #94700f;
@@ -895,7 +896,9 @@ td {
   font-size: 0.85rem;
 }
 
-td > a {
+td > a,
+p > a:only-child,
+.court-case-list a {
   display: inline-block;
   padding-block: 0.2rem;
 }
@@ -914,6 +917,7 @@ tr.selected {
 
 .status-badge {
   display: inline-block;
+  align-self: flex-start;
   padding: 0.18rem 0.6rem;
   border-radius: var(--radius);
   font-size: 0.8rem;
@@ -927,7 +931,7 @@ tr.selected {
 }
 
 .status-badge.draft { background: var(--rule); color: var(--ink); }
-.status-badge.submitted { background: var(--tint); color: var(--accent); }
+.status-badge.submitted { background: var(--info-tint); color: var(--accent); }
 .status-badge.under_review { background: var(--warning-tint); color: var(--warning-ink); }
 .status-badge.accepted { background: var(--success-tint); color: var(--success-ink); }
 .status-badge.rejected { background: var(--danger-tint); color: var(--danger-ink); }
@@ -935,7 +939,7 @@ tr.selected {
 .status-badge.open { background: var(--success-tint); color: var(--success-ink); }
 .status-badge.closed { background: var(--rule); color: var(--ink); }
 /* A service-only filing's documents were recorded; not court acceptance, so not green. */
-.status-badge.served { background: var(--tint); color: var(--accent); }
+.status-badge.served { background: var(--info-tint); color: var(--accent); }
 .status-badge.pending { background: var(--rule); color: var(--ink); }
 .status-badge.dismissed { background: var(--rule); color: var(--ink); }
 
@@ -1130,6 +1134,7 @@ tr.selected {
 
 .search-form .form-group {
   min-width: 12rem;
+  margin-bottom: 0;
 }
 
 .case-search-table {
@@ -1339,7 +1344,7 @@ tr.selected {
 
 /* Alert info */
 .alert-info {
-  background: var(--tint);
+  background: var(--info-tint);
   color: var(--accent);
   padding: 0.8rem 1rem;
   border-radius: var(--radius);
@@ -1608,7 +1613,7 @@ tr.selected {
   display: flex;
   align-items: center;
   gap: 1rem;
-  background: var(--tint);
+  background: var(--info-tint);
   border-radius: var(--radius);
   padding: 0.5rem 1rem;
   margin-bottom: 0.5rem;
@@ -1844,9 +1849,8 @@ tr.selected {
   gap: 0.4rem;
   padding: 0.5rem 0.9rem;
   border-radius: var(--radius);
-  background: var(--tint);
+  background: var(--white);
   color: var(--accent);
-  text-decoration: none;
   font-size: 0.9rem;
 }
 
@@ -2198,7 +2202,7 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 .court-rules-reference {
   margin-top: 1.5rem;
   padding: 1rem;
-  background: var(--tint);
+  background: var(--info-tint);
   border-radius: var(--radius);
 }
 
@@ -2239,7 +2243,7 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 
 /* Document type MCR hint */
 .doc-type-mcr-hint {
-  background: var(--tint);
+  background: var(--info-tint);
   padding: 0.4rem 0.75rem;
   border-radius: var(--radius);
   font-size: 0.85rem;
@@ -2325,7 +2329,7 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 .case-results .selected-row { background: var(--tint); }
 
 .motion-case-info {
-  background: var(--tint);
+  background: var(--info-tint);
   border-radius: var(--radius);
   padding: 0.75rem 1rem;
   margin-bottom: 1rem;
@@ -2333,7 +2337,7 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 }
 
 .motion-badge {
-  background: var(--tint);
+  background: var(--info-tint);
   color: var(--accent);
   padding: 0.2rem 0.6rem;
   border-radius: var(--radius);
@@ -2651,7 +2655,7 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 }
 
 .toast-info {
-  background: var(--tint);
+  background: var(--info-tint);
   color: var(--accent);
 }
 
