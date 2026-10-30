@@ -10,7 +10,7 @@ import PageHeading from '../common/PageHeading';
 function AuthCallback() {
   const navigate = useNavigate();
   const [error, setError] = useState('');
-  usePageTitle('Completing sign-in');
+  usePageTitle(error ? 'Sign-in not completed' : 'Completing sign-in');
 
   useEffect(() => {
     const controller = new AbortController();

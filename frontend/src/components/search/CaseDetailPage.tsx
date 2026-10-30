@@ -46,7 +46,7 @@ function CaseDetailPage() {
   const [filings, setFilings] = useState<CaseFiling[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<{ heading: string; message: string } | null>(null);
-  usePageTitle(caseData?.title || 'Case docket');
+  usePageTitle(error?.heading ?? (caseData?.title || 'Case docket'));
   const [isFavorited, setIsFavorited] = useState(false);
   const [togglingFav, setTogglingFav] = useState(false);
   const [courtName, setCourtName] = useState('');

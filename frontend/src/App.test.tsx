@@ -379,6 +379,7 @@ it.each([
 
   await waitFor(() => expect(screen.getAllByRole('heading', { level: 1 }).map(h1 => h1.textContent)).toEqual([heading]));
   expect(screen.getByRole('alert').textContent).toContain(message);
+  await waitFor(() => expect(document.title).toBe(`${heading} · MUEFS`));
 });
 
 it('heads the administration page and a case docket with their own names once their data loads', async () => {

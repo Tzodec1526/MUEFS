@@ -72,16 +72,19 @@ function FilingWizard() {
   const { userId, loading, error, refresh } = useContext(CourtContext)!;
   if (loading) return <p role="status">Loading your filing workspace…</p>;
   if (!userId) {
-    return <PageLoadError heading="Filing workspace not loaded"
-      failure={error ?? { message: 'Could not verify your account.', retry: true }} onRetry={refresh} />;
+    return <FilingWorkspaceUnavailable failure={error ?? { message: 'Could not verify your account.', retry: true }} onRetry={refresh} />;
   }
   return <FilingForm key={userId} userId={userId} />;
+}
+
+function FilingWorkspaceUnavailable({ failure, onRetry }: { failure: LoadFailure; onRetry: () => void }) {
+  usePageTitle('Filing workspace not loaded');
+  return <PageLoadError heading="Filing workspace not loaded" failure={failure} onRetry={onRetry} />;
 }
 
 function FilingForm({ userId }: { userId: number }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedFilingId = searchParams.get('filing_id');
-  usePageTitle(requestedFilingId ? `Filing #${requestedFilingId}` : 'New filing');
   const draftKey = filingDraftKey(userId, requestedFilingId || `new:${searchParams.toString()}`);
   const [draft] = useState(() => loadFilingDraft(draftKey));
   const [filingData, setFilingData] = useState<FilingData>(() => {
@@ -110,6 +113,7 @@ function FilingForm({ userId }: { userId: number }) {
   const readOnly = loadedFiling !== null && !['draft', 'returned'].includes(loadedFiling.status);
   const [loadingExisting, setLoadingExisting] = useState(Boolean(requestedFilingId));
   const [loadError, setLoadError] = useState<LoadFailure | null>(null);
+  usePageTitle(loadError ? `Filing #${requestedFilingId} not loaded` : requestedFilingId ? `Filing #${requestedFilingId}` : 'New filing');
   const [reloadKey, setReloadKey] = useState(0);
   const [submission, setSubmission] = useState<FilingEnvelope>();
   const [errors, setErrors] = useState<string[]>([]);

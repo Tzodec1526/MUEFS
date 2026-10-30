@@ -154,7 +154,7 @@ export default function CourtIntakePage() {
   const [showHistory, setShowHistory] = useState(false);
   const key = `${courtId}:${userId ?? 'public'}:${attempt}`;
   const current = result?.key === key ? result : undefined;
-  usePageTitle('Filing intake', current?.data?.court_name);
+  usePageTitle(current && !current.data ? 'Filing intake not loaded' : 'Filing intake', current?.data?.court_name);
   useEffect(() => {
     if (loading) return;
     const controller = new AbortController();
