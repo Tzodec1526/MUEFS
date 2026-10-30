@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef, useContext } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
 import { Link } from 'react-router-dom';
-import { batchReview, getClerkQueue, getFiling, reviewFiling, FilingEnvelope, FilingSummary, ClerkQueue, ClerkQueueFilters } from '../../api/filings';
+import { batchReview, getFiling, reviewFiling, FilingEnvelope, FilingSummary, ClerkQueue, ClerkQueueFilters } from '../../api/filings';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import DocumentDownload from '../common/DocumentDownload';
@@ -8,6 +8,7 @@ import { formatBytes, getDocumentLabel, parseServerDate } from '../../utils/form
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
+import { useClerkQueue } from './useClerkQueue';
 
 const ACTION_UNCONFIRMED = 'the request did not complete. Refresh the queue to check its current status before trying again.';
 const BATCH_UNCONFIRMED = 'Could not accept the selected filings. Refresh the queue to check their current status before trying again.';
@@ -20,19 +21,19 @@ function ReviewQueue() {
   const { court } = useContext(CourtContext)!;
   usePageTitle('Review queue', court?.court_name);
   const courtId = court!.court_id;
-  const [queue, setQueue] = useState<ClerkQueue | null>(null);
-  const filings = queue?.filings ?? [];
-  const total = queue?.total ?? 0;
-  const pageCount = queue ? Math.ceil(queue.total / queue.page_size) : 0;
   const [review, setReview] = useState<{
     id: number; filing?: FilingEnvelope; error?: LoadFailure;
   } | null>(null);
-  const selectedFiling = review?.filing;
-  const [loading, setLoading] = useState(false);
-  const [reviewReason, setReviewReason] = useState('');
   const [actionInProgress, setActionInProgress] = useState(false);
-  const [selectedSubmissions, setSelectedSubmissions] = useState<Map<number, number>>(() => new Map());
-  const [filters, setFilters] = useState<ClerkQueueFilters>({ status: 'all', search: '', waiting_48h_only: false });
+  const {
+    queue, loading, setLoading, queueError, filters, setFilters, page, setPage,
+    selectedSubmissions, setSelectedSubmissions, fetchQueue,
+  } = useClerkQueue(courtId, Boolean(review) || actionInProgress);
+  const filings = queue?.filings ?? [];
+  const total = queue?.total ?? 0;
+  const pageCount = queue ? Math.ceil(queue.total / queue.page_size) : 0;
+  const selectedFiling = review?.filing;
+  const [reviewReason, setReviewReason] = useState('');
   const [filterDraft, setFilterDraft] = useState(filters);
   const statusFilter = filters.status;
   const filtersChanged = filterDraft.status !== filters.status || filterDraft.search !== filters.search
@@ -40,48 +41,12 @@ function ReviewQueue() {
   const canReview = selectedFiling
     && ['submitted', 'under_review'].includes(selectedFiling.status)
     && statusFilter !== 'waivers';
-  const [page, setPage] = useState(1);
-  const requestRef = useRef<AbortController | null>(null);
   const reviewRequestRef = useRef<AbortController | null>(null);
   const reviewHeading = useRef<HTMLHeadingElement>(null);
   const queueHeading = useRef<HTMLHeadingElement>(null);
   // Where the processed filings were, so focus can follow the queue once it reloads.
   const focusAfterRefresh = useRef<{ index: number; queue: ClerkQueue | null } | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
-  const [queueError, setQueueError] = useState<LoadFailure | null>(null);
-
-  const fetchQueue = useCallback(async () => {
-    requestRef.current?.abort();
-    const controller = new AbortController();
-    requestRef.current = controller;
-    setLoading(true);
-    setQueueError(null);
-    try {
-      const result = await getClerkQueue(courtId, { ...filters, page, signal: controller.signal });
-      if (controller.signal.aborted) return;
-      if (page > 1 && result.filings.length === 0) {
-        setPage(Math.max(1, Math.ceil(result.total / result.page_size)));
-        return;
-      }
-      setQueue(result);
-      setSelectedSubmissions(previous => new Map(result.filings
-        .filter(filing => previous.get(filing.id) === filing.submission_count)
-        .map(filing => [filing.id, filing.submission_count])));
-    } catch (err) {
-      if (controller.signal.aborted) return;
-      setQueueError(loadFailure(err, "We couldn't load the review queue. Please retry."));
-      setQueue(null);
-      setSelectedSubmissions(new Map());
-    } finally {
-      if (!controller.signal.aborted) setLoading(false);
-    }
-  }, [courtId, page, filters]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- existing pattern; fetchQueue performs the setState for loading/data
-    fetchQueue();
-    return () => requestRef.current?.abort();
-  }, [fetchQueue]);
 
   useEffect(() => () => reviewRequestRef.current?.abort(), []);
   useEffect(() => {
@@ -98,15 +63,6 @@ function ReviewQueue() {
     const next = rows[Math.min(pending.index, rows.length - 1)];
     (next ? document.getElementById(`queue-filing-${next.id}`) : queueHeading.current)?.focus();
   }, [queue, loading]);
-
-  // Auto-refresh every 30 seconds, but never while a filing is open for review or an
-  // action is in flight -- a refresh mid-review would clobber the clerk's work.
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!document.hidden && !review && !actionInProgress) fetchQueue();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [fetchQueue, review, actionInProgress]);
 
   async function handleReview(filing: FilingEnvelope, action: 'accept' | 'reject' | 'return') {
     if (action === 'reject' && !window.confirm(
