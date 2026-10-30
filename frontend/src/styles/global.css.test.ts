@@ -127,6 +127,10 @@ it('serves every font from this origin, in the weights the stylesheets use', () 
   expect(css).not.toContain('IBM Plex');
 });
 
+it('sets dark text on the white notification panel inside the dark header', () => {
+  expect(css).toMatch(/\.notification-panel \{[^}]*background: var\(--white\);[^}]*\scolor: var\(--ink\);/);
+});
+
 it('keeps every design token in one place', () => {
   const declared = stylesheets.filter(name => /^\s*--[\w-]+:/m.test(read(name)));
   expect(declared).toEqual(['tokens.css']);
