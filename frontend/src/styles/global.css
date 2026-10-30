@@ -3251,7 +3251,7 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 .admin-user-card { margin-top: 12px; overflow-wrap: anywhere; }
 .admin-editor { min-width: 0; overflow-wrap: anywhere; }
 .admin-editor > .history-summary { margin-bottom: 20px; }
-.admin-detail-section { border-top: 1px solid var(--color-border, #d5deeb); padding-top: 20px; margin-top: 24px; }
+.admin-detail-section { border-top: 1px solid var(--gray-200); padding-top: 20px; margin-top: 24px; }
 .admin-account-form > p, .admin-detail-section p { margin-bottom: 12px; }
 .admin-history { padding-left: 22px; }
 .admin-history > li { margin: 20px 0; }
