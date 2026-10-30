@@ -24,6 +24,11 @@ interface History {
     before?: Record<string, unknown>; after?: Record<string, unknown>;
   } }[];
 }
+const historyLabels: Record<string, string> = {
+  'case.participant_created': 'Participant added', 'case.participant_changed': 'Participant changed',
+  'case.public_access_changed': 'Public case access changed',
+  'case.participants_review_required': 'Participant records marked for court review',
+};
 const fields: Record<string, string> = {
   party_name: 'Name', role: 'Role', user_id: 'Linked account', attorney_bar_number: 'Bar number',
   represented_party_name: 'Represented party', is_active: 'Active participant', access_enabled: 'Restricted-case access',
@@ -58,7 +63,7 @@ function ParticipantForm({ caseId, record, version, onSaved }: {
   }
   return <form className="admin-account-form" onSubmit={save}>
     <h2 className="card-heading">{record ? 'Edit participant' : 'Add participant'}</h2>
-    {record && !record.reviewed_at && <p className="alert alert-info">This older record requires court review before it can grant restricted-case access.</p>}
+    {record && !record.reviewed_at && <p className="alert alert-info">Unreviewed record. Court review is required before it can grant restricted-case access.</p>}
     <div className="admin-form-grid">
       <div className="form-group"><label htmlFor="participant-name">Participant name</label>
         <input id="participant-name" name="party_name" required maxLength={255} defaultValue={record?.party_name} /></div>
@@ -166,9 +171,7 @@ function ParticipantHistory({ caseId }: { caseId: string }) {
     {current?.data && <>
       {!current.data.total && <p>No case access changes recorded.</p>}
       <ol className="admin-history">{current.data.events.map(event => <li key={event.id}>
-        <strong>{event.action === 'case.participant_created' ? 'Participant added'
-          : event.action === 'case.participant_changed' ? 'Participant changed'
-          : event.action === 'case.public_access_changed' ? 'Public case access changed' : 'Older records require review'}
+        <strong>{historyLabels[event.action] || event.action}
           {event.details.after?.party_name ? ` · ${event.details.after.party_name}` : ''}</strong>
         <p>{formatDateTime(event.occurred_at)} · {event.details.actor_name || 'Database migration'}</p>
         <p>{event.details.reason}</p>
@@ -235,7 +238,7 @@ export default function CaseParticipantsPage() {
           {' · '}{item.access_enabled ? 'Access granted through this record' : 'No access grant'}</p>
           {item.represented_party_name && <p>Represents {item.represented_party_name}</p>}
           {item.account_email && <p>{item.account_email}</p>}
-          {!item.reviewed_at && <p>Older record · court review needed</p>}</div>
+          {!item.reviewed_at && <p>Unreviewed record · court review needed</p>}</div>
         {item.user_id === current.data?.actor_id ? <span>Another staff member must edit your record.</span>
           : <button className="btn btn-secondary btn-small" onClick={() => { setSelection(item.id); setNotice(''); }}
             aria-label={`Edit ${item.party_name}`}>Edit</button>}

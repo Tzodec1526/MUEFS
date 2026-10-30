@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { afterEach, beforeEach, expect, it, vi, type Mock } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { apiClient } from '../../api/client';
 import { CourtContext } from '../auth/CourtSession';
 import FeeReviewQueue from '../clerk/FeeReviewQueue';
@@ -259,6 +259,44 @@ it.each([
   expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(name);
   await waitFor(() => expect(window.document.title).toBe(`${name} · 3rd Circuit Court · MUEFS`));
   expect(screen.getByText('3rd Circuit Court')).toBeTruthy();
+});
+
+describe('a participant record court staff have not reviewed', () => {
+  const unreviewed = { ...responses['/cases/1/participants'] as { participants: object[] } };
+  unreviewed.participants = [{ ...unreviewed.participants[0], reviewed_at: null }];
+  const history = {
+    total: 3,
+    events: [
+      { id: 3, action: 'case.participants_review_required', occurred_at: time, details: { reason: 'Records retained' } },
+      { id: 2, action: 'case.participant_merged', occurred_at: time, details: { reason: 'Duplicate' } },
+      { id: 1, action: 'case.participant_created', occurred_at: time, details: { reason: 'Added' } },
+    ],
+  };
+  beforeEach(() => {
+    const served = { ...responses, '/cases/1/participants': unreviewed, '/cases/1/participants/history': history };
+    get.mockImplementation((url: string) => Promise.resolve({ data: served[url] }));
+    show('/cases/1/participants', '/cases/:caseId/participants', <CaseParticipantsPage />);
+  });
+
+  it('is called unreviewed, whatever its age, in the list and the form', async () => {
+    expect(await screen.findByText('Unreviewed record · court review needed')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Jane Doe' }));
+
+    expect((await screen.findByText(/^Unreviewed record\. Court review is required/)).textContent)
+      .toBe('Unreviewed record. Court review is required before it can grant restricted-case access.');
+    expect(window.document.body.textContent).not.toMatch(/older/i);
+  });
+
+  it('names each audit action in the access history, known or not', async () => {
+    fireEvent.click(await screen.findByRole('button', { name: 'View case access history' }));
+
+    await screen.findByText('Participant added');
+
+    expect(screen.getByText('Participant records marked for court review')).toBeTruthy();
+    expect(screen.getByText('case.participant_merged')).toBeTruthy();
+    expect(window.document.body.textContent).not.toMatch(/older/i);
+  });
 });
 
 it('names case types without their internal codes on the intake page', async () => {
