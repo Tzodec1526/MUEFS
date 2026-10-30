@@ -548,6 +548,11 @@ that file's name. The demo server caches `assets/` as immutable, answers a missi
 404 and sends `index.html` with `no-store`. A court deployment's static server should do the
 same, so that a page from the previous deploy cannot get `index.html` in place of a script.
 
+The root `Dockerfile` writes a `.gz` copy of each built JS and CSS file. The demo server sends
+that copy to a client that accepts gzip, with `Vary: Accept-Encoding`, and nothing else is
+compressed: fonts, `index.html`, `/config.js`, API responses and document downloads go out as
+they are. A build without the `.gz` files still works and sends those assets uncompressed.
+
 Each hosted-demo sandbox keeps its uploads in its own folder under `DEMO_DATA_DIR`, deleted
 together with the sandbox. `DEMO_STORAGE_QUOTA_MB` (default 200) caps each sandbox's
 uploads, and the demo refuses uploads with HTTP 507 while less than 1 GiB of disk is free.

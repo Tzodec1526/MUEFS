@@ -5,6 +5,7 @@ RUN npm ci
 COPY frontend/ ./
 ENV VITE_ALLOW_DEMO_MODE=true
 RUN npm run build
+RUN find dist/assets -type f \( -name '*.js' -o -name '*.css' \) -exec gzip -9k {} +
 
 FROM python:3.12-slim
 WORKDIR /app
