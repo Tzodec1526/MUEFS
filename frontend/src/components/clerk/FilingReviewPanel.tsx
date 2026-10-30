@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import type { FilingEnvelope } from '../../api/filings';
 import LoadError from '../common/LoadError';
 import DocumentDownload from '../common/DocumentDownload';
-import { formatBytes, formatServerDateTime, getDocumentLabel } from '../../utils/format';
+import { getDocumentLabel } from '../../utils/documentTypes';
+import { formatBytes, formatServerDateTime } from '../../utils/format';
 import type { LoadFailure } from '../../utils/errors';
 
 const COMMON_REASONS = [

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { getFiling, submitFiling, validateFiling, FilingValidation, FilingEnvelope } from '../../api/filings';
-import { formatBytes, getDocumentLabel } from '../../utils/format';
+import { getDocumentLabel } from '../../utils/documentTypes';
+import { formatBytes } from '../../utils/format';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';

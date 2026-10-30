@@ -2,7 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { apiClient } from '../../api/client';
 import type { FilingFees } from '../../api/documents';
 import type { FilingEnvelope } from '../../api/filings';
-import { formatBytes, formatCents, getDocumentLabel } from '../../utils/format';
+import { getDocumentLabel } from '../../utils/documentTypes';
+import { formatBytes, formatCents } from '../../utils/format';
 import { errorMessage } from '../../utils/errors';
 import DocumentDownload from '../common/DocumentDownload';
 

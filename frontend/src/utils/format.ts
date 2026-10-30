@@ -50,35 +50,3 @@ export function formatCourtDate(value: string | null): string {
     year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC',
   });
 }
-
-const DOCUMENT_LABELS: Record<string, string> = {
-  COMPLAINT: 'Complaint', SUMMONS: 'Summons', PETITION: 'Petition',
-  INFORMATION: 'Information / Complaint', WARRANT: 'Warrant',
-  PROOF_SERVICE: 'Proof of Service', POS_ELECTRONIC: 'Proof of Service',
-  CERT_SERVICE: 'Certificate of Service', MOTION: 'Motion',
-  BRIEF: 'Brief in Support', BRIEF_SUPPORT: 'Brief in Support',
-  RESPONSE_BRIEF: 'Response Brief', REPLY_BRIEF: 'Reply Brief',
-  PROPOSED_ORDER: 'Proposed Order', NOTICE_HEARING: 'Notice of Hearing',
-  NOT_HEARING: 'Notice of Hearing', AFFIDAVIT: 'Affidavit', EXHIBIT: 'Exhibit',
-  ANSWER: 'Answer', REPLY: 'Reply', JURY_DEMAND: 'Jury Demand',
-  FEE_WAIVER: 'Fee Waiver Request', FEE_WAIVER_ORDER: 'Signed Fee Waiver Decision',
-  PUBLIC_COPY: 'Reviewed Public Copy',
-  MOT_SD: 'Motion for Summary Disposition', MOT_DISMISS: 'Motion to Dismiss',
-  MOT_COMPEL: 'Motion to Compel', MOT_PROTECTIVE: 'Motion for Protective Order',
-  MOT_SANCTIONS: 'Motion for Sanctions', MOT_DEFAULT: 'Motion for Default',
-  MOT_SJ: 'Motion for Summary Judgment', MOT_LIMINE: 'Motion in Limine',
-  MOT_RECONSIDER: 'Motion for Reconsideration', MOT_RELIEF: 'Motion for Relief from Judgment',
-  MOT_STAY: 'Motion to Stay', MOT_ADJOURN: 'Motion to Adjourn',
-  MOT_INTERVENE: 'Motion to Intervene', MOT_AMEND: 'Motion to Amend',
-  MOT_QUASH: 'Motion to Quash', MOT_TRANSFER: 'Motion to Transfer Venue',
-  MOT_CONSOLIDATE: 'Motion to Consolidate', MOT_WITHDRAW: 'Motion to Withdraw',
-  MOT_TRO: 'Motion for TRO', MOT_PRELIM_INJ: 'Motion for Preliminary Injunction',
-  MOT_FEES: 'Motion for Attorney Fees', MOT_OTHER: 'Motion',
-  DISC_CERT_GF: 'Good-Faith Discovery Certification', AFF_DEFAULT: 'Affidavit of Default',
-};
-
-/** Human label for a document type code, e.g. "MOT_SD" -> "Motion for Summary Disposition". */
-export function getDocumentLabel(code: string): string {
-  if (DOCUMENT_LABELS[code]) return DOCUMENT_LABELS[code];
-  return code.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
-}

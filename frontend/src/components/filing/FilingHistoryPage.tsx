@@ -7,7 +7,8 @@ import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import FeeWaiverPanel, { waiverActionLabels } from './FeeWaiverPanel';
 import FilingDateEvidence from './FilingDateEvidence';
-import { formatBytes, formatCents, formatCourtDate, getDocumentLabel, parseServerDate } from '../../utils/format';
+import { getDocumentLabel } from '../../utils/documentTypes';
+import { formatBytes, formatCents, formatCourtDate, parseServerDate } from '../../utils/format';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
 
