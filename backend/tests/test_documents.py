@@ -2,13 +2,40 @@
 
 
 import io
+from pathlib import Path
 
+import pytest
 from pypdf import PdfReader, PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
-from app.services.document_service import inspect_pdf, validate_mime_type
+from app.services.document_service import _within, inspect_pdf, validate_mime_type
 from app.utils.pdf import check_pii_patterns
 from tests.test_document_publication import publication_pdf
+
+
+@pytest.fixture
+def extended_path_resolve(monkeypatch, tmp_path):
+    real_resolve = Path.resolve
+    root = real_resolve(tmp_path)
+
+    def resolve(self, strict=False):
+        resolved = real_resolve(self, strict=strict)
+        return resolved if resolved == root else Path(f"\\\\?\\{resolved}")
+
+    monkeypatch.setattr(Path, "resolve", resolve)
+    return root
+
+
+def test_a_stored_key_stays_inside_the_root_when_windows_extends_its_path(
+    extended_path_resolve,
+):
+    root = extended_path_resolve
+    assert _within(root, "filings/1/a.pdf") == root / "filings" / "1" / "a.pdf"
+
+
+def test_an_escaping_key_is_refused_when_windows_extends_its_path(extended_path_resolve):
+    with pytest.raises(ValueError, match="path traversal detected"):
+        _within(extended_path_resolve, "../outside.pdf")
 
 
 def test_validate_mime_type():

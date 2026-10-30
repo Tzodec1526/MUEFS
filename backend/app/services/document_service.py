@@ -120,10 +120,14 @@ def validate_mime_type(mime_type: str) -> bool:
     return mime_type in allowed
 
 
+def _resolved(path: Path) -> Path:
+    return Path(str(path.resolve()).removeprefix("\\\\?\\"))
+
+
 def _within(root: Path, file_key: str) -> Path:
     """Resolve a key under root, refusing keys that escape it."""
-    base = root.resolve()
-    local_path = (base / file_key).resolve()
+    base = _resolved(root)
+    local_path = _resolved(base / file_key)
     if not local_path.is_relative_to(base):
         raise ValueError("Invalid file key: path traversal detected")
     return local_path
