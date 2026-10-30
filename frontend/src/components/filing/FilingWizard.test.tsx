@@ -285,6 +285,24 @@ it('clears a step error as soon as the filer fixes the field it names', async ()
   expect(screen.queryByRole('alert')).toBeNull();
 });
 
+it('keeps a failed save on screen while the filer edits, until the next save attempt', async () => {
+  serveCourtsAndTypes();
+  vi.mocked(createFiling).mockRejectedValueOnce({ response: { status: 429, data: {} } });
+  openWizard('/filing/new?court_id=3');
+  await chooseNewCaseAndType();
+  fireEvent.change(caption(), { target: { value: 'Doe v. Roe' } });
+  fireEvent.click(button('Save draft'));
+  await stepError('Too many requests. Please wait a moment and try again.');
+
+  fireEvent.change(descriptionField(), { target: { value: 'Complaint for breach of contract' } });
+  fireEvent.change(caption(), { target: { value: 'Doe v. Roe Corp.' } });
+
+  expect(screen.getByRole('alert').textContent).toBe('Too many requests. Please wait a moment and try again.');
+  vi.mocked(createFiling).mockReturnValueOnce(new Promise(() => {}));
+  fireEvent.click(button('Save draft'));
+  await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+});
+
 it('returns to a completed step from the progress bar, and back one step with Back', async () => {
   serveCourtsAndTypes();
   openWizard('/filing/new?court_id=3');

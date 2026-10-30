@@ -108,6 +108,7 @@ function FilingForm({ userId }: { userId: number }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [submission, setSubmission] = useState<FilingEnvelope>();
   const [errors, setErrors] = useState<string[]>([]);
+  const [saveError, setSaveError] = useState('');
   const conflictHeading = useRef<HTMLHeadingElement>(null);
   const [conflict, setConflict] = useState<FilingEnvelope | null>(null);
   const [saveNotice, setSaveNotice] = useState('');
@@ -263,6 +264,7 @@ function FilingForm({ userId }: { userId: number }) {
     if (conflict || !filingData.caseTitle.trim()) return false;
     setSaving(true);
     setErrors([]);
+    setSaveError('');
     setSaveNotice('');
     try {
       let creationKey = filingData.creationKey;
@@ -297,7 +299,7 @@ function FilingForm({ userId }: { userId: number }) {
       return true;
     } catch (err) {
       if (!mounted.current) return false;
-      setErrors([errorMessage(err, 'Could not save your filing. Your edits are still here.')]);
+      setSaveError(errorMessage(err, 'Could not save your filing. Your edits are still here.'));
       if (!filingData.filingId && isAxiosError(err) && err.response?.status === 409) {
         const existingId: unknown = err.response.data?.filing_id;
         if (typeof existingId === 'number' && Number.isSafeInteger(existingId) && existingId > 0) {
@@ -314,7 +316,7 @@ function FilingForm({ userId }: { userId: number }) {
       if (filingData.filingId && isAxiosError(err) && err.response?.status === 409) {
         try {
           const latest = await getFiling(filingData.filingId);
-          if (mounted.current) { setConflict(latest); setErrors([]); }
+          if (mounted.current) { setConflict(latest); setSaveError(''); }
         }
         catch { /* Keep the edits and original precondition if comparison cannot load. */ }
       }
@@ -428,6 +430,7 @@ function FilingForm({ userId }: { userId: number }) {
       setShowDraftBanner(false);
       setConflict(null);
       setErrors([]);
+      setSaveError('');
       return;
     }
     clearFilingDraft(draftKey, filingData.filingId ?? undefined);
@@ -436,6 +439,7 @@ function FilingForm({ userId }: { userId: number }) {
     setShowDraftBanner(false);
     setCurrentStep('court');
     setErrors([]);
+    setSaveError('');
     setSaving(false);
     setConflict(null);
     setSaveNotice('');
@@ -582,9 +586,10 @@ function FilingForm({ userId }: { userId: number }) {
       )}
 
       {/* Validation Errors */}
-      {errors.length > 0 && (
+      {(errors.length > 0 || saveError) && (
         <div className="alert alert-error" role="alert">
           {errors.map((e, i) => <p key={i}>{e}</p>)}
+          {saveError && <p>{saveError}</p>}
         </div>
       )}
 
