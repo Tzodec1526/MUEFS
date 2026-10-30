@@ -667,8 +667,8 @@ def _populate(bind: Engine | Connection) -> None:
             ),
             User(
                 email="clerk@demo.muefs.gov",
-                first_name="Robert",
-                last_name="Johnson",
+                first_name="Dana",
+                last_name="Whitfield",
                 user_type=UserType.CLERK,
                 phone="313-555-0200",
             ),
@@ -1304,7 +1304,7 @@ def _populate(bind: Engine | Connection) -> None:
         ).first()
         if third_circuit:
             session.add(UserCourtRole(
-                user_id=users[1].id,  # Robert Johnson (clerk)
+                user_id=users[1].id,
                 court_id=third_circuit.id,
                 role=CourtRole.CLERK,
             ))
@@ -1318,7 +1318,7 @@ def _populate(bind: Engine | Connection) -> None:
 
         now = datetime.now(UTC)
         attorney = users[0]  # Jane Doe, P12345
-        clerk_user = users[1]  # Robert Johnson
+        clerk_user = users[1]
         srl_user = users[3]  # Maria Williams — linked to case 2 for access-control demos
 
         # Get the 3rd Circuit Court (Wayne County - Detroit)

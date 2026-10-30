@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import Session
 
 import app.seed_data as seed_data
-from app.models.case import Case
+from app.models.case import Case, CaseParticipant
 from app.models.court import CaseType, Court, CourtType, FilingRequirement
 from app.models.filing import FilingDocument
 from app.models.user import User
@@ -230,3 +230,11 @@ async def test_reset_rebuilds_a_postgresql_schema_from_an_earlier_release(postgr
         versions = set(await connection.scalars(text("SELECT version_num FROM alembic_version")))
     assert leftover == 0
     assert versions == set(EXPECTED_HEADS)
+
+
+def test_seeded_clerk_is_not_named_like_a_case_party(seeded_session):
+    clerk = seeded_session.query(User).filter_by(email="clerk@demo.muefs.gov").one()
+    parties = {name for (name,) in seeded_session.query(CaseParticipant.party_name)}
+
+    assert "Robert Johnson" in parties
+    assert f"{clerk.first_name} {clerk.last_name}" not in parties

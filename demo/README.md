@@ -137,7 +137,7 @@ decision; submitting it does not grant the waiver.”
 
 1. Choose **Switch Role**, then **System Administrator**. Open **People & court
    access** if it is not already shown.
-2. Choose **Manage Robert Johnson**, the seeded clerk account.
+2. Choose **Manage Dana Whitfield**, the seeded clerk account.
 3. Select **1st Circuit Court** and **Clerk review**. Enter a reason such as
    “Fictional additional court assignment for the role demonstration.”
 4. Click **Grant court role** and show the retained change and reason.
