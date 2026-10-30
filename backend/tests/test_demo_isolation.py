@@ -77,7 +77,7 @@ async def test_demo_api_commits_to_the_visitors_copy_of_the_template(demo, monke
 
 def test_capacity_falls_back_to_shared(demo, monkeypatch):
     monkeypatch.setattr("app.config.settings.demo_max_sessions", 1)
-    demo.ensure_session_db("d" * 32)  # one private sandbox => at capacity
+    demo.open_sandbox("d" * 32)  # one private sandbox => at capacity
 
     class _Req:
         cookies: dict = {}
@@ -112,10 +112,10 @@ def test_parallel_first_requests_publish_one_complete_database(demo, monkeypatch
 
     monkeypatch.setattr(demo.shutil, "copyfile", slow_copy)
     with ThreadPoolExecutor(max_workers=2) as pool:
-        first = pool.submit(demo.ensure_session_db, sid)
+        first = pool.submit(demo.open_sandbox, sid)
         try:
             assert started.wait(5)
-            second = pool.submit(demo.ensure_session_db, sid)
+            second = pool.submit(demo.open_sandbox, sid)
             assert not demo._session_path(sid).exists()
         finally:
             finish.set()
@@ -134,36 +134,36 @@ def test_failed_session_copy_can_be_retried(demo, monkeypatch):
 
     monkeypatch.setattr(demo.shutil, "copyfile", interrupted_copy)
     with pytest.raises(OSError, match="disk temporarily unavailable"):
-        demo.ensure_session_db(sid)
+        demo.open_sandbox(sid)
     assert not demo._session_path(sid).exists()
     assert not list(demo._sessions_dir().glob("*.tmp"))
 
     monkeypatch.setattr(demo.shutil, "copyfile", copyfile)
-    assert demo.ensure_session_db(sid).read_bytes() == demo._template_db().read_bytes()
+    assert demo.open_sandbox(sid).read_bytes() == demo._template_db().read_bytes()
 
 
 def test_client_chosen_ids_cannot_allocate_sandboxes_beyond_the_cap(demo, monkeypatch):
     monkeypatch.setattr("app.config.settings.demo_max_sessions", 2)
-    issued = [demo.ensure_session_db(sid) for sid in ("1" * 32, "2" * 32)]
+    issued = [demo.open_sandbox(sid) for sid in ("1" * 32, "2" * 32)]
 
     class _Req:
         cookies = {demo.COOKIE_NAME: "3" * 32}
 
     # A well-formed cookie the server never issued must not create a third copy.
     assert demo.resolve_sid(_Req()) == "3" * 32
-    assert demo.ensure_session_db("3" * 32) == demo._session_path(demo.SHARED_SID)
+    assert demo.open_sandbox("3" * 32) == demo._session_path(demo.SHARED_SID)
     assert demo.active_session_count() == 2
-    assert [demo.ensure_session_db(sid) for sid in ("1" * 32, "2" * 32)] == issued
+    assert [demo.open_sandbox(sid) for sid in ("1" * 32, "2" * 32)] == issued
 
 
 def test_sweep_keeps_recent_sandboxes_after_restart(demo, monkeypatch):
-    recent, idle = demo.ensure_session_db("4" * 32), demo.ensure_session_db("5" * 32)
+    recent, idle = demo.open_sandbox("4" * 32), demo.open_sandbox("5" * 32)
     expired = time.time() - demo.settings.demo_session_ttl_minutes * 60 - 1
     os.utime(idle, (expired, expired))
     # A restarted process has no request history for either sandbox.
     monkeypatch.setattr(demo, "_last_access", {})
     monkeypatch.setattr(demo, "_last_sweep", 0.0)
-    demo.maybe_sweep()
+    demo._sweep_idle()
     assert recent.exists()
     assert not idle.exists()
 
@@ -211,7 +211,7 @@ async def test_sandbox_documents_stay_in_and_leave_with_their_sandbox(demo, monk
     os.utime(demo._session_path(sid), (expired, expired))
     monkeypatch.setattr(demo, "_last_access", {})
     monkeypatch.setattr(demo, "_last_sweep", 0.0)
-    demo.maybe_sweep()
+    demo._sweep_idle()
     assert not demo._session_path(sid).exists()
     assert not folder.exists()
 
@@ -282,7 +282,7 @@ def test_boot_removes_uploads_that_belong_to_no_current_sandbox(demo, monkeypatc
 
     monkeypatch.setattr(schema, "prepare_demo_schema", lambda engine: None)
     live = "6" * 32
-    demo.ensure_session_db(live)
+    demo.open_sandbox(live)
     uploads = demo._uploads_dir()
     # The shared sandbox restarts from the template; "7" was swept without its folder.
     for sid in (live, "7" * 32, demo.SHARED_SID):

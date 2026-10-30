@@ -102,17 +102,6 @@ def seed_template() -> None:
             shutil.rmtree(folder, ignore_errors=True)
 
 
-def ensure_session_db(sid: str) -> Path:
-    """Return this session's SQLite path, copying the seeded template if it's new.
-
-    At capacity a new id gets the shared sandbox. The cap is enforced here, not only
-    when an id is issued, because a client can present any well-formed cookie."""
-    # First-page API requests run in separate threads. Do not let one open a
-    # partially copied database, or overwrite another request's committed work.
-    with _session_creation_lock:
-        return _ensure(sid)
-
-
 def open_sandbox(sid: str) -> Path:
     """Sweep idle sandboxes, then return this request's sandbox marked as in use.
 
@@ -161,13 +150,6 @@ def resolve_sid(request: Request, *, allocate: bool = True) -> str:
 
 def touch(sid: str) -> None:
     _last_access[sid] = time.time()
-
-
-def maybe_sweep() -> None:
-    """Opportunistically delete idle private sandboxes — piggybacks on request traffic
-    so there's no background task to manage."""
-    with _session_creation_lock:
-        _sweep_idle()
 
 
 def _sweep_idle() -> None:

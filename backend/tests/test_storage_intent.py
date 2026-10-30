@@ -30,7 +30,7 @@ async def test_request_dependency_keeps_storage_and_database_in_sync(
         dependency = database.get_db()
     else:
         sid = "c" * 32
-        sandbox = demo.ensure_session_db(sid)
+        sandbox = demo.open_sandbox(sid)
         request = Request({"type": "http", "state": {"demo_database": sandbox}})
         dependency = demo.get_demo_db(request)
         engine = create_async_engine(f"sqlite+aiosqlite:///{demo._session_path(sid)}")
@@ -104,7 +104,7 @@ async def test_a_commit_applied_before_failing_keeps_the_documents_it_saved(
         ))
         dependency = database.get_db()
     else:
-        sandbox = demo.ensure_session_db("d" * 32)
+        sandbox = demo.open_sandbox("d" * 32)
         request = Request({"type": "http", "state": {"demo_database": sandbox}})
         dependency = demo.get_demo_db(request)
     saved, unreferenced = "filings/1/saved.txt", "filings/1/unreferenced.txt"
