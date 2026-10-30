@@ -890,6 +890,7 @@ td {
 td > a,
 p > a:only-child,
 .court-case-list a,
+.requirement-list a,
 .filing-wizard > a,
 .document-publication-page > a,
 .participant-actions a,

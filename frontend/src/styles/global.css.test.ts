@@ -96,6 +96,10 @@ it('sentence-cases only status badges, whose values never reach the screen with 
   expect(corpus).not.toMatch(/status-badge[^\n]*>\{[\w.]*filing\.status\}/);
 });
 
+it('gives the court rule links in the wizard checklist a 24 px target', () => {
+  expect(selectorLists.find(list => list.includes('.requirement-list a'))).toContain('td > a');
+});
+
 it('hides the outline of a focused page heading only when the browser would not show a focus ring', () => {
   const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)]
     .filter(([, , body]) => /outline:\s*(none|0)/.test(body))

@@ -352,7 +352,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
                 ? 'Start a new court filing'
                 : 'New E-Filing'}
           </PageHeading>
-          {existingCase && filingData.caseNumber && <p className="wizard-case-number">Case {filingData.caseNumber}</p>}
+          {filingData.caseNumber && <p className="wizard-case-number">Case {filingData.caseNumber}</p>}
         </div>
         <label className="srl-plain-toggle">
           <input

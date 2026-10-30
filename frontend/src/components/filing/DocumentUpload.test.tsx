@@ -53,6 +53,31 @@ it("lists the court's own document types in their own group and lets the filer p
   expect(screen.getByText(/Court Rule:/).textContent).toBe('Court Rule: MCL 600.8031');
 });
 
+const uploaded = (id: number, type: string) => ({ id, title: `Document ${id}`, type, size: 2048, isSearchable: true });
+
+it('labels uploaded documents from the one catalog, and from the court for a type only the court lists', async () => {
+  vi.mocked(getFilingRequirements).mockResolvedValue(COURT_RULE_TYPES);
+  render(<DocumentUpload filingId={7} courtId={3} caseTypeId={11} filingType="initial"
+    documents={[uploaded(1, 'MOT_DEFAULT'), uploaded(2, 'FEE_WAIVER_ORDER'), uploaded(3, 'BUS_CT_NOTICE'), uploaded(4, 'LOCAL_FORM_12')]}
+    onDocumentsChange={vi.fn()} onBusyChange={vi.fn()} />);
+
+  const labels = () => screen.getAllByRole('row').slice(1).map(row => within(row).getAllByRole('cell')[1].textContent);
+  await waitFor(() => expect(labels()).toEqual([
+    'Motion for Default Judgment', 'Signed Fee Waiver Decision', 'Business Court Notice', 'Local Form 12',
+  ]));
+});
+
+it('offers companion documents by their catalog names, in real plurals', async () => {
+  vi.mocked(getFilingRequirements).mockResolvedValue([]);
+  render(<DocumentUpload filingId={7} courtId={3} caseTypeId={11} filingType="subsequent"
+    documents={[uploaded(1, 'MOT_SD')]} onDocumentsChange={vi.fn()} onBusyChange={vi.fn()} />);
+
+  expect(await screen.findByRole('button', { name: 'Add Supporting Affidavits' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Add Brief in Support of Motion' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Add Proof of Service - Electronic' })).toBeTruthy();
+  expect(document.body.textContent).not.toContain('(s)');
+});
+
 it("narrows the type picker to the court's types when that category is chosen", async () => {
   vi.mocked(getFilingRequirements).mockResolvedValue(COURT_RULE_TYPES);
   renderUpload();
