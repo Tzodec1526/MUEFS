@@ -29,7 +29,7 @@ async def process_payment(
     if not filing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Filing envelope not found",
+            detail="Filing not found",
         )
     if filing.filer_id != user_id:
         raise HTTPException(
@@ -70,7 +70,7 @@ async def process_payment(
             payer_id=user_id,
             envelope_id=filing.id,
             fee_basis=basis,
-            description=f"Filing envelope #{data.envelope_id}",
+            description=f"Filing #{data.envelope_id}",
         )
     except payment_service.PaymentsNotConfiguredError as exc:
         raise HTTPException(

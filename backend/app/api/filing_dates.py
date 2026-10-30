@@ -150,8 +150,8 @@ async def record_filing_date_order(
             doc = FilingDocument(
                 envelope_id=filing.id,
                 document_type_code="FILING_DATE_ORDER",
-                title=(f"Signed filing-date order — submission {filing.submission_count}"
-                       if filing.submission_count else "Signed filing-date order — legacy filing"),
+                title=(f"Signed filing-date order, submission {filing.submission_count}"
+                       if filing.submission_count else "Signed filing-date order, older filing"),
                 file_key=file_key,
                 file_size_bytes=len(payload),
                 mime_type=mime,

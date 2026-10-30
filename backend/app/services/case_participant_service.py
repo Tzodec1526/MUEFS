@@ -82,7 +82,7 @@ async def change_participant(
             )
         )
         if not matches:
-            raise HTTPException(422, "This email has no provisioned account")
+            raise HTTPException(422, "This email has no account")
         if len(matches) > 1:
             raise HTTPException(
                 422, "This email matches multiple accounts. Resolve their identities first"

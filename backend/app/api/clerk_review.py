@@ -75,7 +75,7 @@ async def get_review_queue(
     await _require_clerk_role(db, user_id, court_id)
     if status_filter not in (None, FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW):
         raise HTTPException(
-            status_code=400, detail="Queue status must be submitted or under_review"
+            status_code=400, detail="Queue status must be submitted or under review"
         )
     return await filing_service.get_clerk_queue(
         db, court_id, page=page, page_size=page_size, status=status_filter, fee_waivers=fee_waivers,
@@ -126,7 +126,7 @@ async def review_filing(
     if not filing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Filing cannot be reviewed (not in submitted/under_review status)",
+            detail="This filing is not awaiting review",
         )
     if data.action == "accept" and filing.status != FilingStatus.ACCEPTED:
         # Return 502 without raising so get_db commits cms_error on the envelope.
@@ -134,8 +134,8 @@ async def review_filing(
             status_code=status.HTTP_502_BAD_GATEWAY,
             content={
                 "detail": (
-                    f"Court CMS rejected the filing: "
-                    f"{filing.cms_error or 'CMS submission failed'}"
+                    f"The court's case management system rejected the filing: "
+                    f"{filing.cms_error or 'The submission failed'}"
                 )
             },
         )
@@ -214,7 +214,10 @@ async def batch_review_filings(
                 succeeded.append(fid)
                 continue
             if f is not None and f.cms_error:
-                failure = "Court CMS submission failed. Open the filing to inspect its history."
+                failure = (
+                    "The court's case management system did not accept this filing. "
+                    "Open it to see its history."
+                )
         except Exception as exc:
             failure = _batch_failure(fid, exc)
         failed.append(fid)

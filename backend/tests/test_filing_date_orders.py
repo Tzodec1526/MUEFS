@@ -409,7 +409,7 @@ async def test_authority_rechecked_after_pdf_inspection_and_legacy_receipt_not_i
     assert state["submitted_at"] is None and state["submission_count"] == 0
     order = await db_session.get(FilingTransaction, recorded.json()["transaction_id"])
     assert order.submission_number == 0
-    assert "legacy filing" in order.details["documents"][0]["title"]
+    assert "older filing" in order.details["documents"][0]["title"]
 
 
 async def test_staff_cannot_date_their_own_filing(date_record, db_session, api_client):

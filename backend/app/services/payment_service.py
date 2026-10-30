@@ -25,7 +25,7 @@ async def process_payment(
             "Payment processing is not configured. Set PAYMENTS_ARE_SIMULATED=true "
             "only for demonstration, or wire a payment processor."
         )
-    desc = f"[SIMULATED — no funds moved] {(description or '').strip()}".strip()
+    desc = f"[SIMULATED: no funds moved] {(description or '').strip()}".strip()
 
     payment = Payment(
         envelope_id=envelope_id,

@@ -157,7 +157,7 @@ async def verify_document(
             document_id=document_id,
             sha256_hash=doc.sha256_hash,
             is_valid=False,
-            message="Unable to verify document - the file is missing from storage",
+            message="Could not verify the document: its file is missing from storage",
         )
 
     return DocumentVerifyResponse(
@@ -167,6 +167,6 @@ async def verify_document(
         message=(
             "Document integrity verified"
             if is_valid
-            else "Document integrity check failed - hash mismatch"
+            else "Document integrity check failed: the file does not match its fingerprint"
         ),
     )

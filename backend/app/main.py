@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(
     title="Michigan Unified E-Filing System",
-    description="Statewide unified e-filing platform for Michigan courts",
+    description="Open-source e-filing prototype for Michigan courts",
     version="0.1.0",
     lifespan=lifespan,
     docs_url="/docs" if settings.api_docs_enabled else None,

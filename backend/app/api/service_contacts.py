@@ -126,7 +126,7 @@ async def save_service_instructions(
         raise HTTPException(409, "Another court staff member must manage your service instructions")
     if contact and contact.case_id != case.id:
         raise HTTPException(
-            409, "The legacy contact belongs to another case and needs reconciliation"
+            409, "This older contact belongs to another case and needs reconciliation"
         )
     if (contact.version if contact else 0) != data.expected_version:
         raise HTTPException(409, "The service instructions changed. Refresh before saving")

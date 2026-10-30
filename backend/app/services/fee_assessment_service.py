@@ -94,7 +94,7 @@ async def fee_state(
                 FeeItem(
                     fee_type="demo_example",
                     amount_cents=result.total_cents,
-                    description="Synthetic example amount — not court assessed",
+                    description="Synthetic example amount, not court assessed",
                 )
             ]
     if result.source in ("waiver", "service_only"):

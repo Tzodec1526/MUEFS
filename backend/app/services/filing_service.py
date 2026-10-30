@@ -400,7 +400,7 @@ async def validate_filing(
     if filing.fee_waiver_requested and filing.fee_waiver_granted is None and not any(
         doc.document_type_code == "FEE_WAIVER" for doc in filing.documents
     ):
-        missing_docs.append("Completed, signed Fee Waiver Request (MC 20) — nonpublic")
+        missing_docs.append("Completed, signed Fee Waiver Request (MC 20), nonpublic")
 
     # Service-only filings have relaxed validation - just need docs and a case
     is_service_only = filing.filing_type == "service_only"
@@ -445,8 +445,8 @@ async def validate_filing(
                 satisfied = True
             if not satisfied:
                 missing_docs.append(
-                    f"{req.description} ({req.document_type_code})"
-                    + (f" - See {req.mcr_reference}" if req.mcr_reference else "")
+                    req.description
+                    + (f". See {req.mcr_reference}." if req.mcr_reference else "")
                 )
 
         if not filing.case_title and not filing.case_id:
@@ -717,7 +717,7 @@ async def record_review(
             )
         cms_result = await submit_filing_to_cms(case.case_number, filing.id)
         if not cms_result.success:
-            filing.cms_error = cms_result.error_message or "CMS submission failed"
+            filing.cms_error = cms_result.error_message or "The submission failed"
             filing.cms_filing_id = None
             filing.cms_case_number = None
             await record_transaction(db, filing, "cms_failed", reviewer_id, reason=filing.cms_error)

@@ -11,21 +11,21 @@ def check_pii_patterns(text: str) -> list[str]:
     if re.search(r"\b\d{3}-\d{2}-\d{4}\b", text):
         warnings.append(
             "Possible Social Security Number detected. "
-            "MCR 1.109 requires SSN redaction."
+            "MCR 1.109 requires Social Security number redaction."
         )
 
     # Date of birth patterns
     if re.search(r"\b(?:DOB|Date of Birth|Birth Date)\s*[:]\s*\d", text, re.IGNORECASE):
         warnings.append(
             "Possible date of birth detected. "
-            "MCR 1.109 requires DOB redaction (show only year if needed)."
+            "MCR 1.109 requires date of birth redaction (show only the year if needed)."
         )
 
     # Driver's license
     if re.search(r"\b(?:DL|Driver'?s?\s*License)\s*#?\s*[:]\s*\w", text, re.IGNORECASE):
         warnings.append(
             "Possible driver's license number detected. "
-            "MCR 1.109 requires DL number redaction."
+            "MCR 1.109 requires driver's license number redaction."
         )
 
     # Financial account numbers (long digit sequences)

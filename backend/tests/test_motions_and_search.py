@@ -472,6 +472,9 @@ async def test_favorite_case_unique_constraint(db_session):
 # ========== DISCOVERY-MOTION CERTIFICATION (MCR 2.313(A)) ==========
 
 
+CERTIFICATION_MISSING = "Certification of Good Faith Effort (discovery motions). See MCR 2.313(A)."
+
+
 async def _seed_motion_requirements(db_session, court, case_type):
     """Mirror the seeded motion requirements that matter to validation."""
     db_session.add_all([
@@ -543,7 +546,7 @@ async def test_discovery_motion_requires_certification(db_session):
         db_session, await filing_service.get_filing(db_session, motion.id),
     )
     assert not validation.is_valid
-    assert any("DISC_CERT_GF" in m for m in validation.missing_required_documents)
+    assert validation.missing_required_documents == [CERTIFICATION_MISSING]
 
     db_session.add(_motion_doc(motion.id, "DISC_CERT_GF", "Certification of Good Faith Effort"))
     await db_session.flush()
@@ -556,7 +559,7 @@ async def test_discovery_motion_requires_certification(db_session):
 
 @pytest.mark.parametrize("codes, missing", [
     (["ANSWER"], []),
-    (["MOT_COMPEL"], ["DISC_CERT_GF"]),
+    (["MOT_COMPEL"], [CERTIFICATION_MISSING]),
 ])
 async def test_subsequent_filing_needs_motion_companions_only_with_a_motion(
     db_session, codes, missing,
@@ -577,7 +580,4 @@ async def test_subsequent_filing_needs_motion_companions_only_with_a_motion(
     validation = await filing_service.validate_filing(
         db_session, await filing_service.get_filing(db_session, filing.id),
     )
-    missing_codes = [code for code in ("MOTION", "DISC_CERT_GF") if any(
-        f"({code})" in message for message in validation.missing_required_documents
-    )]
-    assert missing_codes == missing
+    assert validation.missing_required_documents == missing

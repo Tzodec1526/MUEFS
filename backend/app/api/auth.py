@@ -61,7 +61,7 @@ async def _resolve_user(
             if required and not demo_permitted():
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid or expired token",
+                    detail="Your sign-in is invalid or has expired",
                 ) from None
             claims = None
         if claims is not None:
@@ -69,7 +69,7 @@ async def _resolve_user(
             if not sub and required:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid token: missing subject",
+                    detail="Your sign-in could not be verified",
                 )
             if sub:
                 user = await db.scalar(select(User).where(User.keycloak_id == sub))
@@ -78,7 +78,7 @@ async def _resolve_user(
                 if not user and required:
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="User not provisioned for this system",
+                        detail="This account is not set up for this system",
                     )
                 if user and not user.is_active and required:
                     raise HTTPException(
@@ -96,7 +96,7 @@ async def _resolve_user(
         if user is None and required:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Unknown or disabled demo user id",
+                detail="This demo account is unknown or disabled",
             )
         return user
 
