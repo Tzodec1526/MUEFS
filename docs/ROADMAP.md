@@ -63,4 +63,4 @@ correction history and PostgreSQL concurrency checks now form part of the core w
   [deployment guide](DEPLOYMENT.md) now exist).
 
 > Courts and evaluators: if a capability matters for your evaluation and isn't listed here,
-> please ask — this list reflects current scope, not a ceiling.
+> please ask. This list reflects current scope, not a ceiling.

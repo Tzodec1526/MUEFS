@@ -7,15 +7,15 @@ real deployment would be hardened.
 
 ## Why demo mode is open
 
-The hosted demo at `demo.tomcedoz.com` is meant to be explored by anyone — attorneys,
-clerks, self-represented litigants, and the public — with **no sign-up and no real
+The hosted demo at `demo.tomcedoz.com` is meant to be explored by anyone (attorneys,
+clerks, self-represented litigants, and the public) with **no sign-up and no real
 identity provider**. To make that possible, the demo intentionally relaxes three things
 that a production court deployment would never relax:
 
 | Setting | Demo value | Why it's open in the demo | Production value |
 | --- | --- | --- | --- |
-| `ALLOW_DEMO_MODE` | `true` | Lets a visitor act as a seeded attorney/clerk/SRL/public user via an `X-Demo-User-Id` header instead of a Keycloak login, so the role-picker works without an IdP. | `false` — Keycloak Bearer JWT only. |
-| `ALLOW_PUBLIC_REGISTRATION` | `true` in `run_demo.py` and Compose; off in the hosted demo | Enables `POST /api/v1/auth/register` for trying the API. The portal itself signs in as seeded roles. | `false` — identities come from the court IdP or an admin invite. |
+| `ALLOW_DEMO_MODE` | `true` | Lets a visitor act as a seeded attorney/clerk/SRL/public user via an `X-Demo-User-Id` header instead of a Keycloak login, so the role-picker works without an IdP. | `false`: Keycloak Bearer JWT only. |
+| `ALLOW_PUBLIC_REGISTRATION` | `true` in `run_demo.py` and Compose; off in the hosted demo | Enables `POST /api/v1/auth/register` for trying the API. The portal itself signs in as seeded roles. | `false`: identities come from the court IdP or an admin invite. |
 | `PAYMENTS_ARE_SIMULATED` | `true` | No payment processor is integrated; the fee/waiver flow is demonstrated, not charged. | Integrate a PSP; never simulate. |
 
 These are **configuration choices, not code defects**. The application code defaults to the
@@ -90,12 +90,14 @@ regardless of demo mode:
   results, not exhaustive inspection or proof of redaction.
 - **SQL injection / path traversal.** All database access is parameterized via SQLAlchemy;
   document storage paths are containment-checked.
+- **Browser policy.** The served app's Content-Security-Policy sets `font-src 'self'`, because
+  Public Sans is self-hosted. The app contacts no font host. `connect-src` adds only the
+  configured Keycloak origin.
 
 ## Threat model & responsibility boundaries
 
 MUEFS is a filing *front end* and workflow engine. It deliberately does **not** take over
-identity, payments, or the court's official record — those stay with established systems,
-which is what keeps adoption low-risk and avoids vendor lock-in.
+identity, payments, or the court's official record. Those stay with established systems.
 
 | Concern | Owned by | MUEFS's role |
 | --- | --- | --- |
@@ -115,7 +117,7 @@ Every uploaded file is screened before it is stored (`backend/app/utils/malware_
 on top of the MIME-type allowlist:
 
 - A **built-in, offline heuristic scan** (always on, no external service) rejects native
-  executables (Windows PE, ELF, Mach-O) and the EICAR antivirus test signature — even if a
+  executables (Windows PE, ELF, Mach-O) and the EICAR antivirus test signature, even if a
   client spoofs the `Content-Type`. This is what keeps the public demo self-contained.
 - An optional **ClamAV** backend (`MALWARE_SCAN_CLAMAV_ENABLED=true`, talking to a `clamd`
   daemon at `CLAMAV_HOST:CLAMAV_PORT` or `CLAMAV_SOCKET`) adds real signature-based
@@ -198,14 +200,14 @@ npm --prefix frontend audit --omit=dev
 
 ## Reporting a vulnerability (responsible disclosure)
 
-Please report security issues **privately** — do not open a public issue with exploit details.
+Please report security issues **privately**. Do not open a public issue with exploit details.
 
-- **Preferred:** GitHub private vulnerability reporting — open a draft advisory at
+- **Preferred:** GitHub private vulnerability reporting. Open a draft advisory at
   <https://github.com/Tzodec1526/MUEFS/security/advisories/new>.
 - **Email:** <tom@tomcedoz.com>.
 
 Include the affected endpoint/file, a description, and reproduction steps. Because the hosted
 demo is intentionally open as described above, please scope reports to issues **beyond** the
-documented demo-mode relaxations — for example: reading a sealed or confidential filing you
+documented demo-mode relaxations. For example: reading a sealed or confidential filing you
 should not be able to, an authentication bypass against the production code paths, injection,
 or a storage escape. We aim to acknowledge reports within a few days.
