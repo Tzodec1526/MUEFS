@@ -21,10 +21,10 @@ import time
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
-import anyio
 from fastapi import Request
 from sqlalchemy import URL, create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.config import settings
@@ -39,6 +39,7 @@ _SWEEP_INTERVAL_SEC = 300.0
 _last_access: dict[str, float] = {}
 _last_sweep = 0.0
 _session_creation_lock = threading.Lock()
+_engines: dict[str, async_sessionmaker[AsyncSession]] = {}
 
 
 def _data_dir() -> Path:
@@ -172,6 +173,7 @@ def _sweep_idle() -> None:
                 p.unlink()
             except OSError:
                 continue
+            _engines.pop(str(p.resolve()), None)
             shutil.rmtree(_uploads_dir() / p.stem, ignore_errors=True)
             _last_access.pop(p.stem, None)
 
@@ -222,20 +224,23 @@ def _renewing(send: Send, sid: str) -> Send:
     return send_with_cookie
 
 
+def _sandbox_sessions(path: Path) -> async_sessionmaker[AsyncSession]:
+    key = str(path.resolve())
+    sessions = _engines.get(key)
+    if sessions is None:
+        engine = create_async_engine(URL.create(
+            "sqlite+aiosqlite", database=path.resolve().as_uri(),
+            query={"mode": "rw", "uri": "true"},
+        ), poolclass=NullPool)
+        sessions = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        _engines[key] = sessions
+    return sessions
+
+
 async def get_demo_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency: a session bound to the sandbox DemoSessionMiddleware opened.
 
-    Replaces the app's normal get_db when demo isolation is on (wired in demo.server).
-    A fresh engine per request keeps the lifecycle trivial — only the files persist."""
+    Replaces the app's normal get_db when demo isolation is on (wired in demo.server)."""
     path = getattr(request.state, "demo_database", None) or _session_path(SHARED_SID)
-    engine = create_async_engine(URL.create(
-        "sqlite+aiosqlite", database=Path(path).resolve().as_uri(),
-        query={"mode": "rw", "uri": "true"},
-    ))
-    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    try:
-        async with session_scope(factory, drain=True) as session:
-            yield session
-    finally:
-        with anyio.CancelScope(shield=True):
-            await engine.dispose()
+    async with session_scope(_sandbox_sessions(Path(path)), drain=True) as session:
+        yield session

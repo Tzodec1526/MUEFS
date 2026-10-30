@@ -30,6 +30,7 @@ def demo(tmp_path, monkeypatch):
     # Request history and the sweep clock are module state; start each test clean.
     monkeypatch.setattr(sdb, "_last_access", {})
     monkeypatch.setattr(sdb, "_last_sweep", 0.0)
+    monkeypatch.setattr(sdb, "_engines", {})
     sdb._sessions_dir().mkdir(parents=True, exist_ok=True)
     engine = create_engine(f"sqlite:///{sdb._template_db()}")
     Base.metadata.create_all(engine)
@@ -332,3 +333,31 @@ def test_a_sandbox_deleted_after_opening_is_not_recreated_empty(demo):
     assert not path.exists()
     # The next request copies the template again instead of using an empty file.
     assert demo.open_sandbox(sid).read_bytes() == demo._template_db().read_bytes()
+
+
+async def test_a_sandbox_reuses_one_engine_until_it_is_swept(demo, monkeypatch):
+    monkeypatch.setitem(app.dependency_overrides, get_db, demo.get_demo_db)
+    engines = []
+    create = demo.create_async_engine
+
+    def recorded_engine(*args, **kwargs):
+        engines.append(create(*args, **kwargs))
+        return engines[-1]
+
+    monkeypatch.setattr(demo, "create_async_engine", recorded_engine)
+    sid = "9" * 32
+    async with _visitor(demo, sid) as client:
+        filing_id = await _draft(client)
+        for _ in range(3):
+            assert (await client.get(f"/api/v1/filings/{filing_id}")).status_code == 200
+    assert len(engines) == 1
+    expired = time.time() - demo.settings.demo_session_ttl_minutes * 60 - 1
+    os.utime(demo._session_path(sid), (expired, expired))
+    monkeypatch.setattr(demo, "_last_access", {})
+    monkeypatch.setattr(demo, "_last_sweep", 0.0)
+    demo._sweep_idle()
+    assert not demo._session_path(sid).exists()
+    async with _visitor(demo, sid) as client:
+        assert (await client.get(f"/api/v1/filings/{filing_id}")).status_code == 404
+        assert (await client.get("/api/v1/filings")).json()["total"] == 0
+    assert len(engines) == 2
