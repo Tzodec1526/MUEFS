@@ -73,11 +73,11 @@ function Favorites() {
     <div className="favorites-page">
       <PageHeading>Favorites</PageHeading>
       <div className="page-header">
-        <h2>Favorite Cases</h2>
-        <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>
+        <h2>Favorite cases</h2>
+        <Link to="/cases/search" className="btn btn-secondary">Search cases</Link>
       </div>
       <p className="info-text">
-        Your bookmarked cases for quick access. Add cases from the Case Search page
+        Your bookmarked cases for quick access. Add cases from the Case search page
         by clicking the star icon.
       </p>
 
@@ -88,7 +88,7 @@ function Favorites() {
         <div className="empty-state">
           <h3>No favorite cases yet</h3>
           <p>Search for a case and click the star to add it to your favorites.</p>
-          <Link to="/cases/search" className="btn btn-primary">Search Cases</Link>
+          <Link to="/cases/search" className="btn btn-primary">Search cases</Link>
         </div>
       )}
 
@@ -99,7 +99,7 @@ function Favorites() {
               <div className="favorite-card-star">&#9733;</div>
               <div className="favorite-card-body">
                 <div className="favorite-card-header">
-                  <h3>{fav.case_title || 'Untitled Case'}</h3>
+                  <h3>{fav.case_title || 'Untitled case'}</h3>
                   <span className="favorite-card-number">{fav.case_number || `Case #${fav.case_id}`}</span>
                 </div>
                 {fav.notes && <p className="favorite-card-notes">{fav.notes}</p>}
@@ -109,7 +109,7 @@ function Favorites() {
               </div>
               <div className="favorite-card-actions">
                 <Link to={`/cases/${fav.case_id}`} className="btn btn-secondary btn-small">
-                  View Case
+                  View case
                 </Link>
                 <button
                   className="btn btn-danger btn-small"
@@ -125,7 +125,7 @@ function Favorites() {
       )}
 
       <div className="page-header" style={{ marginTop: '2rem' }}>
-        <h2>Favorite Courts</h2>
+        <h2>Favorite courts</h2>
         <Link to="/filing/new" className="btn btn-secondary">New filing</Link>
       </div>
       <p className="info-text">
@@ -136,7 +136,7 @@ function Favorites() {
         <div className="empty-state">
           <h3>No favorite courts yet</h3>
           <p>When filing, use the court selector and star your common courts for quick access.</p>
-          <Link to="/filing/new" className="btn btn-primary">Start a Filing</Link>
+          <Link to="/filing/new" className="btn btn-primary">Start a filing</Link>
         </div>
       )}
 
@@ -157,7 +157,7 @@ function Favorites() {
               </div>
               <div className="favorite-card-actions">
                 <Link to={`/filing/new?court_id=${fav.court_id}`} className="btn btn-secondary btn-small">
-                  Use for Filing
+                  Use for filing
                 </Link>
                 <button
                   className="btn btn-danger btn-small"

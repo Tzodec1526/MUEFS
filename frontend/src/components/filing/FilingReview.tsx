@@ -99,8 +99,8 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
     return (
       <div className="form-section success-section">
         <div className="success-icon">&#10003;</div>
-        <h2>{submission.status === 'served' ? 'Service Documents Recorded'
-          : submission.status === 'submitted' ? 'Filing Submitted Successfully' : 'Submission Already Recorded'}</h2>
+        <h2>{submission.status === 'served' ? 'Service documents recorded'
+          : submission.status === 'submitted' ? 'Filing submitted' : 'Submission already recorded'}</h2>
         <p>
           {submission.status === 'served'
             ? 'This service-only filing has been recorded. It does not enter clerk review or deliver documents to other parties.'
@@ -129,8 +129,8 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
         </p>
         <div className="success-actions">
           <Link to={`/filings/${filingId}/history`} className="btn btn-primary">View submission receipt</Link>
-          <Link to="/" className="btn btn-primary">Return to Dashboard</Link>
-          <Link to="/filing/new" className="btn btn-secondary">File Another</Link>
+          <Link to="/" className="btn btn-primary">Return to dashboard</Link>
+          <Link to="/filing/new" className="btn btn-secondary">File another</Link>
         </div>
       </div>
     );
@@ -142,7 +142,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
 
   return (
     <div className="form-section">
-      <h2>{canSubmit ? 'Review Your Filing' : 'Filing Details'}</h2>
+      <h2>{canSubmit ? 'Review your filing' : 'Filing details'}</h2>
       {canSubmit && (
         <p className="info-text">
           Review all information carefully before submitting. Submitted filings
@@ -156,7 +156,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
 
       {/* Filing Summary */}
       <div className="review-card review-summary">
-        <h3>Court & Case Information</h3>
+        <h3>Court and case information</h3>
         <div className="review-grid">
           <div className="review-item">
             <label>Court</label>
@@ -224,7 +224,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
       {/* Validation Results */}
       {validation && (
         <div className={`validation-results ${validation.is_valid ? 'valid' : 'invalid'}`} role="alert">
-          <h3>{validation.is_valid ? 'Validation Passed' : 'Issues Found'}</h3>
+          <h3>{validation.is_valid ? 'Checks passed' : 'Issues found'}</h3>
           {validation.errors.length > 0 && (
             <div className="validation-errors">
               <h4>Errors (must fix before submitting):</h4>
@@ -235,7 +235,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
           )}
           {validation.missing_required_documents.length > 0 && (
             <div className="validation-missing">
-              <h4>Missing Required Documents:</h4>
+              <h4>Missing required documents:</h4>
               <ul>
                 {validation.missing_required_documents.map((doc, i) => <li key={i}>{doc}</li>)}
               </ul>
@@ -261,7 +261,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
         <>
           <div className="review-actions">
             {needsRefresh && <button className="btn btn-secondary" onClick={refreshReview} disabled={submitting}>
-              Refresh Review
+              Refresh review
             </button>}
             <button
               className="btn btn-primary btn-large"
@@ -277,7 +277,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
                     : undefined
               }
             >
-              {submitting ? 'Submitting...' : 'Submit Filing'}
+              {submitting ? 'Submitting...' : 'Submit filing'}
             </button>
           </div>
 

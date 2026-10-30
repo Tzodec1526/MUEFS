@@ -146,7 +146,7 @@ function FilingReviewPanel({
             disabled={actionInProgress || !reviewReason.trim() || !canReview}
             title={!reviewReason.trim() ? 'Reason required' : ''}
           >
-            Return for Correction
+            Return for correction
           </button>
           <button
             className="btn btn-danger"
@@ -158,7 +158,7 @@ function FilingReviewPanel({
           </button>
         </div>
         <p className="info-text review-action-note">
-          <strong>Return for Correction</strong> sends it back so the filer can fix and
+          <strong>Return for correction</strong> sends it back so the filer can fix and
           re-file; the earlier submission remains in their history. <strong>Reject</strong> is final.
         </p>
       </div>

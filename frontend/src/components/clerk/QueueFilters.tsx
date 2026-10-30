@@ -43,10 +43,10 @@ function QueueFilters({ filters, loading, actionInProgress, onApply, onRefresh }
           onChange={(e) => setFilterDraft(previous => ({ ...previous, status: e.target.value }))}
           disabled={actionInProgress}
         >
-          <option value="all">All Pending</option>
-          <option value="submitted">New Submissions</option>
-          <option value="under_review">Under Review</option>
-          <option value="waivers">Pending Fee Waivers</option>
+          <option value="all">All pending</option>
+          <option value="submitted">New submissions</option>
+          <option value="under_review">Under review</option>
+          <option value="waivers">Pending fee waivers</option>
         </select>
       </div>
       <div className="form-group queue-search">

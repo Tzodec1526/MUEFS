@@ -188,7 +188,7 @@ function CaseSearch() {
       >
         <div className="form-row">
           <div className="form-group">
-            <label htmlFor="caseNum">Case Number</label>
+            <label htmlFor="caseNum">Case number</label>
             <input
               id="caseNum"
               name="case_number"
@@ -199,7 +199,7 @@ function CaseSearch() {
             />
           </div>
           <div className="form-group">
-            <label htmlFor="partyName">Party Name</label>
+            <label htmlFor="partyName">Party name</label>
             <input
               id="partyName"
               name="party_name"

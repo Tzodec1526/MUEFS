@@ -70,7 +70,7 @@ function openWizard(entry: string) {
   );
 }
 
-const caption = () => screen.getByLabelText(/Case Title/) as HTMLInputElement;
+const caption = () => screen.getByLabelText(/Case title/) as HTMLInputElement;
 
 beforeEach(() => {
   localStorage.setItem('demo_role', 'attorney');
@@ -145,7 +145,7 @@ it('heads a filing in an existing case with its case number and does not call it
   expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('File in an existing case');
   await waitFor(() => expect(document.title).toBe('File in an existing case · MUEFS'));
   expect(document.body.textContent).not.toMatch(/motion/i);
-  expect((screen.getByRole('textbox', { name: /Filing Description/ }) as HTMLTextAreaElement).placeholder).not.toMatch(/motion/i);
+  expect((screen.getByRole('textbox', { name: /Filing description/ }) as HTMLTextAreaElement).placeholder).not.toMatch(/motion/i);
 });
 
 async function pickExistingCase() {
@@ -164,7 +164,7 @@ it('takes the case number from the case the filer picks', async () => {
 
   fireEvent.click(button('Continue'));
 
-  await screen.findByRole('heading', { name: 'Filing Details' });
+  await screen.findByRole('heading', { name: 'Filing details' });
   expect(screen.getByText('Case 2026-000042-CZ')).toBeTruthy();
 });
 
@@ -185,7 +185,7 @@ it('shows the case number of a saved filing in an existing case', async () => {
   openWizard('/filing/new?filing_id=7&step=details');
 
   expect(await screen.findByText('Case 2026-000042-CZ')).toBeTruthy();
-  expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Continue Filing #7');
+  expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Continue filing #7');
 });
 
 it('reports once that the case number of a saved filing could not load, and still opens the filing', async () => {
@@ -198,11 +198,11 @@ it('reports once that the case number of a saved filing could not load, and stil
   expect(screen.queryByText(/^Case \d/)).toBeNull();
 });
 
-it('groups the File with Court and Service Only choices as one named radio group', async () => {
+it('groups the File with court and Service only choices as one named radio group', async () => {
   vi.mocked(getCase).mockResolvedValue(docket);
   openWizard(CASE_LINK);
 
-  const group = await screen.findByRole('group', { name: /Filing Type/ });
+  const group = await screen.findByRole('group', { name: /Filing type/ });
   expect(within(group).getAllByRole('radio').map(radio => radio.getAttribute('value')))
     .toEqual(['subsequent', 'service_only']);
   expect(document.querySelector('label[for="filingType"]')).toBeNull();
@@ -266,7 +266,7 @@ function conflictError(): AxiosError {
 const stepButton = (label: string) => within(screen.getByRole('navigation', { name: 'Filing progress' }))
   .getByRole('button', { name: new RegExp(`(^|[\\d✓\\s])${label}$`) }) as HTMLButtonElement;
 const button = (name: string | RegExp) => screen.getByRole('button', { name }) as HTMLButtonElement;
-const descriptionField = () => screen.getByLabelText(/Filing Description/) as HTMLTextAreaElement;
+const descriptionField = () => screen.getByLabelText(/Filing description/) as HTMLTextAreaElement;
 
 async function stepError(message: string) {
   expect((await screen.findByRole('alert')).textContent).toBe(message);
@@ -283,7 +283,7 @@ async function chooseNewCaseAndType() {
   fireEvent.click(button('Continue'));
   fireEvent.click(await screen.findByRole('radio', { name: /General Civil/ }));
   fireEvent.click(button('Continue'));
-  await screen.findByRole('heading', { name: 'Case Details' });
+  await screen.findByRole('heading', { name: 'Case details' });
 }
 
 it('walks a new case through each step, refusing to advance past an unfinished one', async () => {
@@ -307,13 +307,13 @@ it('walks a new case through each step, refusing to advance past an unfinished o
 
   fireEvent.click(screen.getByRole('button', { name: /Start a new case/ }));
   fireEvent.click(button('Continue'));
-  await screen.findByRole('heading', { name: 'Select Case Type & Review Requirements' });
+  await screen.findByRole('heading', { name: 'Choose a case type and review its requirements' });
   fireEvent.click(button('Continue'));
   await stepError('Please select a case type to continue.');
 
   fireEvent.click(await screen.findByRole('radio', { name: /General Civil/ }));
   fireEvent.click(button('Continue'));
-  await screen.findByRole('heading', { name: 'Case Details' });
+  await screen.findByRole('heading', { name: 'Case details' });
   fireEvent.click(button('Continue'));
   await stepError('Please enter a case title to continue.');
   expect(createFiling).not.toHaveBeenCalled();
@@ -339,7 +339,7 @@ it('clears a step error as soon as the filer fixes the field it names', async ()
   fireEvent.click(button('Continue'));
   fireEvent.click(await screen.findByRole('radio', { name: /General Civil/ }));
   fireEvent.click(button('Continue'));
-  await screen.findByRole('heading', { name: 'Case Details' });
+  await screen.findByRole('heading', { name: 'Case details' });
   fireEvent.click(button('Continue'));
   await stepError('Please enter a case title to continue.');
   fireEvent.change(caption(), { target: { value: 'Doe v. Roe' } });
@@ -416,7 +416,7 @@ it('keeps a save failure on its own step until the filer leaves that step', asyn
 
   fireEvent.click(screen.getByRole('link', { name: 'Open the documents step' }));
 
-  await screen.findByRole('heading', { name: 'Upload Documents' });
+  await screen.findByRole('heading', { name: 'Upload documents' });
   expect(screen.queryByRole('alert')).toBeNull();
 
   fireEvent.click(button('Back'));
@@ -451,7 +451,7 @@ it('shows the unsaved-changes note only on the step that can save, and does not 
 
   fireEvent.click(button('Back'));
 
-  await screen.findByRole('heading', { name: 'Select Case Type & Review Requirements' });
+  await screen.findByRole('heading', { name: 'Choose a case type and review its requirements' });
   expect(screen.queryByText(/Unsaved changes/)).toBeNull();
 });
 
@@ -521,12 +521,12 @@ it('steps down one heading level at a time on the documents and review steps', a
   });
   vi.mocked(getFilingFees).mockResolvedValue(paidFees(draft));
   openWizard('/filing/new?filing_id=7');
-  await screen.findByRole('heading', { name: 'Upload Documents' });
+  await screen.findByRole('heading', { name: 'Upload documents' });
   expectNoSkippedHeadingLevels();
 
-  fireEvent.click(button('Review Filing'));
+  fireEvent.click(button('Review filing'));
 
-  await screen.findByRole('heading', { name: 'Issues Found' });
+  await screen.findByRole('heading', { name: 'Issues found' });
   await screen.findByText('No additional payment is required for the current filing.');
   expectNoSkippedHeadingLevels();
 });
@@ -543,11 +543,11 @@ it('returns to a completed step from the progress bar, and back one step with Ba
   await chooseNewCaseAndType();
 
   fireEvent.click(button('Back'));
-  await screen.findByRole('heading', { name: 'Select Case Type & Review Requirements' });
+  await screen.findByRole('heading', { name: 'Choose a case type and review its requirements' });
 
   fireEvent.click(stepButton('Court'));
 
-  expect(await screen.findByRole('heading', { name: 'Select Court', level: 2 })).toBeTruthy();
+  expect(await screen.findByRole('heading', { name: 'Select a court', level: 2 })).toBeTruthy();
   expect(stepButton('Court').getAttribute('aria-current')).toBe('step');
   expect(stepButton('Case').disabled).toBe(true);
 });
@@ -564,7 +564,7 @@ it('saves a new filing as a draft and locks the court and case choices', async (
 
   fireEvent.click(button('Save draft'));
 
-  await screen.findByRole('heading', { name: 'Continue Filing #7' });
+  await screen.findByRole('heading', { name: 'Continue filing #7' });
   expect(createFiling).toHaveBeenCalledTimes(1);
   const [payload, creationKey] = vi.mocked(createFiling).mock.calls[0];
   expect(payload).toEqual({
@@ -588,10 +588,10 @@ it('saves the details and moves on to documents when the filer continues', async
 
   fireEvent.click(button('Continue'));
 
-  expect(await screen.findByRole('heading', { name: 'Upload Documents' })).toBeTruthy();
+  expect(await screen.findByRole('heading', { name: 'Upload documents' })).toBeTruthy();
   expect(createFiling).toHaveBeenCalledTimes(1);
   expect(stepButton('Documents').getAttribute('aria-current')).toBe('step');
-  fireEvent.click(button('Review Filing'));
+  fireEvent.click(button('Review filing'));
   await stepError('Please upload at least one document to continue.');
 });
 
@@ -609,7 +609,7 @@ it('offers unsaved edits from this tab when a new filing is reopened', async () 
   expect(screen.getByText('Case:').parentElement?.textContent).toBe('Case: Doe v. Roe');
   expect(screen.getByText('Type:').parentElement?.textContent).toBe('Type: General Civil');
 
-  fireEvent.click(button('Continue Editing'));
+  fireEvent.click(button('Continue editing'));
 
   expect(screen.queryByText(/Recovered unsaved edits/)).toBeNull();
   expect(screen.getByText('Case:').parentElement?.textContent).toBe('Case: Doe v. Roe');
@@ -624,7 +624,7 @@ it('discards recovered edits when the filer starts fresh', async () => {
   const second = openWizard('/filing/new?court_id=3');
   await screen.findByText(/Recovered unsaved edits/);
 
-  fireEvent.click(button('Start Fresh'));
+  fireEvent.click(button('Start fresh'));
 
   expect(screen.queryByText(/Recovered unsaved edits/)).toBeNull();
   expect(screen.queryByText('Case:')).toBeNull();
@@ -649,7 +649,7 @@ it('recovers unsaved edits to a saved filing, and can return to the saved detail
   await screen.findByText(/Recovered unsaved edits/);
   expect(caption().value).toBe('Doe v. Roe, amended');
 
-  fireEvent.click(button('Use Saved Details'));
+  fireEvent.click(button('Use saved details'));
 
   expect(caption().value).toBe('Doe v. Roe');
   expect(screen.queryByText(/Recovered unsaved edits/)).toBeNull();
@@ -682,7 +682,7 @@ it('saves edits to a saved filing and moves on to documents when the filer conti
 
   fireEvent.click(button('Continue'));
 
-  expect(await screen.findByRole('heading', { name: 'Upload Documents' })).toBeTruthy();
+  expect(await screen.findByRole('heading', { name: 'Upload documents' })).toBeTruthy();
   expect(updateFiling).toHaveBeenCalledTimes(1);
   expect(stepButton('Documents').getAttribute('aria-current')).toBe('step');
 });
@@ -748,17 +748,17 @@ it('submits a valid, paid filing from the review step', async () => {
   vi.mocked(getFilingFees).mockResolvedValue(paidFees(draft));
   vi.mocked(submitFiling).mockResolvedValue({ ...draft, status: 'submitted', submission_count: 1 });
   openWizard('/filing/new?filing_id=7');
-  await screen.findByRole('heading', { name: 'Upload Documents' });
+  await screen.findByRole('heading', { name: 'Upload documents' });
 
-  fireEvent.click(button('Review Filing'));
+  fireEvent.click(button('Review filing'));
 
-  await screen.findByRole('heading', { name: 'Review Your Filing' });
-  const submit = await screen.findByRole('button', { name: 'Submit Filing' }) as HTMLButtonElement;
+  await screen.findByRole('heading', { name: 'Review your filing' });
+  const submit = await screen.findByRole('button', { name: 'Submit filing' }) as HTMLButtonElement;
   await waitFor(() => expect(submit.disabled).toBe(false));
 
   fireEvent.click(submit);
 
-  expect(await screen.findByRole('heading', { name: 'Filing Submitted Successfully' })).toBeTruthy();
+  expect(await screen.findByRole('heading', { name: 'Filing submitted' })).toBeTruthy();
   expect(submitFiling).toHaveBeenCalledTimes(1);
   const [filingId, token, idempotencyKey] = vi.mocked(submitFiling).mock.calls[0];
   expect([filingId, token]).toEqual([7, 's-7']);
@@ -775,11 +775,11 @@ it('does not submit a filing that fails validation', async () => {
   });
   vi.mocked(getFilingFees).mockResolvedValue(paidFees(draft));
   openWizard('/filing/new?filing_id=7');
-  fireEvent.click(await screen.findByRole('button', { name: 'Review Filing' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Review filing' }));
 
   expect(await screen.findByText('A summons is required.')).toBeTruthy();
   await screen.findByText('No additional payment is required for the current filing.');
-  expect(button('Submit Filing').disabled).toBe(true);
+  expect(button('Submit filing').disabled).toBe(true);
   expect(submitFiling).not.toHaveBeenCalled();
 });
 

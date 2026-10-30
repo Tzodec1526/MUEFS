@@ -345,7 +345,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
       <div className="wizard-header">
         <div>
           <PageHeading>
-            {loadedFiling ? `Continue Filing #${loadedFiling.id}` : existingCase
+            {loadedFiling ? `Continue filing #${loadedFiling.id}` : existingCase
               ? plainLanguage
                 ? 'File papers in an existing case'
                 : 'File in an existing case'
@@ -374,10 +374,10 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
           <span>Recovered unsaved edits from this tab. Save them to your account before closing the tab.</span>
           <div className="draft-actions">
             <button className="btn btn-primary btn-small" onClick={() => setShowDraftBanner(false)}>
-              Continue Editing
+              Continue editing
             </button>
             <button className="btn btn-secondary btn-small" disabled={saving} onClick={handleDiscardDraft}>
-              {loadedFiling ? 'Use Saved Details' : filingData.creationKey ? 'Start a separate filing' : 'Start Fresh'}
+              {loadedFiling ? 'Use saved details' : filingData.creationKey ? 'Start a separate filing' : 'Start fresh'}
             </button>
           </div>
         </div>
@@ -553,7 +553,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
                 onClick={goNext}
                 disabled={saving || Boolean(conflict)}
               >
-                {saving ? 'Saving...' : currentStepIndex === steps.length - 2 ? 'Review Filing' : 'Continue'}
+                {saving ? 'Saving...' : currentStepIndex === steps.length - 2 ? 'Review filing' : 'Continue'}
               </button>
             )}
           </div>

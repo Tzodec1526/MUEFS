@@ -143,7 +143,7 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
 
   return (
     <div className="form-section">
-      <h2>Select Case Type & Review Requirements</h2>
+      <h2>Choose a case type and review its requirements</h2>
       <p className="info-text">
         Choose the type of case for your filing. After selecting, review the filing
         requirements below to ensure you have all necessary documents.
@@ -158,7 +158,7 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
           >
-            <option value="">All Categories</option>
+            <option value="">All categories</option>
             {categories.map(c => (
               <option key={c} value={c}>{c.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())}</option>
             ))}
@@ -207,7 +207,7 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
         onRetry={() => setRequirementsAttempt(attempt => attempt + 1)} />}
       {selectedCaseTypeId && requirements.length > 0 && (
         <div className="requirements-section">
-          <h3>Filing Requirements & Court Rules</h3>
+          <h3>Filing requirements and court rules</h3>
           <p className="info-text">
             Review these requirements carefully. Missing required documents may cause the
             clerk to return your filing for correction.

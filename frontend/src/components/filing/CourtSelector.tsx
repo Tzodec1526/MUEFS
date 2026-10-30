@@ -190,7 +190,7 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
 
   return (
     <div className="form-section">
-      <h2>Select Court</h2>
+      <h2>Select a court</h2>
       <p className="info-text">
         Search by court name, or browse by county. Statewide and appellate courts (Court of Appeals,
         Supreme Court, Court of Claims) are listed in their own group below.
@@ -211,16 +211,16 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
         <div className="form-group">
           <label htmlFor="county">County</label>
           <select id="county" value={countyFilter} onChange={(e) => { setCountyFilter(e.target.value); setPage(1); }}>
-            <option value="">All Counties</option>
+            <option value="">All counties</option>
             {MICHIGAN_COUNTIES.map((county) => (
               <option key={county} value={county}>{county}</option>
             ))}
           </select>
         </div>
         <div className="form-group">
-          <label htmlFor="courtType">Court Type</label>
+          <label htmlFor="courtType">Court type</label>
           <select id="courtType" value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}>
-            <option value="">All Types</option>
+            <option value="">All types</option>
             <option value="circuit">Circuit Court</option>
             <option value="district">District Court</option>
             <option value="probate">Probate Court</option>

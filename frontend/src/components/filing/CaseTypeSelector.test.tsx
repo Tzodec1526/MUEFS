@@ -95,7 +95,7 @@ it('spells out a category made of two words', async () => {
   await screen.findByText('Small Claims Court');
 
   expect(within(screen.getByLabelText('Category')).getAllByRole('option').map(option => option.textContent))
-    .toEqual(['All Categories', 'Civil', 'Small Claims']);
+    .toEqual(['All categories', 'Civil', 'Small Claims']);
   expect(document.body.textContent).not.toMatch(/small_claims/i);
 });
 

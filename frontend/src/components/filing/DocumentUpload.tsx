@@ -263,7 +263,7 @@ function DocumentUpload({
 
   return (
     <div className="form-section">
-      <h2>Upload Documents</h2>
+      <h2>Upload documents</h2>
       <p className="info-text">
         Select the document type, upload your file, and add it to the filing.
         All PDFs must be text-searchable per MCR 1.109. Maximum file size: 100MB.
@@ -294,7 +294,7 @@ function DocumentUpload({
               value={selectedCategory}
               onChange={(e) => { setSelectedCategory(e.target.value); setDocType(''); }}
             >
-              <option value="">All Categories</option>
+              <option value="">All categories</option>
               {courtTypes.length > 0 && <option value={COURT_CATEGORY}>{COURT_CATEGORY}</option>}
               {FILING_CATEGORIES.map((cat) => (
                 <option key={cat.label} value={cat.label}>{cat.label}</option>
@@ -303,7 +303,7 @@ function DocumentUpload({
           </div>
           <div className="form-group">
             <label htmlFor="docType">
-              Document Type <span className="required-marker">*</span>
+              Document type <span className="required-marker">*</span>
             </label>
             <select
               id="docType"
@@ -336,13 +336,13 @@ function DocumentUpload({
 
         {docType && getTypeMcr(docType) && (
           <div className="doc-type-mcr-hint">
-            Court Rule: <strong>{getTypeMcr(docType)}</strong>
+            Court rule: <strong>{getTypeMcr(docType)}</strong>
           </div>
         )}
 
         <div className="form-group">
           <label htmlFor="docTitle">
-            Document Title <span className="required-marker">*</span>
+            Document title <span className="required-marker">*</span>
           </label>
           <input
             id="docTitle"
@@ -382,14 +382,14 @@ function DocumentUpload({
           onClick={handleUpload}
           disabled={busy || !docType}
         >
-          {pendingAction === 'upload' ? 'Uploading...' : 'Upload Document'}
+          {pendingAction === 'upload' ? 'Uploading...' : 'Upload document'}
         </button>
       </div>
 
       {/* Uploaded Documents List */}
       {documents.length > 0 && (
         <div className="uploaded-documents">
-          <h3>Documents in This Filing ({documents.length})</h3>
+          <h3>Documents in this filing ({documents.length})</h3>
           <table>
             <thead>
               <tr>

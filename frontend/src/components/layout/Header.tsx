@@ -56,7 +56,7 @@ function Header() {
         )}
         {role ? (
           <button className="header-switch-role" onClick={handleSwitchRole}>
-            {isDemoBuild() ? 'Switch Role' : 'Sign out'}
+            {isDemoBuild() ? 'Switch role' : 'Sign out'}
           </button>
         ) : (
           <button className="header-switch-role" onClick={() => navigate('/login')}>

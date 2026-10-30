@@ -84,7 +84,7 @@ it('moves focus to the next filing after accepting one', async () => {
 });
 
 it.each([
-  ['Return for Correction', 'return'],
+  ['Return for correction', 'return'],
   ['Reject', 'reject'],
 ])('moves focus to the queue heading after "%s" on the last filing', async (buttonName, action) => {
   serveQueues([11], []);
@@ -380,7 +380,7 @@ it('requires a reason before a filing can be returned or rejected', async () => 
   openQueue();
   await openReview(11);
 
-  const returnButton = screen.getByRole('button', { name: 'Return for Correction' }) as HTMLButtonElement;
+  const returnButton = screen.getByRole('button', { name: 'Return for correction' }) as HTMLButtonElement;
   const rejectButton = screen.getByRole('button', { name: 'Reject' }) as HTMLButtonElement;
   expect(returnButton.disabled).toBe(true);
   expect(rejectButton.disabled).toBe(true);
@@ -399,7 +399,7 @@ it('sends a typed reason with a return', async () => {
   await openReview(11);
   fireEvent.change(screen.getByLabelText('Review reason'), { target: { value: 'Caption is incomplete' } });
 
-  fireEvent.click(screen.getByRole('button', { name: 'Return for Correction' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Return for correction' }));
 
   await waitFor(() => expect(reviewFiling).toHaveBeenCalledTimes(1));
   expect(reviewFiling).toHaveBeenCalledWith(expect.objectContaining({ id: 11, submission_count: 1 }),

@@ -82,7 +82,7 @@ it('has no status tiles beside the filter', async () => {
   open();
 
   await screen.findByText('Case 1');
-  expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual(['Continue Filing', 'View Filing']);
+  expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual(['Continue filing', 'View filing']);
 });
 
 it('asks for the status chosen in the filter', async () => {

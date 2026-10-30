@@ -26,7 +26,7 @@ function renderUpload() {
     documents={[]} onDocumentsChange={vi.fn()} onBusyChange={vi.fn()} />);
 }
 
-const typePicker = () => screen.getByLabelText(/Document Type/) as HTMLSelectElement;
+const typePicker = () => screen.getByLabelText(/Document type/) as HTMLSelectElement;
 
 function courtGroupOptions(): string[][] | null {
   const group = typePicker().querySelector(`optgroup[label="${COURT_GROUP}"]`);
@@ -49,8 +49,8 @@ it("lists the court's own document types in their own group and lets the filer p
   fireEvent.change(typePicker(), { target: { value: 'BUS_CT_NOTICE' } });
 
   expect(typePicker().value).toBe('BUS_CT_NOTICE');
-  expect((screen.getByLabelText(/Document Title/) as HTMLInputElement).value).toBe('Business Court Notice');
-  expect(screen.getByText(/Court Rule:/).textContent).toBe('Court Rule: MCL 600.8031');
+  expect((screen.getByLabelText(/Document title/) as HTMLInputElement).value).toBe('Business Court Notice');
+  expect(screen.getByText(/Court rule:/).textContent).toBe('Court rule: MCL 600.8031');
 });
 
 const uploaded = (id: number, type: string) => ({ id, title: `Document ${id}`, type, size: 2048, isSearchable: true });
@@ -93,7 +93,7 @@ it("follows the document type with its title until the filer writes their own", 
   vi.mocked(getFilingRequirements).mockResolvedValue([]);
   renderUpload();
   await waitFor(() => expect(getFilingRequirements).toHaveBeenCalled());
-  const title = () => screen.getByLabelText(/Document Title/) as HTMLInputElement;
+  const title = () => screen.getByLabelText(/Document title/) as HTMLInputElement;
 
   fireEvent.change(typePicker(), { target: { value: 'COMPLAINT' } });
   expect(title().value).toBe('Complaint');

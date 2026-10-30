@@ -68,8 +68,8 @@ it('queries the case number, party, court and page that the URL names', async ()
   await screen.findByRole('link', { name: '2026-000042-CZ' });
   expect(searchCases).toHaveBeenCalledTimes(1);
   expect(lastQuery()).toEqual({ case_number: '2026-000042', party_name: 'Smith', court_id: 3, page: 2 });
-  expect(field('Case Number').value).toBe('2026-000042');
-  expect(field('Party Name').value).toBe('Smith');
+  expect(field('Case number').value).toBe('2026-000042');
+  expect(field('Party name').value).toBe('Smith');
   await waitFor(() => expect(field('Court').value).toBe('3'));
   expect(screen.getByRole('heading', { name: 'Results (30)' })).toBeTruthy();
 });
@@ -79,8 +79,8 @@ it('puts the submitted case number, party and court in the URL and searches for 
   openSearch();
   await screen.findByRole('option', { name: 'Washtenaw — Twenty-Second Circuit Court' });
 
-  fireEvent.change(field('Case Number'), { target: { value: ' 2026-000042 ' } });
-  fireEvent.change(field('Party Name'), { target: { value: 'Smith' } });
+  fireEvent.change(field('Case number'), { target: { value: ' 2026-000042 ' } });
+  fireEvent.change(field('Party name'), { target: { value: 'Smith' } });
   fireEvent.change(field('Court'), { target: { value: '9' } });
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
 
@@ -95,7 +95,7 @@ it('leaves an empty filter out of the URL and the query', async () => {
   openSearch();
   await waitFor(() => expect(searchCases).toHaveBeenCalledTimes(1));
 
-  fireEvent.change(field('Party Name'), { target: { value: 'Smith' } });
+  fireEvent.change(field('Party name'), { target: { value: 'Smith' } });
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
 
   await waitFor(() => expect(lastQuery()).toEqual({

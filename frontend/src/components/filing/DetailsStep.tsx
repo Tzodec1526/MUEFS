@@ -18,7 +18,7 @@ function DetailsStep({
 }: DetailsStepProps) {
   return (
     <div className="form-section">
-      <h2>{existingCase ? 'Filing Details' : 'Case Details'}</h2>
+      <h2>{existingCase ? 'Filing details' : 'Case details'}</h2>
 
       {captionMissing && caseLookupError && (
         <LoadError failure={{ ...caseLookupError, message: `${caseLookupError.message} Retry, or go Back to choose the case.` }}
@@ -27,7 +27,7 @@ function DetailsStep({
 
       {existingCase && (
         <fieldset className="form-group filing-type-fieldset">
-          <legend>Filing Type <span className="required-marker">*</span></legend>
+          <legend>Filing type <span className="required-marker">*</span></legend>
           <div className="filing-type-options">
             <label className={`filing-type-option ${filingData.filingType === 'subsequent' ? 'selected' : ''}`}>
               <input
@@ -39,7 +39,7 @@ function DetailsStep({
                 onChange={() => updateData({ filingType: 'subsequent' })}
               />
               <div>
-                <strong>File with Court</strong>
+                <strong>File with court</strong>
                 <span>Document is filed with the court and reviewed by the clerk. Appears on the docket.</span>
               </div>
             </label>
@@ -53,7 +53,7 @@ function DetailsStep({
                 onChange={() => updateData({ filingType: 'service_only' })}
               />
               <div>
-                <strong>Service Only (No Court Filing)</strong>
+                <strong>Service only (no court filing)</strong>
                 <span>Record documents for service outside this app. No court filing, clerk review, or filing fee. This app does not deliver documents to other parties.</span>
               </div>
             </label>
@@ -71,7 +71,7 @@ function DetailsStep({
       </p>
       <div className="form-group">
         <label htmlFor="caseTitle">
-          Case Title <span className="required-marker">*</span>
+          Case title <span className="required-marker">*</span>
         </label>
         <input
           id="caseTitle"
@@ -92,7 +92,7 @@ function DetailsStep({
       </div>
       <div className="form-group">
         <label htmlFor="filingDesc">
-          {filingData.filingType === 'service_only' ? 'Service Description' : 'Filing Description'} <span className="required-marker">*</span>
+          {filingData.filingType === 'service_only' ? 'Service description' : 'Filing description'} <span className="required-marker">*</span>
         </label>
         <textarea
           id="filingDesc"

@@ -626,7 +626,7 @@ it('leads a filer with returned filings, drafts, recent filings and starting a f
   expect(recent.getByText('Accepted')).toBeTruthy();
   expect(recent.getAllByText(/Third Circuit Court/)).toHaveLength(3);
   expect(filingsRequests()[0]).toEqual({ page_size: 5 });
-  expect(within(main).queryByRole('link', { name: 'Search Cases' })).toBeNull();
+  expect(within(main).queryByRole('link', { name: 'Search cases' })).toBeNull();
 });
 
 it('tells a filer with no filings how to start', async () => {
@@ -690,18 +690,18 @@ it('leads the public home with a case search that opens the matching results', a
   fireEvent.click(screen.getByRole('button', { name: 'Search cases' }));
 
   expect(await screen.findByRole('heading', { level: 1, name: 'Case search' })).toBeTruthy();
-  expect((screen.getByLabelText('Party Name') as HTMLInputElement).value).toBe('Smith');
+  expect((screen.getByLabelText('Party name') as HTMLInputElement).value).toBe('Smith');
 });
 
 const recoveryCopy = 'muefs_filing_draft:v2:1:new';
 
-it('keeps a draft-recovery copy and the session when the filer declines Switch Role', async () => {
+it('keeps a draft-recovery copy and the session when the filer declines Switch role', async () => {
   sessionStorage.setItem(recoveryCopy, '{}');
   const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
   serve('attorney', {});
   openApp('/no-such-page', 'attorney');
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Switch Role' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Switch role' }));
 
   expect(confirm).toHaveBeenCalledOnce();
   expect(confirm.mock.calls[0][0]).toContain('discards the unsaved filing edits');
@@ -712,13 +712,13 @@ it('keeps a draft-recovery copy and the session when the filer declines Switch R
 it.each([
   ['a recovery copy in this tab', () => sessionStorage.setItem(recoveryCopy, '{}')],
   ['an older recovery copy', () => localStorage.setItem('muefs_filing_draft', '{}')],
-])('discards %s once the filer confirms Switch Role', async (_name, store) => {
+])('discards %s once the filer confirms Switch role', async (_name, store) => {
   store();
   const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
   serve('attorney', {});
   openApp('/no-such-page', 'attorney');
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Switch Role' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Switch role' }));
 
   expect(confirm).toHaveBeenCalledOnce();
   expect(await screen.findByRole('heading', { level: 1, name: 'Sign in' })).toBeTruthy();
@@ -731,7 +731,7 @@ it('switches role without asking when no recovery copy exists', async () => {
   serve('attorney', {});
   openApp('/no-such-page', 'attorney');
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Switch Role' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Switch role' }));
 
   expect(await screen.findByRole('heading', { level: 1, name: 'Sign in' })).toBeTruthy();
   expect(confirm).not.toHaveBeenCalled();

@@ -224,7 +224,7 @@ function CaseDetailPage() {
                 to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&service_only=true`}
                 className="btn btn-secondary"
               >
-                Serve Documents Only
+                Serve documents only
               </Link>
             </>
           )}

@@ -94,7 +94,7 @@ function MyFilings() {
               ? 'No filings match the selected filter.'
               : 'You haven\'t filed anything yet.'}
           </p>
-          <Link to="/filing/new" className="btn btn-primary">Create Your First Filing</Link>
+          <Link to="/filing/new" className="btn btn-primary">Create your first filing</Link>
         </div>
       )}
 
@@ -107,7 +107,7 @@ function MyFilings() {
                   <span className="filing-card-id">#{filing.id}</span>
                   <span className={`status-badge ${filing.status}`}>{filingStatusLabel(filing.status)}</span>
                 </div>
-                <h2 className="filing-card-title">{filing.case_title || 'Untitled Filing'}</h2>
+                <h2 className="filing-card-title">{filing.case_title || 'Untitled filing'}</h2>
                 <div className="filing-card-meta">
                   <span>{courtNames[filing.court_id] || `Court #${filing.court_id}`}</span>
                   <span>{plural(filing.document_count, 'document')}</span>
@@ -120,15 +120,15 @@ function MyFilings() {
                 )}
                 <div className="filing-card-actions">
                   {filing.status === 'draft' && (
-                    <button className="btn btn-primary btn-small" onClick={() => navigate(`/filing/new?filing_id=${filing.id}`)}>Continue Filing</button>
+                    <button className="btn btn-primary btn-small" onClick={() => navigate(`/filing/new?filing_id=${filing.id}`)}>Continue filing</button>
                   )}
                   {filing.status === 'returned' && (
                     <button className="btn btn-primary btn-small" onClick={() => navigate(`/filing/new?filing_id=${filing.id}`)}>Resubmit</button>
                   )}
                   {filing.case_id ? (
-                    <button className="btn btn-secondary btn-small" onClick={() => navigate(`/cases/${filing.case_id}`)}>View Case</button>
+                    <button className="btn btn-secondary btn-small" onClick={() => navigate(`/cases/${filing.case_id}`)}>View case</button>
                   ) : (
-                    <button className="btn btn-secondary btn-small" onClick={() => navigate(`/filing/new?filing_id=${filing.id}`)}>View Filing</button>
+                    <button className="btn btn-secondary btn-small" onClick={() => navigate(`/filing/new?filing_id=${filing.id}`)}>View filing</button>
                   )}
                   {filing.submitted_at && <Link className="btn btn-secondary btn-small" to={`/filings/${filing.id}/history`}>Receipts &amp; history</Link>}
                 </div>
