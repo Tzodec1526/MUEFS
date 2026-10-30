@@ -15,7 +15,7 @@ The filing wizard lets an attorney or SRL start an e-filing: pick a court, choos
 - Sign in as attorney or SRL, choose `Start a filing` on the dashboard.
 - Choose sidebar `New filing` (`/filing/new`).
 - On a case detail page, choose `File in this case` (hidden for public/anonymous).
-- Clerk or administrator visiting `/filing/new` is redirected home.
+- A clerk visiting `/filing/new` lands on the clerk dashboard. An administrator lands on People and court access (`/admin`).
 
 ## Driving it with control-muefs
 

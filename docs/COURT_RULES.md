@@ -28,8 +28,9 @@ These rules explain why the checklists, the validator and the seed data behave a
   not need it. A good-faith effort is a factor in awarding motion expenses (MCR 2.313(A)(5)),
   not a required filing, so `DISC_CERT_GF` is seeded and offered as recommended. Where a
   requirement row makes it required, the validator enforces that on discovery motions only.
-- **Non-party motion to compel.** It must include the subpoena and proof of service
-  (MCR 2.313(A)(2)(c)).
+- **Non-party motion to compel.** The catalog's help text says it must include the subpoena and
+  proof of service (MCR 2.313(A)(2)(c)). The validator does not check for them, so a filing
+  without them is not blocked.
 - **Proposed order.** Not required at filing. MCR 2.602 governs entry of orders, so a proposed
   order is recommended practice, not a prerequisite.
 
