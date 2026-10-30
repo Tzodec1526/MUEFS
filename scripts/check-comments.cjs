@@ -33,6 +33,7 @@ function commentEnd(text, start, length) {
 const found = [];
 for (const script of scripts) {
   const { name, text } = script;
+  if (text.startsWith('#!')) found.push({ name: script.file ?? name, line: 1, text: text.split('\n', 1)[0] });
   const { spans } = service.getEncodedSyntacticClassifications(name, { start: 0, length: text.length });
   let covered = 0;
   for (let index = 0; index < spans.length; index += 3) {

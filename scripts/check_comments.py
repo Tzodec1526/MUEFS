@@ -19,15 +19,31 @@ LINE_START_SUFFIXES = {".conf"}
 SHELL_WORD_BREAKS = " \t;&|("
 
 
+def comment_tokens(source):
+    return [
+        token for token in tokenize.generate_tokens(io.StringIO(source).readline)
+        if token.type == tokenize.COMMENT
+    ]
+
+
+def embedded_python_findings(text, line):
+    source = textwrap.dedent(text)
+    try:
+        ast.parse(source)
+        tokens = comment_tokens(source)
+    except (SyntaxError, ValueError, tokenize.TokenError):
+        return []
+    return [(line + token.start[0], "in embedded source: " + token.string) for token in tokens]
+
+
 def python_findings(source, offset=0):
-    found = []
-    for token in tokenize.generate_tokens(io.StringIO(source).readline):
-        if token.type == tokenize.COMMENT:
-            found.append((token.start[0] + offset, token.string))
+    found = [(token.start[0] + offset, token.string) for token in comment_tokens(source)]
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) \
                 and isinstance(node.value.value, str):
             found.append((node.lineno + offset, "string statement: " + node.value.value[:60]))
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str) and "\n" in node.value:
+            found += embedded_python_findings(node.value, node.lineno + offset)
     return found
 
 
