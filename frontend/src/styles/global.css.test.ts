@@ -86,6 +86,10 @@ it('stacks the queue rows below 600 px and keeps Select all on screen there', ()
   expect(below600).toMatch(/\.queue-select-all span \{\s+display: inline;/);
 });
 
+it('keeps the Menu button on the right of the main link, though it comes first in tab order', () => {
+  expect(css).toMatch(/@media \(max-width: 768px\) \{[^@]*\.sidebar-toggle \{\s+display: block;\s+order: 1;/);
+});
+
 it('hides the outline of a focused page heading only when the browser would not show a focus ring', () => {
   const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)]
     .filter(([, , body]) => /outline:\s*(none|0)/.test(body))

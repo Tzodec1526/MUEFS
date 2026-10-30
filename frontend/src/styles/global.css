@@ -1202,6 +1202,7 @@ tr.selected {
 
   .sidebar-toggle {
     display: block;
+    order: 1;
   }
 
   .main-content {

@@ -1,4 +1,4 @@
-import { useContext, useId, useState } from 'react';
+import { useContext, useEffect, useId, useRef, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { CourtContext } from '../auth/CourtSession';
 import { hasAdministrationAccess } from '../../auth/session';
@@ -16,6 +16,7 @@ function Sidebar() {
   const { court, courts, role } = useContext(CourtContext)!;
   const [open, setOpen] = useState(false);
   const listId = useId();
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const courtId = court?.court_id;
   const allLinks = [
     { path: '/', label: 'Dashboard', roles: ['attorney', 'clerk', 'srl', 'public'] },
@@ -44,8 +45,31 @@ function Sidebar() {
   const mainTask = links.filter(link => link.path === MAIN_TASK[role ?? '']);
   const ordered = [...mainTask, ...links.filter(link => !mainTask.includes(link))];
 
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      toggleRef.current?.focus();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open]);
+
   return (
     <aside className={`sidebar${open ? ' open' : ''}`}>
+      {ordered.length > 1 && (
+        <button
+          ref={toggleRef}
+          type="button"
+          className="sidebar-toggle"
+          aria-expanded={open}
+          aria-controls={listId}
+          onClick={() => setOpen(!open)}
+        >
+          {open ? 'Close menu' : 'Menu'}
+        </button>
+      )}
       <nav aria-label="Main">
         <ul id={listId}>
           {ordered.map((link) => {
@@ -65,17 +89,6 @@ function Sidebar() {
           })}
         </ul>
       </nav>
-      {ordered.length > 1 && (
-        <button
-          type="button"
-          className="sidebar-toggle"
-          aria-expanded={open}
-          aria-controls={listId}
-          onClick={() => setOpen(!open)}
-        >
-          {open ? 'Close menu' : 'Menu'}
-        </button>
-      )}
     </aside>
   );
 }
