@@ -93,6 +93,12 @@ async def test_listed_extra_audiences_are_accepted(realm, monkeypatch):
     assert await decode_keycloak_access_token(_token(_claims(aud="account")))
 
 
+async def test_a_realm_key_entry_with_private_fields_still_verifies(realm):
+    key_sets, _ = realm
+    key_sets.append({"keys": [{**json.loads(RSAAlgorithm.to_jwk(PRIVATE_KEY)), "kid": "k1"}]})
+    assert (await decode_keycloak_access_token(_token()))["sub"] == "subject-1"
+
+
 async def test_a_token_issued_through_the_browser_client_is_accepted(realm):
     claims = await decode_keycloak_access_token(_token(_claims(azp="muefs-frontend")))
     assert claims["azp"] == "muefs-frontend"

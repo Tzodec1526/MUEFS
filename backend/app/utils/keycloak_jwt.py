@@ -12,6 +12,7 @@ from typing import Any
 
 import httpx
 import jwt
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 from jwt.algorithms import RSAAlgorithm
 from jwt.exceptions import InvalidKeyError
 from jwt.exceptions import InvalidTokenError as JWTError
@@ -79,6 +80,7 @@ async def decode_keycloak_access_token(token: str) -> dict[str, Any]:
         rsa_key = RSAAlgorithm.from_jwk(json.dumps(key_dict))
     except InvalidKeyError as exc:
         raise JWTError("Token signing key is not an RSA key") from exc
+    public_key = rsa_key.public_key() if isinstance(rsa_key, RSAPrivateKey) else rsa_key
 
     issuer = f"{settings.keycloak_url.rstrip('/')}/realms/{settings.keycloak_realm}"
     decode_kwargs: dict[str, Any] = {
@@ -93,8 +95,7 @@ async def decode_keycloak_access_token(token: str) -> dict[str, Any]:
         decode_kwargs["audience"] = settings.jwt_audiences_list
 
     try:
-        # from_jwk returns a cryptography key; PyJWT accepts it at runtime.
-        claims = jwt.decode(token, rsa_key, **decode_kwargs)  # type: ignore[arg-type]
+        claims = jwt.decode(token, public_key, **decode_kwargs)
     except JWTError as exc:
         raise JWTError(str(exc)) from exc
 

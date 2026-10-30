@@ -45,6 +45,7 @@ from app.schemas.filing import (
     FilingEnvelopeUpdate,
     FilingHistoryResponse,
     FilingSubmitRequest,
+    FilingTransactionResponse,
     FilingValidationResult,
     MyFilingsResponse,
 )
@@ -433,7 +434,7 @@ async def filing_history(
     )) or 0
     return FilingHistoryResponse(
         filing_id=filing.id, status=filing.status, submission_count=filing.submission_count,
-        transactions=list(transactions),  # type: ignore[arg-type]
+        transactions=[FilingTransactionResponse.model_validate(row) for row in transactions],
         total=total, page=page, page_size=page_size,
         fee_waiver=await waiver_state(db, filing, user_id) if filing.fee_waiver_requested else None,
         filing_date=filing.filing_date, filing_date_basis=filing.filing_date_basis,

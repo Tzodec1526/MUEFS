@@ -60,7 +60,8 @@ async def list_courts(
     )
     result = await db.execute(query)
 
-    return CourtListResponse(courts=list(result.scalars().all()), total=total)  # type: ignore[arg-type]
+    courts = [CourtResponse.model_validate(court) for court in result.scalars()]
+    return CourtListResponse(courts=courts, total=total)
 
 
 @router.get("/directory", response_model=list[CourtDirectoryEntry])
