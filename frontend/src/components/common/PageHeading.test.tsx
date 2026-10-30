@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { Link, MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { afterEach, expect, it } from 'vitest';
 import PageHeading from './PageHeading';
 
@@ -46,4 +46,65 @@ it('keeps focus where the user put it when only the query string changes', async
 
   await screen.findByText('Query: ?party=Smith');
   expect(document.activeElement).toBe(link);
+});
+
+function Keyed() {
+  const location = useLocation();
+  return <Wizard key={location.key} />;
+}
+
+function Wizard() {
+  const [searchParams] = useSearchParams();
+  return <>
+    <PageHeading>New filing</PageHeading>
+    <p>Filing: {searchParams.get('filing_id') || 'unsaved'}</p>
+  </>;
+}
+
+function SaveDraft() {
+  const navigate = useNavigate();
+  return <button onClick={() => navigate('/filing/new?filing_id=5', { replace: true })}>Save draft</button>;
+}
+
+it('keeps focus where it was when a replace changes only the query string and remounts the page', async () => {
+  render(
+    <MemoryRouter initialEntries={['/drafts', '/filing/new']} initialIndex={1}>
+      <SaveDraft />
+      <Routes>
+        <Route path="/filing/new" element={<Keyed />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  const save = screen.getByRole('button', { name: 'Save draft' });
+  save.focus();
+
+  fireEvent.click(save);
+
+  await screen.findByText('Filing: 5');
+  expect(document.activeElement).toBe(save);
+});
+
+function Back() {
+  const navigate = useNavigate();
+  return <button onClick={() => navigate(-1)}>Back</button>;
+}
+
+it('focuses the heading when the user goes back to the first page of the session', async () => {
+  render(
+    <MemoryRouter initialEntries={['/drafts']}>
+      <Link to="/filings">Open filings</Link>
+      <Back />
+      <Routes>
+        <Route path="/drafts" element={<section><PageHeading>Drafts</PageHeading></section>} />
+        <Route path="/filings" element={<div><PageHeading>Filings</PageHeading></div>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole('link', { name: 'Open filings' }));
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1, name: 'Filings' })));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+
+  const heading = await screen.findByRole('heading', { level: 1, name: 'Drafts' });
+  await waitFor(() => expect(document.activeElement).toBe(heading));
 });

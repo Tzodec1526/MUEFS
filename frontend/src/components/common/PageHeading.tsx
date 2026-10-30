@@ -1,23 +1,21 @@
-import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useContext, useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { UNSAFE_NavigationContext, useLocation, type Navigator } from 'react-router-dom';
 
-let focusedNavigation: string | null = null;
+const lastNavigation = new WeakMap<Navigator, { key: string; pathname: string }>();
 
 export default function PageHeading({ children, headingRef }: {
   children: ReactNode; headingRef?: RefObject<HTMLHeadingElement>;
 }) {
   const ownRef = useRef<HTMLHeadingElement>(null);
   const ref = headingRef ?? ownRef;
+  const { navigator } = useContext(UNSAFE_NavigationContext);
   const { key, pathname } = useLocation();
-  const navigation = useRef(key);
   useEffect(() => {
-    navigation.current = key;
-  }, [key]);
-  useEffect(() => {
-    const target = navigation.current;
-    if (target === 'default' || focusedNavigation === target) return;
-    focusedNavigation = target;
+    const previous = lastNavigation.get(navigator);
+    if (previous?.key === key) return;
+    lastNavigation.set(navigator, { key, pathname });
+    if (previous ? previous.pathname === pathname : key === 'default') return;
     ref.current?.focus();
-  }, [ref, pathname]);
+  }, [navigator, ref, key, pathname]);
   return <h1 ref={ref} tabIndex={-1}>{children}</h1>;
 }
