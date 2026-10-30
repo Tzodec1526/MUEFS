@@ -228,6 +228,11 @@ throwaway instances only; the tests create and drop their own schemas and bucket
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) shows how CI starts all three.
 
+`tests/conftest.py` assigns `DATABASE_URL`, `DEBUG`, `ALLOW_DEMO_MODE` and `RATE_LIMIT_ENABLED`
+rather than defaulting them, so tests run on SQLite and local storage, and a `DATABASE_URL`
+exported for the app cannot send test uploads to a real bucket. Service-backed tests opt in
+through the `MUEFS_TEST_*` variables instead.
+
 #### Reseeding demo data
 
 Seeding runs only once. After that it skips, so a database keeps its old seed data even

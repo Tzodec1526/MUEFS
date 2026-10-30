@@ -454,6 +454,26 @@ Each hosted-demo sandbox keeps its uploads in its own folder under `DEMO_DATA_DI
 together with the sandbox. `DEMO_STORAGE_QUOTA_MB` (default 200) caps each sandbox's
 uploads, and the demo refuses uploads with HTTP 507 while less than 1 GiB of disk is free.
 
+Compose builds `backend/` and `frontend/` directly, so the root `.dockerignore` does not apply
+to those images and each directory keeps its own. They keep local environments, data, caches
+and draft work product out of the images. The frontend image installs its dependencies from
+`package-lock.json`. Inside its container the dev server listens beyond loopback, and Compose
+publishes the port on this computer only.
+
+`docker-compose.yml` is a local evaluation stack. Demo sign-in and development credentials
+are enabled, so every published port listens on this computer only. The `migrate` service
+creates the document bucket, applies migrations and seeds the demo courts and accounts once.
+Services that read the schema wait for it, and a rerun skips a seeded database. Tokens name
+the address browsers use, while the API fetches keys over the internal network and still
+requires that issuer. The ClamAV data mount must allow the official entrypoint to chown its
+database files.
+
+The Trivy image in `.github/workflows/security.yml` is a released scanner pinned by digest:
+update the version and the digest together. The images in `ci.yml` are disposable protocol
+fixtures; production storage and scanner lifecycles are deployment responsibilities. The CI
+scanner uses the image's bundled signatures, because the tests need only EICAR and the
+configured scan limits.
+
 ## Pre-launch checklist
 
 - [ ] `ALLOW_DEMO_MODE=false`, `ALLOW_PUBLIC_REGISTRATION=false`, `PAYMENTS_ARE_SIMULATED=false`, `DEBUG=false`
@@ -665,3 +685,39 @@ recognize `failure_reported`. The existing text-backed delivery-status column an
 event tables support this change without another database migration. A report records a
 court-reviewed observation; it does not adjudicate service, extend a deadline or establish
 that an alternative service method has been completed.
+
+## 16. Hosted demo on Render
+
+`render.yaml` is a Blueprint for the public demo. In Render, choose New > Blueprint and point
+it at this repository; it provisions the `muefs-demo` service. Then add the custom domain
+`demo.tomcedoz.com` in the service settings.
+
+- **Plan.** `standard` is 2 GB and always on, about $25 a month. `starter` is a cheaper 512 MB
+  box.
+- **Deploys.** `autoDeploy` is off, so a deploy is deliberate: Manual Deploy or the
+  **Deploy demo** workflow. That workflow only posts to Render's deploy hook and needs no
+  repository access. To set it up, copy the URL from Render > muefs-demo > Settings > Deploy
+  Hook, then run
+  `gh secret set RENDER_DEPLOY_HOOK_URL --body "https://api.render.com/deploy/..."`.
+- **One instance only.** The per-session sandboxes live on the instance's local disk, tracked
+  in one process's memory. Each browser session gets its own copy of a seeded template. When
+  the cap is reached, or a visitor blocks cookies, they fall back to a shared sandbox that
+  resets on restart. Clients without a cookie, such as monitors and scripts, use the shared
+  sandbox too.
+- **Visitor addresses.** Render's load balancers reach the service from private addresses.
+  Trusting them through `TRUSTED_PROXY_IPS` lets rate limits and audit records use the
+  visitor's address from `X-Forwarded-For` instead of one shared proxy address. After
+  deploying, check that the audit log's `ip_address` values differ between visitors.
+
+To run the same image locally from the repository root:
+
+```bash
+docker build -t muefs-demo .
+docker run -p 127.0.0.1:8000:8000 -e DEMO_MODE_SECRET=local-demo-only muefs-demo
+```
+
+Then open `http://localhost:8000`. Hosted deployments supply their own runtime secret. The
+image leaves `VITE_API_URL` empty so the app calls `/api/v1` on its own host, and `/config.js`
+supplies the demo secret at runtime, so the secret is never baked into an image layer. Render
+injects `$PORT`; locally it defaults to 8000. The health check calls `/ready`, which covers
+the template database and the migration version.
