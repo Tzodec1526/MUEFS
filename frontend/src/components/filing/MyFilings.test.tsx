@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
 import { listFilings, type FilingSummary } from '../../api/filings';
 import MyFilings from './MyFilings';
@@ -28,6 +28,23 @@ function serve(filings: FilingSummary[], total = filings.length, status_counts: 
 
 function open(entry = '/filings') {
   return render(<MemoryRouter initialEntries={[entry]}><MyFilings /></MemoryRouter>);
+}
+
+function HistoryControls() {
+  const navigate = useNavigate();
+  return <>
+    <button onClick={() => navigate(-1)}>Browser back</button>
+    <button onClick={() => navigate(1)}>Browser forward</button>
+  </>;
+}
+
+function openFromDashboard() {
+  return render(
+    <MemoryRouter initialEntries={['/', '/filings?status=returned']} initialIndex={1}>
+      <HistoryControls />
+      <MyFilings />
+    </MemoryRouter>,
+  );
 }
 
 const filter = () => screen.getByLabelText('Filter by status') as HTMLSelectElement;
@@ -107,6 +124,38 @@ it('lands on page 1 of each new status it moves to', async () => {
   fireEvent.change(filter(), { target: { value: 'accepted' } });
 
   await vi.waitFor(() => expect(lastRequest()).toMatchObject({ status: 'accepted', page: 1 }));
+  expect(await screen.findByText('Page 1 of 2')).toBeTruthy();
+});
+
+it('walks the status filters with Back and Forward, starting from the one the filer arrived on', async () => {
+  serve([filing(1)]);
+  openFromDashboard();
+  await screen.findByText('Case 1');
+  expect(filter().value).toBe('returned');
+
+  fireEvent.change(filter(), { target: { value: 'accepted' } });
+  await vi.waitFor(() => expect(lastRequest()).toMatchObject({ status: 'accepted' }));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Browser back' }));
+  await vi.waitFor(() => expect(lastRequest()).toMatchObject({ status: 'returned' }));
+  expect(filter().value).toBe('returned');
+
+  fireEvent.click(screen.getByRole('button', { name: 'Browser forward' }));
+  await vi.waitFor(() => expect(lastRequest()).toMatchObject({ status: 'accepted' }));
+  expect(filter().value).toBe('accepted');
+});
+
+it('lands on page 1 when Back returns to a status the filer had paged', async () => {
+  serve([filing(1)], 30);
+  openFromDashboard();
+  fireEvent.click(await screen.findByRole('button', { name: 'Next' }));
+  await screen.findByText('Page 2 of 2');
+  fireEvent.change(filter(), { target: { value: 'accepted' } });
+  await vi.waitFor(() => expect(lastRequest()).toMatchObject({ status: 'accepted', page: 1 }));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Browser back' }));
+
+  await vi.waitFor(() => expect(lastRequest()).toMatchObject({ status: 'returned', page: 1 }));
   expect(await screen.findByText('Page 1 of 2')).toBeTruthy();
 });
 

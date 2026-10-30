@@ -19,7 +19,7 @@ function MyFilings() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedStatus = searchParams.get('status') ?? '';
   const statusFilter = STATUSES.includes(requestedStatus) ? requestedStatus : '';
-  const setStatusFilter = (status: string) => setSearchParams(status ? { status } : {}, { replace: true });
+  const setStatusFilter = (status: string) => setSearchParams(status ? { status } : {});
   const [page, setPage] = useState(1);
   const [pageStatus, setPageStatus] = useState(statusFilter);
   if (pageStatus !== statusFilter) {
