@@ -85,7 +85,7 @@ def test_readiness_retries_503_and_ignores_external_proxy(monkeypatch):
     attempts = []
 
     class Handler(BaseHTTPRequestHandler):
-        def do_GET(self):  # noqa: N802 - standard-library handler API
+        def do_GET(self):
             attempts.append(self.path)
             self.send_response(200 if len(attempts) > 1 else 503)
             self.end_headers()

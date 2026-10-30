@@ -67,6 +67,7 @@ select = ["E", "F", "I", "N", "W", "UP"]
 [tool.ruff.lint.per-file-ignores]
 # Seed data carries long legal descriptions and MCR rule URLs that don't wrap cleanly.
 "app/seed_data.py" = ["E501"]
+"tests/test_demo_runner.py" = ["N802"]
 
 [tool.mypy]
 python_version = "3.11"
