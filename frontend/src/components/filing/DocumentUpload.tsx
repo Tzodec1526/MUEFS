@@ -568,7 +568,7 @@ function DocumentUpload({
             type="text"
             value={docTitle}
             onChange={(e) => setDocTitle(e.target.value)}
-            placeholder="e.g., Motion for Summary Disposition"
+            placeholder="e.g., Answer to the complaint"
           />
         </div>
         <div className="form-group">

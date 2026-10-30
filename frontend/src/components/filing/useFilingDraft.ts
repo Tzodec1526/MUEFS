@@ -12,6 +12,7 @@ export const defaultFilingData: FilingData = {
   courtId: null,
   courtName: '',
   caseId: null,
+  caseNumber: '',
   filingType: 'initial',
   caseTypeId: null,
   caseTypeName: '',

@@ -82,13 +82,13 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
         type: doc.document_type_code, size: doc.file_size_bytes, isSearchable: doc.is_text_searchable })),
     }));
   }, [setFilingData]);
-  const isMotionMode = filingData.filingType !== 'initial';
+  const existingCase = filingData.filingType !== 'initial';
   const [plainLanguage, setPlainLanguage] = useState(() =>
     (role === 'srl' && !hasPlainLanguagePreference()) || isPlainLanguageMode());
   useEffect(() => {
     if (role === 'srl' && !hasPlainLanguagePreference()) setPlainLanguageMode(true);
   }, [role]);
-  const captionMissing = isMotionMode && !filingData.caseTitle.trim();
+  const captionMissing = existingCase && !filingData.caseTitle.trim();
   const {
     currentStep, setCurrentStep, errors, setErrors, steps, currentStepIndex, detailsStepIndex, goNext, goBack, goToStep,
   } = useWizardSteps({ draft, filingData, plainLanguage, destinationLocked, captionMissing, saveDetails });
@@ -110,9 +110,14 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
         setLoadError(null);
         try {
           const envelope = await getFiling(Number(filingId), controller.signal);
-          const [court, types] = await Promise.all([
+          const [court, types, linkedCase] = await Promise.all([
             getCourt(envelope.court_id),
             getCaseTypes(envelope.court_id, true), // Preserve disabled case-type labels on saved records.
+            envelope.case_id ? getCase(envelope.case_id).catch((err: unknown) => {
+              const message = !controller.signal.aborted && actionErrorMessage(err, 'Could not load the case number.');
+              if (message) emitToast(message, 'error');
+              return null;
+            }) : null,
           ]);
           if (controller.signal.aborted) return;
           const caseType = types.find((type) => type.id === envelope.case_type_id);
@@ -132,6 +137,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
             courtId: envelope.court_id,
             courtName: court.name,
             caseId: envelope.case_id,
+            caseNumber: linkedCase?.case_number ?? '',
             caseTypeId: envelope.case_type_id,
             caseTypeName: caseType?.name || '',
             filingType,
@@ -189,6 +195,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
         courtName: court.name,
         caseTypeName: types.find(t => t.id === prev.caseTypeId)?.name || prev.caseTypeName,
         caseTitle: docket && prev.caseId === docket.id ? docket.title : prev.caseTitle,
+        caseNumber: docket && prev.caseId === docket.id ? docket.case_number : prev.caseNumber,
       });
       setCaseLookupError(failure ?? null);
     });
@@ -335,34 +342,29 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
   return (
     <div className="filing-wizard">
       <div className="wizard-header">
-        <PageHeading>
-          {loadedFiling ? `Continue Filing #${loadedFiling.id}` : isMotionMode
-            ? plainLanguage
-              ? 'File papers in an existing case'
-              : 'File a Motion'
-            : plainLanguage
-              ? 'Start a new court filing'
-              : 'New E-Filing'}
-        </PageHeading>
-        <div className="wizard-header-badges">
-          <label className="srl-plain-toggle">
-            <input
-              type="checkbox"
-              checked={plainLanguage}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                setPlainLanguage(e.target.checked);
-                setPlainLanguageMode(e.target.checked);
-              }}
-            />
-            Plain-language guidance
-          </label>
-          {isMotionMode && filingData.caseId && (
-            <span className="motion-badge">Motion to Case #{filingData.caseId}</span>
-          )}
-          {filingData.filingId && (
-            <span className="filing-id-badge">Filing #{filingData.filingId}</span>
-          )}
+        <div>
+          <PageHeading>
+            {loadedFiling ? `Continue Filing #${loadedFiling.id}` : existingCase
+              ? plainLanguage
+                ? 'File papers in an existing case'
+                : 'File in an existing case'
+              : plainLanguage
+                ? 'Start a new court filing'
+                : 'New E-Filing'}
+          </PageHeading>
+          {existingCase && filingData.caseNumber && <p className="wizard-case-number">Case {filingData.caseNumber}</p>}
         </div>
+        <label className="srl-plain-toggle">
+          <input
+            type="checkbox"
+            checked={plainLanguage}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              setPlainLanguage(e.target.checked);
+              setPlainLanguageMode(e.target.checked);
+            }}
+          />
+          Plain-language guidance
+        </label>
       </div>
 
       {/* Draft Recovery Banner */}
@@ -441,7 +443,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
               updateData({
                 courtId, courtName,
                 caseTypeId: null, caseTypeName: '',
-                caseId: null, caseTitle: '', caseChoiceMade: false, filingType: 'initial',
+                caseId: null, caseNumber: '', caseTitle: '', caseChoiceMade: false, filingType: 'initial',
               });
             }}
           />
@@ -460,6 +462,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
             onSelectExisting={(c: CaseResult, caseTypeName: string) => {
               updateData({
                 caseId: c.id,
+                caseNumber: c.case_number,
                 caseTypeId: c.case_type_id,
                 caseTypeName,
                 caseTitle: c.title,
@@ -470,6 +473,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
             onSelectNew={() => {
               updateData({
                 caseId: null,
+                caseNumber: '',
                 caseTitle: '',
                 caseTypeId: null,
                 caseTypeName: '',
@@ -493,7 +497,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
         {currentStep === 'details' && (
           <DetailsStep
             filingData={filingData}
-            isMotionMode={isMotionMode}
+            existingCase={existingCase}
             captionMissing={captionMissing}
             caseLookupError={caseLookupError}
             retryCaseLookup={retryCaseLookup}

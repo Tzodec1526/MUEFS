@@ -1260,15 +1260,19 @@ tr.selected {
 /* Wizard Header */
 .wizard-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem 1rem;
   margin-bottom: 1rem;
 }
 
-.filing-id-badge {
+.wizard-header h1 {
+  margin-bottom: 0;
+}
+
+.wizard-case-number {
   color: var(--muted);
-  font-size: 0.85rem;
-  font-weight: 600;
 }
 
 /* Filing Summary Bar */
@@ -2199,12 +2203,6 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
   color: var(--ink);
 }
 
-/* Motion badge */
-.wizard-header-badges {
-  display: flex;
-  gap: 0.5rem;
-}
-
 /* Court Rules Reference */
 .court-rules-reference {
   margin-top: 1.5rem;
@@ -2330,27 +2328,9 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 }
 .case-choice-card h4 { margin: 0.5rem 0 0.25rem; }
 .case-choice-card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
-.case-choice-icon { font-size: 1.5rem; line-height: 1; }
 .case-search-inline { margin-top: 0.5rem; }
 .form-group-grow { flex: 1; }
 .case-results .selected-row { background: var(--tint); }
-
-.motion-case-info {
-  background: var(--info-tint);
-  border-radius: var(--radius);
-  padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
-}
-
-.motion-badge {
-  background: var(--info-tint);
-  color: var(--accent);
-  padding: 0.2rem 0.6rem;
-  border-radius: var(--radius);
-  font-size: 0.78rem;
-  font-weight: 600;
-}
 
 @media (max-width: 768px) {
   .case-detail-grid { grid-template-columns: 1fr; }

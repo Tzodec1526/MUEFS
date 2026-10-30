@@ -34,7 +34,7 @@ it("carries an existing case's type name even after the court closed that type t
     onChooseExisting={vi.fn()} onSelectExisting={onSelectExisting} onSelectNew={vi.fn()} />);
   await waitFor(() => expect(getCaseTypes).toHaveBeenCalled());
 
-  fireEvent.click(screen.getByRole('button', { name: /File into an existing case/ }));
+  fireEvent.click(screen.getByRole('button', { name: /File in an existing case/ }));
   fireEvent.change(screen.getByLabelText('Case number or party name'), { target: { value: 'Smith' } });
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Select' }));

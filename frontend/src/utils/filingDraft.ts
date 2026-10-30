@@ -5,6 +5,7 @@ export interface FilingDraft {
   courtId: number | null;
   courtName: string;
   caseId: number | null;
+  caseNumber?: string;
   filingType: 'initial' | 'subsequent' | 'service_only';
   caseTypeId: number | null;
   caseTypeName: string;
@@ -32,6 +33,7 @@ export function loadFilingDraft(key: string): FilingDraft | null {
       || !['courtId', 'caseId', 'caseTypeId', 'filingId'].every(field =>
         draft[field] === null || (Number.isSafeInteger(draft[field]) && draft[field] > 0))
       || !['courtName', 'caseTypeName', 'caseTitle', 'filingDescription'].every(field => typeof draft[field] === 'string')
+      || !(draft.caseNumber === undefined || typeof draft.caseNumber === 'string')
       || typeof draft.caseChoiceMade !== 'boolean'
       || !(draft.creationKey === undefined || (typeof draft.creationKey === 'string'
         && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(draft.creationKey)))
@@ -43,7 +45,7 @@ export function loadFilingDraft(key: string): FilingDraft | null {
 export function saveFilingDraft(key: string, data: FilingDraft): boolean {
   try {
     const draft: FilingDraft = {
-      courtId: data.courtId, courtName: data.courtName, caseId: data.caseId,
+      courtId: data.courtId, courtName: data.courtName, caseId: data.caseId, caseNumber: data.caseNumber,
       filingType: data.filingType, caseTypeId: data.caseTypeId, caseTypeName: data.caseTypeName,
       caseTitle: data.caseTitle, filingDescription: data.filingDescription,
       filingId: data.filingId, detailsToken: data.detailsToken,

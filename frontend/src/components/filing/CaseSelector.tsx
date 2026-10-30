@@ -99,8 +99,7 @@ function CaseSelector({
           onClick={() => { setMode('existing'); onChooseExisting(); }}
           aria-pressed={mode === 'existing'}
         >
-          <div className="case-choice-icon">&#128269;</div>
-          <h4>File into an existing case</h4>
+          <h4>File in an existing case</h4>
           <p>Search by case number or party name in {courtName || 'this court'}.</p>
         </button>
         <button
@@ -109,7 +108,6 @@ function CaseSelector({
           onClick={() => { setMode('new'); if (!isNewChosen) onSelectNew(); }}
           aria-pressed={mode === 'new'}
         >
-          <div className="case-choice-icon">+</div>
           <h4>Start a new case</h4>
           <p>Initiate a new matter, e.g. a complaint or petition.</p>
         </button>

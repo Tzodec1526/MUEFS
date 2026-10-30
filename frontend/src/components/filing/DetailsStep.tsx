@@ -4,7 +4,7 @@ import LoadError from '../common/LoadError';
 
 interface DetailsStepProps {
   filingData: Pick<FilingDraft, 'filingType' | 'caseTitle' | 'filingDescription'>;
-  isMotionMode: boolean;
+  existingCase: boolean;
   captionMissing: boolean;
   caseLookupError: LoadFailure | null;
   retryCaseLookup: () => void;
@@ -14,24 +14,18 @@ interface DetailsStepProps {
 }
 
 function DetailsStep({
-  filingData, isMotionMode, captionMissing, caseLookupError, retryCaseLookup, destinationLocked, saving, updateData,
+  filingData, existingCase, captionMissing, caseLookupError, retryCaseLookup, destinationLocked, saving, updateData,
 }: DetailsStepProps) {
   return (
     <div className="form-section">
-      <h3>{isMotionMode ? 'Motion Details' : 'Case Details'}</h3>
+      <h3>{existingCase ? 'Filing Details' : 'Case Details'}</h3>
 
       {captionMissing && caseLookupError && (
         <LoadError failure={{ ...caseLookupError, message: `${caseLookupError.message} Retry, or go Back to choose the case.` }}
           onRetry={retryCaseLookup} />
       )}
 
-      {isMotionMode && filingData.caseTitle && (
-        <div className="motion-case-info">
-          <strong>Filing motion to:</strong> {filingData.caseTitle}
-        </div>
-      )}
-
-      {isMotionMode && (
+      {existingCase && (
         <fieldset className="form-group filing-type-fieldset">
           <legend>Filing Type <span className="required-marker">*</span></legend>
           <div className="filing-type-options">
@@ -70,8 +64,8 @@ function DetailsStep({
       <p className="info-text">
         {filingData.filingType === 'service_only'
           ? 'Describe the documents you are recording. You must arrange delivery to the other parties outside this app.'
-          : isMotionMode
-          ? 'Describe your motion. The case title is pre-filled from the existing case.'
+          : existingCase
+          ? 'Describe your filing. The case title is pre-filled from the existing case.'
           : <>Enter the case information. Fields marked with <span className="required-marker">*</span> are required.</>
         }
       </p>
@@ -87,10 +81,10 @@ function DetailsStep({
           onChange={(e) => updateData({ caseTitle: e.target.value })}
           placeholder="e.g., Smith v. Jones"
           aria-required="true"
-          readOnly={isMotionMode}
-          autoFocus={!isMotionMode}
+          readOnly={existingCase}
+          autoFocus={!existingCase}
         />
-        {!isMotionMode && (
+        {!existingCase && (
           <span className="field-hint">
             Format: Plaintiff name v. Defendant name (e.g., &quot;Smith v. Jones&quot;)
           </span>
@@ -98,7 +92,7 @@ function DetailsStep({
       </div>
       <div className="form-group">
         <label htmlFor="filingDesc">
-          {filingData.filingType === 'service_only' ? 'Service Description' : isMotionMode ? 'Motion Description' : 'Filing Description'} <span className="required-marker">*</span>
+          {filingData.filingType === 'service_only' ? 'Service Description' : 'Filing Description'} <span className="required-marker">*</span>
         </label>
         <textarea
           id="filingDesc"
@@ -107,11 +101,11 @@ function DetailsStep({
           onChange={(e) => updateData({ filingDescription: e.target.value })}
           placeholder={filingData.filingType === 'service_only'
             ? "e.g., Plaintiff's First Set of Interrogatories (MCR 2.309)"
-            : isMotionMode
-            ? "e.g., Motion for Summary Disposition under MCR 2.116(C)(10)"
+            : existingCase
+            ? 'e.g., Answer to the complaint'
             : "Brief description of this filing (e.g., Initial complaint for breach of contract)..."
           }
-          autoFocus={isMotionMode}
+          autoFocus={existingCase}
           rows={4}
         />
       </div>

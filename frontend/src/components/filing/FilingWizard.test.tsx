@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { Link, MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AxiosError, type AxiosResponse } from 'axios';
-import { getCase, type CaseDocket } from '../../api/cases';
+import { getCase, searchCases, type CaseDocket, type CaseSearchResult } from '../../api/cases';
 import {
   getCaseTypes, getCourt, getFilingRequirements, listCourts, type CaseType, type Court,
 } from '../../api/courts';
@@ -34,7 +34,7 @@ vi.mock('../../api/documents', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../api/documents')>(), getFilingFees: vi.fn(),
 }));
 vi.mock('../../api/cases', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../../api/cases')>(), getCase: vi.fn(),
+  ...await importOriginal<typeof import('../../api/cases')>(), getCase: vi.fn(), searchCases: vi.fn(),
 }));
 
 const FORGED_LINK = '/filing/new?case_id=42&court_id=3&case_type_id=11&case_title=Forged';
@@ -94,7 +94,7 @@ it("captions the filing with the court's case record, not the title in the link"
 
   await waitFor(() => expect(caption().value).toBe('Smith v. Jones'));
   expect(getCase).toHaveBeenCalledWith(42);
-  expect(screen.getByText('Filing motion to:').parentElement?.textContent).toBe('Filing motion to: Smith v. Jones');
+  expect(screen.getByText('Case:').parentElement?.textContent).toBe('Case: Smith v. Jones');
   expect(screen.queryByText(/Forged/)).toBeNull();
 });
 
@@ -137,6 +137,66 @@ it("names the existing case's type even after the court closed that type to new 
   expect(await screen.findByText('General Civil')).toBeTruthy();
 });
 
+it('heads a filing in an existing case with its case number and does not call it a motion', async () => {
+  vi.mocked(getCase).mockResolvedValue(docket);
+  openWizard(CASE_LINK);
+
+  expect(await screen.findByText('Case 2026-000042-CZ')).toBeTruthy();
+  expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('File in an existing case');
+  expect(document.body.textContent).not.toMatch(/motion/i);
+  expect((screen.getByRole('textbox', { name: /Filing Description/ }) as HTMLTextAreaElement).placeholder).not.toMatch(/motion/i);
+});
+
+async function pickExistingCase() {
+  const found = { id: 42, case_number: '2026-000042-CZ', title: 'Smith v. Jones', case_type_id: 11, status: 'open' } as CaseSearchResult;
+  vi.mocked(searchCases).mockResolvedValue({ cases: [found], total: 1, page: 1, page_size: 25 });
+  fireEvent.click(await screen.findByRole('button', { name: /File in an existing case/ }));
+  fireEvent.change(screen.getByLabelText('Case number or party name'), { target: { value: 'Smith' } });
+  fireEvent.click(button('Search'));
+  fireEvent.click(await screen.findByRole('button', { name: 'Select' }));
+}
+
+it('takes the case number from the case the filer picks', async () => {
+  serveCourtsAndTypes();
+  openWizard('/filing/new?court_id=3');
+  await pickExistingCase();
+
+  fireEvent.click(button('Continue'));
+
+  await screen.findByRole('heading', { name: 'Filing Details' });
+  expect(screen.getByText('Case 2026-000042-CZ')).toBeTruthy();
+});
+
+it('forgets the case number when the filer switches to a new case', async () => {
+  serveCourtsAndTypes();
+  openWizard('/filing/new?court_id=3');
+  await pickExistingCase();
+  await screen.findByText('Case 2026-000042-CZ');
+
+  fireEvent.click(screen.getByRole('button', { name: /Start a new case/ }));
+
+  expect(screen.queryByText('Case 2026-000042-CZ')).toBeNull();
+});
+
+it('shows the case number of a saved filing in an existing case', async () => {
+  vi.mocked(getFiling).mockResolvedValue(savedFiling({ case_id: 42, filing_type: 'subsequent' }));
+  vi.mocked(getCase).mockResolvedValue(docket);
+  openWizard('/filing/new?filing_id=7&step=details');
+
+  expect(await screen.findByText('Case 2026-000042-CZ')).toBeTruthy();
+  expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Continue Filing #7');
+});
+
+it('reports once that the case number of a saved filing could not load, and still opens the filing', async () => {
+  vi.mocked(getFiling).mockResolvedValue(savedFiling({ case_id: 42, filing_type: 'subsequent' }));
+  vi.mocked(getCase).mockRejectedValue(new Error('Network Error'));
+  openWizard('/filing/new?filing_id=7&step=details');
+
+  expect(await screen.findAllByText('Could not load the case number.')).toHaveLength(1);
+  expect(caption().value).toBe('Doe v. Roe');
+  expect(screen.queryByText(/^Case \d/)).toBeNull();
+});
+
 it('groups the File with Court and Service Only choices as one named radio group', async () => {
   vi.mocked(getCase).mockResolvedValue(docket);
   openWizard(CASE_LINK);
@@ -156,7 +216,7 @@ it("keeps a self-represented filer's choice to turn plain-language guidance off"
   expect(guidance().checked).toBe(true);
   fireEvent.click(guidance());
   expect(guidance().checked).toBe(false);
-  await screen.findByText('Filing motion to:');
+  await screen.findByText('Smith v. Jones');
   first.unmount();
 
   openWizard(CASE_LINK);
