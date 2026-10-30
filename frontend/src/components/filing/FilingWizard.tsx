@@ -2,10 +2,7 @@ import { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { CourtContext } from '../auth/CourtSession';
-import {
-  filingDraftKey, loadFilingDraft, saveFilingDraft, clearFilingDraft, loadLegacyFilingDraft,
-  type FilingDraft,
-} from '../../utils/filingDraft';
+import { filingDraftKey, saveFilingDraft, clearFilingDraft, loadLegacyFilingDraft } from '../../utils/filingDraft';
 import CourtSelector from './CourtSelector';
 import CaseSelector, { CaseResult } from './CaseSelector';
 import CaseTypeSelector from './CaseTypeSelector';
@@ -14,6 +11,7 @@ import FilingReview from './FilingReview';
 import WizardStepper from './WizardStepper';
 import DraftConflict from './DraftConflict';
 import DetailsStep from './DetailsStep';
+import { defaultFilingData, useFilingDraft, type FilingData } from './useFilingDraft';
 import { emitToast } from '../../utils/toastBus';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { createFiling, getFiling, updateFiling, type FilingEnvelope } from '../../api/filings';
@@ -33,10 +31,6 @@ import PageLoadError from '../common/PageLoadError';
 const CASE_LOOKUP_FAILED = "We couldn't load the court's record for this case, so its title is missing.";
 
 type WizardStep = 'court' | 'case' | 'case-type' | 'details' | 'documents' | 'review';
-
-interface FilingData extends FilingDraft {
-  documents: Array<{ id: number; title: string; type: string; size: number; isSearchable: boolean }>;
-}
 
 // Steps adapt to the filing: a new case adds Case Type + Case Details; filing into an
 // existing case skips Case Type (it's known from the case).
@@ -68,21 +62,6 @@ const CAPTION_MISSING_ERROR = {
   standard: "The case title comes from the court's case record, which has not loaded. Retry loading it, or go Back to choose the case.",
 };
 
-const defaultFilingData: FilingData = {
-  courtId: null,
-  courtName: '',
-  caseId: null,
-  filingType: 'initial',
-  caseTypeId: null,
-  caseTypeName: '',
-  caseTitle: '',
-  filingDescription: '',
-  filingId: null,
-  detailsToken: null,
-  documents: [],
-  caseChoiceMade: false,
-};
-
 function FilingWizard() {
   const { userId, role, loading, error, refresh } = useContext(CourtContext)!;
   if (loading) return <p role="status">Loading your filing workspace…</p>;
@@ -100,43 +79,28 @@ function FilingWorkspaceUnavailable({ failure, onRetry }: { failure: LoadFailure
 function FilingForm({ userId, role }: { userId: number; role: string | null }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedFilingId = searchParams.get('filing_id');
-  const draftKey = filingDraftKey(userId, requestedFilingId || `new:${searchParams.toString()}`);
-  const [draft] = useState(() => loadFilingDraft(draftKey));
-  const [filingData, setFilingData] = useState<FilingData>(() => {
-    if (draft || requestedFilingId) return { ...defaultFilingData, ...draft };
-    const courtId = searchParams.get('court_id');
-    if (!courtId) return defaultFilingData;
-    const caseId = searchParams.get('case_id');
-    const caseTypeId = searchParams.get('case_type_id');
-    if (!caseId || !caseTypeId) return { ...defaultFilingData, courtId: Number(courtId) };
-    const serviceOnly = searchParams.get('service_only') === 'true';
-    return {
-      ...defaultFilingData,
-      courtId: Number(courtId),
-      caseId: Number(caseId),
-      caseTypeId: Number(caseTypeId),
-      filingType: serviceOnly ? 'service_only' : 'subsequent',
-      caseChoiceMade: true,
-    };
+  const [loadedFiling, setLoadedFiling] = useState<FilingEnvelope | null>(null);
+  const readOnly = loadedFiling !== null && !['draft', 'returned'].includes(loadedFiling.status);
+  const [loadingExisting, setLoadingExisting] = useState(Boolean(requestedFilingId));
+  const [loadError, setLoadError] = useState<LoadFailure | null>(null);
+  const [submission, setSubmission] = useState<FilingEnvelope>();
+  const {
+    draftKey, draft, filingData, setFilingData, dirty, recoveryAvailable, setRecoveryAvailable,
+  } = useFilingDraft(userId, searchParams, {
+    loadedFiling, submission, paused: loadingExisting || Boolean(loadError) || readOnly || Boolean(submission),
   });
   const [currentStep, setCurrentStep] = useState<WizardStep>(() =>
     draft?.creationKey ? 'details' : draft ? 'court' : filingData.caseId ? 'details' : filingData.courtId ? 'case' : 'court'
   );
   const [showDraftBanner, setShowDraftBanner] = useState(!!draft);
   const [saving, setSaving] = useState(false);
-  const [loadedFiling, setLoadedFiling] = useState<FilingEnvelope | null>(null);
-  const readOnly = loadedFiling !== null && !['draft', 'returned'].includes(loadedFiling.status);
-  const [loadingExisting, setLoadingExisting] = useState(Boolean(requestedFilingId));
-  const [loadError, setLoadError] = useState<LoadFailure | null>(null);
   usePageTitle(loadError ? `Filing #${requestedFilingId} not loaded` : requestedFilingId ? `Filing #${requestedFilingId}` : 'New filing');
   const [reloadKey, setReloadKey] = useState(0);
-  const [submission, setSubmission] = useState<FilingEnvelope>();
   const [errors, setErrors] = useState<string[]>([]);
   const [saveError, setSaveError] = useState('');
   const conflictHeading = useRef<HTMLHeadingElement>(null);
   const [conflict, setConflict] = useState<FilingEnvelope | null>(null);
   const [saveNotice, setSaveNotice] = useState('');
-  const [recoveryAvailable, setRecoveryAvailable] = useState(true);
   const [creationConflictId, setCreationConflictId] = useState<number | null>(null);
   const destinationLocked = filingData.filingId !== null || Boolean(filingData.creationKey);
   const mounted = useRef(true);
@@ -144,10 +108,6 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
     mounted.current = true;
     return () => { mounted.current = false; };
   }, []);
-  const dirty = !submission && (filingData.filingId
-    ? loadedFiling !== null && (filingData.caseTitle !== (loadedFiling.case_title ?? '')
-      || filingData.filingDescription !== (loadedFiling.filing_description ?? ''))
-    : filingData.courtId !== null);
   const handleFeesChange = useCallback((filing: FilingEnvelope) => {
     setFilingData(prev => ({ ...prev,
       detailsToken: prev.caseTitle === (filing.case_title ?? '')
@@ -156,7 +116,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
       documents: filing.documents.map(doc => ({ id: doc.id, title: doc.title,
         type: doc.document_type_code, size: doc.file_size_bytes, isSearchable: doc.is_text_searchable })),
     }));
-  }, []);
+  }, [setFilingData]);
   const isMotionMode = filingData.filingType !== 'initial';
   const [plainLanguage, setPlainLanguage] = useState(() =>
     (role === 'srl' && !hasPlainLanguagePreference()) || isPlainLanguageMode());
@@ -259,7 +219,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
       setCaseLookupError(failure ?? null);
     });
     return () => { active = false; };
-  }, [searchParams, requestedFilingId, draft, reloadKey, userId]);
+  }, [searchParams, requestedFilingId, draft, reloadKey, userId, setFilingData]);
 
   const steps = buildSteps(filingData.filingType).map((s) => ({
     ...s,
@@ -273,26 +233,6 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
     setErrors([]);
     setFilingData((prev) => ({ ...prev, ...updates }));
   };
-
-  useEffect(() => {
-    if (loadingExisting || loadError || readOnly || submission) return;
-    if (dirty) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- expose whether external recovery storage accepted the current edit
-      setRecoveryAvailable(saveFilingDraft(draftKey, filingData));
-    } else {
-      clearFilingDraft(draftKey);
-    }
-  }, [draftKey, filingData, dirty, loadingExisting, loadError, readOnly, submission]);
-
-  useEffect(() => {
-    if (!dirty) return;
-    const warnBeforeClose = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', warnBeforeClose);
-    return () => window.removeEventListener('beforeunload', warnBeforeClose);
-  }, [dirty]);
 
   async function saveDetails(advance = false): Promise<boolean> {
     if (conflict || !filingData.caseTitle.trim()) return false;
