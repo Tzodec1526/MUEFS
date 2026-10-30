@@ -62,6 +62,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
   usePageTitle(loadError ? `Filing #${requestedFilingId} not loaded` : requestedFilingId ? `Filing #${requestedFilingId}` : 'New filing');
   const [reloadKey, setReloadKey] = useState(0);
   const [saveError, setSaveError] = useState('');
+  const saveErrorBox = useRef<HTMLDivElement>(null);
   const conflictHeading = useRef<HTMLHeadingElement>(null);
   const [conflict, setConflict] = useState<FilingEnvelope | null>(null);
   const [saveNotice, setSaveNotice] = useState('');
@@ -91,6 +92,11 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
   const {
     currentStep, setCurrentStep, errors, setErrors, steps, currentStepIndex, detailsStepIndex, goNext, goBack, goToStep,
   } = useWizardSteps({ draft, filingData, plainLanguage, destinationLocked, captionMissing, saveDetails });
+  const [saveErrorStep, setSaveErrorStep] = useState(currentStep);
+  if (saveErrorStep !== currentStep) {
+    setSaveErrorStep(currentStep);
+    setSaveError('');
+  }
   // Why a case-linked filing has no caption yet: the court's case record did not load.
   const [caseLookupError, setCaseLookupError] = useState<LoadFailure | null>(null);
 
@@ -303,6 +309,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
   };
 
   useEffect(() => { conflictHeading.current?.focus(); }, [conflict]);
+  useEffect(() => { if (saveError) saveErrorBox.current?.focus(); }, [saveError]);
 
   const conflictView = conflict && <DraftConflict conflict={conflict} edits={filingData}
     headingRef={conflictHeading} onResolve={resolveConflict} />;
@@ -377,7 +384,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
       {filingData.creationKey && !filingData.filingId && <p role="note">
         If the earlier save succeeded, retrying will reopen that filing.
       </p>}
-      {dirty && !conflict && <p role="status">Unsaved changes. Use Save draft or Continue to save them to your account.</p>}
+      {dirty && !conflict && currentStep === 'details' && <p>Unsaved changes. Use Save draft or Continue to save them to your account.</p>}
       {!recoveryAvailable && dirty && <p className="alert alert-warning" role="alert">
         This browser could not keep a recovery copy. Keep this page open and save your draft.
       </p>}
@@ -417,7 +424,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
 
       {/* Validation Errors */}
       {(errors.length > 0 || saveError) && (
-        <div className="alert alert-error" role="alert">
+        <div className="alert alert-error" role="alert" ref={saveErrorBox} tabIndex={-1}>
           {errors.map((e, i) => <p key={i}>{e}</p>)}
           {saveError && <p>{saveError}</p>}
         </div>

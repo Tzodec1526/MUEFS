@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { Link, MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { getCase, type CaseDocket } from '../../api/cases';
@@ -301,6 +301,97 @@ it('keeps a failed save on screen while the filer edits, until the next save att
   vi.mocked(createFiling).mockReturnValueOnce(new Promise(() => {}));
   fireEvent.click(button('Save draft'));
   await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+});
+
+it('moves focus to the error after a failed save', async () => {
+  vi.mocked(getFiling).mockResolvedValue(savedFiling());
+  vi.mocked(updateFiling).mockRejectedValueOnce({ response: { status: 429, data: {} } });
+  openWizard('/filing/new?filing_id=7&step=details');
+  await waitFor(() => expect(caption().value).toBe('Doe v. Roe'));
+  fireEvent.change(caption(), { target: { value: 'Doe v. Roe, amended' } });
+
+  fireEvent.click(button('Save draft'));
+
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toBe('Too many requests. Please wait a moment and try again.');
+  expect(document.activeElement).toBe(alert);
+});
+
+it('keeps focus where it is when a step error appears', async () => {
+  serveCourtsAndTypes();
+  openWizard('/filing/new');
+  const next = button('Continue');
+  next.focus();
+
+  fireEvent.click(next);
+
+  await stepError('Please select a court to continue.');
+  expect(document.activeElement).toBe(next);
+});
+
+it('keeps a save failure on its own step until the filer leaves that step', async () => {
+  vi.mocked(getFiling).mockResolvedValue(savedFiling());
+  vi.mocked(getFilingRequirements).mockResolvedValue([]);
+  vi.mocked(updateFiling).mockRejectedValueOnce({ response: { status: 429, data: {} } });
+  render(
+    <ToastProvider>
+      <MemoryRouter initialEntries={['/filing/new?filing_id=7&step=details']}>
+        <Link to="/filing/new?filing_id=7">Open the documents step</Link>
+        <CourtContext.Provider value={{
+          userId: 1, role: 'attorney', courts: [], court: undefined, loading: false, selectCourt: () => {}, refresh: () => {},
+        }}>
+          <FilingWizard />
+        </CourtContext.Provider>
+      </MemoryRouter>
+    </ToastProvider>,
+  );
+  await waitFor(() => expect(caption().value).toBe('Doe v. Roe'));
+  fireEvent.change(caption(), { target: { value: 'Doe v. Roe, amended' } });
+  fireEvent.click(button('Save draft'));
+  await screen.findByRole('alert');
+
+  fireEvent.click(stepButton('Case Details'));
+  expect(screen.getByRole('alert').textContent).toBe('Too many requests. Please wait a moment and try again.');
+
+  fireEvent.click(screen.getByRole('link', { name: 'Open the documents step' }));
+
+  await screen.findByRole('heading', { name: 'Upload Documents' });
+  expect(screen.queryByRole('alert')).toBeNull();
+
+  fireEvent.click(button('Back'));
+
+  await waitFor(() => expect(caption().value).toBe('Doe v. Roe'));
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
+it('offers no way off the details step while a first save has failed', async () => {
+  serveCourtsAndTypes();
+  vi.mocked(createFiling).mockRejectedValueOnce({ response: { status: 429, data: {} } });
+  openWizard('/filing/new?court_id=3');
+  await chooseNewCaseAndType();
+  fireEvent.change(caption(), { target: { value: 'Doe v. Roe' } });
+
+  fireEvent.click(button('Save draft'));
+  await screen.findByRole('alert');
+
+  expect([button('Back').disabled, stepButton('Case Type & Rules').disabled]).toEqual([true, true]);
+});
+
+it('shows the unsaved-changes note only on the step that can save, and does not announce it', async () => {
+  serveCourtsAndTypes();
+  openWizard('/filing/new?court_id=3');
+  await screen.findByRole('heading', { name: 'Existing case or new case?' });
+  expect(screen.queryByText(/Unsaved changes/)).toBeNull();
+
+  await chooseNewCaseAndType();
+
+  expect(screen.getByText(/Unsaved changes/).closest('[role],[aria-live]')).toBeNull();
+  expect(button('Save draft')).toBeTruthy();
+
+  fireEvent.click(button('Back'));
+
+  await screen.findByRole('heading', { name: 'Select Case Type & Review Requirements' });
+  expect(screen.queryByText(/Unsaved changes/)).toBeNull();
 });
 
 it('returns to a completed step from the progress bar, and back one step with Back', async () => {
