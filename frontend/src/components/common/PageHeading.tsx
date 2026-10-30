@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react';
 import { useLocation, useNavigationType, type NavigationType } from 'react-router-dom';
 
 interface HeadingMemory {
@@ -9,7 +9,7 @@ interface HeadingMemory {
 
 type ClaimFocus = (key: string, pathname: string, navigationType: NavigationType) => boolean;
 
-const HeadingFocusContext = createContext<ClaimFocus | null>(null);
+const HeadingFocusContext = createContext<{ claimFocus: ClaimFocus; focusNextHeading: () => void } | null>(null);
 
 function recordNavigation(memory: HeadingMemory, key: string, pathname: string, navigationType: NavigationType, heading: boolean) {
   if (memory.last?.key === key || (!memory.last && !heading)) return;
@@ -32,7 +32,17 @@ export function HeadingFocusScope({ children }: { children: ReactNode }) {
     state.focusedKey = headingKey;
     return true;
   }, []);
-  return <HeadingFocusContext.Provider value={claimFocus}>{children}</HeadingFocusContext.Provider>;
+  const focusNextHeading = useCallback(() => {
+    const state = memory.current;
+    state.focusKey = state.last?.key;
+    state.focusedKey = undefined;
+  }, []);
+  const value = useMemo(() => ({ claimFocus, focusNextHeading }), [claimFocus, focusNextHeading]);
+  return <HeadingFocusContext.Provider value={value}>{children}</HeadingFocusContext.Provider>;
+}
+
+export function useFocusNextHeading(): (() => void) | undefined {
+  return useContext(HeadingFocusContext)?.focusNextHeading;
 }
 
 export default function PageHeading({ children, headingRef }: {
@@ -40,7 +50,7 @@ export default function PageHeading({ children, headingRef }: {
 }) {
   const ownRef = useRef<HTMLHeadingElement>(null);
   const ref = headingRef ?? ownRef;
-  const claimFocus = useContext(HeadingFocusContext);
+  const claimFocus = useContext(HeadingFocusContext)?.claimFocus;
   const { key, pathname } = useLocation();
   const navigationType = useNavigationType();
   useEffect(() => {

@@ -1,12 +1,23 @@
 import { useContext, useState } from 'react';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi, type Mock } from 'vitest';
+import { apiClient } from '../../api/client';
 import type { LoadFailure } from '../../utils/errors';
 import PageHeading, { HeadingFocusScope } from '../common/PageHeading';
-import { CourtContext, CourtWorkspace, StaffCourtSelect } from './CourtSession';
+import { CourtContext, CourtSession, CourtWorkspace, StaffCourtSelect } from './CourtSession';
 
-afterEach(cleanup);
+vi.mock('../../api/client', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../api/client')>(), apiClient: { get: vi.fn() },
+}));
+
+const getProfile = apiClient.get as unknown as Mock<() => Promise<{ data: unknown }>>;
+
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+  vi.resetAllMocks();
+});
 
 const courts = [
   { court_id: 3, role: 'clerk', court_name: 'Wayne Circuit' },
@@ -99,6 +110,96 @@ it('still moves focus to the court page heading after a navigation that waited o
   fireEvent.click(screen.getByRole('button', { name: 'Assignments loaded' }));
 
   expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1, name: 'Review queue' }));
+});
+
+const staffProfile = { data: {
+  id: 2, user_type: 'clerk', court_assignments: [{ court_id: 3, role: 'clerk', court_name: 'Wayne Circuit' }],
+} };
+
+function renderSession(initialEntries = ['/queue']) {
+  localStorage.setItem('demo_role', 'clerk');
+  return render(
+    <MemoryRouter initialEntries={initialEntries}>
+      <HeadingFocusScope>
+        <CourtSession>
+          <Routes>
+            <Route path="/" element={<><PageHeading>Dashboard</PageHeading><Link to="/queue">Queue</Link></>} />
+            <Route path="/queue" element={<CourtWorkspace><PageHeading>Review queue</PageHeading></CourtWorkspace>} />
+          </Routes>
+        </CourtSession>
+      </HeadingFocusScope>
+    </MemoryRouter>,
+  );
+}
+
+const failedHeading = () => screen.findByRole('heading', { level: 1, name: 'Court workspace not loaded' });
+
+async function retry() {
+  fireEvent.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Retry' }));
+  await screen.findByRole('heading', { level: 1, name: 'Loading court workspace' });
+}
+
+it('puts focus back on the error heading when a retry fails again on the first page load', async () => {
+  getProfile.mockRejectedValue(new Error('offline'));
+  renderSession();
+  expect(document.activeElement).not.toBe(await failedHeading());
+
+  await retry();
+
+  const heading = await failedHeading();
+  await waitFor(() => expect(document.activeElement).toBe(heading));
+});
+
+it('puts focus back on the error heading when a retry fails again on the same navigation', async () => {
+  let failFirstLoad = (_reason: Error) => {};
+  getProfile.mockReturnValueOnce(new Promise((_resolve, reject) => { failFirstLoad = reject; }));
+  renderSession(['/']);
+  fireEvent.click(screen.getByRole('link', { name: 'Queue' }));
+  await screen.findByRole('heading', { level: 1, name: 'Loading court workspace' });
+  failFirstLoad(new Error('offline'));
+  const first = await failedHeading();
+  await waitFor(() => expect(document.activeElement).toBe(first));
+  getProfile.mockRejectedValue(new Error('offline'));
+
+  await retry();
+
+  const heading = await failedHeading();
+  await waitFor(() => expect(document.activeElement).toBe(heading));
+});
+
+it('keeps moving focus to the error heading across repeated failures', async () => {
+  getProfile.mockRejectedValue(new Error('offline'));
+  renderSession();
+  await failedHeading();
+  await retry();
+  const second = await failedHeading();
+  await waitFor(() => expect(document.activeElement).toBe(second));
+
+  await retry();
+
+  const third = await failedHeading();
+  await waitFor(() => expect(document.activeElement).toBe(third));
+});
+
+it('moves focus to the court page heading when a retry succeeds', async () => {
+  getProfile.mockRejectedValueOnce(new Error('offline'));
+  renderSession();
+  await failedHeading();
+  getProfile.mockResolvedValueOnce(staffProfile);
+
+  await retry();
+
+  const heading = await screen.findByRole('heading', { level: 1, name: 'Review queue' });
+  await waitFor(() => expect(document.activeElement).toBe(heading));
+});
+
+it('does not move focus to the page heading when nothing asked for a reload', async () => {
+  getProfile.mockResolvedValue(staffProfile);
+  renderSession();
+
+  const heading = await screen.findByRole('heading', { level: 1, name: 'Review queue' });
+
+  expect(document.activeElement).not.toBe(heading);
 });
 
 it('keeps keyboard focus on the working-court select while the page resets for the new court', () => {

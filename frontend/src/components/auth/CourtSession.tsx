@@ -7,7 +7,7 @@ import {
   type CourtAssignment, type SessionProfile,
 } from '../../auth/session';
 import { usePageTitle } from '../../utils/pageTitle';
-import PageHeading from '../common/PageHeading';
+import PageHeading, { useFocusNextHeading } from '../common/PageHeading';
 
 interface CourtSessionState {
   userId?: number;
@@ -24,6 +24,7 @@ export const CourtContext = createContext<CourtSessionState | null>(null);
 
 export function CourtSession({ children }: { children: ReactNode }) {
   const signedIn = hasSession();
+  const focusNextHeading = useFocusNextHeading();
   const [attempt, setAttempt] = useState(0);
   const [selectedId, setSelectedId] = useState(getDemoCourtId);
   const [result, setResult] = useState<{ attempt: number; userId?: number; courts: CourtAssignment[]; error?: LoadFailure }>();
@@ -51,8 +52,13 @@ export function CourtSession({ children }: { children: ReactNode }) {
     setSelectedId(id);
   }
 
+  function refresh() {
+    focusNextHeading?.();
+    setAttempt(n => n + 1);
+  }
+
   return <CourtContext.Provider value={{ userId: signedIn ? current?.userId : undefined, role: getDemoRole(), courts, court, loading: signedIn && !current,
-    error: current?.error, selectCourt, refresh: () => setAttempt(n => n + 1) }}>
+    error: current?.error, selectCourt, refresh }}>
     {children}
   </CourtContext.Provider>;
 }
