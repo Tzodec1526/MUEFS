@@ -6,6 +6,7 @@ import {
   type SessionSnapshot,
 } from '../auth/keycloak';
 import { isPublicPath } from '../auth/publicPath';
+import { demoUserId } from '../auth/session';
 
 // Same-origin by default: the hosted demo serves the API and UI together, and the
 // Vite dev proxy forwards /api to the backend. Set VITE_API_URL only for a split
@@ -49,9 +50,8 @@ apiClient.interceptors.request.use(async (config: SessionConfig) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
 
   if (isDemoBuild() && !oidcSessionExpected() && !token) {
-    const roleToUserId: Record<string, number> = { attorney: 1, clerk: 2, admin: 3, self_represented: 4, srl: 4, public: 5 };
-    const role = localStorage.getItem('demo_role');
-    if (role && roleToUserId[role]) config.headers['X-Demo-User-Id'] = String(roleToUserId[role]);
+    const userId = demoUserId();
+    if (userId) config.headers['X-Demo-User-Id'] = String(userId);
     const secret = import.meta.env.VITE_DEMO_MODE_SECRET
       || (window as Window & { __MUEFS_DEMO_SECRET__?: string }).__MUEFS_DEMO_SECRET__;
     if (secret) config.headers['X-Demo-Auth-Secret'] = secret;

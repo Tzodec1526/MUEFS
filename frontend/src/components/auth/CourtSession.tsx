@@ -3,7 +3,7 @@ import { apiClient } from '../../api/client';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
 import {
-  applySessionFromProfile, getDemoCourtId, getDemoRole, hasSession,
+  applySessionFromProfile, getDemoCourtId, getDemoRole, hasSession, setDemoCourtId,
   type CourtAssignment, type SessionProfile,
 } from '../../auth/session';
 import { usePageTitle } from '../../utils/pageTitle';
@@ -47,7 +47,7 @@ export function CourtSession({ children }: { children: ReactNode }) {
 
   function selectCourt(id: number) {
     if (!courts.some(item => item.court_id === id)) return;
-    localStorage.setItem('demo_court_id', String(id));
+    setDemoCourtId(id);
     setSelectedId(id);
   }
 

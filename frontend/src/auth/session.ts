@@ -18,6 +18,17 @@ export function getDemoCourtId(): number | null {
   return id ? parseInt(id, 10) : null;
 }
 
+export function setDemoCourtId(id: number): void {
+  localStorage.setItem('demo_court_id', String(id));
+}
+
+const DEMO_USER_IDS: Record<string, number> = { attorney: 1, clerk: 2, admin: 3, self_represented: 4, srl: 4, public: 5 };
+
+export function demoUserId(): number | undefined {
+  const role = getDemoRole();
+  return role ? DEMO_USER_IDS[role] : undefined;
+}
+
 export function applyDemoRole(role: string): void {
   clearSession();
   localStorage.setItem('demo_role', role);
