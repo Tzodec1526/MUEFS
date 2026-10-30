@@ -1,7 +1,7 @@
 <%!
     def without_comments(block):
         lines = [line for line in (block or "").splitlines() if not line.lstrip().startswith("#")]
-        return "\n".join(lines) or "pass"
+        return "\n".join(lines).strip() or "pass"
 %>from typing import Sequence, Union
 
 from alembic import op
