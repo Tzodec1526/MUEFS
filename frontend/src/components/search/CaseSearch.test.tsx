@@ -162,6 +162,13 @@ it('shows a failed search inline and searches again on retry', async () => {
   expect(screen.queryByRole('alert')).toBeNull();
 });
 
+it('counts result pages with the page size the search reports', async () => {
+  vi.mocked(searchCases).mockResolvedValue({ cases: [smith], total: 30, page: 1, page_size: 10 });
+  openSearch('/cases/search?party=Smith');
+
+  expect(await screen.findByText('Page 1 of 3')).toBeTruthy();
+});
+
 it("links each result's case number to its docket", async () => {
   serveResults([smith, { ...smith, id: 43, case_number: '2026-000043-CZ', title: 'Doe v. Roe' }]);
   openSearch('/cases/search?party=Smith');

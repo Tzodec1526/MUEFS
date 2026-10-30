@@ -223,6 +223,16 @@ it('pages through a queue longer than one page', async () => {
   expect(queueOptions()).toMatchObject({ page: 1 });
 });
 
+it('counts queue pages with the page size the queue reports', async () => {
+  vi.mocked(getClerkQueue).mockResolvedValue({
+    filings: [11, 12].map(summary), total: 30, page_size: 10, submitted_count: 30, under_review_count: 0,
+    waiting_48h: 0, oldest_submitted_at: null, as_of: '2026-09-28T13:00:00Z',
+  });
+  openQueue();
+
+  expect(await screen.findByText('Page 1 of 3')).toBeTruthy();
+});
+
 it('shows no pagination when the queue fits on one page', async () => {
   serveQueuePage([11, 12], 2);
   openQueue();
