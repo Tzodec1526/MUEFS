@@ -1,4 +1,4 @@
-import { clearFilingDrafts } from '../../utils/filingDraft';
+import { clearFilingDrafts, hasFilingDrafts } from '../../utils/filingDraft';
 import { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isDemoBuild } from '../../config/demoMode';
@@ -12,8 +12,9 @@ function Header() {
   const { role } = useContext(CourtContext)!;
 
   const handleSwitchRole = () => {
+    const action = isDemoBuild() ? 'Switching roles' : 'Signing out';
+    if (hasFilingDrafts() && !window.confirm(`${action} discards the unsaved filing edits kept in this browser. Continue?`)) return;
     clearFilingDrafts();
-    localStorage.removeItem('muefs_filing_draft');
     const logoutUrl = signOut();
     if (logoutUrl) window.location.href = logoutUrl;
     else navigate('/login');

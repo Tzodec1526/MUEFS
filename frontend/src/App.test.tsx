@@ -692,3 +692,47 @@ it('leads the public home with a case search that opens the matching results', a
   expect(await screen.findByRole('heading', { level: 1, name: 'Statewide case search' })).toBeTruthy();
   expect((screen.getByLabelText('Party Name') as HTMLInputElement).value).toBe('Smith');
 });
+
+const recoveryCopy = 'muefs_filing_draft:v2:1:new';
+
+it('keeps a draft-recovery copy and the session when the filer declines Switch Role', async () => {
+  sessionStorage.setItem(recoveryCopy, '{}');
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  serve('attorney', {});
+  openApp('/no-such-page', 'attorney');
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Switch Role' }));
+
+  expect(confirm).toHaveBeenCalledOnce();
+  expect(confirm.mock.calls[0][0]).toContain('discards the unsaved filing edits');
+  expect(sessionStorage.getItem(recoveryCopy)).toBe('{}');
+  expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeTruthy();
+});
+
+it.each([
+  ['a recovery copy in this tab', () => sessionStorage.setItem(recoveryCopy, '{}')],
+  ['an older recovery copy', () => localStorage.setItem('muefs_filing_draft', '{}')],
+])('discards %s once the filer confirms Switch Role', async (_name, store) => {
+  store();
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  serve('attorney', {});
+  openApp('/no-such-page', 'attorney');
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Switch Role' }));
+
+  expect(confirm).toHaveBeenCalledOnce();
+  expect(await screen.findByRole('heading', { level: 1, name: 'Sign in' })).toBeTruthy();
+  expect(sessionStorage.getItem(recoveryCopy)).toBeNull();
+  expect(localStorage.getItem('muefs_filing_draft')).toBeNull();
+});
+
+it('switches role without asking when no recovery copy exists', async () => {
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  serve('attorney', {});
+  openApp('/no-such-page', 'attorney');
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Switch Role' }));
+
+  expect(await screen.findByRole('heading', { level: 1, name: 'Sign in' })).toBeTruthy();
+  expect(confirm).not.toHaveBeenCalled();
+});

@@ -64,11 +64,19 @@ export function clearFilingDraft(key: string, filingId?: number): void {
   } catch { /* Leave unrecognized legacy recovery data untouched. */ }
 }
 
+export function hasFilingDrafts(): boolean {
+  try {
+    return Object.keys(sessionStorage).some(key => key.startsWith(PREFIX))
+      || localStorage.getItem('muefs_filing_draft') !== null;
+  } catch { return false; }
+}
+
 export function clearFilingDrafts(): void {
   try {
     for (const key of Object.keys(sessionStorage)) {
       if (key.startsWith(PREFIX)) sessionStorage.removeItem(key);
     }
+    localStorage.removeItem('muefs_filing_draft');
   } catch { /* Storage may be disabled. */ }
 }
 
