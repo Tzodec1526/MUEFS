@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useContext } from 'react';
 import { Link } from 'react-router-dom';
-import { batchReview, getFiling, reviewFiling, FilingEnvelope, FilingSummary, ClerkQueue, ClerkQueueFilters } from '../../api/filings';
+import { batchReview, getFiling, reviewFiling, FilingEnvelope, FilingSummary, ClerkQueue } from '../../api/filings';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import DocumentDownload from '../common/DocumentDownload';
@@ -9,13 +9,10 @@ import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors'
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
 import { useClerkQueue } from './useClerkQueue';
+import QueueFilters from './QueueFilters';
 
 const ACTION_UNCONFIRMED = 'the request did not complete. Refresh the queue to check its current status before trying again.';
 const BATCH_UNCONFIRMED = 'Could not accept the selected filings. Refresh the queue to check their current status before trying again.';
-
-const sameFilters = (a: ClerkQueueFilters, b: ClerkQueueFilters) =>
-  (a.status || 'all') === (b.status || 'all') && (a.search || '') === (b.search || '')
-  && Boolean(a.waiting_48h_only) === Boolean(b.waiting_48h_only);
 
 function ReviewQueue() {
   const { court } = useContext(CourtContext)!;
@@ -34,10 +31,7 @@ function ReviewQueue() {
   const pageCount = queue ? Math.ceil(queue.total / queue.page_size) : 0;
   const selectedFiling = review?.filing;
   const [reviewReason, setReviewReason] = useState('');
-  const [filterDraft, setFilterDraft] = useState(filters);
   const statusFilter = filters.status;
-  const filtersChanged = filterDraft.status !== filters.status || filterDraft.search !== filters.search
-    || filterDraft.waiting_48h_only !== filters.waiting_48h_only;
   const canReview = selectedFiling
     && ['submitted', 'under_review'].includes(selectedFiling.status)
     && statusFilter !== 'waivers';
@@ -198,58 +192,19 @@ function ReviewQueue() {
       </div>
 
       <div className="queue-controls">
-        <form
-          className="queue-filter"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const fields = new FormData(e.currentTarget);
-            const submitted: ClerkQueueFilters = {
-              status: String(fields.get('status') ?? 'all'),
-              search: String(fields.get('search') ?? '').trim(),
-              waiting_48h_only: fields.get('waiting_48h_only') !== null,
-            };
-            if (!sameFilters(submitted, filters)) {
-              setLoading(true);
-              setFilters(submitted);
-              setFilterDraft(submitted);
-              setPage(1);
-              setSelectedSubmissions(new Map());
-              closeReview();
-            } else void fetchQueue();
+        <QueueFilters
+          filters={filters}
+          loading={loading}
+          actionInProgress={actionInProgress}
+          onApply={(submitted) => {
+            setLoading(true);
+            setFilters(submitted);
+            setPage(1);
+            setSelectedSubmissions(new Map());
+            closeReview();
           }}
-        >
-          <div className="form-group">
-            <label htmlFor="statusFilter">Filter</label>
-            <select
-              id="statusFilter"
-              name="status"
-              value={filterDraft.status}
-              onChange={(e) => setFilterDraft(previous => ({ ...previous, status: e.target.value }))}
-              disabled={actionInProgress}
-            >
-              <option value="all">All Pending</option>
-              <option value="submitted">New Submissions</option>
-              <option value="under_review">Under Review</option>
-              <option value="waivers">Pending Fee Waivers</option>
-            </select>
-          </div>
-          <div className="form-group queue-search">
-            <label htmlFor="queueSearch">Case title, case number or #filing number</label>
-            <input id="queueSearch" name="search" type="search" maxLength={200}
-              placeholder="Example: Smith or #123" value={filterDraft.search}
-              disabled={actionInProgress}
-              onChange={e => setFilterDraft(previous => ({ ...previous, search: e.target.value }))} />
-          </div>
-          <label className="queue-age-filter">
-            <input type="checkbox" name="waiting_48h_only" checked={filterDraft.waiting_48h_only}
-              disabled={actionInProgress}
-              onChange={e => setFilterDraft(previous => ({ ...previous, waiting_48h_only: e.target.checked }))} />
-            Waiting at least 48 hours
-          </label>
-          <button type="submit" className="btn btn-secondary" disabled={loading || actionInProgress}>
-            {loading ? 'Loading...' : filtersChanged ? 'Apply filters' : 'Refresh'}
-          </button>
-        </form>
+          onRefresh={() => void fetchQueue()}
+        />
         {queue && <span className="queue-meta">
           Measured: {formatDate(queue.as_of)}. {queue.oldest_submitted_at && <>Oldest matching receipt: {formatDate(queue.oldest_submitted_at)}. </>}
           Ages are elapsed time since receipt.
