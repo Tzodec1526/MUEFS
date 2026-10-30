@@ -1,5 +1,3 @@
-/// <reference types="vite/client" />
-
 interface ImportMetaEnv {
   readonly VITE_API_URL?: string;
   /** When true, send X-Demo-User-Id for local role-picker (must match backend ALLOW_DEMO_MODE). */
