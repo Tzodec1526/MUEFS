@@ -289,8 +289,8 @@ it('walks a new case through each step, refusing to advance past an unfinished o
   serveCourtsAndTypes();
   openWizard('/filing/new');
 
-  expect(stepButton('Select Court').getAttribute('aria-current')).toBe('step');
-  expect(['Case', 'Case Type & Rules', 'Case Details', 'Documents', 'Review & Submit'].map(label => stepButton(label).disabled))
+  expect(stepButton('Court').getAttribute('aria-current')).toBe('step');
+  expect(['Case', 'Case type', 'Details', 'Documents', 'Review'].map(label => stepButton(label).disabled))
     .toEqual([true, true, true, true, true]);
   expect(button('Back').disabled).toBe(true);
   fireEvent.click(button('Continue'));
@@ -316,7 +316,7 @@ it('walks a new case through each step, refusing to advance past an unfinished o
   fireEvent.click(button('Continue'));
   await stepError('Please enter a case title to continue.');
   expect(createFiling).not.toHaveBeenCalled();
-  expect([stepButton('Documents').disabled, stepButton('Review & Submit').disabled]).toEqual([true, true]);
+  expect([stepButton('Documents').disabled, stepButton('Review').disabled]).toEqual([true, true]);
 });
 
 it('clears a step error as soon as the filer fixes the field it names', async () => {
@@ -410,7 +410,7 @@ it('keeps a save failure on its own step until the filer leaves that step', asyn
   fireEvent.click(button('Save draft'));
   await screen.findByRole('alert');
 
-  fireEvent.click(stepButton('Case Details'));
+  fireEvent.click(stepButton('Details'));
   expect(screen.getByRole('alert').textContent).toBe('Too many requests. Please wait a moment and try again.');
 
   fireEvent.click(screen.getByRole('link', { name: 'Open the documents step' }));
@@ -434,7 +434,7 @@ it('offers no way off the details step while a first save has failed', async () 
   fireEvent.click(button('Save draft'));
   await screen.findByRole('alert');
 
-  expect([button('Back').disabled, stepButton('Case Type & Rules').disabled]).toEqual([true, true]);
+  expect([button('Back').disabled, stepButton('Case type').disabled]).toEqual([true, true]);
 });
 
 it('shows the unsaved-changes note only on the step that can save, and does not announce it', async () => {
@@ -454,6 +454,33 @@ it('shows the unsaved-changes note only on the step that can save, and does not 
   expect(screen.queryByText(/Unsaved changes/)).toBeNull();
 });
 
+const stepLabels = () => within(screen.getByRole('navigation', { name: 'Filing progress' }))
+  .getAllByRole('button').map(step => step.querySelector('.step-label')?.textContent);
+
+it('names each step of a new case in a word or two', async () => {
+  serveCourtsAndTypes();
+  openWizard('/filing/new');
+
+  expect(stepLabels()).toEqual(['Court', 'Case', 'Case type', 'Details', 'Documents', 'Review']);
+});
+
+it('keeps the plain-language step names just as short', async () => {
+  localStorage.setItem('demo_role', 'srl');
+  serveCourtsAndTypes();
+  openWizard('/filing/new');
+
+  expect(stepLabels()).toEqual(['Your court', 'Your case', 'Kind of case', 'Your filing', 'Your papers', 'Check and send']);
+  await screen.findByRole('button', { name: 'Third Circuit Court' });
+});
+
+it('skips the case type step for a filing in an existing case', async () => {
+  vi.mocked(getCase).mockResolvedValue(docket);
+  openWizard(CASE_LINK);
+
+  expect(stepLabels()).toEqual(['Court', 'Case', 'Details', 'Documents', 'Review']);
+  await screen.findByText('Third Circuit Court');
+});
+
 it('returns to a completed step from the progress bar, and back one step with Back', async () => {
   serveCourtsAndTypes();
   openWizard('/filing/new?court_id=3');
@@ -462,10 +489,10 @@ it('returns to a completed step from the progress bar, and back one step with Ba
   fireEvent.click(button('Back'));
   await screen.findByRole('heading', { name: 'Select Case Type & Review Requirements' });
 
-  fireEvent.click(stepButton('Select Court'));
+  fireEvent.click(stepButton('Court'));
 
   expect(await screen.findByRole('heading', { name: 'Select Court', level: 3 })).toBeTruthy();
-  expect(stepButton('Select Court').getAttribute('aria-current')).toBe('step');
+  expect(stepButton('Court').getAttribute('aria-current')).toBe('step');
   expect(stepButton('Case').disabled).toBe(true);
 });
 
@@ -490,7 +517,7 @@ it('saves a new filing as a draft and locks the court and case choices', async (
   });
   expect(creationKey).toMatch(/^[0-9a-f-]{36}$/);
   await waitFor(() => expect(caption().value).toBe('Doe v. Roe'));
-  expect([stepButton('Select Court').disabled, stepButton('Case Type & Rules').disabled, button('Back').disabled])
+  expect([stepButton('Court').disabled, stepButton('Case type').disabled, button('Back').disabled])
     .toEqual([true, true, true]);
 });
 
@@ -545,7 +572,7 @@ it('discards recovered edits when the filer starts fresh', async () => {
 
   expect(screen.queryByText(/Recovered unsaved edits/)).toBeNull();
   expect(screen.queryByText('Case:')).toBeNull();
-  expect(stepButton('Select Court').getAttribute('aria-current')).toBe('step');
+  expect(stepButton('Court').getAttribute('aria-current')).toBe('step');
   second.unmount();
 
   openWizard('/filing/new?court_id=3');

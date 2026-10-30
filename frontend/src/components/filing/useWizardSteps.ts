@@ -8,14 +8,14 @@ export type WizardStep = 'court' | 'case' | 'case-type' | 'details' | 'documents
 function buildSteps(filingType: string): { key: WizardStep; label: string }[] {
   const isNewCase = filingType === 'initial';
   return [
-    { key: 'court', label: 'Select Court' },
+    { key: 'court', label: 'Court' },
     { key: 'case', label: 'Case' },
     ...(isNewCase
-      ? [{ key: 'case-type' as WizardStep, label: 'Case Type & Rules' }]
+      ? [{ key: 'case-type' as WizardStep, label: 'Case type' }]
       : []),
-    { key: 'details', label: isNewCase ? 'Case Details' : 'Filing Details' },
+    { key: 'details', label: 'Details' },
     { key: 'documents', label: 'Documents' },
-    { key: 'review', label: 'Review & Submit' },
+    { key: 'review', label: 'Review' },
   ];
 }
 
