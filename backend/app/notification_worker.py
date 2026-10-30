@@ -43,7 +43,12 @@ async def run(once: bool = False) -> int:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Run with python -m app.notification_worker; --once drains the currently due "
+            "queue."
+        ),
+    )
     parser.add_argument("--once", action="store_true")
     logging.basicConfig(level=logging.INFO)
     raise SystemExit(asyncio.run(run(once=parser.parse_args().once)))

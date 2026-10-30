@@ -581,7 +581,15 @@ async def run_audit(output: TextIO, court_id: int | None = None) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Verify restored filing storage without changing the database or stored "
+            "files. Run against a quiescent restored database and its matching storage "
+            "configuration. Output is JSON Lines. A final summary with complete=true is "
+            "required; an interrupted report is incomplete. Exit codes: 0 verified, "
+            "1 discrepancies, 2 incomplete audit."
+        ),
+    )
     parser.add_argument(
         "--output", type=Path, help="Create a new UTF-8 JSONL report (default: stdout)"
     )

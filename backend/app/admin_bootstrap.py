@@ -67,7 +67,12 @@ async def bootstrap(data: AccountChange) -> int:
 
 
 async def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Bind the first system administrator using an authorized database operator "
+            "session."
+        ),
+    )
     for option in ("email", "first-name", "last-name", "subject", "reason"):
         parser.add_argument(f"--{option}", required=True)
     arguments = parser.parse_args()

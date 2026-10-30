@@ -389,7 +389,12 @@ def verify_archive(path: Path, manifest_sha256: str | None = None) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Export or verify a private case archive. Requires operator database and "
+            "storage access."
+        ),
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     export = commands.add_parser(
         "export", help="Create a new archive; never overwrite an existing file"
