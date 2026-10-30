@@ -778,7 +778,7 @@ def _populate(bind: Engine | Connection) -> None:
                         " to 20 pages. Response due 21 days"
                         " after service."
                     ),
-                    mcr_url=(  # noqa: E501
+                    mcr_url=(
                         "https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2116-summary-disposition"
                     ),
                 ))
