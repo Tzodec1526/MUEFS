@@ -121,6 +121,24 @@ it('shows a delegated court administrator the account directory at /admin', asyn
   expect(await screen.findByRole('heading', { name: 'Grace Hopper' })).toBeTruthy();
 });
 
+it('shows a failed profile load at /admin as that failure, and lets a court administrator in after a retry', async () => {
+  serve('clerk', {
+    '/auth/me': failsOnce({ id: 2, user_type: 'clerk', court_assignments: [{ court_id: 3, role: 'admin', court_name: 'Third Circuit Court' }] }),
+    '/admin/access': { system_admin: false, user_id: 2, courts: [{ id: 3, name: 'Third Circuit Court' }] },
+    '/admin/users': directory,
+  });
+  openApp('/admin', 'clerk');
+
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain('Could not verify court assignments.');
+  expect(screen.getAllByRole('heading', { level: 1 }).map(h1 => h1.textContent)).toEqual(['Administrator access not checked']);
+
+  fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
+
+  expect(await screen.findByRole('heading', { name: 'Grace Hopper' })).toBeTruthy();
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
 it('shows an administrator a failed account directory load inline and loads it again on retry', async () => {
   serve('admin', {
     '/admin/access': { system_admin: true, user_id: 3, courts: [] },

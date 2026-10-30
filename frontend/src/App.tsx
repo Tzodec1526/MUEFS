@@ -70,9 +70,20 @@ function AdministrationAccessRequired() {
   );
 }
 
+function AdministrationAccessUnchecked({ failure, onRetry }: { failure: LoadFailure; onRetry: () => void }) {
+  usePageTitle('Administrator access not checked');
+  return (
+    <div className="empty-state">
+      <PageHeading>Administrator access not checked</PageHeading>
+      <LoadError failure={failure} onRetry={onRetry} />
+    </div>
+  );
+}
+
 function RequireAdministration({ children }: { children: React.ReactNode }) {
-  const { loading } = useContext(CourtContext)!;
+  const { loading, error, refresh } = useContext(CourtContext)!;
   if (loading) return <p className="loading" role="status">Checking administrator access…</p>;
+  if (error) return <AdministrationAccessUnchecked failure={error} onRetry={refresh} />;
   if (!hasAdministrationAccess()) return <AdministrationAccessRequired />;
   return <>{children}</>;
 }
