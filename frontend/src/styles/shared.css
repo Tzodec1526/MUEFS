@@ -193,7 +193,7 @@ tr.selected {
   color: var(--muted);
 }
 
-.empty-state h1, .empty-state h2 { margin-bottom: 0.5rem; color: var(--ink); }
+.empty-state h1, .empty-state h2, .empty-state h3 { margin-bottom: 0.5rem; color: var(--ink); }
 .empty-state h2 { font-size: 1.17rem; }
 .empty-state p { margin-bottom: 1rem; }
 

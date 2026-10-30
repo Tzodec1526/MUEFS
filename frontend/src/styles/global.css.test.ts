@@ -116,6 +116,11 @@ it('keeps every design token in one place', () => {
   expect(declared).toEqual(['tokens.css']);
 });
 
+it('styles the heading of every empty state, whatever its level', () => {
+  expect(definedSelectors.has('.empty-state h2')).toBe(true);
+  expect(definedSelectors.has('.empty-state h3')).toBe(true);
+});
+
 it('hides the outline of a focused page heading only when the browser would not show a focus ring', () => {
   const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)]
     .filter(([, , body]) => /outline:\s*(none|0)/.test(body))

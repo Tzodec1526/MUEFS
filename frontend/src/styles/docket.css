@@ -161,5 +161,5 @@
   .case-detail-grid { grid-template-columns: 1fr; }
   .case-detail-header { flex-direction: column; }
   .case-detail-actions { width: 100%; }
-  .docket-header { flex-direction: column; gap: 0.5rem; }
+  .docket-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
 }
