@@ -10,7 +10,6 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-/** A failed `responseType: 'blob'` request: axios delivers the error body as a Blob. */
 function failWith(status: number, body: Blob) {
   vi.mocked(apiClient.get).mockRejectedValue({ response: { status, data: body } });
 }

@@ -1,7 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 
-// Vitest serves stylesheet imports (even ?raw) as empty strings, so read the file itself.
 const stylesDir = new URL('.', import.meta.url);
 const read = (name: string): string => readFileSync(new URL(name, stylesDir), 'utf8');
 const stylesheets = readdirSync(stylesDir).filter(name => name.endsWith('.css')).sort();
@@ -12,17 +11,13 @@ const corpus = Object.values({
   ...import.meta.glob<string>('../../index.html', { query: '?raw', import: 'default', eager: true }),
 }).join('\n');
 
-// Classes built at run time: `toast-${tone}`, and badge modifiers
-// that come from API data (`status-badge ${filing.status}`, `age-badge ${age.level}`).
 const DYNAMIC_PREFIXES = ['toast-'];
 const DATA_MODIFIED = new Set(['status-badge', 'age-badge', 'flag-badge']);
-// Filing statuses (backend FilingStatus) and case statuses (backend CaseStatus) shown on status badges.
 const BADGE_STATUSES = [
   'draft', 'submitted', 'under_review', 'accepted', 'rejected', 'returned', 'served',
   'open', 'closed', 'dismissed', 'pending',
 ];
 
-/** Selector lists of the style rules, including rules inside @media blocks. */
 const selectorLists = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{[^{}]*\}/g)]
   .map(match => match[1].trim())
   .filter(prelude => !prelude.startsWith('@'));
@@ -46,7 +41,6 @@ function rendered(name: string): boolean {
     || new RegExp(`(?<![\\w-])${name}(?![\\w-])`).test(corpus);
 }
 
-/** Classes a selector requires that nothing renders. */
 function unrenderedClasses(selector: string): string[] {
   const required = selector.replace(/:not\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
   return required.split(/[\s>+~]+/).flatMap(compound => {

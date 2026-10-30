@@ -24,7 +24,6 @@ const courts = [
   { court_id: 9, role: 'clerk', court_name: 'Washtenaw Circuit' },
 ];
 
-/** Same shape as ReviewQueue, ClerkDashboard and the other court pages: the select lives inside the page. */
 function CourtPage() {
   const { court } = useContext(CourtContext)!;
   const [note, setNote] = useState('');
@@ -210,9 +209,7 @@ it('keeps keyboard focus on the working-court select while the page resets for t
   fireEvent.change(courtSelect(), { target: { value: '9' } });
 
   expect(screen.getByText('Queue for Washtenaw Circuit')).toBeTruthy();
-  // State from the prior court is still discarded...
   expect(note().value).toBe('');
-  // ...but keyboard focus stays on the select the user just changed.
   expect(courtSelect().value).toBe('9');
   expect(document.activeElement).toBe(courtSelect());
 });

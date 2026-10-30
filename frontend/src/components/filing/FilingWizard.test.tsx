@@ -14,7 +14,6 @@ import { CourtContext } from '../auth/CourtSession';
 import { ToastProvider } from '../common/Toast';
 import FilingWizard from './FilingWizard';
 
-// Every request this test does not stub below fails instead of reaching a server.
 vi.mock('../../api/client', async (importOriginal) => {
   const offline = () => Promise.reject(new Error('Unexpected API request in a component test'));
   return {
@@ -82,7 +81,6 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.resetAllMocks();
-  // The wizard keeps unsaved edits in sessionStorage under a key derived from the URL.
   sessionStorage.clear();
   localStorage.clear();
 });
@@ -101,7 +99,6 @@ it('leaves the caption blank rather than trusting the link when the case record 
   vi.mocked(getCase).mockRejectedValue(new Error('Network Error'));
   openWizard(FORGED_LINK);
 
-  // The court name arrives in the same update that would have set the caption.
   await screen.findByText('Third Circuit Court');
   expect(caption().value).toBe('');
   expect(screen.queryByText(/Forged/)).toBeNull();
@@ -113,7 +110,6 @@ it('offers a retry when the case record fails to load, and retrying fills in the
 
   await screen.findByText(/couldn't load the court's record for this case/);
   expect((screen.getByRole('button', { name: 'Save draft' }) as HTMLButtonElement).disabled).toBe(true);
-  // Continue explains the read-only caption instead of asking for a title the filer cannot type.
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
   expect(await screen.findByText(/The case title comes from the court's case record/)).toBeTruthy();
   expect(screen.queryByText('Please enter a case title to continue.')).toBeNull();
@@ -212,7 +208,6 @@ it("keeps a self-represented filer's choice to turn plain-language guidance off"
   vi.mocked(getCase).mockResolvedValue(docket);
   const guidance = () => screen.getByLabelText('Plain-language guidance') as HTMLInputElement;
   const first = openWizard(CASE_LINK);
-  // Plain language is the default for a self-represented filer who has not chosen.
   expect(guidance().checked).toBe(true);
   fireEvent.click(guidance());
   expect(guidance().checked).toBe(false);
@@ -222,7 +217,6 @@ it("keeps a self-represented filer's choice to turn plain-language guidance off"
   openWizard(CASE_LINK);
 
   expect(guidance().checked).toBe(false);
-  // Let the reopened wizard (which restores the unsaved draft) finish loading.
   await screen.findByText('Third Circuit Court');
 });
 

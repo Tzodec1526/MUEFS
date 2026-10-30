@@ -21,7 +21,6 @@ function court(id: number, name: string, courtType: string): Court {
   };
 }
 
-/** Serve each tier's requests in order; a thrown entry fails that request. */
 function serveCourts(responses: Record<'appellate' | 'trial', Array<Court[] | Error>>) {
   vi.mocked(listCourts).mockImplementation(async (params) => {
     const tier = params?.tier as 'appellate' | 'trial';
@@ -56,7 +55,6 @@ it('replaces the court lists with a retry when the statewide courts fail to load
   expect(alert.textContent).toContain(STATEWIDE_FAILURE);
   expect(within(alert).getByRole('button', { name: 'Retry' })).toBeTruthy();
 
-  // Even once the trial courts arrive, a missing statewide group must not look like an empty one.
   await waitFor(() => expect(callsFor('trial')).toHaveLength(1));
   await act(async () => {});
   expect(screen.queryByText('Third Circuit Court')).toBeNull();
@@ -74,7 +72,6 @@ it('selects a court with its own button, beside (not around) the favorite star',
 
   const select = await screen.findByRole('button', { name: 'Third Circuit Court' });
   const star = screen.getByRole('button', { name: 'Add Third Circuit Court to favorites' });
-  // Neither control is nested in another interactive element.
   for (const control of [select, star]) {
     expect(control.parentElement!.closest('button, [role="button"], a, [tabindex]')).toBeNull();
   }

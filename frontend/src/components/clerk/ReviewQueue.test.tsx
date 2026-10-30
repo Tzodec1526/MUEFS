@@ -34,7 +34,6 @@ function envelope(id: number): FilingEnvelope {
   };
 }
 
-/** Each load returns a fresh response, as the API does; later loads repeat the last list. */
 function serveQueues(...lists: number[][]) {
   let call = 0;
   vi.mocked(getClerkQueue).mockImplementation(async (): Promise<ClerkQueue> => {
@@ -142,7 +141,6 @@ it.each([
 it('returns focus to the open review when an action fails', async () => {
   serveQueues([11]);
   vi.mocked(reviewFiling).mockImplementation(async () => {
-    // Browsers drop focus from the button once it is disabled for the running action.
     (document.activeElement as HTMLElement | null)?.blur();
     throw new Error('Network Error');
   });

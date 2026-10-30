@@ -15,7 +15,6 @@ function requirement(id: number, code: string, description: string, mcr: string)
   };
 }
 
-// BUS_CT_NOTICE is not in the built-in catalog; COMPLAINT is.
 const COURT_RULE_TYPES = [
   requirement(1, 'BUS_CT_NOTICE', 'Business Court Notice', 'MCL 600.8031'),
   requirement(2, 'COMPLAINT', 'Complaint', 'MCR 2.111'),
@@ -42,7 +41,6 @@ it("lists the court's own document types in their own group and lets the filer p
   vi.mocked(getFilingRequirements).mockResolvedValue(COURT_RULE_TYPES);
   renderUpload();
 
-  // Only the type the catalog lacks is added; COMPLAINT keeps its catalog entry.
   await waitFor(() => expect(courtGroupOptions()).toEqual([['BUS_CT_NOTICE', 'Business Court Notice (MCL 600.8031)']]));
   expect(getFilingRequirements).toHaveBeenCalledWith(3, 11, 'initial', expect.any(AbortSignal));
 

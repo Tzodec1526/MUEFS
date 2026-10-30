@@ -25,7 +25,6 @@ afterEach(() => {
 });
 
 it("carries an existing case's type name even after the court closed that type to new cases", async () => {
-  // Like the API: types closed to new cases are listed only when a caller asks for them.
   vi.mocked(getCaseTypes).mockImplementation(async (_court, includeInactive = false) =>
     [closedToNewCases].filter(type => includeInactive || type.is_active));
   vi.mocked(searchCases).mockResolvedValue({ cases: [smithCase], total: 1, page: 1, page_size: 25 });

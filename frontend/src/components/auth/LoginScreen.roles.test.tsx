@@ -17,13 +17,11 @@ afterEach(() => {
 it('gives each demo role button a name that says which role it opens', () => {
   render(<MemoryRouter initialEntries={['/login']}><LoginScreen /></MemoryRouter>);
 
-  // getByRole fails on duplicates, so each name must identify exactly one button.
   for (const name of [
     'Sign in as Attorney', 'Sign in as Court clerk', 'Sign in as Self-represented litigant',
     'Sign in as System administrator', 'Browse records',
   ]) expect(screen.getByRole('button', { name })).toBeTruthy();
   expect(screen.queryAllByRole('button', { name: 'Sign in' })).toEqual([]);
-  // The visible text stays as it was and is part of each name.
   expect(screen.getByRole('button', { name: 'Sign in as Court clerk' }).textContent).toBe('Sign in');
 });
 

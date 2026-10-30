@@ -40,7 +40,6 @@ function showCase(caseRecord: CaseDocket, caseTypes: CaseType[] = [civil], filin
     if (!(url in responses)) throw new Error(`Unexpected request: ${url}`);
     return { data: responses[url] };
   });
-  // Like the API: types closed to new cases are listed only when a caller asks for them.
   vi.mocked(getCaseTypes).mockImplementation(async (_court, includeInactive = false) =>
     caseTypes.filter(type => includeInactive || type.is_active));
   vi.mocked(listFavorites).mockResolvedValue({ favorites: [], total: 0 });

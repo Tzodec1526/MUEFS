@@ -99,7 +99,6 @@ it('does not accept an OAuth completion after sign-out', async () => {
 
 it('discards a timed-out OAuth initializer even when it eventually succeeds', async () => {
   await auth.startKeycloakLogin();
-  // The callback is a fresh document; reset only module memory, retaining its login attempt.
   vi.resetModules();
   auth = await import('./keycloak');
   const pending = deferred<boolean>();
@@ -174,7 +173,6 @@ it.each([
   const discarded = expect(stale).rejects.toMatchObject({ code: 'ERR_CANCELED' });
   const config = await inFlight.sent;
 
-  // The other tab rewrites the shared marker; this tab only learns of it from storage.
   localStorage.setItem(auth.SESSION_KEY, JSON.stringify(otherTabMarker));
   inFlight.response.resolve({ status: 200, statusText: '', headers: {}, config, data: { private: 'account-a' } });
   await discarded;
