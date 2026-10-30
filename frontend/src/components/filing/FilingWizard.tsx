@@ -12,6 +12,7 @@ import CaseTypeSelector from './CaseTypeSelector';
 import DocumentUpload from './DocumentUpload';
 import FilingReview from './FilingReview';
 import WizardStepper from './WizardStepper';
+import DraftConflict from './DraftConflict';
 import { emitToast } from '../../utils/toastBus';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { createFiling, getFiling, updateFiling, type FilingEnvelope } from '../../api/filings';
@@ -461,20 +462,8 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
 
   useEffect(() => { conflictHeading.current?.focus(); }, [conflict]);
 
-  const conflictView = conflict && <section className="review-card draft-conflict" aria-labelledby="draft-conflict-heading">
-        <h3 id="draft-conflict-heading" ref={conflictHeading} tabIndex={-1}>Compare changes before saving</h3>
-        <p>Your changes are still here. Compare them with the saved details before continuing.</p>
-        <div className="draft-comparison">
-          <div><h4>Your edits</h4><strong>{filingData.caseTitle || '(No title)'}</strong><p>{filingData.filingDescription || '(No description)'}</p></div>
-          <div><h4>Saved to your account</h4><strong>{conflict.case_title || '(No title)'}</strong><p>{conflict.filing_description || '(No description)'}</p></div>
-        </div>
-        <div className="draft-actions">
-          <button className="btn btn-secondary" onClick={() => resolveConflict(false)}>Use saved details</button>
-          {['draft', 'returned'].includes(conflict.status)
-            ? <button className="btn btn-primary" onClick={() => resolveConflict(true)}>Keep my edits for next save</button>
-            : <Link to={`/filings/${conflict.id}/history`}>This filing is {conflict.status.replace('_', ' ')}. Open its history.</Link>}
-        </div>
-      </section>;
+  const conflictView = conflict && <DraftConflict conflict={conflict} edits={filingData}
+    headingRef={conflictHeading} onResolve={resolveConflict} />;
 
   if (loadingExisting) return <p className="loading" role="status">Loading filing...</p>;
   if (loadError) {
