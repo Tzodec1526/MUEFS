@@ -83,8 +83,8 @@ function NotificationBell() {
         <Bell size={18} aria-hidden="true" />
       </button>
       {open && (
-        <div className="notification-panel" id={panelId}>
-          <h3>Recent notifications</h3>
+        <div className="notification-panel" id={panelId} role="region" aria-labelledby={`${panelId}-title`}>
+          <p className="notification-panel-title" id={`${panelId}-title`}>Recent notifications</p>
           {loading ? <p>Loading notifications...</p> : error ? (
             <LoadError failure={error} onRetry={() => setAttempt(n => n + 1)} />
           ) : items.length === 0 ? (

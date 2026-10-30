@@ -54,6 +54,13 @@ it('opens as a disclosure controlled by its button, not as a dialog', async () =
   expect(panel?.textContent).toContain('Recent notifications');
 });
 
+it('adds no heading while open and stays labelled for assistive technology', async () => {
+  const toggle = await openBell();
+
+  expect(screen.queryAllByRole('heading')).toEqual([]);
+  expect(screen.getByRole('region', { name: 'Recent notifications' }).id).toBe(toggle.getAttribute('aria-controls'));
+});
+
 it('closes on Escape and returns focus to its button', async () => {
   const toggle = await openBell();
   const link = screen.getByRole('link', { name: 'View filing history' });
