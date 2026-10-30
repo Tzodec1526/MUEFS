@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
@@ -59,7 +59,8 @@ function openQueue() {
   );
 }
 
-const row = (id: number) => document.getElementById(`queue-filing-${id}`);
+const row = (id: number) => document.getElementById(`queue-filing-${id}`) as HTMLElement;
+const reviewButton = (id: number) => within(row(id)).getByRole('button', { name: `Review filing #${id}` });
 
 async function openReview(id: number) {
   vi.mocked(getFiling).mockResolvedValue(envelope(id));
@@ -78,7 +79,7 @@ it('moves focus to the next filing after accepting one', async () => {
   fireEvent.click(accept);
 
   await waitFor(() => expect(screen.queryByText('Case 12')).toBeNull());
-  await waitFor(() => expect(document.activeElement).toBe(row(13)));
+  await waitFor(() => expect(document.activeElement).toBe(reviewButton(13)));
   expect(reviewFiling).toHaveBeenCalledWith(expect.objectContaining({ id: 12 }), 'accept', undefined);
 });
 
@@ -111,12 +112,12 @@ it('keeps focus in the queue after a batch accept', async () => {
   openQueue();
   fireEvent.click(await screen.findByRole('checkbox', { name: 'Select filing 11' }));
   fireEvent.click(screen.getByRole('checkbox', { name: 'Select filing 12' }));
-  const acceptSelected = screen.getByRole('button', { name: 'Accept 2 Filing(s)' });
+  const acceptSelected = screen.getByRole('button', { name: 'Accept 2 filings' });
   acceptSelected.focus();
 
   fireEvent.click(acceptSelected);
 
-  await waitFor(() => expect(document.activeElement).toBe(row(13)));
+  await waitFor(() => expect(document.activeElement).toBe(reviewButton(13)));
   expect(batchReview).toHaveBeenCalledWith([{ id: 11, submission_count: 1 }, { id: 12, submission_count: 1 }], 'accept');
 });
 
@@ -131,11 +132,11 @@ it.each([
   openQueue();
   fireEvent.click(await screen.findByRole('checkbox', { name: 'Select filing 11' }));
 
-  fireEvent.click(screen.getByRole('button', { name: 'Accept 1 Filing(s)' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Accept 1 filing' }));
 
   const alert = await screen.findByRole('alert');
   expect(alert.textContent).toBe(`${message}Dismiss`);
-  await waitFor(() => expect(document.activeElement).toBe(row(11)));
+  await waitFor(() => expect(document.activeElement).toBe(reviewButton(11)));
 });
 
 it('returns focus to the open review when an action fails', async () => {
@@ -166,6 +167,85 @@ function serveQueuePage(ids: number[], total: number) {
 }
 
 const queueOptions = () => vi.mocked(getClerkQueue).mock.lastCall?.[1];
+
+it('gives each row a named button that opens the review', async () => {
+  serveQueues([11, 12]);
+  vi.mocked(getFiling).mockResolvedValue(envelope(12));
+  openQueue();
+  await screen.findByText('Case 12');
+
+  fireEvent.click(reviewButton(12));
+
+  await screen.findByRole('heading', { name: 'Filing #12' });
+  expect(getFiling).toHaveBeenCalledTimes(1);
+});
+
+it('keeps a click anywhere on the row as a mouse shortcut, without another tab stop', async () => {
+  serveQueues([11, 12]);
+  openQueue();
+  await openReview(12);
+
+  expect(row(12).hasAttribute('tabindex')).toBe(false);
+  expect(row(11).hasAttribute('tabindex')).toBe(false);
+});
+
+it('labels every row value with its column, so a row still reads when it stacks on a phone', async () => {
+  serveQueues([11]);
+  openQueue();
+  await screen.findByText('Case 11');
+
+  const cells = within(row(11)).getAllByRole('cell');
+  expect(cells.map(cell => cell.getAttribute('data-label')))
+    .toEqual([null, null, 'Case title', 'Submitted', 'Age', 'Documents', 'Status']);
+  expect(screen.getAllByRole('columnheader').map(cell => cell.textContent).slice(2))
+    .toEqual(['Case title', 'Submitted', 'Age', 'Documents', 'Status']);
+  expect(cells[3].textContent).toMatch(/^Sep 28, 2026, \d{1,2}:00 [AP]M \S+/);
+});
+
+it('keeps Select all usable when the column headings are hidden on a phone', async () => {
+  serveQueues([11, 12]);
+  openQueue();
+  await screen.findByText('Case 11');
+
+  const selectAll = screen.getByRole('checkbox', { name: 'Select all filings' });
+  expect(selectAll.closest('label')?.textContent).toBe('Select all');
+  fireEvent.click(selectAll);
+
+  expect(screen.getByText('2 filings selected')).toBeTruthy();
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Select filing 11' }));
+  expect(screen.getByText('1 filing selected')).toBeTruthy();
+});
+
+it('puts the working court in the heading row, with no count tiles', async () => {
+  serveQueues([11]);
+  openQueue();
+  await screen.findByText('Case 11');
+
+  const heading = screen.getByRole('heading', { level: 1, name: 'Clerk Review Queue' });
+  expect(heading.parentElement?.contains(screen.getByLabelText('Working court'))).toBe(true);
+  expect(screen.queryByText('Matching filings')).toBeNull();
+  expect(screen.queryByText('Waiting 48+ hours')).toBeNull();
+});
+
+it('folds the queue counts into one line', async () => {
+  serveQueues([11, 12]);
+  vi.mocked(getClerkQueue).mockResolvedValue({
+    filings: [summary(11)], total: 1, page_size: 25, submitted_count: 1, under_review_count: 0, waiting_48h: 1,
+    oldest_submitted_at: '2026-09-28T12:00:00Z', as_of: '2026-09-28T13:00:00Z',
+  });
+  openQueue();
+
+  const line = await screen.findByText(/matching filing/);
+  expect(line.textContent).toMatch(/^1 matching filing · 1 waiting at least 48 hours · Oldest received Sep 28, 2026, \d{1,2}:00 [AP]M \S+$/);
+  expect(document.body.textContent).not.toMatch(/Measured:|Ages are elapsed/);
+});
+
+it('leaves the oldest receipt out of the line when the queue is empty', async () => {
+  serveQueues([]);
+  openQueue();
+
+  expect((await screen.findByText(/matching filing/)).textContent).toBe('0 matching filings · 0 waiting at least 48 hours');
+});
 
 it('loads the queue for the working court with the default filters', async () => {
   serveQueues([11, 12]);
@@ -254,7 +334,7 @@ it('opens a filing for review and closes the review back to its row', async () =
 
   expect(screen.queryByRole('heading', { name: 'Filing #12' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull();
-  expect(document.activeElement).toBe(row(12));
+  expect(document.activeElement).toBe(reviewButton(12));
 });
 
 it('requires a reason before a filing can be returned or rejected', async () => {

@@ -942,10 +942,6 @@ tr.selected {
    Clerk Review
    ============================================ */
 
-.clerk-review h1 {
-  margin-bottom: 1rem;
-}
-
 .queue-controls {
   display: flex;
   flex-wrap: wrap;
@@ -996,7 +992,8 @@ tr.selected {
   padding: 1.25rem;
 }
 
-.filing-detail-panel h3 {
+.filing-detail-panel h2 {
+  font-size: 1.17rem;
   color: var(--ink);
   margin-bottom: 1rem;
 }
@@ -1005,7 +1002,7 @@ tr.selected {
   margin-bottom: 1.25rem;
 }
 
-.detail-section h4 {
+.detail-section h3 {
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--muted);
@@ -1527,35 +1524,36 @@ tr.selected {
   flex-wrap: wrap;
   gap: 1rem;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
   margin-bottom: 1rem;
 }
 
-.clerk-header-stats {
-  display: flex;
-  gap: 0.75rem;
+.clerk-header .staff-court-select {
+  flex: 0 1 36rem;
+  margin-bottom: 0;
 }
 
-.stat-card {
-  text-align: center;
-  padding: 0.5rem 1rem;
-  background: var(--white);
-  border-radius: var(--radius);
-  min-width: 84px;
-}
-
-.stat-number {
-  display: block;
-  font-size: 1.5rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.2;
-}
-
-.stat-label {
-  display: block;
-  font-size: 0.8rem;
+.queue-review-button {
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
   font-weight: 600;
+  text-align: left;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.queue-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.queue-select-all span {
+  display: none;
 }
 
 /* Batch Actions */
@@ -1586,11 +1584,9 @@ tr.selected {
 .th-checkbox, .td-checkbox { width: 36px; text-align: center; }
 .empty-queue { text-align: center; color: var(--muted); padding: 2rem !important; }
 .queue-meta {
-  font-size: 0.8rem;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
   color: var(--muted);
-  align-self: flex-end;
-  padding-bottom: 0.6rem;
-  margin-left: auto;
 }
 
 /* Detail Panel Improvements */
@@ -1876,7 +1872,12 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 
   .clerk-header {
     flex-direction: column;
+    align-items: stretch;
     gap: 0.5rem;
+  }
+
+  .clerk-header .staff-court-select {
+    flex: none;
   }
 
   .batch-actions {
@@ -2433,6 +2434,77 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
     top: 0.5rem;
     right: 0;
     width: auto;
+  }
+
+  .queue-list table,
+  .queue-list thead,
+  .queue-list thead tr,
+  .queue-list tbody {
+    display: block;
+  }
+
+  .queue-list thead th {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .queue-list thead .th-checkbox {
+    position: static;
+    display: block;
+    width: auto;
+    height: auto;
+    padding: 0.5rem 0.75rem;
+    overflow: visible;
+    clip: auto;
+    text-align: left;
+  }
+
+  .queue-select-all span {
+    display: inline;
+  }
+
+  .queue-list tbody tr {
+    display: grid;
+    grid-template-columns: 2.25rem minmax(0, 1fr);
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .queue-list tbody td {
+    display: grid;
+    grid-column: 2;
+    grid-template-columns: 6rem minmax(0, 1fr);
+    gap: 0.5rem;
+    padding: 0.1rem 0;
+    border-bottom: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .queue-list tbody td.td-checkbox {
+    display: block;
+    grid-column: 1;
+    grid-row: 1 / span 6;
+    width: auto;
+    text-align: left;
+  }
+
+  .queue-list tbody td.filing-num,
+  .queue-list tbody td.empty-queue {
+    display: block;
+  }
+
+  .queue-list tbody td.empty-queue {
+    grid-column: 1 / -1;
+  }
+
+  .queue-list td[data-label]::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 600;
   }
 }
 

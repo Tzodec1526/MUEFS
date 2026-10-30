@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getClerkQueue, type ClerkQueue, type ClerkQueueFilters } from '../../api/filings';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 
+export const focusQueueRow = (filingId: number) =>
+  document.getElementById(`queue-filing-${filingId}`)?.querySelector('button')?.focus();
+
 export function useClerkQueue(courtId: number, autoRefreshPaused: boolean) {
   const [queue, setQueue] = useState<ClerkQueue | null>(null);
   const [loading, setLoading] = useState(false);

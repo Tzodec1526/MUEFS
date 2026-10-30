@@ -2,11 +2,11 @@ import { useState, useEffect, useRef, useContext } from 'react';
 import { batchReview, getFiling, reviewFiling, FilingEnvelope, FilingSummary, ClerkQueue } from '../../api/filings';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
-import { formatDateTime, parseServerDate } from '../../utils/format';
+import { formatDateTime, parseServerDate, plural } from '../../utils/format';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
-import { useClerkQueue } from './useClerkQueue';
+import { focusQueueRow, useClerkQueue } from './useClerkQueue';
 import QueueFilters from './QueueFilters';
 import FilingReviewPanel from './FilingReviewPanel';
 
@@ -26,7 +26,6 @@ function ReviewQueue() {
     selectedSubmissions, setSelectedSubmissions, fetchQueue,
   } = useClerkQueue(courtId, Boolean(review) || actionInProgress);
   const filings = queue?.filings ?? [];
-  const total = queue?.total ?? 0;
   const pageCount = queue ? Math.ceil(queue.total / queue.page_size) : 0;
   const selectedFiling = review?.filing;
   const [reviewReason, setReviewReason] = useState('');
@@ -54,7 +53,8 @@ function ReviewQueue() {
     focusAfterRefresh.current = null;
     const rows = queue?.filings ?? [];
     const next = rows[Math.min(pending.index, rows.length - 1)];
-    (next ? document.getElementById(`queue-filing-${next.id}`) : queueHeading.current)?.focus();
+    if (next) focusQueueRow(next.id);
+    else queueHeading.current?.focus();
   }, [queue, loading]);
 
   async function handleReview(filing: FilingEnvelope, action: 'accept' | 'reject' | 'return') {
@@ -159,19 +159,9 @@ function ReviewQueue() {
 
   return (
     <div className="clerk-review">
-      <StaffCourtSelect disabled={!!review || actionInProgress} />
       <div className="clerk-header">
         <PageHeading headingRef={queueHeading}>Clerk Review Queue</PageHeading>
-        <div className="clerk-header-stats">
-          <div className="stat-card">
-            <span className="stat-number">{queue ? total : '—'}</span>
-            <span className="stat-label">Matching filings</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-number">{queue?.waiting_48h ?? '—'}</span>
-            <span className="stat-label">Waiting 48+ hours</span>
-          </div>
-        </div>
+        <StaffCourtSelect disabled={!!review || actionInProgress} />
       </div>
 
       <div className="queue-controls">
@@ -188,11 +178,12 @@ function ReviewQueue() {
           }}
           onRefresh={() => void fetchQueue()}
         />
-        {queue && <span className="queue-meta">
-          Measured: {formatDateTime(queue.as_of)}. {queue.oldest_submitted_at && <>Oldest matching receipt: {formatDateTime(queue.oldest_submitted_at)}. </>}
-          Ages are elapsed time since receipt.
-        </span>}
       </div>
+
+      {queue && <p className="queue-meta">
+        {plural(queue.total, 'matching filing')} · {queue.waiting_48h} waiting at least 48 hours
+        {queue.oldest_submitted_at && ` · Oldest received ${formatDateTime(queue.oldest_submitted_at)}`}
+      </p>}
 
       {reviewError && (
         <div className="alert alert-error" role="alert">
@@ -206,13 +197,13 @@ function ReviewQueue() {
       {/* Batch actions */}
       {selectedSubmissions.size > 0 && statusFilter !== 'waivers' && (
         <div className="batch-actions">
-          <span>{selectedSubmissions.size} filing(s) selected</span>
+          <span>{plural(selectedSubmissions.size, 'filing')} selected</span>
           <button
             className="btn btn-success btn-small"
             onClick={handleBatchAccept}
             disabled={loading || actionInProgress}
           >
-            {actionInProgress ? 'Processing...' : `Accept ${selectedSubmissions.size} Filing(s)`}
+            {actionInProgress ? 'Processing...' : `Accept ${plural(selectedSubmissions.size, 'filing')}`}
           </button>
           <button
             className="btn btn-secondary btn-small"
@@ -230,19 +221,22 @@ function ReviewQueue() {
             <thead>
               <tr>
                 <th className="th-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={selectedSubmissions.size === filings.length && filings.length > 0}
-                    onChange={toggleSelectAll}
-                    aria-label="Select all filings"
-                    disabled={loading || actionInProgress || statusFilter === 'waivers'}
-                  />
+                  <label className="queue-select-all">
+                    <input
+                      type="checkbox"
+                      checked={selectedSubmissions.size === filings.length && filings.length > 0}
+                      onChange={toggleSelectAll}
+                      aria-label="Select all filings"
+                      disabled={loading || actionInProgress || statusFilter === 'waivers'}
+                    />
+                    <span aria-hidden="true">Select all</span>
+                  </label>
                 </th>
-                <th>Filing #</th>
+                <th>Filing</th>
                 <th>Case title</th>
                 <th>Submitted</th>
                 <th>Age</th>
-                <th>Docs</th>
+                <th>Documents</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -255,10 +249,6 @@ function ReviewQueue() {
                     id={`queue-filing-${filing.id}`}
                     className={review?.id === filing.id ? 'selected' : ''}
                     onClick={() => openReview(filing.id)}
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && e.target === e.currentTarget) openReview(filing.id);
-                    }}
                   >
                     <td className="td-checkbox" onClick={(e) => e.stopPropagation()}>
                       <input
@@ -269,14 +259,22 @@ function ReviewQueue() {
                         disabled={loading || actionInProgress || statusFilter === 'waivers'}
                       />
                     </td>
-                    <td className="filing-num">#{filing.id}</td>
-                    <td className="filing-title">{filing.case_title || 'Untitled'}</td>
-                    <td className="filing-date">{formatDateTime(filing.submitted_at)}</td>
-                    <td>
+                    <td className="filing-num">
+                      <button
+                        type="button"
+                        className="queue-review-button"
+                        onClick={(e) => { e.stopPropagation(); openReview(filing.id); }}
+                      >
+                        Review filing #{filing.id}
+                      </button>
+                    </td>
+                    <td className="filing-title" data-label="Case title">{filing.case_title || 'Untitled'}</td>
+                    <td className="filing-date" data-label="Submitted">{formatDateTime(filing.submitted_at)}</td>
+                    <td data-label="Age">
                       <span className={`age-badge ${age.level}`}>{age.text}</span>
                     </td>
-                    <td>{filing.document_count}</td>
-                    <td>
+                    <td data-label="Documents">{filing.document_count}</td>
+                    <td data-label="Status">
                       <span className={`status-badge ${filing.status}`}>
                         {filing.status.replace('_', ' ')}
                       </span>

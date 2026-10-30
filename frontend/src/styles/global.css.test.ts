@@ -78,6 +78,14 @@ it('stacks the case search rows below 600 px instead of scrolling them sideways'
   expect(css).toMatch(/@media \(min-width: 600px\) and \(max-width: 760px\) \{\s+\.search-results table,/);
 });
 
+it('stacks the queue rows below 600 px and keeps Select all on screen there', () => {
+  const below600 = css.slice(css.indexOf('@media (max-width: 599px) {\n  .case-search-table table'));
+  expect(below600).toMatch(/\.queue-list tbody tr \{\s+display: grid;/);
+  expect(below600).toMatch(/\.queue-list td\[data-label\]::before \{\s+content: attr\(data-label\);/);
+  expect(below600).toMatch(/\.queue-list thead \.th-checkbox \{\s+position: static;/);
+  expect(below600).toMatch(/\.queue-select-all span \{\s+display: inline;/);
+});
+
 it('hides the outline of a focused page heading only when the browser would not show a focus ring', () => {
   const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)]
     .filter(([, , body]) => /outline:\s*(none|0)/.test(body))

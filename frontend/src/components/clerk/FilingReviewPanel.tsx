@@ -5,6 +5,7 @@ import LoadError from '../common/LoadError';
 import DocumentDownload from '../common/DocumentDownload';
 import { getDocumentLabel } from '../../utils/documentTypes';
 import { formatBytes, formatDateTime } from '../../utils/format';
+import { focusQueueRow } from './useClerkQueue';
 import type { LoadFailure } from '../../utils/errors';
 
 const COMMON_REASONS = [
@@ -38,14 +39,14 @@ function FilingReviewPanel({
   return (
     <div className="filing-detail-panel">
       <div className="detail-panel-header">
-        <h3 ref={reviewHeading} tabIndex={-1}>Filing #{review.id}</h3>
+        <h2 ref={reviewHeading} tabIndex={-1}>Filing #{review.id}</h2>
         {selectedFiling && <span className={`status-badge ${selectedFiling.status}`}>
           {selectedFiling.status.replace('_', ' ')}
         </span>}
         <button type="button" className="btn btn-secondary btn-small" disabled={actionInProgress}
           onClick={() => {
             closeReview();
-            document.getElementById(`queue-filing-${review.id}`)?.focus();
+            focusQueueRow(review.id);
           }}>
           Close review
         </button>
@@ -57,7 +58,7 @@ function FilingReviewPanel({
         This filing is no longer awaiting intake review. Refresh the queue for current work.
       </p>}
       <div className="detail-section">
-        <h4>Case information</h4>
+        <h3>Case information</h3>
         <p>{selectedFiling.submission_count ? `Reviewing submission ${selectedFiling.submission_count}` : 'Reviewing a legacy submission without a recorded submission number'}</p>
         <Link to={`/filings/${selectedFiling.id}/history`} className="btn btn-secondary btn-small">Receipts &amp; history</Link>
         {selectedFiling.fee_waiver_requested && <p>
@@ -80,7 +81,7 @@ function FilingReviewPanel({
       </div>
 
       <div className="detail-section">
-        <h4>Documents ({selectedFiling.documents.length})</h4>
+        <h3>Documents ({selectedFiling.documents.length})</h3>
         <div className="doc-list">
           {selectedFiling.documents.map((doc) => (
             <div key={doc.id} className="doc-item">
@@ -106,7 +107,7 @@ function FilingReviewPanel({
       </div>
 
       <div className="detail-section">
-        <h4>Review actions</h4>
+        <h3>Review actions</h3>
 
         <div className="form-group">
           <label htmlFor="quickReason">Reason (required for reject/return)</label>
