@@ -10,10 +10,8 @@ Try the live demo at https://demo.tomcedoz.com.
 
 ## Why this exists
 
-Today, e-filing in Michigan is split across several vendors and systems. Attorneys lose
-hours moving between systems that do not work together. Self-represented litigants face
-complex procedures with no guidance. MUEFS is an alternative with one login and one
-interface for filing in Michigan's courts.
+E-filing in Michigan is split across several vendors and systems. MUEFS is an alternative
+with one login and one interface for filing in Michigan's courts.
 
 ## MUEFS compared with MiFILE
 
@@ -140,8 +138,8 @@ MUEFS/
   dashboard shows the current count.
 - The system tells you when a motion needs a companion document: a brief (MCR 2.119), a
   meet-and-confer certification (MCR 2.313) or a proposed order.
-- File a motion in one click: open a case and click "File with Court". The court, case and
-  case type are filled in for you.
+- File from the docket: open a case and click "File in this case". The court, case and case
+  type are filled in for you.
 - Star cases so you can find them quickly in later sessions.
 - Save drafts to your account. You can recover unsaved edits in the same browser tab, and
   compare conflicting changes before you replace the saved details.
@@ -160,7 +158,7 @@ MUEFS/
   receipt credits or demo payments).
 - Court fee review: ask for an itemized assessment and see the remaining balance. When the
   court changes the amount, your earlier payment credits are kept.
-- The process goes step by step, so no legal knowledge of e-filing procedures is needed.
+- The process goes step by step.
 
 ### For court clerks
 
@@ -193,7 +191,7 @@ MUEFS/
 - Scoped administration: court delegates manage their own court's staff. System
   administrators control identity bindings and administrator rights.
 - The system shows counts of courts, users, cases, filings and pending reviews.
-- It is open source, with no vendor lock-in.
+- The code is open source.
 
 ### For the public and press
 
@@ -311,7 +309,7 @@ model, the threat boundaries and the hardening guide.
 - Accessibility needs an independent conformance evaluation. Responsive layouts and keyboard
   controls alone do not show WCAG compliance.
 
-### Why this is lower-risk than the status quo
+### One open codebase
 
 MUEFS is one open-source codebase that can be audited, with a documented security review and
 `SECURITY.md`, instead of several closed vendor systems. There is no lock-in: identity,
@@ -327,6 +325,3 @@ and what is only a demonstration, plus the planned roadmap.
 ## License
 
 MUEFS is licensed under AGPL-3.0. See [LICENSE](LICENSE) for details.
-
-This project is open source to remove barriers to building a unified e-filing system for
-Michigan.
