@@ -128,6 +128,16 @@ it('keeps the stored directory when a page that used it goes away', async () => 
   expect(get).toHaveBeenCalledTimes(1);
 });
 
+it('keeps a directory that arrived when its only caller leaves on receiving it', async () => {
+  const leaving = new AbortController();
+
+  await listCourtDirectory(leaving.signal).then(() => leaving.abort());
+
+  expect(requestSignal(0).aborted).toBe(false);
+  expect(await listCourtDirectory()).toEqual([wayne]);
+  expect(get).toHaveBeenCalledTimes(1);
+});
+
 it('asks again after a role switch', async () => {
   await listCourtDirectory();
   get.mockResolvedValue({ data: [washtenaw] });

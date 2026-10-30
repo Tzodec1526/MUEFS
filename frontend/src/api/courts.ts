@@ -23,6 +23,7 @@ interface DirectoryRequest {
   session: SessionSnapshot;
   controller: AbortController;
   callers: number;
+  fulfilled: boolean;
   entries: Promise<CourtDirectoryEntry[]>;
 }
 
@@ -33,10 +34,10 @@ function requestDirectory(): DirectoryRequest {
   const controller = new AbortController();
   const session = sessionSnapshot();
   const request: DirectoryRequest = {
-    session, controller, callers: 0,
+    session, controller, callers: 0, fulfilled: false,
     entries: apiClient.get<CourtDirectoryEntry[]>('/courts/directory', { signal: controller.signal }).then(({ data }) => data),
   };
-  request.entries.catch(() => { if (directory === request) directory = undefined; });
+  request.entries.then(() => { request.fulfilled = true; }, () => { if (directory === request) directory = undefined; });
   directory = request;
   return request;
 }
@@ -45,16 +46,18 @@ export function listCourtDirectory(signal?: AbortSignal): Promise<CourtDirectory
   if (signal?.aborted) return Promise.reject(new CanceledError());
   const request = directory && isCurrentSession(directory.session) ? directory : requestDirectory();
   request.callers += 1;
-  return new Promise((resolve, reject) => {
-    const leave = () => {
-      reject(new CanceledError());
-      request.callers -= 1;
-      if (request.callers > 0) return;
-      request.controller.abort();
-      if (directory === request) directory = undefined;
-    };
+  let stopListening = () => {};
+  return new Promise<CourtDirectoryEntry[]>((resolve, reject) => {
+    const leave = () => reject(new CanceledError());
     signal?.addEventListener('abort', leave, { once: true });
-    request.entries.then(resolve, reject).finally(() => signal?.removeEventListener('abort', leave));
+    stopListening = () => signal?.removeEventListener('abort', leave);
+    request.entries.then(resolve, reject);
+  }).finally(() => {
+    stopListening();
+    request.callers -= 1;
+    if (request.callers > 0 || request.fulfilled) return;
+    request.controller.abort();
+    if (directory === request) directory = undefined;
   });
 }
 
