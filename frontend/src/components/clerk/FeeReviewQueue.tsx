@@ -36,7 +36,7 @@ export default function FeeReviewQueue() {
     {current?.data && <>
       {!current.data.total && <p className="empty-state">No fee review requests are waiting.</p>}
       {current.data.filings.map(filing => <article className="review-card" key={filing.id}>
-        <h3>Filing #{filing.id}: {filing.case_title || 'Untitled filing'}</h3>
+        <h2 className="card-heading">Filing #{filing.id}: {filing.case_title || 'Untitled filing'}</h2>
         <p>{filing.filer_name} · {filing.status.replace(/_/g, ' ')} · Requested {formatDateTime(filing.requested_at)}</p>
         <Link className="btn btn-primary" to={`/filings/${filing.id}/fees`}>Review fees</Link>
       </article>)}

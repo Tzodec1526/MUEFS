@@ -88,7 +88,7 @@ export default function FilingHistoryPage() {
       <p className="info-text">A receipt records what this system received. Court acceptance is a separate decision.
         Times below are recorded in UTC. Service-only records do not prove delivery to another party.</p>
       <div className="review-card">
-        <h3>Filing date: {formatCourtDate(history.filing_date)}</h3>
+        <h2 className="card-heading">Filing date: {formatCourtDate(history.filing_date)}</h2>
         {history.filing_date_basis && <FilingDateEvidence basis={history.filing_date_basis} />}
         {history.filing_date_basis?.source !== 'court_order' && <p>This date uses the court&apos;s published business-day calendar. It does not decide relief from
           a deadline, the effect of a correction, or timely payment after a fee-waiver denial.</p>
@@ -101,13 +101,13 @@ export default function FilingHistoryPage() {
       {history.fee_waiver && <FeeWaiverPanel key={`${filingId}-${attempt}`} filingId={history.filing_id}
         waiver={history.fee_waiver} onChange={() => { setPage(1); setAttempt(n => n + 1); }} />}
       {history.transactions.length === 0 && <div className="empty-state">
-        <h3>No recorded transactions</h3>
+        <h2>No recorded transactions</h2>
         <p>Receipts are created when a filing is submitted. Filings that predate receipt tracking do not have reconstructed receipts.</p>
       </div>}
       <ol className="filing-timeline">
         {history.transactions.map(transaction => <li key={transaction.id} className="receipt-card">
           <div className="receipt-heading">
-            <h3>{eventLabels[transaction.event_type] || transaction.event_type}</h3>
+            <h2 className="card-heading">{eventLabels[transaction.event_type] || transaction.event_type}</h2>
             <span>{transaction.submission_number ? `Submission ${transaction.submission_number}`
               : ['payment_recorded', 'fee_payment_recorded', 'fee_payment_reversed', 'fee_review_requested', 'fee_assessed'].includes(transaction.event_type) ? 'Before submission' : 'Legacy filing'}</span>
           </div>
@@ -165,7 +165,7 @@ export default function FilingHistoryPage() {
           </p>}
           {transaction.details.cms_case_number && <p>Court case number: <strong>{transaction.details.cms_case_number}</strong></p>}
           {transaction.details.public_copy && transaction.details.document_id && <div className="receipt-documents">
-            <h4>Public copy recorded at this transaction</h4>
+            <h3 className="card-subheading">Public copy recorded at this transaction</h3>
             <p>{transaction.details.public_copy.title} · {formatBytes(transaction.details.public_copy.file_size_bytes)}</p>
             <DocumentDownload id={transaction.details.document_id} copyId={transaction.details.public_copy.id} title={transaction.details.public_copy.title} />
             <details><summary>Public copy fingerprint (SHA-256)</summary><code>{transaction.details.public_copy.sha256_hash}</code></details>
@@ -174,7 +174,7 @@ export default function FilingHistoryPage() {
             <Link to={`/documents/${transaction.details.document_id}/publication`}>Manage document public access</Link>
           </p>}
           {transaction.details.documents && <>
-            <h4>Documents recorded ({transaction.details.documents.length})</h4>
+            <h3 className="card-subheading">Documents recorded ({transaction.details.documents.length})</h3>
             <ul className="receipt-documents">{transaction.details.documents.map(doc => <li key={doc.id}>
               <div className="receipt-document-heading"><strong>{doc.title}</strong>
                 <div className="participant-actions"><DocumentDownload id={doc.id} title={doc.title} />

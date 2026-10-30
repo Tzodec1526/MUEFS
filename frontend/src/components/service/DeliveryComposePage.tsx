@@ -71,7 +71,7 @@ export default function DeliveryComposePage() {
     {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {!current && <p role="status">Loading documents and service instructions…</p>}
     {data && <>
-      <div className="review-card"><h3>{data.court_name}</h3><p>{data.case_number} · {data.case_title}</p></div>
+      <div className="review-card"><h2 className="card-heading">{data.court_name}</h2><p>{data.case_number} · {data.case_title}</p></div>
       {!data.enabled && <p className="alert alert-warning">Document delivery is not enabled for this deployment. Follow the court&apos;s service instructions.</p>}
       {error && <p role="alert" className="alert alert-error">{error}</p>}
       <form onSubmit={send}>
@@ -86,7 +86,7 @@ export default function DeliveryComposePage() {
                 {doc.is_confidential && <span className="status-badge">Confidential — review recipient authority</span>}</span></label>
             <DocumentDownload id={doc.id} title={doc.title} />
           </div>)}
-          <h3>Recipients and service instructions</h3>
+          <h2 className="card-heading">Recipients and service instructions</h2>
           <p>{data.total} active case participant{data.total === 1 ? '' : 's'}. Review every page for people who need another service method.</p>
           {data.recipients.map(contact => <div className="service-choice" key={contact.participant_id}>
             <label className="checkbox-label"><input type="checkbox" disabled={contact.issues.length > 0}
@@ -103,7 +103,7 @@ export default function DeliveryComposePage() {
             <span>Page {page} of {Math.ceil(data.total / data.page_size)}</span>
             <button type="button" className="btn btn-secondary" disabled={page * data.page_size >= data.total} onClick={() => setPage(n => n + 1)}>Next participants</button>
           </nav>}
-          <div className="review-card"><h3>Review this delivery</h3>
+          <div className="review-card"><h2 className="card-heading">Review this delivery</h2>
             <p>{selection.documents.length} document{selection.documents.length === 1 ? '' : 's'} · {selection.contacts.length} recipient{selection.contacts.length === 1 ? '' : 's'}</p>
             <ul>{selection.contacts.map(contact => <li key={contact.contact_id}>{contact.name} · {contact.email}
               {' '}<button type="button" className="btn btn-small btn-secondary" onClick={() => { setReviewed(false); setSelection(s => ({ ...s, contacts: s.contacts.filter(c => c.contact_id !== contact.contact_id) })); }}>Remove {contact.name}</button>

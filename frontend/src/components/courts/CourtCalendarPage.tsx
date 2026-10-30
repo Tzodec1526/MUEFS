@@ -122,7 +122,7 @@ export default function CourtCalendarPage() {
         </form>
       </details>}
       <form className="review-card" onSubmit={preview}>
-        <h3>Check a receipt timestamp</h3>
+        <h2 className="card-heading">Check a receipt timestamp</h2>
         <div className="form-group"><label htmlFor="calendar-received">Received timestamp, including UTC offset</label>
           <input id="calendar-received" name="received_at" placeholder="2026-09-05T03:59:00Z" required /></div>
         <button className="btn btn-secondary" disabled={busy}>Check filing date</button>
@@ -136,7 +136,7 @@ export default function CourtCalendarPage() {
       </form>
       {data.calendars.length === 0 && <p className="alert alert-warning">No calendar has been published. Filing dates cannot be established from a calendar yet.</p>}
       {data.calendars.map(calendar => <article className="review-card" key={calendar.id}>
-        <h3>Calendar revision #{calendar.id}</h3>
+        <h2 className="card-heading">Calendar revision #{calendar.id}</h2>
         <p>{formatCourtDate(calendar.valid_from)} – {formatCourtDate(calendar.valid_through)} · {calendar.timezone}</p>
         <p>Authority: {calendar.authority_reference}</p>
         <p>Published: {formatDateTime(calendar.published_at)}</p>

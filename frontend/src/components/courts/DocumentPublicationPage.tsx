@@ -130,13 +130,13 @@ export default function DocumentPublicationPage() {
     {current?.data && <>
       <Link to={`/filings/${current.data.filing_id}/history`}>Back to filing receipts &amp; history</Link>
       <div className="publication-grid">
-        <section className="review-card"><h3>Filed original</h3><p><strong>{current.data.document.title}</strong></p>
+        <section className="review-card"><h2 className="card-heading">Filed original</h2><p><strong>{current.data.document.title}</strong></p>
           <p>{formatBytes(current.data.document.file_size_bytes)} · {current.data.filing_status}</p>
           <p>{current.data.document.is_confidential ? 'Restricted to the filer and assigned court staff.' : 'Available through the case docket, subject to case access.'}</p>
           <DocumentDownload id={current.data.document.id} title={current.data.document.title} />
           <details><summary>Original fingerprint</summary><code>{current.data.document.sha256_hash}</code></details>
         </section>
-        <section className="review-card"><h3>Active public copy</h3>
+        <section className="review-card"><h2 className="card-heading">Active public copy</h2>
           {current.data.current_copy ? <><p><strong>{current.data.current_copy.title}</strong></p>
             <p>{formatBytes(current.data.current_copy.file_size_bytes)} · {current.data.current_copy.page_count} page{current.data.current_copy.page_count === 1 ? '' : 's'}</p>
             <DocumentDownload id={current.data.document.id} copyId={current.data.current_copy.id} title={current.data.current_copy.title} />
@@ -145,7 +145,7 @@ export default function DocumentPublicationPage() {
         </section>
       </div>
       {current.data.can_withhold && <form className="review-card" key={`withhold:${documentId}:${current.data.version}`} onSubmit={event => change(event, false)}>
-        <h3>Withhold public access</h3>
+        <h2 className="card-heading">Withhold public access</h2>
         <p>Use the court&apos;s authority to withhold the original and any active public copy while review is pending. Previously downloaded files cannot be recalled.</p>
         <div className="form-group"><label htmlFor="withhold-reason">Reason and authority for withholding</label>
           <textarea id="withhold-reason" name="reason" maxLength={2000} required rows={2} /></div>
@@ -153,7 +153,7 @@ export default function DocumentPublicationPage() {
       </form>}
       {current.data.publication_block ? <p className="alert alert-info">{current.data.publication_block}</p> : <>
         <form className="review-card" onSubmit={prepare} key={`prepare:${documentId}`}>
-          <h3>Prepare a public copy</h3>
+          <h2 className="card-heading">Prepare a public copy</h2>
           <p>Upload a court-reviewed PDF with the required redactions. Preparation retains a separate copy for review; the original and its receipt stay intact.</p>
           <div className="form-group"><label htmlFor="public-title">Title approved for the public docket</label>
             <input id="public-title" name="title" maxLength={500} required /></div>
@@ -162,7 +162,7 @@ export default function DocumentPublicationPage() {
           <button className="btn btn-secondary" disabled={busy}>{busy ? 'Working…' : 'Prepare copy for review'}</button>
         </form>
         {selected && <form className="review-card" key={`review:${documentId}:${selected.id}:${current.data.version}`} onSubmit={event => change(event, true)}>
-          <h3 ref={reviewHeading} tabIndex={-1}>Review prepared copy</h3><p><strong>{selected.title}</strong> · {selected.page_count} page{selected.page_count === 1 ? '' : 's'} · {formatBytes(selected.file_size_bytes)}</p>
+          <h2 className="card-heading" ref={reviewHeading} tabIndex={-1}>Review prepared copy</h2><p><strong>{selected.title}</strong> · {selected.page_count} page{selected.page_count === 1 ? '' : 's'} · {formatBytes(selected.file_size_bytes)}</p>
           <DocumentDownload id={current.data.document.id} copyId={selected.id} title={selected.title} />
           <details><summary>Prepared copy fingerprint</summary><code>{selected.sha256_hash}</code></details>
           {selected.pii_warnings.length > 0 && <div className="alert alert-warning"><strong>Review these scan warnings before publishing:</strong>

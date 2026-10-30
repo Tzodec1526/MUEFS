@@ -74,7 +74,17 @@ tr.selected {
   margin-bottom: 1rem;
 }
 
+.card-heading {
+  font-size: 1.17em;
+  line-height: inherit;
+}
+
+.card-subheading {
+  font-size: 1em;
+}
+
 .review-card h4,
+.review-card .card-subheading,
 .review-card.review-summary h3,
 .draft-conflict h3 {
   font-size: 0.95rem;

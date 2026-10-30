@@ -10,9 +10,11 @@ import LoadError from '../common/LoadError';
 const FeeAssessmentForm = lazy(() => import('../clerk/FeeAssessmentForm'));
 const PaymentRecordsPanel = lazy(() => import('./PaymentRecordsPanel'));
 
-export default function PaymentForm({ filingId, onFeesChange }: {
-  filingId: number; onFeesChange?: (filing: FilingEnvelope, obligationMet: boolean) => void;
+export default function PaymentForm({ filingId, headingLevel = 3, onFeesChange }: {
+  filingId: number; headingLevel?: 2 | 3; onFeesChange?: (filing: FilingEnvelope, obligationMet: boolean) => void;
 }) {
+  const Heading = `h${headingLevel}` as const;
+  const Subheading = headingLevel === 2 ? 'h3' : 'h4';
   const [result, setResult] = useState<{ key: string; fees?: FilingFees; filing?: FilingEnvelope; error?: LoadFailure }>();
   const [attempt, setAttempt] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('credit_card');
@@ -89,7 +91,7 @@ export default function PaymentForm({ filingId, onFeesChange }: {
     (fees.can_pay && fees.payments_simulated) || fees.can_request_waiver
   );
   return <div className="review-card filing-fees">
-    <div className="page-header"><h3>Filing fees &amp; payments</h3>
+    <div className="page-header"><Heading className="card-heading">Filing fees &amp; payments</Heading>
       <button className="btn btn-secondary btn-small" disabled={busy} onClick={() => { setError(''); setAttempt(n => n + 1); }}>Refresh fees</button></div>
     {notice && <p className="alert alert-success" role="status">{notice}</p>}
     {error && <p className="alert alert-error" role="alert">{error}</p>}
@@ -112,7 +114,7 @@ export default function PaymentForm({ filingId, onFeesChange }: {
     <button className="btn btn-secondary" aria-expanded={paymentsOpen} disabled={busy}
       onClick={() => setPaymentsOpen(value => !value)}>{paymentsOpen ? 'Hide payment records' : 'View payment records'}</button>
     {paymentsOpen && <Suspense fallback={<p role="status">Loading payment records…</p>}>
-      <PaymentRecordsPanel key={filingId} fees={fees} onBusyChange={setBusy}
+      <PaymentRecordsPanel key={filingId} fees={fees} Heading={Subheading} onBusyChange={setBusy}
         onChanged={message => { setNotice(message); setAttempt(n => n + 1); }} />
     </Suspense>}
     {fees.can_request_review && <form onSubmit={requestReview} className="fee-review-request">
@@ -122,7 +124,7 @@ export default function PaymentForm({ filingId, onFeesChange }: {
     </form>}
     {fees.can_pay && !fees.payments_simulated && <p className="info-text">Online payment is unavailable. Contact the court about payment options.</p>}
     {canChoosePayment && <>
-      <div className="payment-methods"><h4>Payment or waiver</h4><div className="payment-option-list">
+      <div className="payment-methods"><Subheading className="card-subheading">Payment or waiver</Subheading><div className="payment-option-list">
         {[
           { value: 'credit_card', label: 'Credit card' }, { value: 'debit_card', label: 'Debit card' },
           { value: 'ach', label: 'ACH / eCheck' }, { value: 'waiver', label: 'Fee waiver request' },

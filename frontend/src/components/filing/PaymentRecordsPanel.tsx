@@ -9,8 +9,8 @@ import LoadError from '../common/LoadError';
 
 type PendingRequest = { path: string; body: Record<string, unknown>; key?: string };
 
-export default function PaymentRecordsPanel({ fees, onChanged, onBusyChange }: {
-  fees: FilingFees; onChanged: (message: string) => void; onBusyChange: (busy: boolean) => void;
+export default function PaymentRecordsPanel({ fees, Heading, onChanged, onBusyChange }: {
+  fees: FilingFees; Heading: 'h3' | 'h4'; onChanged: (message: string) => void; onBusyChange: (busy: boolean) => void;
 }) {
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
@@ -71,7 +71,7 @@ export default function PaymentRecordsPanel({ fees, onChanged, onBusyChange }: {
   }
 
   return <section className="payment-records" aria-label="Payment records">
-    <div className="page-header"><h4>Payment records for filing #{fees.filing_id}</h4>
+    <div className="page-header"><Heading className="card-subheading">Payment records for filing #{fees.filing_id}</Heading>
       {fees.can_record_external_payment && current?.records && !stale && !editing && <button className="btn btn-secondary" onClick={() => {
         setEditing('new'); setError('');
       }}>Record external receipt</button>}</div>

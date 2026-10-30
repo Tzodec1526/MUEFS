@@ -99,7 +99,7 @@ function Favorites() {
               <div className="favorite-card-star">&#9733;</div>
               <div className="favorite-card-body">
                 <div className="favorite-card-header">
-                  <h4>{fav.case_title || 'Untitled Case'}</h4>
+                  <h3>{fav.case_title || 'Untitled Case'}</h3>
                   <span className="favorite-card-number">{fav.case_number || `Case #${fav.case_id}`}</span>
                 </div>
                 {fav.notes && <p className="favorite-card-notes">{fav.notes}</p>}
@@ -147,7 +147,7 @@ function Favorites() {
               <div className="favorite-card-star">&#9733;</div>
               <div className="favorite-card-body">
                 <div className="favorite-card-header">
-                  <h4>{fav.court_name || `Court #${fav.court_id}`}</h4>
+                  <h3>{fav.court_name || `Court #${fav.court_id}`}</h3>
                   <span className="favorite-card-number">{fav.county ? `${fav.county} County` : ''} {fav.court_type ? `| ${fav.court_type}` : ''}</span>
                 </div>
                 {fav.notes && <p className="favorite-card-notes">{fav.notes}</p>}

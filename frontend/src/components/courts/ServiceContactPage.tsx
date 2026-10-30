@@ -49,7 +49,7 @@ function ContactForm({ path, records, onSaved }: {
     finally { setBusy(false); }
   }
   return <form className="admin-account-form" onSubmit={save}>
-    <h3>{contact ? 'Review service instructions' : 'Record service instructions'}</h3>
+    <h2 className="card-heading">{contact ? 'Review service instructions' : 'Record service instructions'}</h2>
     <div className="form-group"><label htmlFor="service-method">Recorded service method</label>
       <select id="service-method" value={method} onChange={event => setMethod(event.target.value as keyof typeof methods)}>
         {Object.entries(methods).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -135,7 +135,7 @@ export default function ServiceContactPage() {
     {!current && <p role="status">Loading service instructions…</p>}
     {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
-      <h3>{court?.court_name || `Court ${current.data.court_id}`} · {current.data.case_number} · {current.data.title}</h3>
+      <h2 className="card-heading">{court?.court_name || `Court ${current.data.court_id}`} · {current.data.case_number} · {current.data.title}</h2>
       <p><strong>{current.data.participant.party_name}</strong> · {participantRoles[current.data.participant.role] || current.data.participant.role}
         {current.data.participant.represented_party_name && <> · Represents {current.data.participant.represented_party_name}</>}</p>
       <p>Record the court-reviewed destination and method for this participant. These instructions do not send documents or establish that service occurred.</p>

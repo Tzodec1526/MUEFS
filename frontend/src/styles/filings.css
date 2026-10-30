@@ -78,7 +78,7 @@
 .receipt-card {
   margin-block: 1.25rem; padding: 1.5rem; border-radius: var(--radius); background: var(--white);
 }
-.receipt-heading h3 { margin: 0; }
+.receipt-heading h2 { margin: 0; }
 .receipt-heading > span { color: var(--muted); font-size: .9rem; }
 .receipt-reference { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
 .receipt-details { display: grid; gap: .9rem; margin-block: 1.25rem; }

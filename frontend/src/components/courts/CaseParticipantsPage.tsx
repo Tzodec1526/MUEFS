@@ -57,7 +57,7 @@ function ParticipantForm({ caseId, record, version, onSaved }: {
     finally { setBusy(false); }
   }
   return <form className="admin-account-form" onSubmit={save}>
-    <h3>{record ? 'Edit participant' : 'Add participant'}</h3>
+    <h2 className="card-heading">{record ? 'Edit participant' : 'Add participant'}</h2>
     {record && !record.reviewed_at && <p className="alert alert-info">This legacy record requires court review before it can grant restricted-case access.</p>}
     <div className="admin-form-grid">
       <div className="form-group"><label htmlFor="participant-name">Participant name</label>
@@ -160,7 +160,7 @@ function ParticipantHistory({ caseId }: { caseId: string }) {
     return field === 'user_id' ? `Account ${value}` : String(value);
   }
   return <section className="admin-detail-section">
-    <h3>Retained case access history</h3>
+    <h2 className="card-heading">Retained case access history</h2>
     {!current && <p role="status">Loading history…</p>}
     {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
@@ -217,7 +217,7 @@ export default function CaseParticipantsPage() {
     {!current && <p role="status">Loading participant records…</p>}
     {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
-      <h3>{current.data.case_number} · {current.data.title}</h3>
+      <h2 className="card-heading">{current.data.case_number} · {current.data.title}</h2>
       <p><strong>{current.data.is_sealed ? 'Public case access is restricted.' : 'Public case access is enabled.'}</strong></p>
       <PublicAccessForm key={`${caseId}:${current.data.participant_version}`} caseId={caseId}
         restricted={current.data.is_sealed} version={current.data.participant_version}

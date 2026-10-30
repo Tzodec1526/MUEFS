@@ -31,7 +31,7 @@ function DeliveryHistory({ deliveryId }: { deliveryId: string }) {
       .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load delivery history.') }); });
     return () => controller.abort();
   }, [deliveryId, kind, page, key]);
-  return <div className="review-card"><h3>Retained delivery history</h3>
+  return <div className="review-card"><h2 className="card-heading">Retained delivery history</h2>
     <label htmlFor="delivery-history-kind">Records to display</label>
     <select id="delivery-history-kind" value={kind} onChange={event => { setKind(event.target.value); setPage(1); }}>
       <option value="portal">Delivery activity</option><option value="email">Email attempts</option>
@@ -121,15 +121,15 @@ export default function DeliveryDetailPage() {
     {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {error && <p role="alert" className="alert alert-error">{error}</p>}
     {data && <>
-      <div className="review-card"><h3>{data.court_name}</h3><p>{data.case_number} · {data.case_title}</p>
+      <div className="review-card"><h2 className="card-heading">{data.court_name}</h2><p>{data.case_number} · {data.case_title}</p>
         <p>From {data.sender} to {data.contact.name} · {data.contact.email}</p>
         <p>Recorded {formatDateTime(data.created_at)}</p>
         <p>Service authority: {data.contact.authority}</p>
         <p className="receipt-reference">Delivery reference: <code>{data.id}</code></p>
       </div>
-      <div className="review-card"><h3>Documents in this delivery</h3>
+      <div className="review-card"><h2 className="card-heading">Documents in this delivery</h2>
         <ul className="service-list">{data.documents.map(doc => <li className="service-choice" key={doc.id}>
-          <h4>{doc.title}</h4><p>{formatBytes(doc.file_size_bytes)}{doc.is_confidential && ' · Confidential'}</p>
+          <h3 className="card-subheading">{doc.title}</h3><p>{formatBytes(doc.file_size_bytes)}{doc.is_confidential && ' · Confidential'}</p>
           <DocumentDownload id={doc.id} title={doc.title} deliveryId={data.id} />
           <details><summary>Retained document fingerprint</summary><code>{doc.sha256_hash}</code></details>
         </li>)}</ul>
@@ -138,7 +138,7 @@ export default function DeliveryDetailPage() {
         {data.can_acknowledge && <button className="btn btn-primary" disabled={busy} onClick={() => void act('acknowledge')}>Acknowledge receipt of this package</button>}
         <p>An acknowledgment records the recipient&apos;s statement. A download request records a request, and does not establish that the transfer completed.</p>
       </div>
-      <div className="review-card"><h3>Email alert</h3><p>{deliveryLabels[data.delivery_status] || data.delivery_status}</p>
+      <div className="review-card"><h2 className="card-heading">Email alert</h2><p>{deliveryLabels[data.delivery_status] || data.delivery_status}</p>
         <p>Current attempt: {data.attempt_count}</p>
         {data.last_error && <p className="alert alert-warning">{data.last_error}</p>}
         <p>Relay acceptance does not confirm inbox delivery or completed legal service. Follow the court&apos;s requirements for proof of service.</p>

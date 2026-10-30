@@ -52,7 +52,7 @@ export default function FeeWaiverPanel({ filingId, waiver, onChange }: {
   }
 
   return <div className="review-card fee-waiver-panel">
-    <h3>Fee waiver: {state}</h3>
+    <h2 className="card-heading">Fee waiver: {state}</h2>
     <p>The application and signed decision are nonpublic. Filing acceptance is a separate decision.</p>
     {waiver.granted !== null && !waiver.decided_at && <p className="alert alert-warning">
       This is a legacy waiver state. A separate signed decision was not recorded in this system.

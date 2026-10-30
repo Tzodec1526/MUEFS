@@ -45,7 +45,7 @@ function DeliveryDetails({ notice, onRetry }: { notice: NotificationItem; onRetr
   }
 
   return <div className="notice-delivery">
-    <h4>Email history for notice #{notice.id}</h4>
+    <h3 className="card-subheading">Email history for notice #{notice.id}</h3>
     {error && <LoadError failure={error} onRetry={() => setAttempt(n => n + 1)} />}
     {!history && !error && <p role="status">Loading email history…</p>}
     {history && <>
@@ -144,7 +144,7 @@ export default function NotificationsPage() {
       {!data.email_enabled && <p className="alert alert-warning">Email delivery is not enabled. These notices are available in the portal.</p>}
       <p>{data.total} notice{data.total === 1 ? '' : 's'}</p>
       {data.notifications.map(notice => <article className="review-card notice-card" key={notice.id}>
-        <h3>{notice.subject}</h3>
+        <h2 className="card-heading">{notice.subject}</h2>
         <p className="notice-body">{notice.body}</p>
         <p><strong>{deliveryLabels[notice.delivery_status] || notice.delivery_status}</strong> · {notice.attempt_count} email attempt{notice.attempt_count === 1 ? '' : 's'}</p>
         {notice.email_recipient && <p>Recipient: {notice.email_recipient}</p>}

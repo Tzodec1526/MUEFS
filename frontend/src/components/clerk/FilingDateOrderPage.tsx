@@ -69,7 +69,7 @@ export default function FilingDateOrderPage() {
     {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {data && <>
       <div className="review-card">
-        <h3>Current record</h3>
+        <h2 className="card-heading">Current record</h2>
         <p>Submission {data.submission_count || 'not recorded'} · {data.status.replace(/_/g, ' ')}</p>
         <p>Receipt time: {formatDateTime(data.submitted_at)}</p>
         <p>Filing date: <strong>{formatCourtDate(data.filing_date)}</strong></p>
@@ -78,7 +78,7 @@ export default function FilingDateOrderPage() {
         <button className="btn btn-secondary btn-small" disabled={busy} onClick={() => { setError(''); setAttempt(n => n + 1); }}>Refresh dates</button>
       </div>
       {data.order_block ? <p className="alert alert-warning">{data.order_block}</p> : <form className="review-card" key={key} onSubmit={record}>
-        <h3>Signed court order</h3>
+        <h2 className="card-heading">Signed court order</h2>
         <p>Record the date exactly as ordered. This decision applies to the current submission and preserves its receipt time and status.
           A later corrected submission requires its own date review.</p>
         <fieldset disabled={busy}>

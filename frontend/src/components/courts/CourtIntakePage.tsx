@@ -112,7 +112,7 @@ function IntakeHistory({ courtId }: { courtId: number }) {
     return () => controller.abort();
   }, [courtId, page, key]);
   return <section aria-label="Intake change history">
-    <h3>Intake change history</h3>
+    <h2 className="card-heading">Intake change history</h2>
     {!current && <p role="status">Loading intake changes…</p>}
     {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
@@ -121,7 +121,7 @@ function IntakeHistory({ courtId }: { courtId: number }) {
         const previous = new Map(change.before.case_types.map(item => [item.id, item.is_active]));
         const typeChanges = change.after.case_types.filter(item => previous.get(item.id) !== item.is_active);
         return <article className="review-card" key={change.id}>
-          <h4>Revision {change.after.version} · {change.actor_name}</h4>
+          <h3 className="card-subheading">Revision {change.after.version} · {change.actor_name}</h3>
           <p>{formatDateTime(change.timestamp)}</p>
           <p><strong>Reason:</strong> {change.reason}</p>
           <p><strong>Authority:</strong> {change.authority_reference}</p>
@@ -174,10 +174,10 @@ export default function CourtIntakePage() {
       <p>Current availability and instructions published by the court.</p></div>
       <Link className="btn btn-secondary" to={`/courts/${data.court_id}/calendar`}>Court calendar</Link></div>
     <div className="review-card">
-      <h3>{data.is_efiling_enabled ? 'Court intake enabled' : 'Court intake closed'}</h3>
+      <h2 className="card-heading">{data.is_efiling_enabled ? 'Court intake enabled' : 'Court intake closed'}</h2>
       {!data.is_efiling_enabled && <p>New electronic submissions and corrections are currently unavailable.</p>}
       {(data.public_notice || !data.is_efiling_enabled) && <>
-        <h4>Notice from the court</h4>
+        <h3 className="card-subheading">Notice from the court</h3>
         <p className="intake-notice">{data.public_notice || 'Contact the court for filing options.'}</p>
       </>}
       <p>For deadlines or alternative filing arrangements, follow the court&apos;s instructions.</p>

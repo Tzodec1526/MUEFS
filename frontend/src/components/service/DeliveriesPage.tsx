@@ -44,7 +44,7 @@ export default function DeliveriesPage() {
     {data && <>
       {!data.deliveries.length && <p className="empty-state">No document deliveries recorded.</p>}
       <ul className="service-list">{data.deliveries.map(item => <li className="review-card" key={item.id}>
-        <h3><Link to={`/service/deliveries/${item.id}`}>{item.name || `Documents from ${item.actor_name}`}</Link></h3>
+        <h2 className="card-heading"><Link to={`/service/deliveries/${item.id}`}>{item.name || `Documents from ${item.actor_name}`}</Link></h2>
         {item.email && <p>{item.email}</p>}
         <p><time dateTime={item.created_at}>{formatDateTime(item.created_at)}</time></p>
         <p>{deliveryLabels[item.delivery_status] || item.delivery_status}</p>

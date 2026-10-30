@@ -106,7 +106,7 @@ export default function PaymentRegisterPage() {
       {!current && <p role="status">Loading receipt activity…</p>}
       {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
       {report && <>
-        <h3>{report.date_from} through {report.date_to} · {report.timezone}</h3>
+        <h2 className="card-heading">{report.date_from} through {report.date_to} · {report.timezone}</h2>
         <p>{report.total} recorded {report.total === 1 ? 'entry' : 'entries'} · Generated {formatDateTime(report.generated_at, report.timezone)} ({report.timezone})</p>
         <dl className="register-totals">
           <div><dt>External credits</dt><dd>{formatCents(report.totals.credits_cents)}</dd></div>

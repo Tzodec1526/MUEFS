@@ -9,6 +9,6 @@ export default function FilingFeesPage() {
   return <section className="filing-fees-page">
     <div className="page-header"><PageHeading>Filing #{filingId}: fees &amp; payments</PageHeading>
       <Link className="btn btn-secondary" to={`/filings/${filingId}/history`}>Receipts &amp; history</Link></div>
-    <PaymentForm filingId={Number(filingId)} />
+    <PaymentForm filingId={Number(filingId)} headingLevel={2} />
   </section>;
 }
