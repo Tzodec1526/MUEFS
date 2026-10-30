@@ -23,6 +23,7 @@ function ReviewQueue() {
   const [queue, setQueue] = useState<ClerkQueue | null>(null);
   const filings = queue?.filings ?? [];
   const total = queue?.total ?? 0;
+  const pageCount = queue ? Math.ceil(queue.total / queue.page_size) : 0;
   const [review, setReview] = useState<{
     id: number; filing?: FilingEnvelope; error?: LoadFailure;
   } | null>(null);
@@ -59,7 +60,7 @@ function ReviewQueue() {
       const result = await getClerkQueue(courtId, { ...filters, page, signal: controller.signal });
       if (controller.signal.aborted) return;
       if (page > 1 && result.filings.length === 0) {
-        setPage(Math.max(1, Math.ceil(result.total / 25)));
+        setPage(Math.max(1, Math.ceil(result.total / result.page_size)));
         return;
       }
       setQueue(result);
@@ -398,14 +399,14 @@ function ReviewQueue() {
               )}
             </tbody>
           </table>
-          {total > 25 && (
+          {pageCount > 1 && (
             <div className="pagination">
               <button className="btn btn-secondary btn-small" disabled={page <= 1 || loading || actionInProgress}
                 onClick={() => { setLoading(true); setPage((p) => p - 1); setSelectedSubmissions(new Map()); closeReview(); }}>
                 Previous
               </button>
-              <span>Page {page} of {Math.ceil(total / 25)}</span>
-              <button className="btn btn-secondary btn-small" disabled={page >= Math.ceil(total / 25) || loading || actionInProgress}
+              <span>Page {page} of {pageCount}</span>
+              <button className="btn btn-secondary btn-small" disabled={page >= pageCount || loading || actionInProgress}
                 onClick={() => { setLoading(true); setPage((p) => p + 1); setSelectedSubmissions(new Map()); closeReview(); }}>
                 Next
               </button>

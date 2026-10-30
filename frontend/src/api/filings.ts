@@ -272,6 +272,7 @@ export async function reviewFiling(
 export interface ClerkQueue {
   filings: FilingSummary[];
   total: number;
+  page_size: number;
   submitted_count: number;
   under_review_count: number;
   waiting_48h: number;

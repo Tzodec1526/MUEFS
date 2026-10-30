@@ -40,6 +40,7 @@ function CaseSearch() {
   const [courtReloadKey, setCourtReloadKey] = useState(0);
   const [results, setResults] = useState<CaseSearchResult[]>([]);
   const [total, setTotal] = useState(0);
+  const [pageCount, setPageCount] = useState(0);
   const [searching, setSearching] = useState(false);
   const [favoritedIds, setFavoritedIds] = useState<Set<number>>(() => new Set());
   const [togglingFav, setTogglingFav] = useState<number | null>(null);
@@ -89,6 +90,7 @@ function CaseSearch() {
         setError({ message, retry: false });
         setResults([]);
         setTotal(0);
+        setPageCount(0);
         setSearching(false);
         return;
       }
@@ -102,11 +104,13 @@ function CaseSearch() {
         if (controller.signal.aborted) return;
         setResults(data.cases);
         setTotal(data.total);
+        setPageCount(Math.ceil(data.total / data.page_size));
       } catch (err) {
         if (controller.signal.aborted) return;
         setError(loadFailure(err, "We couldn't reach the records system. Please try again."));
         setResults([]);
         setTotal(0);
+        setPageCount(0);
       } finally {
         if (!controller.signal.aborted) setSearching(false);
       }
@@ -306,7 +310,7 @@ function CaseSearch() {
                   : 'No public filings to show yet.'}
             </p>
           )}
-          {results.length > 0 && Math.ceil(total / 25) > 1 && (
+          {results.length > 0 && pageCount > 1 && (
             <div className="pagination">
               <button
                 className="btn btn-secondary btn-small"
@@ -315,10 +319,10 @@ function CaseSearch() {
               >
                 Previous
               </button>
-              <span>Page {page} of {Math.ceil(total / 25)}</span>
+              <span>Page {page} of {pageCount}</span>
               <button
                 className="btn btn-secondary btn-small"
-                disabled={page >= Math.ceil(total / 25) || searching}
+                disabled={page >= pageCount || searching}
                 onClick={() => goToPage(page + 1)}
               >
                 Next

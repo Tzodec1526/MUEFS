@@ -40,7 +40,7 @@ function serveQueues(...lists: number[][]) {
   vi.mocked(getClerkQueue).mockImplementation(async (): Promise<ClerkQueue> => {
     const ids = lists[Math.min(call++, lists.length - 1)];
     return {
-      filings: ids.map(summary), total: ids.length, submitted_count: ids.length, under_review_count: 0,
+      filings: ids.map(summary), total: ids.length, page_size: 25, submitted_count: ids.length, under_review_count: 0,
       waiting_48h: 0, oldest_submitted_at: null, as_of: '2026-09-28T13:00:00Z',
     };
   });
@@ -160,7 +160,7 @@ it('returns focus to the open review when an action fails', async () => {
 
 function serveQueuePage(ids: number[], total: number) {
   vi.mocked(getClerkQueue).mockResolvedValue({
-    filings: ids.map(summary), total, submitted_count: total, under_review_count: 0,
+    filings: ids.map(summary), total, page_size: 25, submitted_count: total, under_review_count: 0,
     waiting_48h: 0, oldest_submitted_at: null, as_of: '2026-09-28T13:00:00Z',
   });
 }
