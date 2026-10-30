@@ -510,7 +510,7 @@ async def submit_filing(
             "Stored documents changed after integrity verification. Review the draft and try again."
         )
     now = datetime.now(UTC)
-    received_at = await first_receipt(db, filing) or now
+    filing.filed_at = filing.filed_at or filing.submitted_at or now
     filing.submitted_at = now
     filing.reviewed_at = None
     filing.reviewer_id = None
@@ -519,7 +519,7 @@ async def submit_filing(
     filing.submission_count += 1
     filing.filing_date_version += 1
     if filing.filing_type != "service_only" and filing.filing_date is None:
-        assessment = await filing_date_for_receipt(db, filing.court_id, received_at)
+        assessment = await filing_date_for_receipt(db, filing.court_id, filing.filed_at)
         filing.filing_date = assessment.filing_date
         filing.filing_date_basis = assessment.model_dump(mode="json")
 
@@ -589,16 +589,6 @@ async def verify_review(
     return ReviewEvidence(date_version, ordered_date, fingerprints)
 
 
-async def first_receipt(db: AsyncSession, filing: FilingEnvelope) -> datetime | None:
-    if filing.submission_count <= 1:
-        return filing.submitted_at
-    first = await db.scalar(select(func.min(FilingTransaction.occurred_at)).where(
-        FilingTransaction.filing_id == filing.id,
-        FilingTransaction.event_type == "submitted",
-    ))
-    return first or filing.submitted_at
-
-
 async def record_review(
     db: AsyncSession,
     filing_id: int,
@@ -648,7 +638,7 @@ async def record_review(
     filing.reviewed_at = now
 
     if action == "accept":
-        received_at = await first_receipt(db, filing)
+        received_at = filing.filed_at or filing.submitted_at
         if received_at is None:
             raise FilingDateUnavailableError("The filing has no recorded receipt time")
         if not ordered_date:

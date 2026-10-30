@@ -5,12 +5,18 @@ from pathlib import Path
 import pytest
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from sqlalchemy import MetaData, Table, create_engine, text
+from sqlalchemy import MetaData, Table, create_engine, inspect, select, text, update
 from sqlalchemy.exc import DBAPIError
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from alembic import command
 from app.demo.schema import prepare_demo_schema
+from app.models.filing import FilingEnvelope
+from app.models.filing_transaction import FilingTransaction
 from tests.test_filing_concurrency import postgres_sessions as postgres_sessions
+from tests.test_filing_history import filing_fixture
+
+FIRST_RECEIPT_BASE = "e6b3f0a72c95"
 
 
 @pytest.mark.skipif(not os.getenv("MUEFS_TEST_POSTGRES_URL"), reason="PostgreSQL not configured")
@@ -299,6 +305,88 @@ def test_unversioned_demo_upgrade_preserves_filings(tmp_path):
             assert conn.scalar(text("SELECT email_message FROM notifications")) is None
     finally:
         engine.dispose()
+
+
+async def check_first_receipt_migration(sessions):
+    engine = sessions.kw["bind"]
+
+    def migrate(connection, operation, revision):
+        config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+        config.set_main_option(
+            "script_location", str(Path(__file__).resolve().parents[1] / "alembic"),
+        )
+        config.attributes["connection"] = connection
+        getattr(command, operation)(config, revision)
+
+    async def run(operation, revision):
+        async with engine.connect() as connection:
+            await connection.run_sync(migrate, operation, revision)
+
+    async def columns():
+        async with engine.connect() as connection:
+            return await connection.run_sync(lambda sync: {
+                column["name"] for column in inspect(sync).get_columns("filing_envelopes")
+            })
+
+    await run("upgrade", "head")
+    received = datetime(2026, 9, 4, 20, tzinfo=UTC)
+    corrected = datetime(2026, 9, 16, 20, tzinfo=UTC)
+    async with sessions.begin() as db:
+        with_history, filer, *_ = await filing_fixture(db)
+        copy = text(
+            "INSERT INTO filing_envelopes (court_id, case_type_id, filer_id, case_title, "
+            "filing_type, status, fee_waiver_requested, submission_count) "
+            "SELECT court_id, case_type_id, filer_id, case_title, filing_type, status, "
+            "fee_waiver_requested, submission_count FROM filing_envelopes WHERE id = :id "
+            "RETURNING id"
+        )
+        without_history = await db.scalar(copy, {"id": with_history})
+        draft = await db.scalar(copy, {"id": with_history})
+        for row, moment in [(with_history, corrected), (without_history, received)]:
+            await db.execute(update(FilingEnvelope).where(FilingEnvelope.id == row).values(
+                submitted_at=moment,
+            ))
+        for event, moment in [
+            ("filing_date_assessed", datetime(2026, 9, 1, 20, tzinfo=UTC)),
+            ("submitted", corrected), ("submitted", received),
+        ]:
+            db.add(FilingTransaction(
+                filing_id=with_history, submission_number=1, event_type=event, actor_id=filer,
+                actor_name="Synthetic filer", occurred_at=moment, details={},
+            ))
+
+    await run("downgrade", FIRST_RECEIPT_BASE)
+    assert "filed_at" not in await columns()
+    await run("upgrade", "head")
+    async with sessions() as db:
+        stored = dict((await db.execute(select(
+            FilingEnvelope.id, FilingEnvelope.filed_at,
+        ))).all())
+    assert stored == {with_history: received, without_history: received, draft: None}
+
+    await run("downgrade", FIRST_RECEIPT_BASE)
+    await run("upgrade", "head")
+    async with sessions.begin() as db:
+        await db.execute(update(FilingEnvelope).where(FilingEnvelope.id == without_history).values(
+            submitted_at=corrected,
+        ))
+    with pytest.raises(RuntimeError, match="first receipt"):
+        await run("downgrade", FIRST_RECEIPT_BASE)
+    assert "filed_at" in await columns()
+
+
+async def test_first_receipt_migration_on_sqlite(tmp_path):
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'migrated.db'}")
+    try:
+        await check_first_receipt_migration(async_sessionmaker(engine, expire_on_commit=False))
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.skipif(not os.getenv("MUEFS_TEST_POSTGRES_URL"), reason="PostgreSQL not configured")
+@pytest.mark.parametrize("postgres_sessions", [True], indirect=True)
+async def test_first_receipt_migration_on_postgres(postgres_sessions):
+    await check_first_receipt_migration(postgres_sessions)
 
 
 def test_retained_history_cannot_be_downgraded(tmp_path):

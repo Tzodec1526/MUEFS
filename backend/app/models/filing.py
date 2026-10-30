@@ -80,6 +80,7 @@ class FilingEnvelope(Base):
     )
     case_title: Mapped[str | None] = mapped_column(String(500))
     filing_description: Mapped[str | None] = mapped_column(Text)
+    filed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     submitted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     reviewed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)

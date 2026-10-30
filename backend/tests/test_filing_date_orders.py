@@ -1,5 +1,5 @@
 import hashlib
-from datetime import UTC, date
+from datetime import UTC, date, datetime
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -288,6 +288,48 @@ async def test_a_resubmitted_filing_is_accepted_on_its_ordered_date(
     case = await db_session.get(Case, accepted.case_id)
     assert accepted.status == FilingStatus.ACCEPTED
     assert case.filing_date == accepted.filing_date == date(2026, 9, 3)
+
+
+async def test_a_filing_returned_before_transaction_history_keeps_its_ordered_date(
+    db_session, monkeypatch, stored_document,
+):
+    fid, _, clerk, _ = await filing_fixture(db_session)
+    received = datetime(2026, 9, 4, 20, tzinfo=UTC)
+    corrected = datetime(2026, 9, 16, 20, tzinfo=UTC)
+    order = stored_document(fid, document_type_code="FILING_DATE_ORDER", title="Order")
+    order.retained_at = received
+    db_session.add_all([stored_document(fid), order])
+    await db_session.flush()
+    filing = await filing_service.get_filing(db_session, fid)
+    filing.status, filing.submitted_at = FilingStatus.RETURNED, received
+    filing.filing_date = date(2026, 9, 3)
+    filing.filing_date_basis = {
+        "source": "court_order", "filing_date": "2026-09-03", "order_document_id": order.id,
+        "order_signed_date": "2026-09-05", "authority_reference": "Synthetic order REF-101",
+        "submission_number": 0,
+    }
+    await db_session.flush()
+    assert filing.submission_count == 0
+    assert await db_session.scalar(select(func.count()).select_from(FilingTransaction)) == 0
+
+    class ReceiptClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return corrected
+
+    monkeypatch.setattr(filing_service, "datetime", ReceiptClock)
+    await filing_service.submit_filing(db_session, fid)
+    monkeypatch.setattr(filing_service, "datetime", datetime)
+    accepted = await filing_service.review_filing(
+        db_session, fid, clerk, "accept", expected_submission_count=1
+    )
+    case = await db_session.get(Case, accepted.case_id)
+    assert accepted.status == FilingStatus.ACCEPTED
+    assert accepted.filing_date == case.filing_date == date(2026, 9, 3)
+    assert accepted.filing_date_basis["source"] == "court_order"
+    assert case.filed_date == received
+    assert accepted.submitted_at == corrected
+    assert accepted.filed_at == received
 
 
 async def test_authority_and_validation_block_unreviewed_or_unreceived_orders(
