@@ -1,4 +1,3 @@
-// @ts-check
 import js from '@eslint/js';
 import eslintReact from '@eslint-react/eslint-plugin';
 import { defineConfig, globalIgnores } from 'eslint/config';
