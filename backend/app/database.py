@@ -1,4 +1,5 @@
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Dialect, TypeDecorator
@@ -43,7 +44,17 @@ class UTCDateTime(TypeDecorator[datetime]):
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Use function scope so commit failures can prevent a successful HTTP response."""
-    async with async_session() as session:
+    async with session_scope(
+        async_session, drain=document_service.uses_local_storage(),
+    ) as session:
+        yield session
+
+
+@asynccontextmanager
+async def session_scope(
+    sessions: async_sessionmaker[AsyncSession], *, drain: bool,
+) -> AsyncIterator[AsyncSession]:
+    async with sessions() as session:
         try:
             yield session
         except BaseException:
@@ -52,14 +63,10 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         try:
             await session.commit()
         except BaseException:
-            await storage_intent.rollback_with_upload_cleanup(
-                session, verify_with=async_session,
-            )
+            await storage_intent.rollback_with_upload_cleanup(session, verify_with=sessions)
             raise
         queued = storage_intent.queued_deletion(session.sync_session)
-    if queued and document_service.uses_local_storage():
-        # Deployments that keep documents on local disk (the demos) run no storage
-        # worker: delete removed drafts' files once their removal has committed.
-        from app import storage_cleanup  # it imports this module
+    if queued and drain:
+        from app import storage_cleanup
 
-        await storage_cleanup.drain(async_session)
+        await storage_cleanup.drain(sessions)

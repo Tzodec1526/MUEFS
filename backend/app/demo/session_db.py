@@ -27,9 +27,9 @@ from sqlalchemy import URL, create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app import storage_cleanup
 from app.config import settings
-from app.services import document_service, storage_intent
+from app.database import session_scope
+from app.services import document_service
 
 COOKIE_NAME = "muefs_demo_sid"
 SHARED_SID = "_shared"
@@ -252,22 +252,8 @@ async def get_demo_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
     ))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     try:
-        async with factory() as session:
-            try:
-                yield session
-            except BaseException:
-                await storage_intent.rollback_with_upload_cleanup(session)
-                raise
-            try:
-                await session.commit()
-            except BaseException:
-                await storage_intent.rollback_with_upload_cleanup(session, verify_with=factory)
-                raise
-            queued = storage_intent.queued_deletion(session.sync_session)
-        # No worker serves sandbox databases: delete removed drafts' files now, so they
-        # stop counting against the sandbox's quota.
-        if queued:
-            await storage_cleanup.drain(factory)
+        async with session_scope(factory, drain=True) as session:
+            yield session
     finally:
         with anyio.CancelScope(shield=True):
             await engine.dispose()
