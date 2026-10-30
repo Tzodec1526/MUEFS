@@ -24,7 +24,7 @@ function DeliveryDetails({ notice, onRetry }: { notice: NotificationItem; onRetr
   const requestKey = `${notice.id}:${page}:${attempt}`;
   const current = result?.key === requestKey ? result : undefined;
   const history = current?.data;
-  const error = actionError ? { message: actionError, retry: true } : current?.error;
+  const error = current?.error;
   useEffect(() => {
     const controller = new AbortController();
     apiClient.get<DeliveryHistory>(`/notifications/${notice.id}/delivery`, { params: { page }, signal: controller.signal })
@@ -46,7 +46,7 @@ function DeliveryDetails({ notice, onRetry }: { notice: NotificationItem; onRetr
 
   return <div className="notice-delivery">
     <h4>Email history for notice #{notice.id}</h4>
-    {error && <LoadError failure={error} onRetry={() => { setActionError(null); setAttempt(n => n + 1); }} />}
+    {error && <LoadError failure={error} onRetry={() => setAttempt(n => n + 1)} />}
     {!history && !error && <p role="status">Loading email history…</p>}
     {history && <>
       {history.message_id && <p className="receipt-reference">Message-ID: <code>{history.message_id}</code></p>}
@@ -67,6 +67,7 @@ function DeliveryDetails({ notice, onRetry }: { notice: NotificationItem; onRetr
       {history.can_retry && <form onSubmit={retry}>
         <div className="form-group"><label htmlFor={`retry-${notice.id}`}>Reason for requesting another email</label>
           <input id={`retry-${notice.id}`} name="reason" maxLength={1000} required /></div>
+        {actionError && <p className="alert alert-error" role="alert">{actionError}</p>}
         <button className="btn btn-secondary" disabled={busy}>{busy ? 'Queuing…' : 'Queue another email'}</button>
       </form>}
     </>}
