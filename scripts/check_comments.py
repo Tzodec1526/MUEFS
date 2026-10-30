@@ -133,17 +133,41 @@ def shell_findings(text, first_line=1):
 
 def yaml_comment_column(line):
     quote = None
-    previous = ""
-    for column, char in enumerate(line):
+    node_start = True
+    flow_depth = 0
+    index = 0
+    while index < len(line):
+        char = line[index]
+        following = line[index + 1:index + 2]
         if quote:
-            if char == quote:
+            if quote == '"' and char == "\\":
+                index += 1
+            elif char == quote and quote == "'" and following == "'":
+                index += 1
+            elif char == quote:
                 quote = None
-        elif char in "\"'" and previous in ("", ":", "-", ",", "[", "{"):
+        elif char == "#" and (index == 0 or line[index - 1] in " \t"):
+            return index
+        elif char == ":" and (flow_depth or following in ("", " ", "\t")):
+            node_start = True
+        elif char == "," and flow_depth:
+            node_start = True
+        elif char in "[{" and (node_start or flow_depth):
+            flow_depth += 1
+            node_start = True
+        elif char in "]}" and flow_depth:
+            flow_depth -= 1
+        elif node_start and char in "-?" and following in ("", " ", "\t"):
+            pass
+        elif node_start and char in "!&":
+            while index + 1 < len(line) and line[index + 1] not in " \t":
+                index += 1
+        elif node_start and char in "\"'":
             quote = char
-        elif char == "#" and (column == 0 or line[column - 1] in " \t"):
-            return column
-        if not char.isspace():
-            previous = char
+            node_start = False
+        elif char not in " \t":
+            node_start = False
+        index += 1
     return None
 
 
