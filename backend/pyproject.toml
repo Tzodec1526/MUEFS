@@ -9,8 +9,6 @@ description = "Michigan Unified E-Filing System - Backend API"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.121.1",
-    # Imported directly (thread pools, cancellation shields, storage errors), not only
-    # through FastAPI and boto3.
     "starlette>=0.40.0",
     "anyio>=4.0.0",
     "uvicorn[standard]>=0.30.0",
@@ -38,10 +36,8 @@ test = [
     "httpx>=0.27.0",
     "ruff>=0.4.0",
     "mypy>=1.10.0",
-    "aiosqlite>=0.20.0",  # async SQLite driver used by the demo and the test suite
+    "aiosqlite>=0.20.0",
 ]
-# `dev` is an alias for `test` so both `pip install -e ".[test]"` (README) and
-# `pip install -e ".[dev]"` (CI) pull the same tooling.
 dev = ["muefs-backend[test]"]
 
 [tool.setuptools.packages.find]
@@ -51,13 +47,10 @@ include = ["app*"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 filterwarnings = [
-    # SQLite batch migrations reflect `users`, whose lower(email) index SQLAlchemy cannot
-    # reflect; the migration keeps it (asserted in test_filing_migration).
     "ignore:Skipped unsupported reflection of expression-based index ix_users_email_lower:sqlalchemy.exc.SAWarning",
 ]
 
 [tool.ruff]
-# Match requires-python, so lint never demands syntax 3.11 cannot run.
 target-version = "py311"
 line-length = 100
 
@@ -65,7 +58,6 @@ line-length = 100
 select = ["E", "F", "I", "N", "W", "UP"]
 
 [tool.ruff.lint.per-file-ignores]
-# Seed data carries long legal descriptions and MCR rule URLs that don't wrap cleanly.
 "app/seed_data.py" = ["E501"]
 "tests/test_demo_runner.py" = ["N802"]
 
