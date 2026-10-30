@@ -3,6 +3,8 @@ import { searchCases } from '../../api/cases';
 import { getCaseTypes } from '../../api/courts';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
+import { actionErrorMessage } from '../../api/client';
+import { emitToast } from '../../utils/toastBus';
 
 export interface CaseResult {
   id: number;
@@ -47,7 +49,10 @@ function CaseSelector({
       .then((types) => {
         if (active) setTypeNames(Object.fromEntries(types.map((t) => [t.id, t.name] as const)));
       })
-      .catch(() => { /* names are a nicety; ignore failures */ });
+      .catch((err: unknown) => {
+        const message = active && actionErrorMessage(err, 'Could not load the case type names.');
+        if (message) emitToast(message, 'error');
+      });
     return () => {
       active = false;
     };

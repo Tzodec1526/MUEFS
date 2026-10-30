@@ -114,3 +114,12 @@ it("shows the server's explanation of a failed favorite update once, in place of
   expect(addFavorite).toHaveBeenCalledWith(42);
   expect(screen.queryByText('Could not update favorite')).toBeNull();
 });
+
+it("reports once that the filer's favorite cases could not load", async () => {
+  localStorage.setItem('demo_role', 'attorney');
+  vi.mocked(listFavorites).mockRejectedValueOnce(new Error('Network Error'));
+  showCase(docket(true));
+
+  expect(await screen.findAllByText('Could not load your favorite cases.')).toHaveLength(1);
+  expect(screen.getByRole('button', { name: '☆ Favorite' })).toBeTruthy();
+});

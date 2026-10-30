@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { CanceledError } from 'axios';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { searchCases, type CaseSearchResult } from '../../api/cases';
@@ -164,4 +165,24 @@ it("links each result's case number to its docket", async () => {
 
   expect((await screen.findByRole('link', { name: '2026-000042-CZ' })).getAttribute('href')).toBe('/cases/42');
   expect(screen.getByRole('link', { name: '2026-000043-CZ' }).getAttribute('href')).toBe('/cases/43');
+});
+
+it("reports once that the filer's favorite cases could not load", async () => {
+  localStorage.setItem('demo_role', 'attorney');
+  serveResults([smith]);
+  vi.mocked(listFavorites).mockRejectedValue(new Error('Network Error'));
+  openSearch('/cases/search?party=Smith');
+
+  expect(await screen.findAllByText('Could not load your favorite cases.')).toHaveLength(1);
+});
+
+it('stays silent when the favorite cases request was cancelled', async () => {
+  localStorage.setItem('demo_role', 'attorney');
+  serveResults([smith]);
+  vi.mocked(listFavorites).mockRejectedValue(new CanceledError('The signed-in account changed.'));
+  openSearch('/cases/search?party=Smith');
+
+  await screen.findByRole('link', { name: '2026-000042-CZ' });
+  await waitFor(() => expect(listFavorites).toHaveBeenCalled());
+  expect(screen.queryByText('Could not load your favorite cases.')).toBeNull();
 });

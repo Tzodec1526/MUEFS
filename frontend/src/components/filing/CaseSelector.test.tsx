@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, expect, it, vi } from 'vitest';
 import { searchCases, type CaseSearchResult } from '../../api/cases';
 import { getCaseTypes, type CaseType } from '../../api/courts';
+import { ToastProvider } from '../common/Toast';
 import CaseSelector from './CaseSelector';
 
 vi.mock('../../api/cases', () => ({ searchCases: vi.fn() }));
@@ -39,4 +40,12 @@ it("carries an existing case's type name even after the court closed that type t
   fireEvent.click(await screen.findByRole('button', { name: 'Select' }));
 
   expect(onSelectExisting).toHaveBeenCalledWith(smithCase, 'General Civil');
+});
+
+it('reports once that the case type names could not load', async () => {
+  vi.mocked(getCaseTypes).mockRejectedValue(new Error('Network Error'));
+  render(<ToastProvider><CaseSelector courtId={3} courtName="Third Circuit Court" selectedCaseId={null} isNewChosen={false}
+    onChooseExisting={vi.fn()} onSelectExisting={vi.fn()} onSelectNew={vi.fn()} /></ToastProvider>);
+
+  expect(await screen.findAllByText('Could not load the case type names.')).toHaveLength(1);
 });

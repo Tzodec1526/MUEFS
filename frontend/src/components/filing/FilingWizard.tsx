@@ -14,6 +14,7 @@ import FilingReview from './FilingReview';
 import { emitToast } from '../../utils/toastBus';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { createFiling, getFiling, updateFiling, type FilingEnvelope } from '../../api/filings';
+import { actionErrorMessage } from '../../api/client';
 import LoadError from '../common/LoadError';
 import { getCase, type CaseDocket } from '../../api/cases';
 import { getCourt, getCaseTypes } from '../../api/courts';
@@ -203,11 +204,21 @@ function FilingForm({ userId }: { userId: number }) {
     const caseTypeId = searchParams.get('case_type_id');
     const caseId = searchParams.get('case_id');
     let active = true;
+    const report = (err: unknown, fallback: string) => {
+      const message = active && actionErrorMessage(err, fallback);
+      if (message) emitToast(message, 'error');
+    };
     type CaseLookup = { docket: CaseDocket | null; failure?: LoadFailure };
     Promise.all([
-      getCourt(Number(courtId)).catch(() => ({ name: `Court #${courtId}` })),
+      getCourt(Number(courtId)).catch((err: unknown) => {
+        report(err, "Could not load the court's name.");
+        return { name: `Court #${courtId}` };
+      }),
       // A display label for an existing case: keep it after the court closes the type to new cases.
-      caseTypeId ? getCaseTypes(Number(courtId), true).catch(() => []) : Promise.resolve([]),
+      caseTypeId ? getCaseTypes(Number(courtId), true).catch((err: unknown) => {
+        report(err, 'Could not load the case type name.');
+        return [];
+      }) : Promise.resolve([]),
       // The court's case record, not the link, names the case being filed into.
       caseId
         ? getCase(Number(caseId)).then(

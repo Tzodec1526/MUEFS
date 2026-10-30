@@ -72,7 +72,11 @@ function CaseDetailPage() {
           apiClient.get(`/cases/${caseId}/filings`, { signal: controller.signal }),
           !isFiler
             ? Promise.resolve({ favorites: [] as { case_id: number }[] })
-            : listFavorites().catch(() => ({ favorites: [] })),
+            : listFavorites().catch((err: unknown) => {
+              const message = !controller.signal.aborted && actionErrorMessage(err, 'Could not load your favorite cases.');
+              if (message) pushToast(message, 'error');
+              return { favorites: [] };
+            }),
         ]);
         if (controller.signal.aborted) return;
         setCaseData(caseRes.data);
@@ -110,7 +114,7 @@ function CaseDetailPage() {
     }
     load();
     return () => controller.abort();
-  }, [caseId, isFiler]);
+  }, [caseId, isFiler, pushToast]);
 
   const loadMoreFilings = async () => {
     const signal = requestRef.current?.signal;

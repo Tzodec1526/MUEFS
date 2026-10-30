@@ -95,16 +95,21 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
   }, [countyFilter, typeFilter, search, reloadKey, page]);
 
   useEffect(() => {
+    let active = true;
     async function loadFavorites() {
       try {
         const data = await listFavoriteCourts();
-        setFavoritedCourtIds(new Set(data.favorites.map(f => f.court_id)));
-      } catch {
+        if (active) setFavoritedCourtIds(new Set(data.favorites.map(f => f.court_id)));
+      } catch (err) {
+        if (!active) return;
         setFavoritedCourtIds(new Set());
+        const message = actionErrorMessage(err, 'Could not load your favorite courts.');
+        if (message) pushToast(message, 'error');
       }
     }
     loadFavorites();
-  }, []);
+    return () => { active = false; };
+  }, [pushToast]);
 
   const toggleFavoriteCourt = async (courtId: number) => {
     setTogglingFav(courtId);

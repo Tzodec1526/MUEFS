@@ -561,3 +561,21 @@ it('shows a saved filing that fails to load inline and loads it again on retry',
   await waitFor(() => expect(caption().value).toBe('Doe v. Roe'));
   expect(getFiling).toHaveBeenCalledTimes(2);
 });
+
+it("reports once that the court's name could not load for a filing link", async () => {
+  vi.mocked(getCase).mockResolvedValue(docket);
+  vi.mocked(getCourt).mockRejectedValue(new Error('Network Error'));
+  openWizard(CASE_LINK);
+
+  expect(await screen.findAllByText("Could not load the court's name.")).toHaveLength(1);
+  expect(screen.getByText('Court #3')).toBeTruthy();
+});
+
+it('reports once that the case type name could not load for a filing link', async () => {
+  vi.mocked(getCase).mockResolvedValue(docket);
+  vi.mocked(getCaseTypes).mockRejectedValue(new Error('Network Error'));
+  openWizard(CASE_LINK);
+
+  expect(await screen.findAllByText('Could not load the case type name.')).toHaveLength(1);
+  expect(screen.getByText('Third Circuit Court')).toBeTruthy();
+});

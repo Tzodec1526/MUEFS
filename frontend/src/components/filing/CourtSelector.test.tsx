@@ -108,3 +108,11 @@ it('reloads both the statewide and the trial courts on retry', async () => {
   expect(callsFor('appellate')).toHaveLength(2);
   expect(callsFor('trial')).toHaveLength(2);
 });
+
+it("reports once that the filer's favorite courts could not load", async () => {
+  serveCourts({ appellate: [[]], trial: [[]] });
+  vi.mocked(listFavoriteCourts).mockRejectedValue(new Error('Network Error'));
+  renderSelector();
+
+  expect(await screen.findAllByText('Could not load your favorite courts.')).toHaveLength(1);
+});

@@ -62,16 +62,19 @@ function CaseSearch() {
 
   useEffect(() => {
     if (!showFavorites) return;
+    let active = true;
     async function loadFavorites() {
       try {
         const data = await listFavorites();
-        setFavoritedIds(new Set(data.favorites.map((f) => f.case_id)));
-      } catch {
-        // not authenticated
+        if (active) setFavoritedIds(new Set(data.favorites.map((f) => f.case_id)));
+      } catch (err) {
+        const message = active && actionErrorMessage(err, 'Could not load your favorite cases.');
+        if (message) pushToast(message, 'error');
       }
     }
     loadFavorites();
-  }, [showFavorites]);
+    return () => { active = false; };
+  }, [showFavorites, pushToast]);
 
   useEffect(() => {
     const controller = new AbortController();
