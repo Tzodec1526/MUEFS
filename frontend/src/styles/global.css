@@ -2206,7 +2206,7 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
-h1[tabindex="-1"]:focus {
+h1[tabindex="-1"]:focus:not(:focus-visible) {
   outline: none;
 }
 

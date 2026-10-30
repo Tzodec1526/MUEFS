@@ -70,3 +70,11 @@ it('keeps no rules for classes that nothing renders', () => {
     .every(selector => unrenderedClasses(selector).length > 0));
   expect(unused).toEqual([]);
 });
+
+it('hides the outline of a focused page heading only when the browser would not show a focus ring', () => {
+  const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(([, , body]) => /outline:\s*(none|0)/.test(body))
+    .flatMap(([, prelude]) => splitSelectors(prelude.trim()))
+    .filter(selector => selector.startsWith('h1'));
+  expect(rules).toEqual(['h1[tabindex="-1"]:focus:not(:focus-visible)']);
+});
