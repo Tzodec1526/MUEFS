@@ -16,6 +16,10 @@ export function filingStatusLabel(status: string): string {
   return FILING_STATUS_LABELS[status] || status;
 }
 
+export function filingStatusInSentence(status: string): string {
+  return status === 'served' ? 'recorded for service' : filingStatusLabel(status).toLowerCase();
+}
+
 export function filingTypeLabel(type: string): string {
   return FILING_TYPE_LABELS[type] || type;
 }

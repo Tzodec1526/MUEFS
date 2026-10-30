@@ -687,8 +687,27 @@ it('saves edits to a saved filing and moves on to documents when the filer conti
   expect(stepButton('Documents').getAttribute('aria-current')).toBe('step');
 });
 
-async function openConflict() {
-  const latest = savedFiling({ case_title: 'Doe v. Roe, Inc.', filing_description: 'Amended complaint', details_token: LATEST_TOKEN });
+it.each([
+  ['served', 'Service documents recorded'],
+  ['under_review', 'Under review'],
+])('shows a closed %s filing with its status in words', async (status, label) => {
+  vi.mocked(getFiling).mockResolvedValue(savedFiling({ status: status as FilingEnvelope['status'] }));
+  openWizard('/filing/new?filing_id=7');
+
+  const heading = await screen.findByRole('heading', { level: 1, name: 'Filing #7' });
+
+  expect(heading.parentElement?.querySelector('.status-badge')?.textContent).toBe(label);
+});
+
+it('words the status on the link out of a conflict with a closed filing', async () => {
+  await openConflict({ status: 'served' });
+
+  expect(screen.getByRole('link', { name: 'Status: Service documents recorded. Open its history.' })
+    .getAttribute('href')).toBe('/filings/7/history');
+});
+
+async function openConflict(changes: Partial<FilingEnvelope> = {}) {
+  const latest = savedFiling({ case_title: 'Doe v. Roe, Inc.', filing_description: 'Amended complaint', details_token: LATEST_TOKEN, ...changes });
   vi.mocked(getFiling).mockResolvedValueOnce(savedFiling()).mockResolvedValue(latest);
   vi.mocked(updateFiling).mockRejectedValueOnce(conflictError());
   openWizard('/filing/new?filing_id=7&step=details');

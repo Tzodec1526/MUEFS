@@ -1,6 +1,7 @@
 import type { RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import type { FilingEnvelope } from '../../api/filings';
+import { filingStatusLabel } from '../../utils/filingStatus';
 
 interface DraftConflictProps {
   conflict: FilingEnvelope;
@@ -22,7 +23,7 @@ function DraftConflict({ conflict, edits, headingRef, onResolve }: DraftConflict
         <button className="btn btn-secondary" onClick={() => onResolve(false)}>Use saved details</button>
         {['draft', 'returned'].includes(conflict.status)
           ? <button className="btn btn-primary" onClick={() => onResolve(true)}>Keep my edits for next save</button>
-          : <Link to={`/filings/${conflict.id}/history`}>This filing is {conflict.status.replace('_', ' ')}. Open its history.</Link>}
+          : <Link to={`/filings/${conflict.id}/history`}>Status: {filingStatusLabel(conflict.status)}. Open its history.</Link>}
       </div>
     </section>
   );

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { getFiling, submitFiling, validateFiling, FilingValidation, FilingEnvelope } from '../../api/filings';
 import { getDocumentLabel } from '../../utils/documentTypes';
+import { filingStatusInSentence, filingStatusLabel } from '../../utils/filingStatus';
 import { formatBytes } from '../../utils/format';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import DocumentDownload from '../common/DocumentDownload';
@@ -121,7 +122,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
           </div>
           <div className="success-detail-row">
             <span>Status</span>
-            <span className={`status-badge ${submission.status}`}>{submission.status.replace('_', ' ')}</span>
+            <span className={`status-badge ${submission.status}`}>{filingStatusLabel(submission.status)}</span>
           </div>
         </div>
         <p className="success-note">
@@ -151,7 +152,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
       )}
 
       {!canSubmit && !readOnly && <p className="alert alert-warning" role="status">
-        This filing is now {filing.status.replace('_', ' ')}. <Link to={`/filings/${filingId}/history`}>View its receipt and current status</Link>.
+        This filing is now {filingStatusInSentence(filing.status)}. <Link to={`/filings/${filingId}/history`}>View its receipt and current status</Link>.
       </p>}
 
       {/* Filing Summary */}

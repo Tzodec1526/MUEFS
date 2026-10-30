@@ -15,6 +15,7 @@ import { defaultFilingData, useFilingDraft, type FilingData } from './useFilingD
 import { useWizardSteps } from './useWizardSteps';
 import { emitToast } from '../../utils/toastBus';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
+import { filingStatusLabel } from '../../utils/filingStatus';
 import { createFiling, getFiling, updateFiling, type FilingEnvelope } from '../../api/filings';
 import { actionErrorMessage } from '../../api/client';
 import { getCase, type CaseDocket } from '../../api/cases';
@@ -333,7 +334,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
         <Link to="/filings">Back to My filings</Link>
         <PageHeading>Filing #{loadedFiling.id}</PageHeading>
         {conflictView}
-        <p>Status: <span className={`status-badge ${loadedFiling.status}`}>{loadedFiling.status.replace('_', ' ')}</span></p>
+        <p>Status: <span className={`status-badge ${loadedFiling.status}`}>{filingStatusLabel(loadedFiling.status)}</span></p>
         {loadedFiling.rejection_reason && <p role="note">Clerk note: {loadedFiling.rejection_reason}</p>}
         <FilingReview filingId={loadedFiling.id} courtName={filingData.courtName} caseTypeName={filingData.caseTypeName} readOnly />
       </div>
