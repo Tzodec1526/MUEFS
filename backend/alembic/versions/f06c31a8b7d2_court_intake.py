@@ -1,5 +1,3 @@
-"""Version court intake publications without changing existing intake flags."""
-
 import sqlalchemy as sa
 
 from alembic import op

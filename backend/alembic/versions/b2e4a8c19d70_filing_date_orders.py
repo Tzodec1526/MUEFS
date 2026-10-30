@@ -1,5 +1,3 @@
-"""Version filing and case dates for retained court-order decisions."""
-
 import sqlalchemy as sa
 
 from alembic import op

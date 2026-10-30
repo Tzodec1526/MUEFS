@@ -1,5 +1,3 @@
-"""Court-reviewed service instructions; legacy addresses do not imply enrollment."""
-
 import sqlalchemy as sa
 
 from alembic import op
@@ -26,7 +24,6 @@ def upgrade() -> None:
         )
         batch.create_foreign_key("fk_service_contact_reviewer", "users", ["reviewer_id"], ["id"])
         batch.create_index("uq_service_contact_participant", ["participant_id"], unique=True)
-    # Preserve old addresses without guessing which participant or authority they belong to.
 
 
 def downgrade() -> None:

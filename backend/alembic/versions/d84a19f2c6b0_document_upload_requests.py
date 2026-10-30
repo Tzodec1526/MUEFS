@@ -1,5 +1,3 @@
-"""Retain completed upload requests so lost responses can be retried safely."""
-
 import sqlalchemy as sa
 
 from alembic import op

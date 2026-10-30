@@ -1,5 +1,3 @@
-"""Retain external payment credits, reversals and independent payment review versions."""
-
 import sqlalchemy as sa
 
 from alembic import op
@@ -86,4 +84,3 @@ def downgrade() -> None:
     for column in ("external_receipt", "external_receipt_key", "external_request_key"):
         op.drop_column("payments", column)
     op.drop_column("filing_envelopes", "payment_version")
-    # PostgreSQL keeps the unused enum label; no payment can use it without retained evidence.

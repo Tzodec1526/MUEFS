@@ -1,5 +1,3 @@
-"""Read pending filings in receipt order without sorting both review statuses."""
-
 from contextlib import nullcontext
 
 from sqlalchemy import text
@@ -29,7 +27,6 @@ def replace_index(old: str, new: str, columns: list[str], *, pending: bool = Fal
             new, "filing_envelopes", columns, if_not_exists=True,
             postgresql_concurrently=postgres, postgresql_where=predicate, sqlite_where=predicate,
         )
-        # The existing court/status/submitted index still covers general status queries.
         op.drop_index(old, if_exists=True, postgresql_concurrently=postgres)
 
 

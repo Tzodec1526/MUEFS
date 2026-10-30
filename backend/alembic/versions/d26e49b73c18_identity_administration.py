@@ -1,5 +1,3 @@
-"""Retain identity changes and prevent duplicate court grants."""
-
 import sqlalchemy as sa
 
 from alembic import op
@@ -36,8 +34,6 @@ def upgrade() -> None:
         sa.column("entity_id", sa.Integer()),
         sa.column("details", sa.JSON()),
     )
-    # Identical grants confer the same authority. Retain their old identifiers and
-    # timestamps in the audit log before enforcing uniqueness on the live assignments.
     for row in connection.execute(
         sa.select(roles).where(roles.c.id.not_in(first_grants))
     ).mappings():

@@ -1,5 +1,3 @@
-"""Retain court fee assessments and bind payments to their filing and assessment basis."""
-
 import sqlalchemy as sa
 
 from alembic import op
@@ -33,8 +31,6 @@ def upgrade() -> None:
         )
         batch.create_foreign_key("fk_payment_envelope", "filing_envelopes", ["envelope_id"], ["id"])
         batch.create_index("ix_payments_envelope_id", ["envelope_id"])
-    # Preserve only unambiguous historical links with the recorded payer. Ambiguous
-    # or orphaned legacy payments require reconciliation, not an invented association.
     op.execute("""UPDATE payments SET envelope_id = (
         SELECT MIN(f.id) FROM filing_envelopes AS f
         WHERE f.payment_id = payments.id AND f.filer_id = payments.payer_id

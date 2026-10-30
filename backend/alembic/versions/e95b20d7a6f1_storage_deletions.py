@@ -1,5 +1,3 @@
-"""Queue physical draft deletion in the transaction that removes its metadata."""
-
 import sqlalchemy as sa
 
 from alembic import op

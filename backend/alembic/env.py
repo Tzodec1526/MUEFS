@@ -11,8 +11,6 @@ from app.models import User
 
 config = context.config
 
-# Migrate the database the application uses. ConfigParser treats "%" in URL-encoded
-# passwords as syntax.
 database_url = settings.database_url
 config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
@@ -58,7 +56,6 @@ def run_migrations_online() -> None:
     if existing_connection is not None:
         do_run_migrations(existing_connection)
         return
-    # The application's drivers (asyncpg, aiosqlite) are asynchronous.
     if make_url(database_url).get_dialect().is_async:
         asyncio.run(run_async_migrations())
         return

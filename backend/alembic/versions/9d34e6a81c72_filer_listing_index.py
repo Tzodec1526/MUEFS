@@ -1,5 +1,3 @@
-"""Read a filer's newest page and status counts without scanning full envelopes."""
-
 from contextlib import nullcontext
 
 from sqlalchemy import text
@@ -23,7 +21,6 @@ def replace_index(old: str, new: str, columns: list[str]) -> None:
                 WHERE n.nspname = current_schema() AND c.relname = :name
             """), {"name": new})
             if valid is False:
-                # A cancelled concurrent build leaves an unusable index behind.
                 op.drop_index(new, postgresql_concurrently=True)
         op.create_index(
             new, "filing_envelopes", columns,

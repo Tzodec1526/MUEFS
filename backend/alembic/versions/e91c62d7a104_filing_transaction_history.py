@@ -1,9 +1,3 @@
-"""Retain submission manifests, decisions, and superseded documents.
-
-Revision ID: e91c62d7a104
-Revises: c4f8e2a91b0d
-"""
-
 import sqlalchemy as sa
 from alembic import op
 
@@ -19,7 +13,6 @@ def upgrade() -> None:
     ))
     op.add_column("filing_documents", sa.Column("retained_at", sa.DateTime(timezone=True)))
     op.add_column("filing_documents", sa.Column("removed_at", sa.DateTime(timezone=True)))
-    # Preserve known historical documents without fabricating receipts for old filings.
     op.execute("""UPDATE filing_documents SET retained_at = (
         SELECT submitted_at FROM filing_envelopes WHERE id = filing_documents.envelope_id
     )""")
@@ -54,7 +47,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # A routine rollback must not erase evidence of submissions or clerk decisions.
     raise RuntimeError(
         "This migration retains court transactions and cannot be downgraded automatically. "
         "Restore a verified pre-migration backup only under the court's recovery procedure."

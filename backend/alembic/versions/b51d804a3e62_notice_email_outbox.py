@@ -1,5 +1,3 @@
-"""Queue notices and retain SMTP attempts without treating acceptance as delivery."""
-
 import sqlalchemy as sa
 
 from alembic import op
@@ -12,7 +10,6 @@ depends_on = None
 
 def upgrade() -> None:
     op.add_column("users", sa.Column("verified_email", sa.String(255)))
-    # String-backed enum allows transport states without changing a PostgreSQL enum in use.
     if op.get_bind().dialect.name == "postgresql":
         op.alter_column(
             "notifications",
@@ -20,7 +17,6 @@ def upgrade() -> None:
             type_=sa.String(24),
             postgresql_using="delivery_status::text",
         )
-    # Earlier releases had no sender. Do not send a backlog when email is enabled.
     op.execute(
         "UPDATE notifications SET delivery_status='DISABLED' WHERE delivery_status='PENDING'"
     )
@@ -59,7 +55,6 @@ def upgrade() -> None:
         "notification_delivery_events",
         ["notification_id"],
     )
-    # Preserve old claims without presenting them as evidence from the new sender.
     op.execute("""INSERT INTO notification_delivery_events
         (notification_id, attempt_number, outcome, occurred_at, detail)
         SELECT id, 0, 'legacy_status', COALESCE(sent_at, created_at),
