@@ -121,7 +121,7 @@ it('keeps the chosen case type on screen when a category filter would hide it', 
   expect(screen.queryByText('No case types match your filters.')).toBeNull();
 });
 
-it('still says nothing matched when a search leaves only the chosen case type', async () => {
+it('says no other case type matched when a search leaves only the chosen case type', async () => {
   render(<Harness />);
   fireEvent.click(await screen.findByRole('radio', { name: /General Civil/ }));
   await screen.findByRole('heading', { name: 'Required documents (1)' });
@@ -130,7 +130,8 @@ it('still says nothing matched when a search leaves only the chosen case type', 
 
   expect(radioLabels()).toEqual(['General Civil$175.00Contract and other civil claims']);
   expect((screen.getByRole('radio', { name: /General Civil/ }) as HTMLInputElement).checked).toBe(true);
-  expect(screen.getByText('No case types match your filters.')).toBeTruthy();
+  expect(screen.queryByText('No other case types match your filters.')).not.toBeNull();
+  expect(screen.queryByText('No case types match your filters.')).toBeNull();
   expect(screen.getByRole('heading', { name: 'Required documents (1)' })).toBeTruthy();
 });
 

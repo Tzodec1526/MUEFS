@@ -193,7 +193,7 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
         ))}
       </fieldset>
       {!loading && !error && noMatches && (
-        <p className="no-results">No case types match your filters.</p>
+        <p className="no-results">{listed.length > 0 ? 'No other case types match your filters.' : 'No case types match your filters.'}</p>
       )}
 
       {selectedCaseTypeId && !currentRequirements && <p role="status">Loading filing requirements…</p>}
