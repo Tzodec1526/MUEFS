@@ -1,11 +1,10 @@
+import { readdirSync, readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 
 // Vitest serves stylesheet imports (even ?raw) as empty strings, so read the file itself.
-const fsModule = 'node:fs';
-const { readdirSync, readFileSync } = await import(/* @vite-ignore */ fsModule);
 const stylesDir = new URL('.', import.meta.url);
 const read = (name: string): string => readFileSync(new URL(name, stylesDir), 'utf8');
-const stylesheets: string[] = readdirSync(stylesDir).filter((name: string) => name.endsWith('.css')).sort();
+const stylesheets = readdirSync(stylesDir).filter(name => name.endsWith('.css')).sort();
 const css = stylesheets.filter(name => name !== 'global.css').map(read).join('\n');
 
 const corpus = Object.values({

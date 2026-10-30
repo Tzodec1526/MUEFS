@@ -8,3 +8,8 @@ interface ImportMetaEnv {
   readonly VITE_KEYCLOAK_CLIENT_ID?: string;
   readonly VITE_KEYCLOAK_REDIRECT_URI?: string;
 }
+
+declare module 'node:fs' {
+  export function readdirSync(path: URL): string[];
+  export function readFileSync(path: URL, encoding: 'utf8'): string;
+}
