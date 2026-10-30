@@ -172,7 +172,7 @@ export default function CourtIntakePage() {
   return <section className="court-intake-page">
     <div className="page-header"><div><PageHeading>{data.court_name}: filing intake</PageHeading>
       <p>Current availability and instructions published by the court.</p></div>
-      <Link className="btn btn-secondary" to={`/courts/${data.court_id}/calendar`}>Court calendar</Link></div>
+      <Link className="btn btn-secondary" to={`/courts/${data.court_id}/calendar`}>Filing calendar</Link></div>
     <div className="review-card">
       <h2 className="card-heading">{data.is_efiling_enabled ? 'Court intake enabled' : 'Court intake closed'}</h2>
       {!data.is_efiling_enabled && <p>New electronic submissions and corrections are currently unavailable.</p>}

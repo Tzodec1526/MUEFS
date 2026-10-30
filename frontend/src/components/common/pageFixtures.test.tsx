@@ -238,6 +238,17 @@ it.each([
   expect(await screen.findByText(count)).toBeTruthy();
 });
 
+it.each([
+  ['the intake page', '/courts/3/intake', '/courts/:courtId/intake', <CourtIntakePage key="p" />, 'Filing calendar'],
+  ['the filing history', '/filings/2/history', '/filings/:filingId/history', <FilingHistoryPage key="p" />, 'View filing calendar and revisions'],
+])('links %s to the filing calendar by its page name', async (_name, url, path, page, name) => {
+  show(url, path, page);
+
+  const link = await screen.findByRole('link', { name });
+
+  expect(link.getAttribute('href')).toBe('/courts/3/calendar');
+});
+
 it('names case types without their internal codes on the intake page', async () => {
   show('/courts/3/intake', '/courts/:courtId/intake', <CourtIntakePage />);
   await screen.findByRole('cell', { name: 'General Civil' });

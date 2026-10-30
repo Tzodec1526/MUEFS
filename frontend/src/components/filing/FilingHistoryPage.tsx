@@ -95,7 +95,7 @@ export default function FilingHistoryPage() {
           a deadline, the effect of a correction, or timely payment after a fee-waiver denial.</p>
         }
         <div className="participant-actions">
-          <Link to={`/courts/${history.court_id}/calendar`}>View court calendar and revisions</Link>
+          <Link to={`/courts/${history.court_id}/calendar`}>View filing calendar and revisions</Link>
           {history.can_manage_documents && <Link to={`/filings/${filingId}/filing-date`}>Record a filing-date order</Link>}
         </div>
       </div>
