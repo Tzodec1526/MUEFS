@@ -313,3 +313,34 @@ async def test_summary_counts_current_attachments_without_loading_details(
         event.remove(engine, "before_cursor_execute", record_query)
         event.remove(db_session.sync_session, "loaded_as_persistent", record_loaded)
         app.dependency_overrides.pop(get_current_user_id, None)
+
+
+async def test_a_party_opening_a_docket_loads_the_account_and_case_access_once(
+    db_session, api_client, docket,
+):
+    owner, _, _, _, case, _ = docket
+    db_session.add(CaseParticipant(
+        case_id=case.id, user_id=owner.id, role=ParticipantRole.PLAINTIFF, party_name="Owner",
+        access_enabled=True, reviewed_at=datetime.now(UTC),
+    ))
+    await db_session.flush()
+    case_id, owner_id = case.id, owner.id
+    db_session.expunge_all()
+    selects = []
+
+    def record_query(_conn, _cursor, statement, *_args):
+        if statement.lstrip().upper().startswith("SELECT"):
+            selects.append(" ".join(statement.split()))
+
+    engine = db_session.bind.sync_engine
+    event.listen(engine, "before_cursor_execute", record_query)
+    try:
+        response = await api_client.get(
+            f"/api/v1/cases/{case_id}", headers={"X-Demo-User-Id": str(owner_id)},
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", record_query)
+    assert response.status_code == 200, response.text
+    assert response.json()["can_file"] is True
+    assert sum(sql.startswith("SELECT users.") for sql in selects) == 1, selects
+    assert sum(sql.startswith("SELECT cases.id FROM cases") for sql in selects) == 1, selects

@@ -190,7 +190,9 @@ async def test_validate_filing_no_documents(db_session):
     )
     filing = await filing_service.create_filing(db_session, user.id, data)
 
-    validation = await filing_service.validate_filing(db_session, filing.id)
+    validation = await filing_service.validate_filing(
+        db_session, await filing_service.get_filing(db_session, filing.id),
+    )
     assert validation.is_valid is False
     assert any("document" in e.lower() for e in validation.errors)
 

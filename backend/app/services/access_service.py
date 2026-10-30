@@ -102,6 +102,13 @@ PUBLIC_ACCOUNT_REFUSAL = "Public docket accounts cannot create or manage e-filin
 
 async def user_may_file_on_case(db: AsyncSession, user: User, case_id: int) -> bool:
     """Subsequent filings require a court-reviewed participant grant, not public docket read."""
+    return (
+        await user_has_filing_grant(db, user, case_id)
+        and await user_may_read_case(db, user, case_id)
+    )
+
+
+async def user_has_filing_grant(db: AsyncSession, user: User, case_id: int) -> bool:
     if not user.is_active or user.user_type == UserType.PUBLIC:
         return False
     counsel = (
@@ -121,9 +128,7 @@ async def user_may_file_on_case(db: AsyncSession, user: User, case_id: int) -> b
         )
         .limit(1)
     )
-    if not participation:
-        return False
-    return await user_may_read_case(db, user, case_id)
+    return bool(participation)
 
 
 async def user_may_read_filing_envelope(

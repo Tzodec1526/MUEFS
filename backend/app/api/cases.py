@@ -76,7 +76,7 @@ async def get_case(
         "can_manage_records": await access_service.user_is_court_staff_for_court(
             db, user.id if user else None, case.court_id,
         ),
-        "can_file": user is not None and await access_service.user_may_file_on_case(
+        "can_file": user is not None and await access_service.user_has_filing_grant(
             db, user, case_id,
         ),
     })

@@ -223,7 +223,7 @@ async def validate_filing(
         await filing_service.validate_filing_destination(db, filing, filer_id=user_id)
     except filing_service.FilingDestinationError as exc:
         return FilingValidationResult(is_valid=False, errors=[exc.detail])
-    return await filing_service.validate_filing(db, filing_id)
+    return await filing_service.validate_filing(db, filing)
 
 
 @router.post("/{filing_id}/submit", response_model=FilingEnvelopeResponse)

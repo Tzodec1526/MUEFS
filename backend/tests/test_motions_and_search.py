@@ -516,7 +516,9 @@ async def test_general_motion_does_not_require_discovery_certification(db_sessio
     db_session.add(_motion_doc(motion.id, "MOT_RECONSIDER", "Motion for Reconsideration"))
     await db_session.flush()
 
-    validation = await filing_service.validate_filing(db_session, motion.id)
+    validation = await filing_service.validate_filing(
+        db_session, await filing_service.get_filing(db_session, motion.id),
+    )
     assert validation.is_valid, validation.missing_required_documents
 
 
@@ -537,14 +539,18 @@ async def test_discovery_motion_requires_certification(db_session):
     db_session.add(_motion_doc(motion.id, "MOT_COMPEL", "Motion to Compel Discovery"))
     await db_session.flush()
 
-    validation = await filing_service.validate_filing(db_session, motion.id)
+    validation = await filing_service.validate_filing(
+        db_session, await filing_service.get_filing(db_session, motion.id),
+    )
     assert not validation.is_valid
     assert any("DISC_CERT_GF" in m for m in validation.missing_required_documents)
 
     db_session.add(_motion_doc(motion.id, "DISC_CERT_GF", "Certification of Good Faith Effort"))
     await db_session.flush()
     await db_session.refresh(motion, ["documents"])
-    validation = await filing_service.validate_filing(db_session, motion.id)
+    validation = await filing_service.validate_filing(
+        db_session, await filing_service.get_filing(db_session, motion.id),
+    )
     assert validation.is_valid, validation.missing_required_documents
 
 
@@ -568,7 +574,9 @@ async def test_subsequent_filing_needs_motion_companions_only_with_a_motion(
     db_session.add_all([_motion_doc(filing.id, code, code.title()) for code in codes])
     await db_session.flush()
 
-    validation = await filing_service.validate_filing(db_session, filing.id)
+    validation = await filing_service.validate_filing(
+        db_session, await filing_service.get_filing(db_session, filing.id),
+    )
     missing_codes = [code for code in ("MOTION", "DISC_CERT_GF") if any(
         f"({code})" in message for message in validation.missing_required_documents
     )]

@@ -383,14 +383,8 @@ async def get_filing_status_counts(db: AsyncSession, filer_id: int) -> dict[Fili
 
 async def validate_filing(
     db: AsyncSession,
-    filing_id: int,
+    filing: FilingEnvelope,
 ) -> FilingValidationResult:
-    filing = await get_filing(db, filing_id)
-    if not filing:
-        return FilingValidationResult(
-            is_valid=False, errors=["Filing not found"]
-        )
-
     errors: list[str] = []
     warnings: list[str] = []
     missing_docs: list[str] = []
@@ -502,7 +496,7 @@ async def check_submission(
         raise FilingSubmissionError(400, "Only draft or returned filings can be submitted")
     if not (await fee_state(db, filing)).obligation_met:
         raise FilingSubmissionError(402, "Payment required before submission")
-    validation = await validate_filing(db, filing.id)
+    validation = await validate_filing(db, filing)
     if not validation.is_valid:
         error_parts = []
         if validation.errors:
