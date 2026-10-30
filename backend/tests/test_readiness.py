@@ -9,7 +9,7 @@ import pytest
 import pytest_asyncio
 from alembic.config import Config
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import create_engine, event, make_url, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import command
@@ -184,14 +184,14 @@ async def test_postgres_readiness_follows_each_committed_schema_revision(
 
 
 def test_migrations_accept_a_url_encoded_database_address(tmp_path, monkeypatch):
-    database_file = tmp_path / "p%40ss.db"
-    monkeypatch.setattr(settings, "database_url", f"sqlite:///{database_file.as_posix()}")
+    address = f"sqlite:///{(tmp_path / 'p%40ss.db').as_posix()}"
+    monkeypatch.setattr(settings, "database_url", address)
     config = Config()
     config.set_main_option(
         "script_location", str(Path(__file__).resolve().parents[1] / "alembic"),
     )
     command.current(config)
-    assert database_file.exists()
+    assert Path(make_url(address).database).exists()
 
 
 def test_hosted_demo_probes_do_not_allocate_sessions_or_recreate_missing_storage(tmp_path):
