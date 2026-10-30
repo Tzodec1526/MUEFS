@@ -197,7 +197,7 @@ it('shows the time of a filing in the one date-time format', async () => {
   serve([filing(1, { submitted_at: '2026-09-28T12:00:00Z', status: 'submitted' })]);
   open();
 
-  expect(await screen.findByText(/^Sep 28, 2026, \d{1,2}:00 [AP]M \S+$/)).toBeTruthy();
+  expect(await screen.findByText(/^Sep 28, 2026, \d{1,2}:00:00 [AP]M \S+$/)).toBeTruthy();
 });
 
 it('steps from the page heading straight to one heading per filing', async () => {

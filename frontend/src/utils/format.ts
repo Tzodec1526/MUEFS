@@ -31,7 +31,7 @@ export function parseServerDate(d: string): Date {
 }
 
 const DATE_TIME: Intl.DateTimeFormatOptions = {
-  year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
+  year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', timeZoneName: 'short',
 };
 
 export function formatDateTime(value: string | null, timeZone?: string): string {

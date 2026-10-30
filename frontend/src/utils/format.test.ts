@@ -3,29 +3,29 @@ import { formatCourtDate, formatDateTime, formatShortDate, plural } from './form
 
 describe('formatDateTime', () => {
   it.each([
-    ['a Z suffix', '2026-08-14T21:39:00Z'],
-    ['a +00:00 offset', '2026-08-14T21:39:00+00:00'],
-    ['no offset, which the server means as UTC', '2026-08-14T21:39:00'],
-    ['fractional seconds and no offset', '2026-08-14T21:39:00.123456'],
-    ['the same instant in another offset', '2026-08-14T17:39:00-04:00'],
+    ['a Z suffix', '2026-08-14T21:39:05Z'],
+    ['a +00:00 offset', '2026-08-14T21:39:05+00:00'],
+    ['no offset, which the server means as UTC', '2026-08-14T21:39:05'],
+    ['fractional seconds and no offset', '2026-08-14T21:39:05.123456'],
+    ['the same instant in another offset', '2026-08-14T17:39:05-04:00'],
   ])('reads a timestamp with %s as the same instant', (_kind, value) => {
-    expect(formatDateTime(value, 'UTC')).toBe('Aug 14, 2026, 9:39 PM UTC');
+    expect(formatDateTime(value, 'UTC')).toBe('Aug 14, 2026, 9:39:05 PM UTC');
   });
 
   it("shows the instant in the court's time zone, naming the zone", () => {
-    expect(formatDateTime('2026-08-14T21:39:00Z', 'America/Detroit')).toBe('Aug 14, 2026, 5:39 PM EDT');
-    expect(formatDateTime('2026-01-14T21:39:00Z', 'America/Detroit')).toBe('Jan 14, 2026, 4:39 PM EST');
+    expect(formatDateTime('2026-08-14T21:39:05Z', 'America/Detroit')).toBe('Aug 14, 2026, 5:39:05 PM EDT');
+    expect(formatDateTime('2026-01-14T21:39:05Z', 'America/Detroit')).toBe('Jan 14, 2026, 4:39:05 PM EST');
   });
 
   it("crosses midnight with the time zone, unlike a court's civil date", () => {
-    expect(formatDateTime('2026-08-15T02:00:00Z', 'America/Detroit')).toBe('Aug 14, 2026, 10:00 PM EDT');
+    expect(formatDateTime('2026-08-15T02:00:00Z', 'America/Detroit')).toBe('Aug 14, 2026, 10:00:00 PM EDT');
   });
 
   it("uses the viewer's time zone unless told otherwise, whatever suffix the server sent", () => {
-    const viewer = formatDateTime('2026-08-14T21:39:00Z');
-    expect(viewer).toMatch(/^Aug 1[45], 2026, \d{1,2}:39 [AP]M \S+/);
-    expect(formatDateTime('2026-08-14T21:39:00')).toBe(viewer);
-    expect(formatDateTime('2026-08-14T21:39:00+00:00')).toBe(viewer);
+    const viewer = formatDateTime('2026-08-14T21:39:05Z');
+    expect(viewer).toMatch(/^Aug 1[45], 2026, \d{1,2}:39:05 [AP]M \S+/);
+    expect(formatDateTime('2026-08-14T21:39:05')).toBe(viewer);
+    expect(formatDateTime('2026-08-14T21:39:05+00:00')).toBe(viewer);
   });
 
   it('says so when no time was recorded', () => {

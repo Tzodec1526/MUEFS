@@ -199,7 +199,7 @@ it('labels every row value with its column, so a row still reads when it stacks 
     .toEqual([null, null, 'Case title', 'Submitted', 'Age', 'Documents', 'Status']);
   expect(screen.getAllByRole('columnheader').map(cell => cell.textContent).slice(2))
     .toEqual(['Case title', 'Submitted', 'Age', 'Documents', 'Status']);
-  expect(cells[3].textContent).toMatch(/^Sep 28, 2026, \d{1,2}:00 [AP]M \S+/);
+  expect(cells[3].textContent).toMatch(/^Sep 28, 2026, \d{1,2}:00:00 [AP]M \S+/);
 });
 
 it('writes a two-word status in words on its badge', async () => {
@@ -247,7 +247,7 @@ it('folds the queue counts into one line', async () => {
   openQueue();
 
   const line = await screen.findByText(/matching filing/);
-  expect(line.textContent).toMatch(/^1 matching filing · 1 waiting at least 48 hours · Oldest received Sep 28, 2026, \d{1,2}:00 [AP]M \S+$/);
+  expect(line.textContent).toMatch(/^1 matching filing · 1 waiting at least 48 hours · Oldest received Sep 28, 2026, \d{1,2}:00:00 [AP]M \S+$/);
   expect(document.body.textContent).not.toMatch(/Measured:|Ages are elapsed/);
 });
 
