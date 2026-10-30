@@ -4,7 +4,7 @@ import type { FilingEnvelope } from '../../api/filings';
 import LoadError from '../common/LoadError';
 import DocumentDownload from '../common/DocumentDownload';
 import { getDocumentLabel } from '../../utils/documentTypes';
-import { formatBytes, formatDateTime } from '../../utils/format';
+import { formatBytes, formatDateTime, plural } from '../../utils/format';
 import { focusQueueRow } from './useClerkQueue';
 import type { LoadFailure } from '../../utils/errors';
 
@@ -89,7 +89,7 @@ function FilingReviewPanel({
                 <strong>{doc.title}</strong>
                 <span className="doc-meta">
                   {getDocumentLabel(doc.document_type_code)} &middot; {formatBytes(doc.file_size_bytes)}
-                  {doc.page_count && ` \u00b7 ${doc.page_count} pages`}
+                  {doc.page_count && ` \u00b7 ${plural(doc.page_count, 'page')}`}
                 </span>
               </div>
               <div className="doc-flags">

@@ -348,6 +348,21 @@ it('opens a filing for review and closes the review back to its row', async () =
   expect(document.activeElement).toBe(reviewButton(12));
 });
 
+it('counts the pages of a document in a real plural', async () => {
+  serveQueues([11]);
+  vi.mocked(getFiling).mockResolvedValue({ ...envelope(11), documents: [
+    { id: 1, document_type_code: 'MOTION', title: 'Short', file_size_bytes: 2048, mime_type: 'application/pdf', page_count: 1,
+      sha256_hash: 'a'.repeat(64), is_confidential: false, is_text_searchable: true, uploaded_at: '2026-09-28T12:00:00Z' },
+    { id: 2, document_type_code: 'MOTION', title: 'Long', file_size_bytes: 2048, mime_type: 'application/pdf', page_count: 3,
+      sha256_hash: 'b'.repeat(64), is_confidential: false, is_text_searchable: true, uploaded_at: '2026-09-28T12:00:00Z' },
+  ] });
+  openQueue();
+  fireEvent.click(await screen.findByText('Case 11'));
+
+  expect(await screen.findByText(/2 KB · 1 page$/)).toBeTruthy();
+  expect(screen.getByText(/2 KB · 3 pages$/)).toBeTruthy();
+});
+
 it('requires a reason before a filing can be returned or rejected', async () => {
   serveQueues([11]);
   openQueue();
