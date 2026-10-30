@@ -130,7 +130,6 @@ async def delivery_history(
         )
         or 0
     )
-    # Message bodies are retained in the archive but omitted from list responses.
     rows = await db.execute(
         select(
             NotificationDeliveryEvent.id,

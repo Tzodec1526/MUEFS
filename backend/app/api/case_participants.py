@@ -1,6 +1,3 @@
-"""Court staff manage portal participant records and explicit restricted-case access."""
-
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -163,7 +160,6 @@ async def change_public_access(
     if not data.is_sealed and not data.confirm_public_release:
         raise HTTPException(422, "Confirm the court's instruction to restore public case access")
     before = {"is_sealed": case.is_sealed, "participant_version": case.participant_version}
-    # Participant grants and public access share a revision: either invalidates older editors.
     version = await db.scalar(update(Case).where(
         Case.id == case_id, Case.participant_version == data.expected_version,
     ).values(is_sealed=data.is_sealed, participant_version=data.expected_version + 1)

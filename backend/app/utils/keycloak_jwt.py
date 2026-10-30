@@ -1,9 +1,3 @@
-"""Keycloak / OIDC access token validation (RS256 via realm JWKS).
-
-Compliance note: Court systems should validate issuer, signature, and expiry on
-every request; demo mode (ALLOW_DEMO_MODE) must never be enabled in production.
-"""
-
 from __future__ import annotations
 
 import json
@@ -21,15 +15,12 @@ from app.config import settings
 
 _jwks_cache: tuple[float, dict[str, Any]] | None = None
 _JWKS_TTL_SEC = 300.0
-# Tokens signed with an unknown key trigger at most one refetch per interval.
 _JWKS_REFRESH_SEC = 30.0
 
-# Re-export so callers can catch JWTError without importing PyJWT.
 __all__ = ["IdentityProviderUnavailableError", "JWTError", "decode_keycloak_access_token"]
 
 
 class IdentityProviderUnavailableError(Exception):
-    """The realm's signing keys could not be retrieved; the token was not judged."""
     pass
 
 
@@ -41,7 +32,6 @@ async def _fetch_jwks(*, refresh: bool = False) -> dict[str, Any]:
         if age < _JWKS_TTL_SEC and not (refresh and age >= _JWKS_REFRESH_SEC):
             return _jwks_cache[1]
 
-    # The issuer stays KEYCLOAK_URL; only the key fetch may use an internal address.
     base = (settings.keycloak_internal_url or settings.keycloak_url).rstrip("/")
     url = f"{base}/realms/{settings.keycloak_realm}/protocol/openid-connect/certs"
     try:
@@ -60,7 +50,6 @@ def _signing_key(jwks: dict[str, Any], kid: str) -> dict[str, Any] | None:
 
 
 async def decode_keycloak_access_token(token: str) -> dict[str, Any]:
-    """Validate signature, exp, and iss; return claims (includes 'sub')."""
     try:
         header = jwt.get_unverified_header(token)
     except JWTError as exc:
@@ -72,7 +61,6 @@ async def decode_keycloak_access_token(token: str) -> dict[str, Any]:
 
     key_dict = _signing_key(await _fetch_jwks(), kid)
     if key_dict is None:
-        # The realm may have rotated keys since the cached set was fetched.
         key_dict = _signing_key(await _fetch_jwks(refresh=True), kid)
     if key_dict is None:
         raise JWTError(f"No JWKS key for kid={kid}")
@@ -102,9 +90,5 @@ async def decode_keycloak_access_token(token: str) -> dict[str, Any]:
 
     if not claims.get("sub"):
         raise JWTError("Token missing sub")
-
-    # Realm operators may add optional azp/aud checks via Keycloak mappers;
-    # browser flows often use a public frontend client while this API uses a
-    # separate confidential client id, so we do not require azp == KEYCLOAK_CLIENT_ID.
 
     return claims

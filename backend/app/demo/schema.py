@@ -1,5 +1,3 @@
-"""Upgrade local/demo SQLite databases without resetting filings or stored documents."""
-
 from pathlib import Path
 
 from alembic.config import Config
@@ -10,7 +8,6 @@ from app.database import Base
 
 
 def alembic_config(connection: Connection) -> Config:
-    """Run migrations on the caller's connection instead of the configured URL."""
     backend = Path(__file__).resolve().parents[2]
     config = Config(str(backend / "alembic.ini"))
     config.set_main_option("script_location", str(backend / "alembic"))
@@ -33,8 +30,6 @@ def prepare_demo_connection(connection: Connection) -> None:
         command.stamp(config, "head")
         return
     if not inspector.has_table("alembic_version"):
-        # Earlier demos used create_all without migration tracking. Adopt the
-        # last known schema, then apply the same retained-history migration.
         columns = {c["name"] for c in inspector.get_columns("filing_envelopes")}
         revision = "c4f8e2a91b0d" if "cms_filing_id" in columns else "baec3dbedabf"
         command.stamp(config, revision)

@@ -18,8 +18,6 @@ async def search_cases(
     page_size: int = 25,
 ) -> tuple[list[Case], int]:
     if (case_number or party_name) and db.get_bind().dialect.name == "postgresql":
-        # A rare name and a statewide match need different plans. Cached generic
-        # plans can make broad searches slower after adding trigram indexes.
         await db.execute(text("SET LOCAL plan_cache_mode = force_custom_plan"))
     filters: list[ColumnElement[bool]] = [Case.is_sealed.is_(False)]
 

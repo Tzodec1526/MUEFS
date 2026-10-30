@@ -1,5 +1,3 @@
-"""Bounded path and query parameters shared by the API routes."""
-
 from typing import Annotated
 
 from fastapi import Path, Query

@@ -1,5 +1,3 @@
-"""Prepare, review, publish and withdraw public copies without rewriting filed originals."""
-
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile

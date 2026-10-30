@@ -107,8 +107,6 @@ async def get_case_filings(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access filings for this case",
         )
-    # Newest first by the court's filing date; filings without one (still in review)
-    # sort by submission. A draft's creation time says nothing about docket order.
     query = (
         select(FilingEnvelope)
         .where(FilingEnvelope.case_id == case_id)
@@ -120,7 +118,6 @@ async def get_case_filings(
             FilingEnvelope.id.desc(),
         )
     )
-    # Standing on a case does not expose another filer's drafts or waiver request.
     staff_courts = select(UserCourtRole.court_id).where(
         UserCourtRole.user_id == user_id,
         UserCourtRole.role.in_([CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]),
@@ -135,8 +132,6 @@ async def get_case_filings(
     result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
     staff = await access_service.user_is_court_staff_for_court(db, user_id, case.court_id)
     filings = list(result.scalars())
-    # Court orders belong on the docket, but never in the filer's attachment manifest.
-    # Load all current docket documents once, including separately recorded date orders.
     documents: dict[int, list[FilingDocument]] = {}
     if filings:
         for doc in await db.scalars(select(FilingDocument).where(
@@ -161,8 +156,6 @@ async def get_case_filings(
                     continue
                 copy = copies.get(doc.public_copy_id) if doc.public_copy_id else None
                 if copy and copy.document_id == doc.id:
-                    # Never copy the original title, hash, size or private flags into
-                    # the public derivative's response. Only its reviewed metadata is public.
                     visible_documents.append(CaseDocumentResponse(
                         id=doc.id, copy_id=copy.id, document_type_code="PUBLIC_COPY",
                         title=copy.title,

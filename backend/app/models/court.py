@@ -40,7 +40,7 @@ class Court(Base):
     state: Mapped[str] = mapped_column(String(2), default="MI")
     zip_code: Mapped[str | None] = mapped_column(String(10))
     phone: Mapped[str | None] = mapped_column(String(20))
-    cms_type: Mapped[str | None] = mapped_column(String(50))  # JIS, Tyler, etc.
+    cms_type: Mapped[str | None] = mapped_column(String(50))
     is_efiling_enabled: Mapped[bool] = mapped_column(default=True)
     intake_version: Mapped[int] = mapped_column(default=0, server_default="0")
     intake_notice: Mapped[str | None] = mapped_column(Text)
@@ -93,7 +93,7 @@ class FilingRequirement(Base):
     document_type_code: Mapped[str] = mapped_column(String(50))
     is_required: Mapped[bool] = mapped_column(default=True)
     description: Mapped[str] = mapped_column(Text)
-    mcr_reference: Mapped[str | None] = mapped_column(String(50))  # e.g., "MCR 2.116"
+    mcr_reference: Mapped[str | None] = mapped_column(String(50))
     local_rule_reference: Mapped[str | None] = mapped_column(String(100))
     page_limit: Mapped[int | None] = mapped_column(Integer)
     format_notes: Mapped[str | None] = mapped_column(Text)

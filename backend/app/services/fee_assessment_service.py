@@ -1,5 +1,3 @@
-"""Resolve the current court assessment, waiver decision and recorded payment balance."""
-
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -83,8 +81,6 @@ async def fee_state(
         and settings.allow_demo_mode
         and not filing.fee_review_requested_at
     ):
-        # These are visibly synthetic examples, never a substitute for a court assessment.
-        # A subsequent filing is not necessarily a motion. Do not invent a $20 charge.
         case_type = await db.get(CaseType, filing.case_type_id)
         if case_type is not None and (
             filing.filing_type == "initial" or case_type.filing_fee_cents == 0

@@ -1,15 +1,3 @@
-"""Per-visitor isolated SQLite sandboxes for the public hosted demo.
-
-DEMO DEPLOY ONLY. A real court deployment uses one shared database. For the public
-demo we give each browser session its own copy of a seeded template database, so
-visitors never see or affect each other. When the per-session cap is reached (or a
-visitor blocks cookies) they fall back to a shared, restart-reset sandbox. Each
-sandbox's uploads live in its own quota-limited folder, deleted with the sandbox.
-
-This is deliberately single-process and disk-based: the demo runs as one Render
-instance, so an in-memory registry plus copied SQLite files is all it needs.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -35,7 +23,6 @@ COOKIE_NAME = "muefs_demo_sid"
 SHARED_SID = "_shared"
 _SWEEP_INTERVAL_SEC = 300.0
 
-# sid -> last-access epoch seconds. In-memory, single process by design.
 _last_access: dict[str, float] = {}
 _last_sweep = 0.0
 _session_creation_lock = threading.Lock()
@@ -63,7 +50,6 @@ def _uploads_dir() -> Path:
 
 
 def upload_scope(sid: str) -> document_service.LocalStorageScope:
-    """The sandbox's private document folder, removed along with its database."""
     return document_service.LocalStorageScope(
         root=_uploads_dir() / sid, quota_bytes=settings.demo_storage_quota_mb * 1024 * 1024,
     )
@@ -74,16 +60,12 @@ def _is_valid_sid(sid: str) -> bool:
 
 
 def seed_template() -> None:
-    """Create the seeded template database once (full Michigan seed), then (re)create
-    the shared sandbox from it. Idempotent for the template; the shared copy refreshes
-    on each boot, and uploads belonging to no current sandbox are removed."""
     _sessions_dir().mkdir(parents=True, exist_ok=True)
     _uploads_dir().mkdir(parents=True, exist_ok=True)
     template = _template_db()
     if not template.exists():
         from app.seed_data import seed_database
 
-        # An interrupted first boot must not leave a schema-only template that looks ready.
         partial = template.with_suffix(".seeding")
         partial.unlink(missing_ok=True)
         seed_database(url=f"sqlite:///{partial}")
@@ -104,10 +86,6 @@ def seed_template() -> None:
 
 
 def open_sandbox(sid: str) -> Path:
-    """Sweep idle sandboxes, then return this request's sandbox marked as in use.
-
-    The sweep and the lookup share one lock, so a sandbox cannot be deleted between a
-    request finding it and marking it active."""
     with _session_creation_lock:
         _sweep_idle()
         path = _ensure(sid)
@@ -131,16 +109,10 @@ def _ensure(sid: str) -> Path:
 
 
 def active_session_count() -> int:
-    """Number of private sandboxes (the shared one doesn't count toward the cap)."""
     return sum(1 for p in _sessions_dir().glob("*.db") if p.stem != SHARED_SID)
 
 
 def resolve_sid(request: Request, *, allocate: bool = True) -> str:
-    """Decide which sandbox this request uses.
-
-    Reuse a valid existing cookie; otherwise mint a new private sandbox if under the
-    cap, else fall back to the shared one. Browsers load a page before calling the
-    API, so cookieless API clients (monitors, scripts) use the shared sandbox."""
     cookie = request.cookies.get(COOKIE_NAME)
     if cookie and (cookie == SHARED_SID or _is_valid_sid(cookie)):
         return cookie
@@ -164,7 +136,6 @@ def _sweep_idle() -> None:
         if p.stem == SHARED_SID:
             continue
         try:
-            # After a restart, recent writes still count as activity.
             last = max(_last_access.get(p.stem, 0.0), p.stat().st_mtime)
         except FileNotFoundError:
             continue
@@ -179,14 +150,6 @@ def _sweep_idle() -> None:
 
 
 class DemoSessionMiddleware:
-    """Pure-ASGI middleware: pin each request to a sandbox and keep private sandboxes'
-    cookies current.
-
-    API requests open their sandbox here, so the database (read by get_demo_db from the
-    scope state) and the document folder belong to the same sandbox for the whole
-    response, including a download streamed after the transaction ends. Pure ASGI (not
-    BaseHTTPMiddleware) so scope-state and Set-Cookie propagate reliably."""
-
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 
@@ -212,7 +175,6 @@ class DemoSessionMiddleware:
 
 
 def _renewing(send: Send, sid: str) -> Send:
-    # Renew on every response; a fixed expiry would end an active session mid-use.
     ttl = settings.demo_session_ttl_minutes * 60
     cookie = f"{COOKIE_NAME}={sid}; Max-Age={ttl}; Path=/; HttpOnly; SameSite=Lax".encode()
 
@@ -238,9 +200,6 @@ def _sandbox_sessions(path: Path) -> async_sessionmaker[AsyncSession]:
 
 
 async def get_demo_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI dependency: a session bound to the sandbox DemoSessionMiddleware opened.
-
-    Replaces the app's normal get_db when demo isolation is on (wired in demo.server)."""
     path = getattr(request.state, "demo_database", None) or _session_path(SHARED_SID)
     async with session_scope(_sandbox_sessions(Path(path)), drain=True) as session:
         yield session

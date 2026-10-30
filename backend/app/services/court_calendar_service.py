@@ -26,7 +26,6 @@ async def may_publish_calendar(db: AsyncSession, user_id: int | None, court_id: 
 
 
 def assess_date(calendars: list[CourtCalendar], received_at: datetime) -> FilingDateAssessment:
-    """MCR 1.109(G)(5)(b), using the newest published revision covering each day."""
     initial = next(
         (
             c
@@ -44,7 +43,6 @@ def assess_date(calendars: list[CourtCalendar], received_at: datetime) -> Filing
     result.timezone = initial.timezone
     result.local_received_date = received_at.astimezone(ZoneInfo(initial.timezone)).date()
     day = result.local_received_date
-    # Bounded even if a calendar closes every day. Do not infer an open day beyond coverage.
     for _ in range(367):
         calendar = next((c for c in calendars if c.valid_from <= day <= c.valid_through), None)
         if calendar is None or calendar.timezone != initial.timezone:
@@ -70,7 +68,6 @@ async def filing_date_for_receipt(
     received_at: datetime,
 ) -> FilingDateAssessment:
     utc_day: date = received_at.astimezone(UTC).date()
-    # One query also covers a year boundary; adjacent published calendars may apply.
     calendars = list(
         await db.scalars(
             select(CourtCalendar)

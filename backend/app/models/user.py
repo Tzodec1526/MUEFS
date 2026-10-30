@@ -19,7 +19,6 @@ class UserType(enum.StrEnum):
     CLERK = "clerk"
     JUDGE = "judge"
     SELF_REPRESENTED = "self_represented"
-    # Signed-in public docket viewer (journalist, citizen); no filing privileges by default.
     PUBLIC = "public"
     ADMIN = "admin"
 
@@ -36,13 +35,10 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
-    # Set from a verified IdP claim; sending also checks it still matches email.
     verified_email: Mapped[str | None] = mapped_column(String(255))
     first_name: Mapped[str] = mapped_column(String(100))
     last_name: Mapped[str] = mapped_column(String(100))
     bar_number: Mapped[str | None] = mapped_column(String(20), index=True)
-    # Set True only by an admin or a verified IdP claim. Self-asserted bar numbers from
-    # public self-registration stay False and never grant sealed-case (counsel) access.
     bar_number_verified: Mapped[bool] = mapped_column(default=False)
     user_type: Mapped[UserType] = mapped_column(Enum(UserType))
     phone: Mapped[str | None] = mapped_column(String(20))
@@ -59,8 +55,6 @@ class User(Base):
     favorite_cases: Mapped[list[FavoriteCase]] = relationship(back_populates="user")
     favorite_courts: Mapped[list[FavoriteCourt]] = relationship(back_populates="user")
 
-    # Legacy case variants remain distinct accounts; exact insensitive lookups must
-    # detect ambiguity rather than merging identities or choosing the first match.
     __table_args__ = (Index("ix_users_email_lower", func.lower(email)),)
 
     @property
@@ -94,7 +88,7 @@ class FavoriteCase(Base):
     __table_args__ = (UniqueConstraint("user_id", "case_id", name="uq_user_case_favorite"),)
 
     user: Mapped[User] = relationship(back_populates="favorite_cases")
-    case: Mapped[Case] = relationship()  # No back_populates needed
+    case: Mapped[Case] = relationship()
 
 
 class FavoriteCourt(Base):
@@ -109,4 +103,4 @@ class FavoriteCourt(Base):
     __table_args__ = (UniqueConstraint("user_id", "court_id", name="uq_user_court_favorite"),)
 
     user: Mapped[User] = relationship(back_populates="favorite_courts")
-    court: Mapped[Court] = relationship()  # No back_populates needed
+    court: Mapped[Court] = relationship()

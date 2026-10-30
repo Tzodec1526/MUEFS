@@ -30,13 +30,13 @@ class FilingStatus(enum.StrEnum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     RETURNED = "returned"
-    SERVED = "served"  # Legacy API/storage value: documents recorded, not proof of delivery.
+    SERVED = "served"
 
 
 class FilingType(enum.StrEnum):
-    INITIAL = "initial"          # New case initiation
-    SUBSEQUENT = "subsequent"    # Filing to existing case
-    SERVICE_ONLY = "service_only"  # Record documents for service outside clerk intake.
+    INITIAL = "initial"
+    SUBSEQUENT = "subsequent"
+    SERVICE_ONLY = "service_only"
 
 
 class FilingEnvelope(Base):
@@ -44,7 +44,6 @@ class FilingEnvelope(Base):
 
     @property
     def details_token(self) -> str:
-        """Identify the editable details and submission the filer actually opened."""
         values = [
             self.id, self.status, self.submission_count,
             self.case_title, self.filing_description,
@@ -54,7 +53,6 @@ class FilingEnvelope(Base):
 
     @property
     def submission_token(self) -> str:
-        """Bind final review to the details, active documents, and fee state."""
         values = [
             self.details_token, self.court_id, self.case_id, self.case_type_id,
             self.filing_type, self.fee_version, self.payment_id, self.payment_version,
@@ -113,7 +111,6 @@ class FilingEnvelope(Base):
         "filing_transactions.id", use_alter=True, name="fk_filing_fee_assessment",
     ))
 
-    # The filer's current attachments; court orders and removed versions stay in history.
     documents: Mapped[list["FilingDocument"]] = relationship(
         back_populates="envelope",
         primaryjoin=lambda: and_(
@@ -128,7 +125,6 @@ class FilingEnvelope(Base):
         Index('uq_filing_creation_key', 'filer_id', 'creation_key', unique=True,
               postgresql_where=text('creation_key IS NOT NULL'),
               sqlite_where=text('creation_key IS NOT NULL')),
-        # Status is covered for counters; updated_at/id support stable page ordering.
         Index('ix_filing_filer_updated', 'filer_id', 'updated_at', 'id', 'status'),
         Index('ix_filing_pending_received', 'court_id', 'submitted_at', 'id', 'status',
               postgresql_where=text("status IN ('SUBMITTED', 'UNDER_REVIEW')"),
@@ -147,7 +143,7 @@ class FilingDocument(Base):
     envelope_id: Mapped[int] = mapped_column(ForeignKey("filing_envelopes.id"), index=True)
     document_type_code: Mapped[str] = mapped_column(String(50))
     title: Mapped[str] = mapped_column(String(500))
-    file_key: Mapped[str] = mapped_column(String(500), index=True)  # S3 path
+    file_key: Mapped[str] = mapped_column(String(500), index=True)
     file_size_bytes: Mapped[int] = mapped_column(Integer)
     mime_type: Mapped[str] = mapped_column(String(100))
     page_count: Mapped[int | None] = mapped_column(Integer)
@@ -169,8 +165,6 @@ class FilingDocument(Base):
 
 
 class DocumentUploadRequest(Base):
-    """A completed upload remains recognizable even after its draft document is removed."""
-
     __tablename__ = "document_upload_requests"
 
     envelope_id: Mapped[int] = mapped_column(ForeignKey("filing_envelopes.id"), primary_key=True)

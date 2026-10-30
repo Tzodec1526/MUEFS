@@ -102,7 +102,6 @@ class NotificationDeliveryEvent(Base):
     detail: Mapped[str | None] = mapped_column(String(1000))
     smtp_code: Mapped[int | None]
     actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
-    # A queued event preserves the exact message, including its original recipient.
     message: Mapped[str | None] = mapped_column(Text)
 
 

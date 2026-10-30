@@ -1,5 +1,3 @@
-"""Redis-backed (or in-memory) rate limiting with stricter tiers for search and documents."""
-
 from __future__ import annotations
 
 import logging
@@ -25,7 +23,6 @@ _redis_client = None
 def _path_bucket(path: str) -> str:
     if path.rstrip("/").endswith("/cases/search"):
         return "search"
-    # Every route that streams or re-hashes stored document bytes.
     if path.endswith(("/download", "/verify")) or (
         "/deliveries/" in path and "/documents/" in path
     ):
@@ -72,7 +69,6 @@ def _memory_check_allow(client_ip: str, bucket: str) -> bool:
     limit = _limit_for_bucket(bucket)
     key = f"{bucket}:{client_ip}"
 
-    # Many distinct clients within one interval must not grow the store unbounded.
     if now - _mem_last_cleanup > _MEM_CLEANUP_INTERVAL or len(_mem_store) > _MEM_MAX_KEYS:
         stale = [k for k, ts in _mem_store.items() if not ts or now - ts[-1] > window_sec]
         for k in stale:

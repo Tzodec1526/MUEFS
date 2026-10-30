@@ -37,7 +37,6 @@ async def _decidable_filing(
             status_code=403,
             detail="This waiver action requires the appropriate court role and pending request",
         )
-    # The filer may replace the application after the reviewer opened it.
     if filing.fee_version != expected_fee_version:
         raise HTTPException(
             status_code=409,
@@ -79,8 +78,6 @@ async def decide_fee_waiver(
     if action == "refer" and file is not None:
         raise HTTPException(status_code=400, detail="Referral does not enter a court decision")
 
-    # Screening the order can take many seconds, so store it before taking the locks
-    # and repeat every check once they are held.
     doc = None
     if file is not None:
         doc = await store_document_upload(

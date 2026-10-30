@@ -1,5 +1,3 @@
-"""Court review publishes a retained copy; original bytes and receipts remain intact."""
-
 from fastapi import HTTPException
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,8 +23,6 @@ async def document_context(
     if doc is None:
         raise HTTPException(404, "Document not found")
     if for_update:
-        # Administration locks the actor; filing mutations lock the envelope. Use that
-        # order and refresh both records after waiting for competing work to commit.
         locked_actor = await db.scalar(
             select(User)
             .where(User.id == actor.id)
@@ -214,7 +210,6 @@ async def may_read_public_copy(
     if await access_service.user_is_court_staff_for_court(db, user_id, filing.court_id):
         return True
     if user_id == filing.filer_id:
-        # Copies are append-only; publication is recorded on the filing receipt.
         return bool(
             await db.scalar(
                 select(FilingTransaction.id)

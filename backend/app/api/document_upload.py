@@ -1,5 +1,3 @@
-"""The common bounded, inspected upload path for filer documents and court orders."""
-
 import hashlib
 import mimetypes
 import uuid
@@ -16,7 +14,6 @@ from app.utils import malware_scan
 
 
 async def read_upload(file: UploadFile) -> bytes:
-    # Bound the read without retaining both a chunk list and a joined copy.
     max_bytes = settings.max_file_size_mb * 1024 * 1024
     file_data = await file.read(max_bytes + 1)
     if len(file_data) > max_bytes:
@@ -39,7 +36,6 @@ async def inspect_upload(
 ) -> tuple[bytes, str, str, document_service.PdfInspection]:
     file_data = await read_upload(file)
 
-    # Validate MIME type from file content (never trust client Content-Type alone).
     try:
         content_type = await run_in_threadpool(
             document_service.resolve_upload_mime_type, file_data, file.content_type
@@ -58,8 +54,6 @@ async def inspect_upload(
     if require_pdf and content_type != "application/pdf":
         raise HTTPException(status_code=415, detail="This document must be a PDF")
 
-    # Malware screening (defense in depth): reject executables / known-bad signatures
-    # regardless of the declared MIME type.
     try:
         scan = await malware_scan.scan_upload(file_data)
     except malware_scan.ScannerUnavailableError as exc:
@@ -92,12 +86,9 @@ async def store_document_upload(
     title: str,
     is_confidential: bool = False,
 ) -> FilingDocument:
-    """Store inspected bytes and return metadata for the caller to persist under its lock."""
     file_data, content_type, sha256, inspection = await inspect_upload(
         file, require_pdf=document_type_code == "FEE_WAIVER_ORDER",
     )
-    # Original filenames may exceed filesystem limits or name Windows devices.
-    # Keep storage keys portable; the title supplies the download filename.
     extension = mimetypes.guess_extension(content_type) or ""
     file_key = f"filings/{filing_id}/{uuid.uuid4()}{extension}"
     await run_in_threadpool(document_service.upload_document, file_data, file_key, content_type)

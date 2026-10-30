@@ -26,15 +26,12 @@ router = APIRouter(prefix="/documents", tags=["Documents"])
 
 
 def sanitize_filename(filename: str) -> str:
-    """Remove path traversal and special characters from filenames."""
     filename = re.sub(r'[^\w\s\-.]', '', filename)
     filename = filename.strip('. ')
     return filename or "document"
 
 
 class DocumentResponse(StreamingResponse):
-    """Open storage after the request transaction commits, and close it on disconnect."""
-
     def __init__(
         self, doc: FilingDocument | DocumentPublicCopy, *, integrity: tuple[str, int] | None = None,
     ):
@@ -56,8 +53,6 @@ class DocumentResponse(StreamingResponse):
         stream = document_service.download_document(self.file_key)
         if self.integrity is None:
             return stream
-        # Verify the exact bytes before sending headers. Large deliveries spill to
-        # disk; the object is read once and memory stays bounded.
         verified = SpooledTemporaryFile(max_size=8 * 1024 * 1024)
         digest, size = hashlib.sha256(), 0
         try:
@@ -99,8 +94,6 @@ async def download_document(
     db: AsyncSession = Depends(get_db, scope="function"),
     user: User | None = Depends(get_optional_user),
 ):
-    """Public download for non-confidential documents on non-sealed, accepted
-    filings. Confidential documents and sealed matters require an authorized account."""
     result = await db.execute(
         select(FilingDocument).where(FilingDocument.id == document_id)
     )

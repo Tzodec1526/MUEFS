@@ -8,7 +8,6 @@ from app.models.payment import Payment, PaymentMethod, PaymentStatus
 
 
 class PaymentsNotConfiguredError(Exception):
-    """PAYMENTS_ARE_SIMULATED is off and no processor is wired."""
     pass
 
 
@@ -32,7 +31,7 @@ async def process_payment(
         envelope_id=envelope_id,
         fee_basis=fee_basis,
         amount_cents=amount_cents,
-        status=PaymentStatus.COMPLETED,  # Replace when wiring a real PSP + webhooks
+        status=PaymentStatus.COMPLETED,
         payment_method=payment_method,
         payer_id=payer_id,
         description=desc,

@@ -1,5 +1,3 @@
-"""Durable filing notices. SMTP acceptance is neither delivery nor legal service."""
-
 import smtplib
 import ssl
 from datetime import UTC, datetime, timedelta
@@ -65,7 +63,6 @@ async def queue_email(
     actor_id: int | None = None,
     reason: str | None = None,
 ) -> None:
-    """Materialize a generic notice inside the filing transaction, without network I/O."""
     if not settings.email_delivery_enabled:
         notice.delivery_status = DeliveryStatus.DISABLED
         return
@@ -190,7 +187,6 @@ async def claim_email(sessions: async_sessionmaker[AsyncSession]) -> Notificatio
 
 
 def send_email(notice: Notification) -> tuple[str, int | None, str | None]:
-    """Use a bounded socket timeout; an interrupted DATA exchange has an unknown outcome."""
     if not notice.email_sender or not notice.email_recipient or not notice.email_message:
         return "permanent_failure", None, "Queued email is incomplete"
     smtp: smtplib.SMTP | None = None
@@ -209,7 +205,6 @@ def send_email(notice: Notification) -> tuple[str, int | None, str | None]:
                 smtp.starttls(context=ssl.create_default_context())
         if settings.smtp_username:
             smtp.login(settings.smtp_username, settings.smtp_password.get_secret_value())
-        # Explicit envelope stages distinguish a refused message from a lost final response.
         smtp.ehlo_or_helo_if_needed()
         sender = validate_email(notice.email_sender, check_deliverability=False).ascii_email
         recipient = validate_email(notice.email_recipient, check_deliverability=False).ascii_email
@@ -256,7 +251,6 @@ def send_email(notice: Notification) -> tuple[str, int | None, str | None]:
         )
     finally:
         if smtp is not None:
-            # QUIT failure after a successful DATA must not turn acceptance into failure.
             smtp.close()
 
 
@@ -288,7 +282,7 @@ async def finish_attempt(
             current.attempt_count != notice.attempt_count
             or current.delivery_status not in (DeliveryStatus.SENDING, DeliveryStatus.UNKNOWN)
         ):
-            return  # Keep the relay outcome; do not overwrite a newer attempt or retry.
+            return
         current.last_error = detail
         if outcome == "accepted":
             current.delivery_status = DeliveryStatus.SENT

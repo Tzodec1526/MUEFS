@@ -1,18 +1,3 @@
-"""Centralized authorization for case and document access (court / compliance).
-
-A ``user_id`` of ``None`` means an anonymous public visitor (no account). Anonymous
-and authenticated users alike may view non-sealed dockets and non-confidential documents
-(public transparency); the anonymous path simply has no elevated grants, so every sealed,
-confidential, or draft check fails closed for it.
-
-Non-sealed matters: anyone (including anonymous) may view the case docket and non-confidential
-documents. Only accepted filings appear on the public docket. Draft, pending, rejected,
-returned, and service-only envelopes remain visible only to the filer and court staff.
-Sealed matters: accounts explicitly granted access through active participant records,
-court staff, and system admin — never anonymous. Counsel grants also require a matching
-verified bar number. Filing acceptance alone does not grant access to the rest of a case.
-"""
-
 from __future__ import annotations
 
 from sqlalchemy import ColumnElement, false, or_, select, true
@@ -22,8 +7,6 @@ from app.models.case import COUNSEL_ROLES, Case, CaseParticipant
 from app.models.filing import PRIVATE_DOCUMENT_TYPES, FilingDocument, FilingEnvelope, FilingStatus
 from app.models.user import CourtRole, User, UserCourtRole, UserType
 
-# Filings that may appear on a public (non-sealed) docket to non-parties.
-# Pending, rejected, returned, and service-only envelopes stay off the public record.
 PUBLIC_DOCKET_FILING_STATUSES = frozenset({
     FilingStatus.ACCEPTED,
 })
@@ -51,7 +34,6 @@ async def user_is_court_staff_for_court(
 
 
 def case_visibility_filter(user: User | None) -> ColumnElement[bool]:
-    """Shared SQL predicate for both single-case reads and saved-case listings."""
     public = Case.is_sealed.is_(False)
     if user is None:
         return public
@@ -82,7 +64,6 @@ def case_visibility_filter(user: User | None) -> ColumnElement[bool]:
 
 
 async def user_may_read_sealed_case(db: AsyncSession, user: User | None, case_id: int) -> bool:
-    """Sealed docket: explicit participant grants, court staff and system administrators."""
     if user is None:
         return False
     return bool(await db.scalar(select(Case.id).where(
@@ -91,7 +72,6 @@ async def user_may_read_sealed_case(db: AsyncSession, user: User | None, case_id
 
 
 async def user_may_read_case(db: AsyncSession, user: User | None, case_id: int) -> bool:
-    """Non-sealed: anyone, including anonymous public visitors. Sealed: restricted list."""
     return bool(await db.scalar(select(Case.id).where(
         Case.id == case_id, case_visibility_filter(user),
     )))
@@ -101,7 +81,6 @@ PUBLIC_ACCOUNT_REFUSAL = "Public docket accounts cannot create or manage e-filin
 
 
 async def user_may_file_on_case(db: AsyncSession, user: User, case_id: int) -> bool:
-    """Subsequent filings require a court-reviewed participant grant, not public docket read."""
     return (
         await user_has_filing_grant(db, user, case_id)
         and await user_may_read_case(db, user, case_id)
@@ -168,8 +147,6 @@ async def user_may_read_document(
     if not envelope:
         return False
 
-    # Superseded documents remain available to their filer and court staff, even
-    # after a corrected filing is accepted. They must never enter the public docket.
     if (doc.is_confidential or doc.document_type_code in PRIVATE_DOCUMENT_TYPES
             or doc.removed_at is not None):
         if envelope.filer_id == user_id:

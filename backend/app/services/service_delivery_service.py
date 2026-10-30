@@ -1,5 +1,3 @@
-"""Explicit document delivery with retained contents and recipient-scoped access."""
-
 import hashlib
 import json
 from datetime import UTC, datetime
@@ -341,7 +339,6 @@ async def require_delivery_viewer(
     staff = await access_service.user_is_court_staff_for_court(db, actor.id, case.court_id)
     if not actor.is_active:
         raise HTTPException(403, "Account is unavailable")
-    # Staff send on behalf of the court; revoking the assignment ends that access.
     sender = actor.id == packet.actor_id and (staff or await db.scalar(
         select(FilingEnvelope.filer_id).where(FilingEnvelope.id == packet.filing_id)
     ) == actor.id)
@@ -366,8 +363,6 @@ async def require_delivery_viewer(
             or not await access_service.user_may_read_case(db, actor, case.id)
         ):
             raise HTTPException(403, "Current case participation and access are required")
-        # The stable account retains past deliveries when its service email changes.
-        # A new address does not redirect an old delivery to another account.
     query = (
         select(Notification)
         .where(Notification.id == recipient.notification_id)

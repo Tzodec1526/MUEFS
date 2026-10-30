@@ -101,7 +101,6 @@ async def add_favorite(
 
     fav = FavoriteCase(user_id=user_id, case_id=data.case_id, notes=data.notes)
     try:
-        # The unique constraint decides; checking first races a request from another tab.
         async with db.begin_nested():
             db.add(fav)
     except IntegrityError:
@@ -133,13 +132,10 @@ async def remove_favorite(
         )
     )
     fav = result.scalar_one_or_none()
-    # Deleting is idempotent: another tab may already have removed it.
     if fav is not None:
         await db.delete(fav)
         await db.flush()
 
-
-# --- Court Favorites ---
 
 @router.get("/courts", response_model=FavoriteCourtListResponse)
 async def list_favorite_courts(
@@ -177,7 +173,6 @@ async def add_favorite_court(
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
-    # Check court exists
     court_result = await db.execute(select(Court).where(Court.id == data.court_id))
     court = court_result.scalar_one_or_none()
     if not court:
@@ -217,7 +212,6 @@ async def remove_favorite_court(
         )
     )
     fav = result.scalar_one_or_none()
-    # Deleting is idempotent: another tab may already have removed it.
     if fav is not None:
         await db.delete(fav)
         await db.flush()

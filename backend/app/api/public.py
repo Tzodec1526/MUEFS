@@ -1,5 +1,3 @@
-"""Public, unauthenticated endpoints for demo transparency and landing stats."""
-
 from fastapi import APIRouter, Depends
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +13,6 @@ router = APIRouter(prefix="/public", tags=["Public"])
 
 @router.get("/stats")
 async def get_public_platform_stats(db: AsyncSession = Depends(get_db, scope="function")):
-    """Aggregate counts for the demo landing — no auth, no PII."""
     counts = (await db.execute(select(
         select(func.count()).select_from(Court).where(Court.is_efiling_enabled.is_(True))
         .scalar_subquery(),

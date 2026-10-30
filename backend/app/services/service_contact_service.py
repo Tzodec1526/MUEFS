@@ -1,5 +1,3 @@
-"""Shared checks for reviewed service instructions and document delivery."""
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -74,7 +72,6 @@ async def email_context(
     db: AsyncSession,
     notification_id: int,
 ) -> tuple[ServiceRecipient | None, str | None]:
-    """Recheck a frozen address and authority before queuing or claiming its alert."""
     if not settings.service_delivery_enabled or not settings.email_delivery_enabled:
         return None, "Document delivery is not enabled"
     row = (

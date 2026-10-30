@@ -1,14 +1,3 @@
-"""Provision internal User rows from OIDC token claims on first login.
-
-Court deployments typically disable auto-provision (provision_user_on_first_oidc_login=false)
-and use admin invite, SCIM, or batch import instead.
-
-Security: auto-provisioning trusts the IdP's email claim to locate or create an account, so
-it only acts on a *verified* email (the ``email_verified`` claim) and refuses to silently
-adopt a pre-existing privileged account (admin / clerk / judge, or any account carrying a
-bar number). Those must be bound to an OIDC subject explicitly by an administrator.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -48,12 +37,6 @@ async def provision_user_from_oidc(
     sub: str,
     claims: dict,
 ) -> User | None:
-    """Create or link a User for this Keycloak subject.
-
-    Returns None if provisioning is impossible or disallowed (missing/unverified email,
-    an email already bound to a different subject, or an attempt to auto-adopt a
-    privileged pre-existing account).
-    """
     email = verified_email_from_claims(claims)
     if email is None:
         logger.warning("OIDC token email not verified; refusing to auto-provision/link sub=%s", sub)
@@ -62,8 +45,6 @@ async def provision_user_from_oidc(
     first = (claims.get("given_name") or claims.get("first_name") or "").strip() or "User"
     last = (claims.get("family_name") or claims.get("last_name") or "").strip() or "Name"
 
-    # Link existing row that matched email before OIDC was attached (e.g. migrated demo account).
-    # Stored addresses keep their original case; legacy case variants are ambiguous.
     matches = (await db.scalars(
         select(User).where(func.lower(User.email) == email).limit(2)
     )).all()
@@ -76,7 +57,6 @@ async def provision_user_from_oidc(
             logger.warning("Email %s already bound to another OIDC subject", email)
             return None
         if not existing.keycloak_id:
-            # A bar number can grant access to sealed cases. Bind these accounts explicitly.
             if (
                 existing.user_type in (UserType.ADMIN, UserType.CLERK, UserType.JUDGE)
                 or existing.bar_number

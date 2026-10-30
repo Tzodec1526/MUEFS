@@ -9,14 +9,13 @@ from sqlalchemy.orm import DeclarativeBase
 from app.config import settings
 from app.services import document_service, storage_intent
 
-# SQLite doesn't support pool_size/max_overflow/pool_pre_ping
 engine_kwargs: dict = {"echo": settings.database_echo}
 if "sqlite" not in settings.database_url:
     engine_kwargs["pool_size"] = 20
     engine_kwargs["max_overflow"] = 10
-    engine_kwargs["pool_pre_ping"] = True  # Detect stale connections
-    engine_kwargs["pool_recycle"] = 300  # Recycle connections every 5 min
-    engine_kwargs["connect_args"] = {"command_timeout": 30}  # 30s query timeout
+    engine_kwargs["pool_pre_ping"] = True
+    engine_kwargs["pool_recycle"] = 300
+    engine_kwargs["connect_args"] = {"command_timeout": 30}
 
 engine = create_async_engine(settings.database_url, **engine_kwargs)
 
@@ -43,7 +42,6 @@ class UTCDateTime(TypeDecorator[datetime]):
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Use function scope so commit failures can prevent a successful HTTP response."""
     async with session_scope(
         async_session, drain=document_service.uses_local_storage(),
     ) as session:

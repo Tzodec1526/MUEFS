@@ -1,5 +1,3 @@
-"""Run the local SQLite demo. Usage: python run_demo.py"""
-
 import os
 import shutil
 import signal
@@ -17,7 +15,6 @@ STARTUP_TIMEOUT = 60
 
 
 def demo_environment() -> dict[str, str]:
-    # Override only this launch's environment; never rewrite the user's .env file.
     return {
         **os.environ,
         "DATABASE_URL": "sqlite+aiosqlite:///./demo.db",
@@ -42,7 +39,6 @@ def demo_environment() -> dict[str, str]:
 
 
 def check_ports(ports: tuple[int, ...] = (8000, 3000)) -> None:
-    # Check before seeding or accepting an unrelated server's readiness response.
     for port in ports:
         unavailable = RuntimeError(
             f"Port {port} is unavailable. Stop the service using it and try again."
@@ -52,8 +48,6 @@ def check_ports(ports: tuple[int, ...] = (8000, 3000)) -> None:
                 probe.bind(("127.0.0.1", port))
             except OSError as exc:
                 raise unavailable from exc
-        # Browsers and Vite's proxy use "localhost", which may resolve to an IPv6
-        # listener that the IPv4 bind above cannot detect.
         for family, kind, protocol, _, address in socket.getaddrinfo(
             "localhost", port, type=socket.SOCK_STREAM,
         ):
@@ -64,7 +58,6 @@ def check_ports(ports: tuple[int, ...] = (8000, 3000)) -> None:
 
 
 def start_process(command: list[str], cwd: Path, env: dict[str, str]) -> subprocess.Popen:
-    # Separate groups let Ctrl+C clean up npm and Vite's subprocesses too.
     return subprocess.Popen(
         command, cwd=cwd, env=env,
         start_new_session=sys.platform != "win32",
@@ -75,7 +68,6 @@ def start_process(command: list[str], cwd: Path, env: dict[str, str]) -> subproc
 def stop_process(process: subprocess.Popen) -> None:
     if sys.platform == "win32":
         if process.poll() is None:
-            # terminate() kills only the parent and can leave its children running.
             subprocess.run(
                 ["taskkill", "/PID", str(process.pid), "/T", "/F"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
@@ -106,7 +98,6 @@ def check_processes(processes: list[tuple[str, subprocess.Popen]]) -> None:
 
 def wait_until_ready(url: str, processes: list[tuple[str, subprocess.Popen]]) -> None:
     deadline = time.monotonic() + STARTUP_TIMEOUT
-    # Local readiness must work even when the user's shell has a corporate HTTP proxy.
     client = build_opener(ProxyHandler({}))
     while time.monotonic() < deadline:
         check_processes(processes)
@@ -116,7 +107,7 @@ def wait_until_ready(url: str, processes: list[tuple[str, subprocess.Popen]]) ->
                     check_processes(processes)
                     return
         except HTTPError as exc:
-            exc.close()  # Not ready yet (for example 503); release the response.
+            exc.close()
         except OSError:
             pass
         time.sleep(0.2)
@@ -133,7 +124,6 @@ def main() -> int:
     try:
         signals = [signal.SIGINT, signal.SIGTERM]
         if hasattr(signal, "SIGHUP"):
-            # Closing the terminal hangs up this launcher, not the services' own sessions.
             signals.append(signal.SIGHUP)
         for signum in signals:
             previous_handlers[signum] = signal.signal(signum, shutdown)
@@ -196,7 +186,6 @@ def main() -> int:
         print(f"\nDemo could not run: {exc}", file=sys.stderr, flush=True)
         return 1
     finally:
-        # Ignore a second Ctrl+C while the owned service trees are being reaped.
         for signum in previous_handlers:
             signal.signal(signum, signal.SIG_IGN)
         try:

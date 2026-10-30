@@ -1,5 +1,3 @@
-"""Court-reviewed service instructions. These records do not transmit documents."""
-
 from datetime import UTC, datetime
 from typing import Self
 
@@ -86,8 +84,6 @@ async def save_service_instructions(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    # Match participant management's actor-before-case lock order. The case lock also
-    # serializes creation of a participant's first contact and participant reassignments.
     actor = await db.scalar(
         select(User)
         .where(User.id == current_user.id)
@@ -141,7 +137,6 @@ async def save_service_instructions(
         "is_active": data.is_active,
         "authority": data.authority,
     }
-    # Validate a proposal before touching the persisted contact or its retained history.
     proposal = ServiceContact(case_id=case.id, participant_id=participant.id, **values)
     account = await db.get(User, participant.user_id) if participant.user_id else None
     if data.is_active:

@@ -1,5 +1,3 @@
-"""A reviewed derivative never overwrites the filed original or an earlier copy."""
-
 from datetime import datetime
 
 from sqlalchemy import JSON, ForeignKey, Index, String, func

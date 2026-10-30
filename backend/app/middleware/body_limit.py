@@ -1,5 +1,3 @@
-"""Reject request bodies larger than any endpoint accepts, before they are buffered."""
-
 from __future__ import annotations
 
 from starlette.exceptions import HTTPException
@@ -8,15 +6,11 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.config import settings
 
-# Room for multipart boundaries and form fields around an upload; also the cap for
-# JSON and form bodies, which are far smaller.
 _OVERHEAD_BYTES = 1024 * 1024
 _DETAIL = "Request body too large"
 
 
 class BodySizeLimitMiddleware:
-    """Form parsing spools uploads to disk before authentication, so bound it here."""
-
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
 

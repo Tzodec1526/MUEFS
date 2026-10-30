@@ -16,41 +16,30 @@ logger = logging.getLogger(__name__)
 
 
 class StorageUnavailableError(OSError):
-    """Storage could not complete the operation. A missing file is FileNotFoundError."""
     pass
 
 
 class StorageQuotaExceededError(Exception):
-    """The upload does not fit in the storage allotted to it."""
     pass
 
 
 @dataclass(frozen=True)
 class LocalStorageScope:
-    """A private upload folder over the shared local root (hosted-demo sandboxes).
-
-    Writes and deletes stay inside `root`; reads fall back to the shared root, where the
-    seeded sample documents that every sandbox references live."""
-
     root: Path
     quota_bytes: int
 
 
-# Set per request by the hosted demo; unscoped everywhere else.
 storage_scope: ContextVar[LocalStorageScope | None] = ContextVar("storage_scope", default=None)
 
-# Scoped uploads leave this much disk free for sandbox databases and the process.
 _SCOPED_FREE_SPACE_RESERVE = 1024 * 1024 * 1024
 
 
 def uses_local_storage() -> bool:
-    """SQLite deployments (the demos) keep documents on disk instead of S3."""
     return "sqlite" in settings.database_url
 
 
 @contextmanager
 def storage_errors() -> Iterator[None]:
-    """Report outages as StorageUnavailableError and missing objects as FileNotFoundError."""
     from botocore.exceptions import BotoCoreError, ClientError
 
     try:
@@ -66,17 +55,13 @@ def storage_errors() -> Iterator[None]:
 
 
 def _local_storage_path() -> Path:
-    """Only uploads create directories; reading missing storage must have no side effects."""
     return Path(settings.local_storage_path)
 
 
 @cache
 def get_s3_client():
-    """Reuse a process-local connection pool; settings are loaded at process startup."""
     import boto3
     from botocore.config import Config
-    # Independent sessions also make concurrent first calls safe; boto3's shared
-    # default session must not create clients concurrently in upload worker threads.
     return boto3.session.Session().client(
         "s3",
         endpoint_url=settings.s3_endpoint_url,
@@ -88,7 +73,6 @@ def get_s3_client():
 
 
 def detect_mime_type(file_data: bytes) -> str:
-    """Detect MIME type from file content using python-magic."""
     try:
         import magic
         return magic.from_buffer(file_data[:2048], mime=True)
@@ -97,7 +81,6 @@ def detect_mime_type(file_data: bytes) -> str:
 
 
 def resolve_upload_mime_type(file_data: bytes, http_type: str | None) -> str:
-    """Pick a MIME type for an upload; strict mode rejects unknown content."""
     detected = detect_mime_type(file_data)
     if detected != "application/octet-stream":
         return detected
@@ -127,7 +110,6 @@ def _resolved(path: Path) -> Path:
 
 
 def _within(root: Path, file_key: str) -> Path:
-    """Resolve a key under root, refusing keys that escape it."""
     base = _resolved(root)
     local_path = _resolved(base / file_key)
     if not local_path.is_relative_to(base):
@@ -150,7 +132,6 @@ def _readable_path(file_key: str) -> Path:
 
 
 def _require_room(scope: LocalStorageScope, size: int) -> None:
-    # Concurrent uploads can each pass this check; the disk reserve still bounds the total.
     used = sum(
         f.stat().st_size for f in scope.root.rglob("*") if f.is_file()
     ) if scope.root.exists() else 0
@@ -167,9 +148,6 @@ def _require_room(scope: LocalStorageScope, size: int) -> None:
 
 
 def ensure_bucket() -> None:
-    """Create the configured bucket for a disposable local stack.
-
-    Court deployments provision their own bucket and its policies."""
     if uses_local_storage():
         return
     from botocore.exceptions import ClientError
@@ -227,7 +205,6 @@ def stored_integrity(file_key: str) -> tuple[str, int]:
 def delete_document(file_key: str) -> None:
     with storage_errors():
         if uses_local_storage():
-            # A sandbox deletes only its own files, never the shared seeded samples.
             _writable_path(file_key).unlink(missing_ok=True)
             return
         get_s3_client().delete_object(Bucket=settings.s3_bucket_name, Key=file_key)
@@ -241,7 +218,6 @@ class PdfInspection:
 
 
 def inspect_pdf(file_data: bytes, max_pages: int = 5) -> PdfInspection:
-    """Parse once and reuse sampled text for searchability and advisory PII checks."""
     from app.utils.pdf import check_pii_patterns
 
     inspection = PdfInspection()

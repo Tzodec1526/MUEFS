@@ -1,5 +1,3 @@
-"""OWASP-aligned HTTP security headers for API and SPA responses."""
-
 from __future__ import annotations
 
 from fastapi import Request, Response
@@ -16,8 +14,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
         identity = HttpUrl(settings.keycloak_url)
-        # PKCE exchanges the authorization code from the browser. Permit the configured
-        # provider origin without opening script loading or unrelated connections.
         self.spa_csp = (
             "default-src 'self'; "
             "script-src 'self'; "

@@ -1,5 +1,3 @@
-"""Track storage keys written inside a request so commit failure can reclaim them."""
-
 from __future__ import annotations
 
 import logging
@@ -48,7 +46,6 @@ def purge_keys(file_keys: set[str]) -> None:
 
 
 async def _referenced(sessions: async_sessionmaker[AsyncSession], keys: set[str]) -> set[str]:
-    # Imported here: app.database imports this module before the models exist.
     from app.models.document_public_copy import DocumentPublicCopy
     from app.models.filing import FilingDocument
 
@@ -70,11 +67,6 @@ async def _referenced(sessions: async_sessionmaker[AsyncSession], keys: set[str]
 async def rollback_with_upload_cleanup(
     session: AsyncSession, *, verify_with: async_sessionmaker[AsyncSession] | None = None,
 ) -> None:
-    """Finish rollback and reclaim uncommitted objects even when the request is cancelled.
-
-    A commit can apply and still fail to report success. After a failed commit,
-    ``verify_with`` checks a new session so objects that committed rows reference stay.
-    """
     pending = take_pending_uploads(session.sync_session)
     with anyio.CancelScope(shield=True):
         try:
@@ -88,7 +80,6 @@ async def rollback_with_upload_cleanup(
 
 @event.listens_for(Session, "after_commit")
 def _clear_pending_uploads(session: Session) -> None:
-    # Releasing a savepoint fires after_commit too; only the outer commit keeps uploads.
     if session.in_nested_transaction():
         return
     session.info.pop(_PENDING, None)

@@ -1,5 +1,3 @@
-"""Fail-fast checks for unsafe production configuration."""
-
 from __future__ import annotations
 
 import logging
@@ -23,7 +21,6 @@ _PLACEHOLDER_SECRETS = frozenset(
 
 
 def validate_security_config() -> None:
-    """Raise on unsafe production settings; warn for the rest unless strict startup is on."""
     issues: list[str] = []
     fatal: list[str] = []
     validate_email_config()
@@ -37,13 +34,10 @@ def validate_security_config() -> None:
         issues.append("ALLOW_PUBLIC_REGISTRATION should be false outside DEBUG")
     if not settings.debug and settings.enable_api_docs:
         issues.append("ENABLE_API_DOCS should be false outside DEBUG")
-    # The hosted demo runs DEBUG=false with ALLOW_DEMO_MODE=true on SQLite and local
-    # storage; only a court deployment (neither flag) must refuse to start.
     production = not settings.debug and not settings.allow_demo_mode
     if production and not settings.malware_scan_clamav_enabled:
         fatal.append("MALWARE_SCAN_CLAMAV_ENABLED must be true outside demo/debug mode")
 
-    # SQLite deployments keep documents on local disk and never use the S3 credentials.
     secret = settings.s3_secret_key
     if not settings.debug and not uses_local_storage() and (
         secret in _PLACEHOLDER_SECRETS or len(secret) < 16

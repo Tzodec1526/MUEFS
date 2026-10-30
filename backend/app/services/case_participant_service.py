@@ -1,5 +1,3 @@
-"""Court-reviewed participant records; appearance data is not inferred from acceptance."""
-
 from datetime import UTC, datetime
 
 from fastapi import HTTPException
@@ -50,8 +48,6 @@ async def change_participant(
     *,
     context: dict,
 ) -> CaseParticipant:
-    # Lock the actor before the case, and refresh permission state after a concurrent
-    # account/court revocation. Case versioning prevents one editor overwriting another.
     actor = await db.scalar(
         select(User)
         .where(User.id == actor_id)

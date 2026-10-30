@@ -111,8 +111,6 @@ async def create_filing(
     created = False
     if envelope is None:
         try:
-            # The unique index arbitrates simultaneous requests, including across workers.
-            # Roll back only the losing insert, then read the committed winner.
             async with db.begin_nested():
                 envelope = await filing_service.create_filing(db, user_id, data, creation_key=key)
             created = True
@@ -184,8 +182,6 @@ async def get_filing(
     filing = await filing_service.get_filing(db, filing_id)
     if not filing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
-    # The full envelope contains the fee-waiver application. Case access uses the
-    # separately filtered docket endpoint, not this private filing record.
     if filing.filer_id != user_id and not await access_service.user_is_court_staff_for_court(
         db, user_id, filing.court_id,
     ):
@@ -283,7 +279,6 @@ async def upload_document(
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
-    # Authorization and status checks without locking across AV / S3 I/O.
     filing = await _owned_filing(db, filing_id, user_id)
 
     def fingerprint(sha256: str, size: int) -> str:
@@ -324,8 +319,6 @@ async def upload_document(
     )
     try:
         await require_user_may_manage_efilings(await lock_current_user(db, user_id))
-        # Insert only after locking: an earlier document INSERT takes a foreign-key
-        # lock that can deadlock when simultaneous uploads upgrade the envelope lock.
         locked = await filing_service.get_filing(db, filing_id, for_update=True)
         if not locked or locked.filer_id != user_id:
             raise HTTPException(status_code=403, detail="Not your filing")
@@ -366,7 +359,6 @@ async def remove_document(
     user_id = current_user.id
     filing = await _owned_filing(db, filing_id, user_id, for_update=True)
 
-    # Record immutability: only draft/returned envelopes may drop attachments (court retention).
     if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -380,11 +372,9 @@ async def remove_document(
     filing.fee_version += 1
 
     if doc.retained_at is not None or filing.submitted_at is not None:
-        # Corrections remove a document from the next submission, not from history.
         doc.removed_at = datetime.now(UTC)
         await db.flush()
     else:
-        # SQLite demo connections do not enforce ON DELETE, and may reuse this document ID.
         await db.execute(update(DocumentUploadRequest).where(
             DocumentUploadRequest.document_id == doc.id,
         ).values(document_id=None))
@@ -418,8 +408,6 @@ async def filing_history(
     filing = await db.get(FilingEnvelope, filing_id)
     if not filing:
         raise HTTPException(status_code=404, detail="Filing not found")
-    # Receipts include rejected submissions, private document metadata, and payment
-    # references. Standing on the public/sealed case alone does not grant this access.
     staff = await access_service.user_is_court_staff_for_court(db, user_id, filing.court_id)
     if filing.filer_id != user_id and not staff:
         raise HTTPException(
@@ -439,7 +427,5 @@ async def filing_history(
         fee_waiver=await waiver_state(db, filing, user_id) if filing.fee_waiver_requested else None,
         filing_date=filing.filing_date, filing_date_basis=filing.filing_date_basis,
         court_id=filing.court_id,
-        # Filing-date orders and publication are court decisions; a filer cannot make
-        # them on their own filing.
         can_manage_documents=staff and filing.filer_id != user_id,
     )

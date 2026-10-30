@@ -32,9 +32,6 @@ async def _administration_transaction(db: AsyncSession) -> AsyncIterator[None]:
             409, "This email address, identity subject or court grant is already assigned"
         ) from exc
     except DBAPIError as exc:
-        # Authentication may have updated the actor's verified email before we take
-        # ordered access locks. Let the operator refresh after an overlapping change;
-        # never automatically replay an authority change or expose a database failure.
         if getattr(exc.orig, "sqlstate", None) == "40P01":
             raise HTTPException(
                 409, "Another administration change overlapped this one. Refresh before retrying"
@@ -211,8 +208,6 @@ async def list_accounts(
         await administration.require_court_administrator(db, current_user, court_id)
     query = select(User)
     if email and email.strip():
-        # Exact lookup lets court administrators add known staff without exposing a
-        # statewide identity directory or other courts' assignments.
         query = query.where(func.lower(User.email) == email.strip().lower())
         if current_user.user_type != UserType.ADMIN:
             query = query.where(User.user_type.in_([UserType.CLERK, UserType.JUDGE]))

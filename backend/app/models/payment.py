@@ -70,7 +70,6 @@ class Payment(Base):
     )
 
 
-# External credits retain their original evidence. Only a one-way reversal can change them.
 _unchanged = " AND ".join(f"NEW.{column.name} IS OLD.{column.name}"
                           for column in Payment.__table__.columns if column.name != "status")
 event.listen(Payment.__table__, "after_create", DDL(f"""

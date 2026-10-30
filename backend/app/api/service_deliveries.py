@@ -1,5 +1,3 @@
-"""Explicit, recipient-scoped delivery of retained subsequent documents."""
-
 import hashlib
 import json
 from datetime import UTC, datetime
@@ -66,7 +64,6 @@ async def send_documents(
     actor: Actor,
     idempotency_key: Annotated[UUID, Header()],
 ):
-    # A failed recipient or integrity check must not leave a partial delivery behind.
     async with db.begin_nested():
         packet = await service.create_packet(db, actor.id, filing_id, data, str(idempotency_key))
     return {"packet_id": packet.id}
@@ -282,7 +279,6 @@ async def report_delivery_failure(
         raise HTTPException(403, "Assigned court staff must review delivery-failure reports")
     details = data.model_dump(mode="json")
     fingerprint = hashlib.sha256(json.dumps(details, sort_keys=True).encode()).hexdigest()
-    # The notice lock serializes replay, reporting and retrying for this recipient.
     previous = await db.scalar(
         select(ServiceEvent)
         .where(
@@ -315,7 +311,6 @@ async def report_delivery_failure(
     if (
         observed_at > datetime.now(UTC)
         or notice.last_attempt_at is None
-        # Source notices and the review form commonly record whole seconds.
         or observed_at
         < notice.last_attempt_at.replace(microsecond=0)
     ):
@@ -329,8 +324,6 @@ async def report_delivery_failure(
             previous_status=notice.delivery_status,
             email_recipient=notice.email_recipient,
         )
-        # A reviewed report is an observation, not a fabricated SMTP exchange.
-        # Keep the original relay time, message and transport events intact.
         notice.delivery_status = DeliveryStatus.FAILURE_REPORTED
         notice.next_attempt_at = None
         notice.last_error = f"Delivery failure reported: {data.description}"

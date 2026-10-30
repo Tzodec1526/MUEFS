@@ -1,5 +1,3 @@
-"""Record receipts and decisions atomically with their filing transition."""
-
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -44,7 +42,6 @@ async def record_transaction(
             "filing_description": filing.filing_description,
             "fee_waiver_requested": filing.fee_waiver_requested,
             "filing_date_basis": filing.filing_date_basis,
-            # Financial hardship text is deliberately not copied into notices/receipts.
             "payments": [{
                 "id": item.id, "amount_cents": item.amount_cents,
                 "transaction_ref": item.transaction_ref, "status": item.status.value,

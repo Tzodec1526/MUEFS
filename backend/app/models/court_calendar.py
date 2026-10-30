@@ -1,5 +1,3 @@
-"""Published court calendars are revisions, so receipt date calculations remain explainable."""
-
 from datetime import date, datetime
 
 from sqlalchemy import JSON, Date, ForeignKey, Index, String

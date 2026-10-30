@@ -45,14 +45,12 @@ class Case(Base):
     case_number: Mapped[str] = mapped_column(String(50))
     case_type_id: Mapped[int] = mapped_column(ForeignKey("case_types.id"), index=True)
     title: Mapped[str] = mapped_column(String(500))
-    # Restricted docket access requires an explicit participant grant or court authority.
     is_sealed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     status: Mapped[CaseStatus] = mapped_column(Enum(CaseStatus), default=CaseStatus.OPEN)
     filed_date: Mapped[datetime] = mapped_column(UTCDateTime())
     filing_date: Mapped[date | None]
     filing_date_version: Mapped[int] = mapped_column(default=0, server_default="0")
     judge_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
-    # Shared by participant grants and case-wide public access instructions.
     participant_version: Mapped[int] = mapped_column(default=0, server_default="0")
 
     __table_args__ = (

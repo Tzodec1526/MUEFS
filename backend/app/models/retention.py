@@ -1,11 +1,7 @@
-"""Database guards for records that the application must retain without rewriting."""
-
 from sqlalchemy import DDL, FromClause, Table, event
 
 
 def append_only(table: FromClause) -> None:
-    # Names come from model definitions, never from a request. Database owners can still
-    # remove these guards; deployments also need restricted roles and protected backups.
     assert isinstance(table, Table)
     name = table.name
     for operation in ("UPDATE", "DELETE"):

@@ -78,7 +78,6 @@ async def process_payment(
             detail=str(exc),
         ) from exc
 
-    # Keep the legacy latest-payment pointer; the balance uses all completed payments.
     filing.payment_id = payment.id
     filing.payment_version += 1
     await db.flush()

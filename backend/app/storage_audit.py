@@ -1,10 +1,3 @@
-"""Verify restored filing storage without changing the database or stored files.
-
-Run against a quiescent restored database and its matching storage configuration.
-Output is JSON Lines. A final summary with complete=true is required; an interrupted
-report is incomplete. Exit codes: 0 verified, 1 discrepancies, 2 incomplete audit.
-"""
-
 import argparse
 import asyncio
 import hashlib
@@ -89,8 +82,6 @@ async def inspect_files(
                     except ValueError:
                         result["status"] = "invalid_reference"
                     except OSError as exc:
-                        # Report the storage failure behind the wrapper (for example
-                        # EndpointConnectionError or PermissionError).
                         cause = exc.__cause__ or exc
                         result.update(status="unavailable", error_type=type(cause).__name__)
                     else:
@@ -186,7 +177,6 @@ async def inspect_receipts(
         )
     last_id: str | None = None
     references: list[dict] = []
-    # Receipts carry JSON manifests. Keep only a small page plus one document batch.
     while rows := (
         await connection.execute(
             query.where(FilingTransaction.id > last_id if last_id is not None else true())
@@ -268,7 +258,6 @@ async def inspect_service_packets(
     *,
     case_id: int | None = None,
 ) -> AsyncIterator[dict]:
-    """Compare frozen selections with their source; later routing changes are allowed."""
     scoped = court_id is not None or case_id is not None
     filings = select(FilingEnvelope.id)
     cases = select(Case.id)
@@ -309,7 +298,6 @@ async def inspect_service_packets(
                 CaseParticipant.case_id.in_(cases),
             ))
         )
-        # Include either side of a damaged cross-case link, so neither export can hide it.
         query = query.where(or_(
             ServicePacket.case_id.in_(cases),
             ServicePacket.filing_id.in_(filings),
@@ -326,8 +314,6 @@ async def inspect_service_packets(
             select(ServiceRecipient.packet_id, func.count())
             .where(ServiceRecipient.packet_id.in_(ids)).group_by(ServiceRecipient.packet_id)
         )).tuples().all())
-        # The sending contract permits 1..100 recipients. Count first so damaged imports
-        # cannot make one packet or one page materialize an unlimited recipient collection.
         eligible = [packet_id for packet_id in ids if 1 <= counts.get(packet_id, 0) <= 100]
         recipients: dict[str, list] = {packet_id: [] for packet_id in ids}
         if eligible:
@@ -483,8 +469,6 @@ async def inspect_service_packets(
                 yield result
         last_id = packets[-1]["id"]
 
-    # A remaining recipient row also proves a packet is missing, even when that packet
-    # can no longer be found by the page scan above.
     orphans = (
         select(ServiceRecipient.id, ServiceRecipient.packet_id)
         .outerjoin(ServicePacket, ServicePacket.id == ServiceRecipient.packet_id)
@@ -542,7 +526,6 @@ async def run_audit(output: TextIO, court_id: int | None = None) -> int:
     except BrokenPipeError:
         raise
     except (SQLAlchemyError, OSError, ValueError, LookupError) as exc:
-        # Database/storage exception messages can contain credentials, keys or filenames.
         print(
             json.dumps(
                 {
@@ -599,7 +582,6 @@ def main() -> int:
         parser.error("--court-id must be positive")
     try:
         if args.output:
-            # Never overwrite an earlier recovery report.
             with args.output.open("x", encoding="utf-8") as output:
                 return asyncio.run(run_audit(output, args.court_id))
         return asyncio.run(run_audit(sys.stdout, args.court_id))

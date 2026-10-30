@@ -1,5 +1,3 @@
-"""Record dates established by signed court orders without altering receipt instants."""
-
 from datetime import UTC, date, datetime
 from uuid import uuid4
 
@@ -102,8 +100,6 @@ async def record_filing_date_order(
     if filing.filing_date_version != expected_version:
         raise HTTPException(409, "This filing changed. Refresh and review its date and status")
 
-    # Inspect/store the PDF before acquiring authority and record locks. Recheck all
-    # decisions after that slow work; revocation, resubmission and acceptance may race it.
     payload, mime, digest, inspection = await inspect_upload(file, require_pdf=True)
     file_key = f"filings/{filing_id}/orders/{uuid4()}.pdf"
     await run_in_threadpool(document_service.upload_document, payload, file_key, mime)

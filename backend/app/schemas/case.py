@@ -6,8 +6,6 @@ from app.models.case import CaseStatus, ParticipantRole
 
 
 class CaseSearchParticipantPublic(BaseModel):
-    """Public party/counsel identifiers only — no contact PII (court privacy)."""
-
     id: int
     party_name: str
     role: ParticipantRole
@@ -19,10 +17,6 @@ class CaseSearchParticipantPublic(BaseModel):
 
 
 class CasePublicRecord(BaseModel):
-    """Public docket and search fields with participant contact PII (email, phone, address)
-    stripped — the docket is open by default, so litigant contact details are never
-    served on it. Sealed-case access is gated separately."""
-
     id: int
     court_id: int
     case_number: str
@@ -40,8 +34,6 @@ class CasePublicRecord(BaseModel):
 
 
 class CaseDocketResponse(CasePublicRecord):
-    """One case, with what the current account may do on it."""
-
     can_manage_records: bool = False
     can_file: bool = False
 

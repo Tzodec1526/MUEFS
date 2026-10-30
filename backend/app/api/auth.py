@@ -123,13 +123,6 @@ async def get_current_user(
 
 
 async def get_current_user_id(current_user: User = Depends(get_current_user)) -> int:
-    """Resolve the authenticated internal user id. Fail closed.
-
-    - Production (allow_demo_mode=False): valid Keycloak Bearer JWT only; user must
-      exist with matching keycloak_id (OIDC 'sub').
-    - Demo (allow_demo_mode=True): JWT if valid and provisioned, else X-Demo-User-Id
-      when the user id exists in the database (no default user).
-    """
     return current_user.id
 
 
@@ -147,21 +140,10 @@ async def get_optional_user(
 
 
 async def get_optional_user_id(user: User | None = Depends(get_optional_user)) -> int | None:
-    """Resolve the user id if valid credentials are present, else return None (anonymous).
-
-    Used by public-docket read endpoints (case search, docket, public document download).
-    Never raises on missing/invalid credentials — the caller falls back to the anonymous
-    public view (non-sealed cases, non-confidential documents, non-draft filings only).
-
-    Security: this must stay strictly no more permissive than get_current_user_id — it only
-    returns an id for a valid token bound to an active provisioned user, or a valid demo id
-    when allow_demo_mode is on. Anything else resolves to None, not an error.
-    """
     return user.id if user else None
 
 
 async def require_user_may_manage_efilings(current_user: User = Depends(get_current_user)) -> User:
-    """Public docket accounts may search and read non-sealed matters but not file or pay."""
     if current_user.user_type == UserType.PUBLIC:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -171,7 +153,6 @@ async def require_user_may_manage_efilings(current_user: User = Depends(get_curr
 
 
 async def lock_current_user(db: AsyncSession, user_id: int) -> User:
-    """Hold authority stable while allowing other filings and foreign-key references."""
     user = await db.scalar(
         select(User).where(User.id == user_id).with_for_update(read=True)
         .execution_options(populate_existing=True)
@@ -204,21 +185,17 @@ async def register_user(
     data: UserCreate,
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
-    # Court production: self-registration off; identities come from IdP or admin invite.
-    # Demo mode does not imply it: the demo signs in as seeded roles.
     if not settings.allow_public_registration:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Self-registration is disabled. Sign in through your court identity provider.",
         )
-    # Addresses differing only in case would create ambiguous identities.
     if await db.scalar(select(User.id).where(func.lower(User.email) == data.email.lower())):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="User with this email already exists",
         )
 
-    # Only allow non-privileged user types on self-registration
     allowed_types = {UserType.ATTORNEY, UserType.SELF_REPRESENTED, UserType.PUBLIC}
     if data.user_type not in allowed_types:
         raise HTTPException(

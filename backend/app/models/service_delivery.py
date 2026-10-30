@@ -1,5 +1,3 @@
-"""Retained document packages and their explicitly selected recipients."""
-
 from datetime import datetime
 from uuid import uuid4
 

@@ -1,5 +1,3 @@
-"""Request and record itemized court fee assessments before payment or submission."""
-
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -34,8 +32,6 @@ async def current_fees(
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
-    # Document edits, assessments and payments all lock the envelope. Keep this
-    # short read consistent so the reviewer's documents match the fee version.
     filing = await db.scalar(
         select(FilingEnvelope)
         .where(FilingEnvelope.id == filing_id)

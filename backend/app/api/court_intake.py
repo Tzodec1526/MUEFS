@@ -1,5 +1,3 @@
-"""Publish court intake settings while preserving receipt and administrator authority locks."""
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,7 +35,6 @@ async def get_intake(
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int | None = Depends(get_optional_user_id),
 ):
-    # One statement observes the court and every case-type flag at the same instant.
     rows = (await db.execute(select(Court, CaseType)
         .outerjoin(CaseType, CaseType.court_id == Court.id).where(Court.id == court_id)
         .order_by(CaseType.name, CaseType.id).execution_options(populate_existing=True))).all()
@@ -85,7 +82,6 @@ async def publish_intake(
     if (not data.is_efiling_enabled or not all(desired.values())) and not data.public_notice:
         raise HTTPException(422, "Publish instructions for filers when closing electronic intake")
 
-    # The comparison also protects SQLite, where FOR UPDATE is not enforced.
     court = await db.scalar(update(Court).where(
         Court.id == court_id, Court.intake_version == data.expected_version,
     ).values(

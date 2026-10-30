@@ -26,7 +26,6 @@ router = APIRouter(prefix="/clerk", tags=["Clerk Review"])
 async def _require_clerk_role(
     db: AsyncSession, user_id: int, court_id: int,
 ) -> None:
-    """Verify user has clerk/judge/admin role for the given court."""
     if not await access_service.user_is_court_staff_for_court(db, user_id, court_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -37,7 +36,6 @@ async def _require_clerk_role(
 async def _require_independent_reviewer(
     db: AsyncSession, user_id: int, filing: FilingEnvelope,
 ) -> None:
-    """Like fee assessments and waivers, a filer cannot decide their own filing."""
     await _require_clerk_role(db, user_id, filing.court_id)
     if filing.filer_id == user_id:
         raise HTTPException(
@@ -98,7 +96,6 @@ async def review_filing(
             detail="Reason is required for reject/return actions",
         )
 
-    # Look up filing to check court authorization
     await lock_current_user(db, user_id)
     filing_check = await filing_service.get_filing(db, filing_id)
     if not filing_check:
@@ -129,7 +126,6 @@ async def review_filing(
             detail="This filing is not awaiting review",
         )
     if data.action == "accept" and filing.status != FilingStatus.ACCEPTED:
-        # Return 502 without raising so get_db commits cms_error on the envelope.
         return JSONResponse(
             status_code=status.HTTP_502_BAD_GATEWAY,
             content={
@@ -163,9 +159,6 @@ async def batch_review_filings(
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
-    """Batch accept filings (UI multi-select).
-    Rejects/returns remain single-file (reasons required per item).
-    """
     await lock_current_user(db, user_id)
     succeeded: list[int] = []
     failed: list[int] = []
@@ -192,15 +185,12 @@ async def batch_review_filings(
         failed.append(fid)
         errors[fid] = failure
 
-    # Different reviewers must acquire envelope locks in the same order.
     if verified:
         await filing_service.lock_filings(db, [item.filing_id for item, _ in verified])
     for item, evidence in verified:
         fid = item.filing_id
         failure = "The filing is no longer awaiting review. Refresh the queue."
         try:
-            # One failure must roll back that filing's case, receipt, and notices,
-            # without poisoning the transaction for the rest of the batch.
             async with db.begin_nested():
                 f = await filing_service.record_review(
                     db,

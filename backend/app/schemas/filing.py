@@ -104,8 +104,6 @@ class FilingEnvelopeResponse(BaseModel):
 
 
 class FilingSummary(BaseModel):
-    """Fields used by filing lists; documents and private details load on opening."""
-
     id: int
     court_id: int
     case_id: int | None
@@ -145,8 +143,6 @@ class CaseDocumentResponse(FilingDocumentResponse):
 
 
 class CaseFilingResponse(BaseModel):
-    """Docket fields only; payment references and waiver applications are private."""
-
     id: int
     status: FilingStatus
     case_title: str | None
@@ -177,7 +173,6 @@ class BatchReviewItem(BaseModel):
 
 
 class BatchReviewRequest(BaseModel):
-    """Batch accept support (reject/return require per-filing reasons so are single only)."""
     filings: list[BatchReviewItem] = Field(..., min_length=1, max_length=100)
     action: Literal["accept"]
 

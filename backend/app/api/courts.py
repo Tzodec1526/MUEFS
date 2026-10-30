@@ -32,8 +32,6 @@ async def list_courts(
         filters.append(Court.county.icontains(county, autoescape=True))
     if court_type:
         filters.append(Court.court_type == court_type)
-    # Tier lets the picker separate statewide/appellate forums (no county) from the
-    # county-based trial courts -- the appellate courts are otherwise buried.
     if tier == "appellate":
         appellate = (
             CourtType.COURT_OF_CLAIMS, CourtType.COURT_OF_APPEALS, CourtType.SUPREME_COURT,
@@ -66,7 +64,6 @@ async def list_courts(
 
 @router.get("/directory", response_model=list[CourtDirectoryEntry])
 async def court_directory(db: AsyncSession = Depends(get_db, scope="function")):
-    # Closed efiling intake does not remove a court's existing public records.
     result = await db.execute(
         select(Court.id, Court.name, Court.county).order_by(Court.county, Court.name, Court.id)
     )

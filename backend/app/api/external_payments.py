@@ -1,5 +1,3 @@
-"""Credit verified external receipts without moving funds or rewriting their evidence."""
-
 import hashlib
 import json
 from datetime import UTC, datetime
@@ -228,7 +226,6 @@ async def record_external_payment(
                 user_agent=client_user_agent(request),
             )
     except IntegrityError as exc:
-        # The unique receipt key arbitrates competing credits on different filings.
         duplicate = await db.scalar(
             select(Payment).where(
                 Payment.external_receipt_key == receipt_key,
@@ -273,7 +270,6 @@ async def reverse_external_payment(
     )
     if payment is None:
         raise HTTPException(404, "External payment credit not found")
-    # A lost reversal response can be retried without another balance change or event.
     if payment.status == PaymentStatus.REVERSED:
         return PaymentRecord.model_validate(payment)
     if payment.status != PaymentStatus.COMPLETED:

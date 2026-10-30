@@ -73,14 +73,13 @@ class SubmissionAlreadyRecordedError(Exception):
 async def verify_filing_documents(
     filing: FilingEnvelope, court_order: FilingDocument | None = None,
 ) -> None:
-    """Confirm current attachment bytes before creating a receipt or accepting a filing."""
     if not filing.documents:
         raise FilingDocumentError("The filing has no current documents to verify")
     documents = [*filing.documents, court_order] if court_order else filing.documents
     for doc in documents:
         try:
             digest, size = await run_in_threadpool(document_service.stored_integrity, doc.file_key)
-        except OSError as exc:  # Missing, or storage unavailable
+        except OSError as exc:
             raise FilingDocumentError(
                 f"Stored document '{doc.title}' is unavailable. "
                 "Retry when storage is available, or contact the court to restore the file."
@@ -91,12 +90,8 @@ async def verify_filing_documents(
                 "Replace the draft attachment or contact the court to restore the original."
             )
 
-# Document-code classifiers shared by the submission validator and the
-# requirements API, so the UI shows exactly the set the validator enforces.
 _SERVICE_PROOF_CODES = {"PROOF_SERVICE", "POS_ELECTRONIC", "CERT_SERVICE"}
 
-# MCR 2.313(A): the good-faith (meet-and-confer) certification accompanies discovery
-# motions only; other motions do not need it.
 _DISCOVERY_MOTION_CODES = {"MOT_COMPEL", "MOT_PROTECTIVE", "MOT_SANCTIONS"}
 
 
@@ -105,7 +100,6 @@ def _is_motion_code(code: str) -> bool:
     return (
         c.startswith("MOT_")
         or c in (
-            # NOTICE_HEARING is the probate lists' spelling; the catalog uses NOT_HEARING.
             "MOTION", "BRIEF", "BRIEF_SUPPORT", "BRIEF_RESPONSE", "BRIEF_REPLY",
             "PROPOSED_ORDER", "NOT_HEARING", "NOTICE_HEARING", "DISC_CERT_GF",
         )
@@ -127,20 +121,6 @@ def requirements_for_filing_type(
     requirements: list[FilingRequirement],
     filing_type: str,
 ) -> list[FilingRequirement]:
-    """Return the subset of court-rule requirements that apply to a filing context.
-
-    Mirrors the enforcement logic in :func:`validate_filing` so the requirements
-    panel can display exactly what the validator will enforce.
-
-    - ``initial`` (new case): initiating pleadings only. Motion companions,
-      responsive documents, and proof/certificate of service are dropped --
-      service (and its proof) happens *after* the case is filed and the summons
-      issued (MCR 2.104 / 2.107).
-    - ``subsequent`` / ``motion``: motion-related companions only; the original
-      complaint and similar initiating documents are already on file. The validator
-      enforces them on a subsequent filing only when it includes a motion.
-    - any other type (e.g. service-only): returned unfiltered.
-    """
     if filing_type == "initial":
         return [
             r
@@ -160,7 +140,6 @@ async def validate_filing_destination(
     db: AsyncSession, data: FilingEnvelopeCreate | FilingEnvelope, *, filer_id: int | None,
     lock: bool = True,
 ) -> Case | None:
-    """Court review checks routing; intake also checks availability and filer access."""
     if data.filing_type not in ("initial", "subsequent", "motion", "service_only"):
         raise FilingDestinationError(
             409, "This record has an unsupported filing type and needs correction.",
@@ -173,8 +152,6 @@ async def validate_filing_destination(
         raise FilingDestinationError(
             409, "The filing type does not match its case reference. Start a new draft.",
         )
-    # Read current scalar values, even if a caller previously loaded these records.
-    # Shared locks keep configuration and case access stable until the receipt commits.
     target_query = (
         select(Court.is_efiling_enabled, Court.intake_notice, CaseType.court_id, CaseType.is_active)
         .select_from(Court).join(CaseType, CaseType.id == data.case_type_id)
@@ -224,7 +201,6 @@ async def validate_filing_destination(
 
 
 def creation_fingerprint(data: FilingEnvelopeCreate) -> str:
-    # Include validated defaults so omitted fields and their explicit defaults replay alike.
     return hashlib.sha256(json.dumps(
         data.model_dump(mode="json"), sort_keys=True, ensure_ascii=False,
     ).encode("utf-8")).hexdigest()
@@ -247,7 +223,6 @@ async def create_filing(
         creation_key=creation_key,
         creation_sha256=creation_fingerprint(data) if creation_key else None,
         filing_type=data.filing_type,
-        # A filing into an existing case carries the court's caption, not a client value.
         case_title=case.title if case is not None else data.case_title,
         filing_description=data.filing_description,
         fee_waiver_requested=data.fee_waiver_requested,
@@ -317,8 +292,6 @@ async def get_filing(
         .execution_options(populate_existing=True)
     )
     if for_update:
-        # A request may already have read the row for authorization. Refresh that
-        # identity-map entry after the lock, or concurrent decisions can use stale status.
         query = query.with_for_update()
     result = await db.execute(query)
     return result.scalar_one_or_none()
@@ -339,7 +312,6 @@ _FILING_SUMMARIES = select(
     FilingEnvelope.created_at,
     FilingEnvelope.updated_at,
     FilingEnvelope.submission_count,
-    # Count current attachments using the same scope as FilingEnvelope.documents.
     select(func.count())
     .select_from(FilingDocument)
     .where(
@@ -402,14 +374,12 @@ async def validate_filing(
     ):
         missing_docs.append("Completed, signed Fee Waiver Request (MC 20), nonpublic")
 
-    # Service-only filings have relaxed validation - just need docs and a case
     is_service_only = filing.filing_type == "service_only"
 
     if is_service_only:
         if not filing.case_id:
             errors.append("Service-only filings must reference an existing case")
     else:
-        # Check required documents against court rules
         requirements = await db.execute(
             select(FilingRequirement).where(
                 FilingRequirement.court_id == filing.court_id,
@@ -425,23 +395,18 @@ async def validate_filing(
         if filing.filing_type == "subsequent" and not any(
             dt.startswith("MOT_") or dt == "MOTION" for dt in filed_doc_types
         ):
-            # An answer or other subsequent paper does not need motion companions.
             required_docs = []
 
         for req in required_docs:
             code = req.document_type_code
             satisfied = code in filed_doc_types
             if not satisfied and (code.startswith("MOT_") or code == "MOTION"):
-                # Any motion document satisfies a motion-document requirement, in both
-                # directions: a specific type (MOT_SD, MOT_RECONSIDER, ...) covers a
-                # generic MOTION row and vice versa.
                 satisfied = any(dt.startswith("MOT_") or dt == "MOTION" for dt in filed_doc_types)
             if (
                 not satisfied
                 and code == "DISC_CERT_GF"
                 and not (filed_doc_types & _DISCOVERY_MOTION_CODES)
             ):
-                # The certification requirement applies only to discovery motions.
                 satisfied = True
             if not satisfied:
                 missing_docs.append(
@@ -452,7 +417,6 @@ async def validate_filing(
         if not filing.case_title and not filing.case_id:
             errors.append("Case title is required for new case filings")
 
-    # MCR 1.109 text-searchability is advisory at validation.
     for doc in filing.documents:
         if not doc.is_text_searchable and doc.mime_type == "application/pdf":
             warnings.append(
@@ -460,8 +424,6 @@ async def validate_filing(
                 "MCR 1.109 requires text-searchable PDFs."
             )
 
-    # Advisory screening is tied to the uploaded bytes. Transitions independently
-    # verify those bytes; repeating PDF extraction here adds no new assurance.
     for doc in filing.documents:
         if doc.mime_type == "application/pdf":
             if doc.pii_warnings is None:
@@ -560,7 +522,6 @@ async def submit_filing(
         filing.filing_date = assessment.filing_date
         filing.filing_date_basis = assessment.model_dump(mode="json")
 
-    # Service-only filings skip clerk review entirely
     if filing.filing_type == "service_only":
         filing.status = FilingStatus.SERVED
     else:
@@ -590,7 +551,6 @@ async def verify_review(
     *,
     expected_submission_count: int,
 ) -> ReviewEvidence | None:
-    # Verify stored bytes before taking the write lock. Re-check cheap metadata after.
     probe = await get_filing(db, filing_id)
     if not probe:
         return None
@@ -653,7 +613,6 @@ async def record_review(
 
     case = None
     if action == "accept":
-        # A date order recorded during verification must not be replaced by the calendar.
         if filing.filing_date_version != evidence.date_version:
             raise StaleFilingReviewError(
                 "The filing date changed while this review was in progress. Refresh the "
@@ -695,7 +654,6 @@ async def record_review(
                 await record_transaction(db, filing, "filing_date_assessed", reviewer_id, details={
                     "previous_filing_date": previous_date, "filing_date_basis": basis,
                 })
-        # Acceptance can create the case. An already-open date form must be refreshed.
         filing.filing_date_version += 1
         filing.status = FilingStatus.UNDER_REVIEW
         if case is None:

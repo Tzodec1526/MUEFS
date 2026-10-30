@@ -1,5 +1,3 @@
-"""Run with python -m app.notification_worker; --once drains the currently due queue."""
-
 import argparse
 import asyncio
 import logging

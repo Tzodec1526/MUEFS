@@ -1,5 +1,3 @@
-"""Only a committed removal may authorize deleting an unreceived draft's bytes."""
-
 from datetime import datetime
 
 from sqlalchemy import Index, String, func
@@ -12,7 +10,6 @@ class StorageDeletion(Base):
     __tablename__ = "storage_deletions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    # These identify deleted metadata; they deliberately are not foreign keys.
     document_id: Mapped[int]
     envelope_id: Mapped[int]
     file_key: Mapped[str] = mapped_column(String(500))

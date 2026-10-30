@@ -1,5 +1,3 @@
-"""Retained filing transactions. Submission details are snapshots, not live references."""
-
 from datetime import datetime
 from uuid import uuid4
 
