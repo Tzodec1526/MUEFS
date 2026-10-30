@@ -39,6 +39,7 @@ const CaseSearch = lazy(() => import('./components/search/CaseSearch'));
 const Favorites = lazy(() => import('./components/search/Favorites'));
 const CaseDetailPage = lazy(() => import('./components/search/CaseDetailPage'));
 const AuthCallback = lazy(() => import('./components/auth/AuthCallback'));
+const AboutPage = lazy(() => import('./components/about/AboutPage'));
 
 function RequireRole({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -142,6 +143,7 @@ function App() {
                         <Route path="/filings/:filingId/history" element={<FilingHistoryPage key={location.pathname} />} />
                         <Route path="/filings/:filingId/fees" element={<FilingFeesPage key={location.pathname} />} />
                         <Route path="/filings/:filingId/filing-date" element={<CourtWorkspace><FilingDateOrderPage key={location.pathname} /></CourtWorkspace>} />
+                        <Route path="/about" element={<AboutPage />} />
                         <Route path="/cases/search" element={<CaseSearch />} />
                         <Route path="/courts/:courtId/calendar" element={<CourtCalendarPage key={location.pathname} />} />
                         <Route path="/courts/:courtId/intake" element={<CourtIntakePage key={location.pathname} />} />

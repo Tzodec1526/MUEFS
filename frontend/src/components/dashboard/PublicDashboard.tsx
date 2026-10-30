@@ -1,7 +1,5 @@
 import { Link } from 'react-router-dom';
 import { Search } from 'lucide-react';
-import PlatformStats from '../marketing/PlatformStats';
-import MifileComparison from '../marketing/MifileComparison';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
 
@@ -24,8 +22,6 @@ function PublicDashboard() {
           <Link to="/cases/search" className="btn btn-primary">Search Cases</Link>
         </div>
       </div>
-      <PlatformStats />
-      <MifileComparison variant="dashboard" />
     </div>
   );
 }

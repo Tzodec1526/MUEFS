@@ -2,7 +2,6 @@ import { useContext, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ClipboardCheck, Search } from 'lucide-react';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
-import PlatformStats from '../marketing/PlatformStats';
 import { getClerkQueue } from '../../api/filings';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
@@ -54,7 +53,6 @@ function ClerkDashboard() {
           <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>
         </div>
       </div>
-      <PlatformStats />
     </div>
   );
 }

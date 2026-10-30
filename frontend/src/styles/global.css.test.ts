@@ -10,9 +10,9 @@ const corpus = Object.values({
   ...import.meta.glob<string>('../../index.html', { query: '?raw', import: 'default', eager: true }),
 }).join('\n');
 
-// Classes built at run time: `toast-${tone}`, `mifile-comparison--${variant}`, and badge modifiers
+// Classes built at run time: `toast-${tone}`, and badge modifiers
 // that come from API data (`status-badge ${filing.status}`, `age-badge ${age.level}`).
-const DYNAMIC_PREFIXES = ['toast-', 'mifile-comparison--'];
+const DYNAMIC_PREFIXES = ['toast-'];
 const DATA_MODIFIED = new Set(['status-badge', 'age-badge', 'flag-badge', 'req-badge']);
 // Filing statuses (backend FilingStatus) and case statuses (backend CaseStatus) shown on status badges.
 const BADGE_STATUSES = [

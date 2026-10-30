@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FilePlus2, FolderOpen, Search } from 'lucide-react';
-import PlatformStats from '../marketing/PlatformStats';
-import MifileComparison from '../marketing/MifileComparison';
 import { getFilingStatusCounts } from '../../api/filings';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
@@ -72,8 +70,6 @@ function FilerDashboard() {
           <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>
         </div>
       </div>
-      <PlatformStats />
-      <MifileComparison variant="dashboard" />
     </div>
   );
 }

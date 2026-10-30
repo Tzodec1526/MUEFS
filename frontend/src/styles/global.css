@@ -322,6 +322,12 @@ h1, h2 {
   color: var(--on-dark-muted);
 }
 
+.app-footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
 .app-footer a {
   display: inline-flex;
   align-items: center;
@@ -2560,10 +2566,6 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
   }
 }
 
-/* ============================================
-   Marketing: MiFILE comparison + platform stats
-   ============================================ */
-
 .sr-only {
   position: absolute;
   width: 1px;
@@ -2576,80 +2578,38 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
   border: 0;
 }
 
+.about-page {
+  max-width: 1060px;
+  margin-inline: auto;
+}
+
+.about-page > p {
+  margin-top: 0.5rem;
+}
+
+.about-page h2 {
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
 .mifile-comparison {
-  margin-top: 2.5rem;
-  padding: 1.75rem;
+  margin-top: 2rem;
+  padding: 1.5rem;
   background: var(--white);
   border-radius: var(--radius);
 }
 
-.mifile-comparison--login {
-  margin-top: 2rem;
-  text-align: left;
-  background: rgba(255, 255, 255, 0.97);
-}
-
-.mifile-comparison-header h2 {
-  font-size: 1.35rem;
-  margin-bottom: 0.5rem;
-  color: var(--ink);
-}
-
-.mifile-comparison-header p {
-  color: var(--muted);
-  font-size: 0.95rem;
-  margin-bottom: 1.25rem;
-  max-width: 52rem;
-}
-
-.mifile-comparison-table-wrap {
-  overflow-x: auto;
-}
-
-.mifile-comparison-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-
 .mifile-comparison-table th,
 .mifile-comparison-table td {
-  padding: 0.65rem 0.85rem;
-  border-bottom: 1px solid var(--rule);
-  text-align: left;
   vertical-align: top;
 }
 
-.mifile-comparison-table thead th {
-  font-size: 0.8rem;
-  color: var(--muted);
-  background: var(--tint);
-}
-
-.mifile-comparison-table .muefs-col {
-  background: var(--tint);
+.mifile-comparison-table tbody th {
+  background: none;
+  color: var(--ink);
+  font-size: 0.85rem;
   font-weight: 600;
-  color: var(--ink);
 }
-
-.mifile-comparison-table td.compare-gap {
-  background: var(--warning-tint);
-}
-
-.compare-bool {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.compare-partial-cell {
-  color: var(--ink);
-  font-weight: 500;
-}
-
-.compare-yes { color: var(--success); }
-.compare-no { color: var(--danger); }
-.compare-partial { color: var(--warning-ink); }
 
 .mifile-comparison-foot {
   margin-top: 1rem;
@@ -2657,17 +2617,8 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
   color: var(--muted);
 }
 
-.mifile-comparison-foot a {
-  color: var(--accent);
-}
-
 .platform-stats {
-  margin-top: 2.5rem;
-}
-
-.platform-stats-title {
-  font-size: 1.25rem;
-  margin-bottom: 0.35rem;
+  margin-top: 2rem;
 }
 
 .platform-stats-grid {
@@ -2682,15 +2633,9 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
   padding: 1rem 1.1rem;
 }
 
-.platform-stat-icon {
-  color: var(--accent);
-  margin-bottom: 0.35rem;
-}
-
 .platform-stat-value {
   font-size: 1.65rem;
   font-weight: 700;
-  color: var(--ink);
   line-height: 1.1;
 }
 
@@ -2700,10 +2645,42 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
   margin-top: 0.2rem;
 }
 
-.platform-stat-sub {
-  font-size: 0.75rem;
-  color: var(--muted);
-  margin-top: 0.35rem;
+@media (max-width: 600px) {
+  .mifile-comparison {
+    padding: 1rem;
+  }
+
+  .mifile-comparison-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .mifile-comparison-table,
+  .mifile-comparison-table tbody,
+  .mifile-comparison-table tr,
+  .mifile-comparison-table th,
+  .mifile-comparison-table td {
+    display: block;
+  }
+
+  .mifile-comparison-table tbody tr {
+    padding-block: 0.75rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .mifile-comparison-table th,
+  .mifile-comparison-table td {
+    padding: 0.1rem 0;
+    border-bottom: 0;
+  }
+
+  .mifile-comparison-table td::before {
+    content: attr(data-label) ': ';
+    font-weight: 600;
+  }
 }
 
 .case-search-hero {

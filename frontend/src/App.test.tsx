@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi, type Mock } from 'vitest';
 import { apiClient } from './api/client';
+import { isPublicPath } from './auth/publicPath';
 import { ToastProvider } from './components/common/Toast';
 import App from './App';
 
@@ -186,7 +187,6 @@ it("shows a failed load of a filer's filings inline and loads them again on retr
 it('tells a filer when their filing counts fail to load, and loads them again on retry', async () => {
   serve('attorney', {
     '/filings/summary': failsOnce({ draft: 2, returned: 1 }),
-    '/public/stats': stats,
   });
   openApp('/', 'attorney');
 
@@ -204,7 +204,6 @@ it('tells a clerk when the pending review count fails to load, and loads it agai
   serve('clerk', {
     '/auth/me': { id: 2, user_type: 'clerk', court_assignments: [{ court_id: 3, role: 'clerk', court_name: 'Third Circuit Court' }] },
     '/clerk/queue': failsOnce({ filings: [], total: 4, page: 1, page_size: 1 }),
-    '/public/stats': stats,
   });
   openApp('/', 'clerk');
 
@@ -219,7 +218,7 @@ it('tells a clerk when the pending review count fails to load, and loads it agai
 
 it('shows that platform statistics did not load instead of hiding them, and loads them again on retry', async () => {
   serve('public', { '/public/stats': failsOnce(stats) });
-  openApp('/', 'public');
+  openApp('/about', 'public');
 
   const alert = await screen.findByRole('alert');
   expect(alert.textContent).toContain('Platform statistics are unavailable right now.');
@@ -240,12 +239,12 @@ function holdCall(url: string, call: number) {
 }
 
 it.each([
-  ['the filing counts', 'attorney', '/filings/summary', /drafts in progress/],
-  ['the platform statistics', 'public', '/public/stats', /Public cases indexed/],
-])('keeps %s from the latest retry when an earlier retry fails later', async (_name, role, url, loaded) => {
-  serve(role, { '/public/stats': stats, [url]: failsOnce(url === '/public/stats' ? stats : { draft: 2, returned: 1 }) });
+  ['the filing counts', 'attorney', '/', '/filings/summary', /drafts in progress/],
+  ['the platform statistics', 'public', '/about', '/public/stats', /Public cases indexed/],
+])('keeps %s from the latest retry when an earlier retry fails later', async (_name, role, entry, url, loaded) => {
+  serve(role, { [url]: failsOnce(url === '/public/stats' ? stats : { draft: 2, returned: 1 }) });
   const failEarlierRetry = holdCall(url, 2);
-  openApp('/', role);
+  openApp(entry, role);
   const retry = within(await screen.findByRole('alert')).getByRole('button', { name: 'Retry' });
 
   fireEvent.click(retry);
@@ -259,7 +258,7 @@ it.each([
 
 it('states the number of e-filing courts the platform reports', async () => {
   serve('public', { '/public/stats': stats });
-  openApp('/', 'public');
+  openApp('/about', 'public');
 
   const card = (await screen.findByText('Courts accepting e-filing')).closest<HTMLElement>('.platform-stat-card')!;
   expect(within(card).getByText('255')).toBeTruthy();
@@ -267,18 +266,19 @@ it('states the number of e-filing courts the platform reports', async () => {
 });
 
 it.each([
-  ['/login', 'attorney', {}],
-  ['/', 'attorney', { '/filings/summary': { draft: 0, returned: 0 } }],
+  ['/login', 'attorney', {}, 'Attorney'],
+  ['/about', 'attorney', {}, 'Courts accepting e-filing'],
+  ['/', 'attorney', { '/filings/summary': { draft: 0, returned: 0 } }, 'Your filings'],
   ['/', 'clerk', {
     '/auth/me': { id: 2, user_type: 'clerk', court_assignments: [{ court_id: 3, role: 'clerk', court_name: 'Third Circuit Court' }] },
     '/clerk/queue': { filings: [], total: 0, page: 1, page_size: 1 },
-  }],
-])('claims no statewide court coverage at %s for a %s', async (entry, role, answers) => {
+  }, 'Open Queue'],
+])('claims no statewide court coverage at %s for a %s', async (entry, role, answers, loaded) => {
   serve(role, { '/public/stats': stats, ...answers });
   localStorage.setItem('demo_role', role);
   render(<ToastProvider><MemoryRouter initialEntries={[entry]}><App /></MemoryRouter></ToastProvider>);
 
-  await screen.findByText(entry === '/login' ? 'Attorney' : 'Courts accepting e-filing');
+  await screen.findByText(loaded);
   expect(document.body.textContent).not.toMatch(/(all|any) Michigan courts?/i);
 });
 
@@ -291,6 +291,7 @@ it.each([
   ['/', 'attorney', 'Your filings'],
   ['/', 'public', 'Public court records'],
   ['/', 'clerk', 'Clerk dashboard · Third Circuit Court'],
+  ['/about', 'attorney', 'About'],
   ['/filing/new', 'attorney', 'New filing'],
   ['/filings', 'attorney', 'My filings'],
   ['/filings/7/history', 'attorney', 'Filing #7 history'],
@@ -329,6 +330,7 @@ it.each([
   ['/', 'attorney', 'Your filings'],
   ['/', 'public', 'Public court records'],
   ['/', 'clerk', 'Third Circuit Court'],
+  ['/about', 'public', 'About MUEFS'],
   ['/filing/new', 'attorney', 'New E-Filing'],
   ['/filings', 'attorney', 'My Filings'],
   ['/filings/7/history', 'attorney', 'Filing #7: receipts & history'],
@@ -411,7 +413,6 @@ it('heads the administration page and a case docket with their own names once th
 it('moves focus to the new page heading after a navigation, but not on the first page load', async () => {
   serve('attorney', {
     '/filings/summary': { draft: 0, returned: 0 },
-    '/public/stats': stats,
     '/filings': { filings: [], total: 0, status_counts: {}, court_names: {} },
   });
   openApp('/', 'attorney');
@@ -504,4 +505,71 @@ it('shows the demo notice as plain text, not a live region', async () => {
   const notice = await screen.findByText(/not for real filings/);
   expect(notice.tagName).toBe('P');
   expect(notice.closest('[aria-live], [role="status"], [role="alert"]')).toBeNull();
+});
+
+function openAnonymously(entry: string) {
+  return render(<ToastProvider><MemoryRouter initialEntries={[entry]}><App /></MemoryRouter></ToastProvider>);
+}
+
+it('opens the About page without a session, with the comparison and the live statistics', async () => {
+  serve('public', { '/public/stats': stats });
+  openAnonymously('/about');
+
+  expect(await screen.findByRole('heading', { level: 1, name: 'About MUEFS' })).toBeTruthy();
+  expect(screen.getByRole('heading', { level: 2, name: 'MUEFS compared with MiFILE' })).toBeTruthy();
+  expect(screen.getByRole('table')).toBeTruthy();
+  expect(await screen.findByText('Public cases indexed')).toBeTruthy();
+  await waitFor(() => expect(document.title).toBe('About · MUEFS'));
+  expect(requested('/auth/me')).toBe(false);
+});
+
+it('sends an anonymous visitor to sign-in for a private page, unlike About', async () => {
+  serve('public', {});
+  openAnonymously('/filings');
+
+  expect(await screen.findByRole('heading', { level: 1, name: 'Sign in' })).toBeTruthy();
+});
+
+it.each(['/about', '/about/', '/cases/search', '/cases/42', '/courts/3/intake'])('treats %s as a public path', (pathname) => {
+  expect(isPublicPath(pathname)).toBe(true);
+});
+
+it.each(['/', '/filings', '/about/team', '/aboutus', '/cases/42/participants'])('treats %s as a private path', (pathname) => {
+  expect(isPublicPath(pathname)).toBe(false);
+});
+
+it('states what delivery and draft editing really do', async () => {
+  serve('public', { '/public/stats': stats });
+  openAnonymously('/about');
+
+  const row = (name: string) => screen.getByRole('rowheader', { name }).closest('tr')!;
+  expect((await screen.findByRole('rowheader', { name: 'Service-only records' })).closest('tr')!.textContent)
+    .toContain('opt-in delivery to reviewed recipients');
+  expect(row('Draft editing').textContent).toContain('Save to your account');
+  expect(row('Draft editing').textContent).toContain('compare conflicting versions');
+  expect(document.body.textContent).not.toMatch(/arrange delivery outside the app|Browser draft recovery|autosave/i);
+});
+
+it('links to About from the app shell', async () => {
+  serve('attorney', { '/public/stats': stats });
+  openApp('/no-such-page', 'attorney');
+
+  fireEvent.click(within(await screen.findByRole('contentinfo')).getByRole('link', { name: 'About MUEFS' }));
+
+  expect(await screen.findByRole('heading', { level: 1, name: 'About MUEFS' })).toBeTruthy();
+});
+
+it.each([
+  ['/login', 'attorney', {}, 'Attorney'],
+  ['/', 'attorney', { '/filings/summary': { draft: 1, returned: 0 } }, 'Your filings'],
+  ['/', 'public', {}, 'Public court records'],
+  ['/', 'clerk', { ...clerkAtThirdCircuit, '/clerk/queue': { filings: [], total: 0, page: 1, page_size: 1 } }, 'Open Queue'],
+])('keeps the comparison and the platform statistics off %s for a %s', async (entry, role, answers, loaded) => {
+  serve(role, { '/public/stats': stats, ...answers });
+  openApp(entry, role);
+
+  await screen.findByText(loaded);
+  expect(screen.queryByText(/MiFILE/)).toBeNull();
+  expect(screen.queryByText('Courts accepting e-filing')).toBeNull();
+  expect(requested('/public/stats')).toBe(false);
 });

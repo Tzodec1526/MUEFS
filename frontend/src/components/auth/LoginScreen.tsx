@@ -4,7 +4,6 @@ import { Scale, ClipboardCheck, UserRound, BookOpen, ShieldCheck } from 'lucide-
 import type { LucideIcon } from 'lucide-react';
 import { isDemoBuild } from '../../config/demoMode';
 import MichiganMark from '../common/MichiganMark';
-import MifileComparison from '../marketing/MifileComparison';
 import {
   keycloakConfigured, oidcSessionExpected, safeLoginReturnPath, SessionChangedError, startKeycloakLogin,
 } from '../../auth/keycloak';
@@ -148,7 +147,6 @@ function LoginScreen() {
           {!keycloakConfigured() && <p className="login-message" role="alert">Sign-in is not configured for this deployment. Contact the court&apos;s support team.</p>}
           <Link className="btn btn-secondary" to="/cases/search">Browse public records</Link>
         </div>}
-        {demo && <MifileComparison variant="login" />}
       </main>
       {isDemoBuild() && (
         <div className="demo-stakeholder-banner demo-stakeholder-banner--login" role="status">
