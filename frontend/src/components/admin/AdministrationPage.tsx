@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
-import { formatDateTime } from '../../utils/format';
+import { formatDateTime, plural } from '../../utils/format';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
@@ -242,17 +242,22 @@ function AccountDirectory({ access }: { access: Access }) {
     {court > 0 && <p><Link to={`/courts/${court}/intake`}>Manage this court&apos;s filing intake</Link></p>}
     {!access.system_admin && <p>Search the exact email of a known staff member to assign access. A system administrator must provision their identity first.</p>}
     {message && <p className="alert alert-success" role="status">{message}</p>}
-    <div className="admin-workspace">
+    <div className={`admin-workspace${editor ? ' editor-open' : ''}`}>
       <section aria-label="Account directory">
         {!current && <p role="status">Loading accounts…</p>}
         {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
         {current?.data && <>
-          <p>{current.data.total} account{current.data.total === 1 ? '' : 's'}</p>
-          {current.data.users.map(user => <article className="review-card admin-user-card" key={user.id}>
-            <h3>{user.first_name} {user.last_name}</h3><p>{user.email}</p>
-            <p>{accountTypes[user.user_type]} · {user.is_active ? 'Active' : 'Inactive'}</p>
-            <button className="btn btn-secondary btn-small" onClick={() => setEditor(user)}>Manage {user.first_name} {user.last_name}</button>
-          </article>)}
+          <p>{plural(current.data.total, 'account')}</p>
+          <ul className="court-case-list admin-account-list">
+            {current.data.users.map(user => <li key={user.id}>
+              <div>
+                <strong>{user.first_name} {user.last_name}</strong>
+                <p>{user.email}</p>
+                <p>{accountTypes[user.user_type]} · {user.is_active ? 'Active' : 'Inactive'}</p>
+              </div>
+              <button className="btn btn-secondary btn-small" onClick={() => setEditor(user)}>Manage {user.first_name} {user.last_name}</button>
+            </li>)}
+          </ul>
           {current.data.total > 25 && <nav className="pagination" aria-label="Account directory pages">
             <button className="btn btn-secondary" disabled={page === 1} onClick={() => setPage(n => n - 1)}>Previous accounts</button>
             <span>Page {page} of {Math.ceil(current.data.total / 25)}</span>

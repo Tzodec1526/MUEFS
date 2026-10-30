@@ -113,7 +113,7 @@ it('shows a system administrator the account directory at /admin', async () => {
   openApp('/admin', 'admin');
 
   expect(await screen.findByRole('heading', { name: 'People & court access' })).toBeTruthy();
-  expect(await screen.findByRole('heading', { name: 'Grace Hopper' })).toBeTruthy();
+  expect(await screen.findByRole('button', { name: 'Manage Grace Hopper' })).toBeTruthy();
   expect(screen.getByText('grace.hopper@example.gov')).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Provision account' })).toBeTruthy();
 });
@@ -147,7 +147,7 @@ it('shows a delegated court administrator the account directory at /admin', asyn
   openApp('/admin', 'clerk');
 
   expect(await screen.findByRole('heading', { name: 'People & court access' })).toBeTruthy();
-  expect(await screen.findByRole('heading', { name: 'Grace Hopper' })).toBeTruthy();
+  expect(await screen.findByRole('button', { name: 'Manage Grace Hopper' })).toBeTruthy();
 });
 
 it('shows a failed profile load at /admin as that failure, and lets a court administrator in after a retry', async () => {
@@ -164,7 +164,7 @@ it('shows a failed profile load at /admin as that failure, and lets a court admi
 
   fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
 
-  expect(await screen.findByRole('heading', { name: 'Grace Hopper' })).toBeTruthy();
+  expect(await screen.findByRole('button', { name: 'Manage Grace Hopper' })).toBeTruthy();
   expect(screen.queryByRole('alert')).toBeNull();
 });
 
@@ -180,7 +180,7 @@ it('shows an administrator a failed account directory load inline and loads it a
 
   fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
 
-  expect(await screen.findByRole('heading', { name: 'Grace Hopper' })).toBeTruthy();
+  expect(await screen.findByRole('button', { name: 'Manage Grace Hopper' })).toBeTruthy();
   expect(screen.queryByText('Could not load accounts.')).toBeNull();
 });
 

@@ -2691,11 +2691,11 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
   .filing-history { max-width: none; color: #000; }
   .receipt-card { break-inside: avoid; }
 }
-.admin-workspace { display: grid; grid-template-columns: minmax(260px, .75fr) minmax(0, 1.35fr); gap: 24px; align-items: start; }
+.admin-workspace { display: grid; gap: 24px; align-items: start; }
+.admin-workspace.editor-open { grid-template-columns: minmax(260px, .75fr) minmax(0, 1.35fr); }
 .admin-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .admin-directory-filter { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 16px; align-items: end; margin-bottom: 20px; }
 .admin-directory-filter .form-group { margin-bottom: 0; }
-.admin-user-card { margin-top: 12px; overflow-wrap: anywhere; }
 .admin-editor { min-width: 0; overflow-wrap: anywhere; }
 .admin-editor > .history-summary { margin-bottom: 20px; }
 .admin-detail-section { padding-top: 20px; margin-top: 24px; }
@@ -2705,7 +2705,7 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 .admin-changes > div { margin: 10px 0; }
 .admin-changes dt { font-weight: 600; }
 .admin-changes dd { margin-left: 0; }
-@media (max-width: 800px) { .admin-workspace, .admin-directory-filter, .admin-form-grid { grid-template-columns: 1fr; } }
+@media (max-width: 800px) { .admin-workspace.editor-open, .admin-directory-filter, .admin-form-grid { grid-template-columns: 1fr; } }
 
 .court-cases-page > p, .case-participants-page > p { margin-bottom: 20px; }
 .staff-court-select { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-bottom: 24px; }
@@ -2719,6 +2719,8 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 .court-case-list > li > div { min-width: 0; }
 .court-case-list p { margin: 5px 0 0; }
 .court-case-list .btn { flex-shrink: 0; }
+.court-case-list.admin-account-list { margin: 12px 0; padding-inline: 16px; border-radius: var(--radius); background: var(--white); }
+.admin-account-list > li { flex-wrap: wrap; }
 .participant-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .case-participants-page .admin-account-form { margin-top: 24px; padding: 24px; border-radius: var(--radius); }
 .case-participants-page fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
