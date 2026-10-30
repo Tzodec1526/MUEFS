@@ -273,7 +273,7 @@ describe('a participant record court staff have not reviewed', () => {
     ],
   };
   beforeEach(() => {
-    const served = { ...responses, '/cases/1/participants': unreviewed, '/cases/1/participants/history': history };
+    const served: Record<string, unknown> = { ...responses, '/cases/1/participants': unreviewed, '/cases/1/participants/history': history };
     get.mockImplementation((url: string) => Promise.resolve({ data: served[url] }));
     show('/cases/1/participants', '/cases/:caseId/participants', <CaseParticipantsPage />);
   });
