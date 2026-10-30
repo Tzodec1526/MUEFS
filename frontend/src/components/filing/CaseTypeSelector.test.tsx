@@ -107,3 +107,39 @@ it('narrows the list by category', async () => {
 
   expect(screen.getAllByRole('radio').map(radio => radio.closest('label')?.textContent)).toEqual(['DivorceNo fee']);
 });
+
+const radioLabels = () => screen.getAllByRole('radio').map(radio => radio.closest('label')?.textContent);
+
+it('keeps the chosen case type on screen when a category filter would hide it', async () => {
+  render(<Harness />);
+  fireEvent.click(await screen.findByRole('radio', { name: /Divorce/ }));
+
+  fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'civil' } });
+
+  expect(radioLabels()).toEqual(['General Civil$175.00Contract and other civil claims', 'DivorceNo fee']);
+  expect((screen.getByRole('radio', { name: /Divorce/ }) as HTMLInputElement).checked).toBe(true);
+  expect(screen.queryByText('No case types match your filters.')).toBeNull();
+});
+
+it('still says nothing matched when a search leaves only the chosen case type', async () => {
+  render(<Harness />);
+  fireEvent.click(await screen.findByRole('radio', { name: /General Civil/ }));
+  await screen.findByRole('heading', { name: 'Required documents (1)' });
+
+  fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'probate' } });
+
+  expect(radioLabels()).toEqual(['General Civil$175.00Contract and other civil claims']);
+  expect((screen.getByRole('radio', { name: /General Civil/ }) as HTMLInputElement).checked).toBe(true);
+  expect(screen.getByText('No case types match your filters.')).toBeTruthy();
+  expect(screen.getByRole('heading', { name: 'Required documents (1)' })).toBeTruthy();
+});
+
+it('drops an unchosen case type from the list as soon as the choice moves away from it', async () => {
+  render(<Harness />);
+  fireEvent.click(await screen.findByRole('radio', { name: /Divorce/ }));
+  fireEvent.change(screen.getByLabelText('Category'), { target: { value: 'civil' } });
+
+  fireEvent.click(screen.getByRole('radio', { name: /General Civil/ }));
+
+  expect(radioLabels()).toEqual(['General Civil$175.00Contract and other civil claims']);
+});

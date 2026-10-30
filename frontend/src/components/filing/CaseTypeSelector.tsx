@@ -133,10 +133,10 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
 
   const categories = [...new Set(caseTypes.map(ct => ct.category))];
 
-  const filtered = caseTypes.filter(ct => {
-    if (categoryFilter && ct.category !== categoryFilter) return false;
-    return !searchQuery || ct.name.toLowerCase().includes(searchQuery.toLowerCase());
-  });
+  const matchesFilters = (ct: CaseType) => (!categoryFilter || ct.category === categoryFilter)
+    && (!searchQuery || ct.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const noMatches = !caseTypes.some(matchesFilters);
+  const listed = caseTypes.filter(ct => matchesFilters(ct) || ct.id === selectedCaseTypeId);
 
   const requiredDocs = requirements.filter(r => r.is_required);
   const optionalDocs = requirements.filter(r => !r.is_required);
@@ -181,7 +181,7 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
 
       <fieldset className="case-type-list">
         <legend className="sr-only">Case type</legend>
-        {filtered.map((ct) => (
+        {listed.map((ct) => (
           <label key={ct.id} className={`case-type-option ${selectedCaseTypeId === ct.id ? 'selected' : ''}`}>
             <input
               type="radio"
@@ -197,7 +197,7 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
           </label>
         ))}
       </fieldset>
-      {!loading && !error && filtered.length === 0 && (
+      {!loading && !error && noMatches && (
         <p className="no-results">No case types match your filters.</p>
       )}
 
