@@ -87,17 +87,6 @@
   font-size: 0.8rem;
   color: var(--muted);
 }
-.docket-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.75rem;
-}
-
-.docket-header h2 {
-  margin: 0;
-}
-
 .docket-list {
   display: flex;
   flex-direction: column;
@@ -161,5 +150,4 @@
   .case-detail-grid { grid-template-columns: 1fr; }
   .case-detail-header { flex-direction: column; }
   .case-detail-actions { width: 100%; }
-  .docket-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
 }

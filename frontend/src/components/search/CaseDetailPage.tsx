@@ -218,7 +218,7 @@ function CaseDetailPage() {
                 to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}`}
                 className="btn btn-primary"
               >
-                File with Court
+                File in this case
               </Link>
               <Link
                 to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&service_only=true`}
@@ -271,17 +271,7 @@ function CaseDetailPage() {
 
       {/* Filing History / Docket */}
       <div className="case-detail-card">
-        <div className="docket-header">
-          <h2>Docket</h2>
-          {isFiler && caseData.can_file && (
-            <Link
-              to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}`}
-              className="btn btn-primary btn-small"
-            >
-              + Create New Filing
-            </Link>
-          )}
-        </div>
+        <h2>Docket</h2>
 
         {filings.length > 0 ? (
           <div className="docket-list">

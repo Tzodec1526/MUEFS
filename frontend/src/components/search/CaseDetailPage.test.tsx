@@ -84,9 +84,9 @@ describe.each(['attorney', 'srl'])('for the %s filer role', (role) => {
     localStorage.setItem('demo_role', role);
     showCase(docket(true));
 
-    await screen.findByRole('link', { name: 'File with Court' });
+    await screen.findByRole('link', { name: 'File in this case' });
     const base = '/filing/new?case_id=42&court_id=3&case_type_id=11';
-    expect(filingLinks()).toEqual([base, `${base}&service_only=true`, base]);
+    expect(filingLinks()).toEqual([base, `${base}&service_only=true`]);
     for (const href of filingLinks()) {
       expect(new URL(href, 'http://localhost').searchParams.has('case_title')).toBe(false);
     }
