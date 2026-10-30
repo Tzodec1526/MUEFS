@@ -11,6 +11,7 @@ import CaseSelector, { CaseResult } from './CaseSelector';
 import CaseTypeSelector from './CaseTypeSelector';
 import DocumentUpload from './DocumentUpload';
 import FilingReview from './FilingReview';
+import WizardStepper from './WizardStepper';
 import { emitToast } from '../../utils/toastBus';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { createFiling, getFiling, updateFiling, type FilingEnvelope } from '../../api/filings';
@@ -561,30 +562,13 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
         </div>
       )}
 
-      {/* Step Progress Bar - clickable for completed steps */}
-      <nav className="wizard-steps" aria-label="Filing progress">
-        {steps.map((step, index) => (
-          <button
-            key={step.key}
-            type="button"
-            className={`wizard-step ${
-              index === currentStepIndex
-                ? 'active'
-                : index < currentStepIndex
-                ? 'completed'
-                : 'upcoming'
-            }`}
-            onClick={() => goToStep(step.key)}
-            disabled={Boolean(submission) || Boolean(conflict) || saving || index > currentStepIndex || (destinationLocked && index < detailsStepIndex)}
-            aria-current={index === currentStepIndex ? 'step' : undefined}
-          >
-            <span className="step-number">
-              {index < currentStepIndex ? '\u2713' : index + 1}
-            </span>
-            <span className="step-label">{step.label}</span>
-          </button>
-        ))}
-      </nav>
+      <WizardStepper
+        steps={steps}
+        currentIndex={currentStepIndex}
+        locked={Boolean(submission) || Boolean(conflict) || saving}
+        earliestIndex={destinationLocked ? detailsStepIndex : 0}
+        onSelect={goToStep}
+      />
 
       {/* Filing Summary Sidebar */}
       {filingData.courtId && currentStep !== 'review' && (
