@@ -1,8 +1,16 @@
-const ROWS = [
+import type { PublicPlatformStats } from '../../api/public';
+
+const SEE_STATISTICS = 'See platform statistics';
+
+const rows = (stats: PublicPlatformStats | undefined) => [
   { feature: 'Court coverage', mifile: 'Not all courts or case types', muefs: 'Demo portal (seeded courts)' },
   { feature: 'Public docket search', mifile: 'Varies by court; often separate portals', muefs: 'Built in; no account needed in the demo' },
   { feature: 'Document types', mifile: 'Varies by vendor', muefs: 'A catalog tied to the Michigan Court Rules (MCR)' },
-  { feature: 'Upload limit', mifile: '25 MB', muefs: '100 MB' },
+  {
+    feature: 'Upload limit',
+    mifile: stats ? `${stats.mifile_max_upload_mb} MB` : SEE_STATISTICS,
+    muefs: stats ? `${stats.max_upload_mb} MB` : SEE_STATISTICS,
+  },
   { feature: 'Fee waiver (MCR 2.002)', mifile: 'Payment screen; court must grant', muefs: 'Part of the filing wizard (demo payments)' },
   { feature: 'Motion companions', mifile: 'Filers must know MCR rules', muefs: 'Checks for them and prompts the filer (MCR 2.119)' },
   { feature: 'File from the case docket', mifile: 'Existing-case filing supported', muefs: 'Filled in from the case page' },
@@ -31,7 +39,7 @@ const ROWS = [
   { feature: 'Cost and license', mifile: 'Per-transaction vendor fees', muefs: 'AGPL-3.0 (no license fee)' },
 ];
 
-function MifileComparison() {
+function MifileComparison({ stats }: { stats: PublicPlatformStats | undefined }) {
   return (
     <section className="mifile-comparison" aria-labelledby="mifile-compare-heading">
       <h2 id="mifile-compare-heading">MUEFS compared with MiFILE</h2>
@@ -44,7 +52,7 @@ function MifileComparison() {
           </tr>
         </thead>
         <tbody>
-          {ROWS.map((row) => (
+          {rows(stats).map((row) => (
             <tr key={row.feature}>
               <th scope="row">{row.feature}</th>
               <td data-label="MiFILE">{row.mifile}</td>

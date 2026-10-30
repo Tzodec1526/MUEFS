@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
-import { getPublicStats, type PublicPlatformStats } from '../../api/public';
-import { loadFailure, type LoadFailure } from '../../utils/errors';
+import type { PublicPlatformStats } from '../../api/public';
+import type { LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
+
+export type PublicStatsResult = { stats?: PublicPlatformStats; error?: LoadFailure };
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
@@ -13,25 +14,14 @@ function StatCard({ label, value, sub }: { label: string; value: string | number
   );
 }
 
-function PlatformStats() {
-  const [result, setResult] = useState<{ stats?: PublicPlatformStats; error?: LoadFailure }>();
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let current = true;
-    getPublicStats()
-      .then(stats => { if (current) setResult({ stats }); })
-      .catch(err => { if (current) setResult({ error: loadFailure(err, 'Platform statistics are unavailable right now.') }); });
-    return () => { current = false; };
-  }, [attempt]);
-
+function PlatformStats({ result, onRetry }: { result: PublicStatsResult | undefined; onRetry: () => void }) {
   if (!result) return null;
   const heading = <h2 id="platform-stats-heading">Platform statistics</h2>;
   if (!result.stats) {
     return (
       <section className="platform-stats" aria-labelledby="platform-stats-heading">
         {heading}
-        <LoadError failure={result.error!} onRetry={() => setAttempt(n => n + 1)} />
+        <LoadError failure={result.error!} onRetry={onRetry} />
       </section>
     );
   }
