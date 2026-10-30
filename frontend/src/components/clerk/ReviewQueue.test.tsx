@@ -213,6 +213,17 @@ it('writes a two-word status in words on its badge', async () => {
   expect(within(row(11)).getAllByRole('cell')[6].textContent).toBe('Under review');
 });
 
+it('writes a two-word status in words in the review panel', async () => {
+  serveQueues([11]);
+  vi.mocked(getFiling).mockResolvedValue({ ...envelope(11), status: 'under_review' });
+  openQueue();
+  fireEvent.click(await screen.findByText('Case 11'));
+
+  const heading = await screen.findByRole('heading', { name: 'Filing #11' });
+  expect(heading.parentElement?.textContent).toContain('Under review');
+  expect(heading.parentElement?.textContent).not.toContain('under review');
+});
+
 it('keeps Select all usable when the column headings are hidden on a phone', async () => {
   serveQueues([11, 12]);
   openQueue();
