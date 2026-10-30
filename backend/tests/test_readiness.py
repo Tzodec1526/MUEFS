@@ -222,12 +222,10 @@ async def exercise():
                 assert "set-cookie" not in result.headers
             assert not session_db._last_access
             assert set(directory.rglob("*.db")) == original_files
-            # Cookieless API clients (monitors, scripts) share the demo sandbox.
             probe = await client.get("/api/v1/courts")
             assert probe.status_code == 200, probe.text
             assert "set-cookie" not in probe.headers
             assert set(directory.rglob("*.db")) == original_files
-            # A browser loads a page first; its cookie then selects a private sandbox.
             assert "set-cookie" in (await client.get("/")).headers
             visitor = await client.get("/api/v1/courts")
             assert visitor.status_code == 200, visitor.text

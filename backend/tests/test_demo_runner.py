@@ -131,10 +131,8 @@ from pathlib import Path
 listener = socket.socket()
 listener.bind(("127.0.0.1", 0))
 listener.listen()
-# Publish atomically: the parent must never read a created but unwritten file.
 Path(sys.argv[1] + ".tmp").write_text(str(listener.getsockname()[1]))
 os.replace(sys.argv[1] + ".tmp", sys.argv[1])
-# Drain probes: on Windows a full backlog refuses connections like a closed port.
 deadline = time.monotonic() + 60
 while (remaining := deadline - time.monotonic()) > 0:
     listener.settimeout(remaining)

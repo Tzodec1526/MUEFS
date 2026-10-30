@@ -37,7 +37,6 @@ from sqlalchemy import URL, create_engine
 from app.demo.schema import prepare_demo_schema
 
 async def exercise():
-    # Import the hosted entry point only in this subprocess: it extends the global app.
     directory = Path(os.environ["DEMO_DATA_DIR"])
     directory.mkdir()
     setup = create_engine(URL.create("sqlite", database=str(directory / "template.db")))
@@ -63,7 +62,6 @@ async def exercise():
             assert response.status_code == 200, (path, response.text)
             assert response.headers["cache-control"] == "no-store", path
             assert "Current demo" in response.text
-        # Pages that never open a sandbox must not accumulate per-visitor state.
         assert not session_db._last_access, session_db._last_access
         bundle = await client.get("/assets/app-12345678.js")
         assert bundle.status_code == 200
