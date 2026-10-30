@@ -75,6 +75,7 @@ export async function createFiling(data: {
 export async function listFilings(params?: {
   status?: string;
   page?: number;
+  page_size?: number;
 }, signal?: AbortSignal): Promise<{
   filings: FilingSummary[];
   total: number;
@@ -82,11 +83,6 @@ export async function listFilings(params?: {
   court_names: Record<number, string>;
 }> {
   const { data } = await apiClient.get('/filings', { params, signal });
-  return data;
-}
-
-export async function getFilingStatusCounts(): Promise<Record<string, number>> {
-  const { data } = await apiClient.get('/filings/summary');
   return data;
 }
 

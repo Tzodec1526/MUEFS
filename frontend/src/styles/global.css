@@ -315,33 +315,69 @@ h1, h2 {
    ============================================ */
 
 .dashboard h2 {
+  font-size: 1.125rem;
+  margin-bottom: 0.75rem;
+}
+
+.dashboard-summary {
+  margin-top: 0.25rem;
+  color: var(--muted);
+}
+
+.dashboard > .dashboard-summary {
   margin-bottom: 1.5rem;
 }
 
-.dashboard-cards {
+.recent-filings {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.25rem;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  list-style: none;
 }
 
-/* Cards */
-.card {
+.recent-filings li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  padding: 0.85rem 1rem;
   background: var(--white);
   border-radius: var(--radius);
-  padding: 1.5rem;
 }
 
-.card h3 {
-  font-size: 1.05rem;
-  font-weight: 700;
-  margin-bottom: 0.35rem;
-  color: var(--ink);
+.recent-filings a {
+  padding-block: 0.15rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
-.card p {
+.recent-filing-meta {
+  flex-basis: 100%;
   color: var(--muted);
-  margin-bottom: 1.1rem;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+}
+
+.queue-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.queue-counts > div {
+  flex: 1 1 10rem;
+  padding: 1rem;
+  background: var(--white);
+  border-radius: var(--radius);
+}
+
+.queue-counts dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.queue-counts dd {
+  font-size: 1.5rem;
+  font-weight: 700;
 }
 
 /* ============================================
@@ -1661,6 +1697,8 @@ tr.selected {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
   margin-bottom: 1.5rem;
 }
 
@@ -1793,19 +1831,6 @@ tr.selected {
    Dashboard Improvements
    ============================================ */
 
-.dashboard-welcome {
-  margin-bottom: 1.5rem;
-}
-
-.dashboard-welcome h1 {
-  font-size: 1.6rem;
-  margin-bottom: 0.25rem;
-}
-
-.dashboard-welcome p {
-  color: var(--muted);
-}
-
 .dashboard-alert-row {
   display: flex;
   flex-wrap: wrap;
@@ -1839,24 +1864,6 @@ tr.selected {
   margin: 4rem auto;
   text-align: center;
   padding: 2rem;
-}
-
-.card-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 46px;
-  height: 46px;
-  border-radius: var(--radius);
-  background: var(--tint);
-  color: var(--accent);
-  font-size: 1.4rem;
-  margin-bottom: 0.85rem;
-}
-
-.card-primary .card-icon {
-  background: var(--accent);
-  color: var(--white);
 }
 
 /* Focus styles for accessibility */

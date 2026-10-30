@@ -1,8 +1,7 @@
 import { useContext, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ClipboardCheck, Search } from 'lucide-react';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
-import { getClerkQueue } from '../../api/filings';
+import { getClerkQueue, type ClerkQueue } from '../../api/filings';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { usePageTitle } from '../../utils/pageTitle';
@@ -12,47 +11,41 @@ function ClerkDashboard() {
   const { court } = useContext(CourtContext)!;
   const courtId = court!.court_id;
   usePageTitle('Clerk dashboard', court!.court_name || `Court ${courtId}`);
-  const [pending, setPending] = useState<number | null>(null);
-  const [pendingError, setPendingError] = useState<LoadFailure | null>(null);
-  const [pendingAttempt, setPendingAttempt] = useState(0);
+  const [queue, setQueue] = useState<ClerkQueue | null>(null);
+  const [queueError, setQueueError] = useState<LoadFailure | null>(null);
+  const [queueAttempt, setQueueAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    getClerkQueue(courtId, { page_size: 1, signal: controller.signal }).then((r) => {
+    getClerkQueue(courtId, { page_size: 1, signal: controller.signal }).then((result) => {
       if (controller.signal.aborted) return;
-      setPendingError(null);
-      setPending(r.total);
+      setQueueError(null);
+      setQueue(result);
     }).catch((err) => {
-      if (!controller.signal.aborted) setPendingError(loadFailure(err, 'Could not load the number of filings pending review.'));
+      if (!controller.signal.aborted) setQueueError(loadFailure(err, 'Could not load the number of filings pending review.'));
     });
     return () => controller.abort();
-  }, [courtId, pendingAttempt]);
+  }, [courtId, queueAttempt]);
 
   return (
     <div className="dashboard">
       <StaffCourtSelect />
-      <div className="dashboard-welcome">
-        <PageHeading>{court!.court_name || `Court ${courtId}`}</PageHeading>
-        <p>
-          Clerk Review Dashboard
-          {pending !== null ? ` — ${pending} filing${pending === 1 ? '' : 's'} pending review` : ''}
-        </p>
-      </div>
-      {pendingError && <LoadError failure={pendingError} onRetry={() => setPendingAttempt(n => n + 1)} />}
-
-      <div className="dashboard-cards">
-        <div className="card card-primary">
-          <div className="card-icon"><ClipboardCheck size={22} aria-hidden="true" /></div>
-          <h3>Review Queue</h3>
-          <p>Review and process pending filings for your court.</p>
-          <Link to="/clerk/queue" className="btn btn-primary">Open Queue</Link>
+      <div className="page-header">
+        <div>
+          <PageHeading>{court!.court_name || `Court ${courtId}`}</PageHeading>
+          <p className="dashboard-summary">
+            {queue ? `${queue.total} filing${queue.total === 1 ? '' : 's'} pending review` : 'Clerk dashboard'}
+          </p>
         </div>
-        <div className="card">
-          <div className="card-icon"><Search size={22} aria-hidden="true" /></div>
-          <h3>Case Search</h3>
-          <p>Search court case records.</p>
-          <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>
-        </div>
+        <Link to="/clerk/queue" className="btn btn-primary">Open review queue</Link>
       </div>
+      {queueError && <LoadError failure={queueError} onRetry={() => setQueueAttempt(n => n + 1)} />}
+      {queue && (
+        <dl className="queue-counts">
+          <div><dt>Submitted</dt><dd>{queue.submitted_count}</dd></div>
+          <div><dt>Under review</dt><dd>{queue.under_review_count}</dd></div>
+          <div><dt>Waiting 48+ hours</dt><dd>{queue.waiting_48h}</dd></div>
+        </dl>
+      )}
     </div>
   );
 }

@@ -38,6 +38,34 @@ const stats = {
   mcr_document_types: 20, max_upload_mb: 50, mifile_max_upload_mb: 25,
 };
 
+const filerOverview = {
+  filings: [
+    {
+      id: 11, court_id: 3, case_id: null, filer_id: 1, status: 'returned', case_title: 'Doe v. Roe', filing_description: null,
+      submitted_at: '2026-03-02T12:00:00Z', rejection_reason: 'Missing signature', created_at: '2026-03-01T12:00:00Z',
+      updated_at: '2026-03-03T12:00:00Z', submission_count: 1, document_count: 2,
+    },
+    {
+      id: 12, court_id: 3, case_id: null, filer_id: 1, status: 'accepted', case_title: 'Smith v. Jones', filing_description: null,
+      submitted_at: '2026-02-02T12:00:00Z', rejection_reason: null, created_at: '2026-02-01T12:00:00Z',
+      updated_at: '2026-02-03T12:00:00Z', submission_count: 1, document_count: 1,
+    },
+    {
+      id: 13, court_id: 3, case_id: null, filer_id: 1, status: 'draft', case_title: null, filing_description: null,
+      submitted_at: null, rejection_reason: null, created_at: '2026-01-02T12:00:00Z',
+      updated_at: '2026-01-02T12:00:00Z', submission_count: 0, document_count: 0,
+    },
+  ],
+  total: 8,
+  status_counts: { draft: 2, returned: 1, accepted: 5 },
+  court_names: { 3: 'Third Circuit Court' },
+};
+
+const queueOverview = {
+  filings: [], total: 4, page_size: 1, submitted_count: 3, under_review_count: 1, waiting_48h: 2,
+  oldest_submitted_at: null, as_of: '2026-03-03T12:00:00Z',
+};
+
 function serve(userType: string, answers: Record<string, Answer>) {
   const responses: Record<string, Answer> = {
     '/auth/me': { id: 3, user_type: userType, court_assignments: [] },
@@ -186,12 +214,12 @@ it("shows a failed load of a filer's filings inline and loads them again on retr
 
 it('tells a filer when their filing counts fail to load, and loads them again on retry', async () => {
   serve('attorney', {
-    '/filings/summary': failsOnce({ draft: 2, returned: 1 }),
+    '/filings': failsOnce(filerOverview),
   });
   openApp('/', 'attorney');
 
   const alert = await screen.findByRole('alert');
-  expect(alert.textContent).toContain('Could not load your filing counts.');
+  expect(alert.textContent).toContain('Could not load your filings.');
 
   fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
 
@@ -203,7 +231,7 @@ it('tells a filer when their filing counts fail to load, and loads them again on
 it('tells a clerk when the pending review count fails to load, and loads it again on retry', async () => {
   serve('clerk', {
     '/auth/me': { id: 2, user_type: 'clerk', court_assignments: [{ court_id: 3, role: 'clerk', court_name: 'Third Circuit Court' }] },
-    '/clerk/queue': failsOnce({ filings: [], total: 4, page: 1, page_size: 1 }),
+    '/clerk/queue': failsOnce(queueOverview),
   });
   openApp('/', 'clerk');
 
@@ -239,10 +267,10 @@ function holdCall(url: string, call: number) {
 }
 
 it.each([
-  ['the filing counts', 'attorney', '/', '/filings/summary', /drafts in progress/],
+  ['the filing counts', 'attorney', '/', '/filings', /drafts in progress/],
   ['the platform statistics', 'public', '/about', '/public/stats', /Public cases indexed/],
 ])('keeps %s from the latest retry when an earlier retry fails later', async (_name, role, entry, url, loaded) => {
-  serve(role, { [url]: failsOnce(url === '/public/stats' ? stats : { draft: 2, returned: 1 }) });
+  serve(role, { [url]: failsOnce(url === '/public/stats' ? stats : filerOverview) });
   const failEarlierRetry = holdCall(url, 2);
   openApp(entry, role);
   const retry = within(await screen.findByRole('alert')).getByRole('button', { name: 'Retry' });
@@ -268,11 +296,11 @@ it('states the number of e-filing courts the platform reports', async () => {
 it.each([
   ['/login', 'attorney', {}, 'Attorney'],
   ['/about', 'attorney', {}, 'Courts accepting e-filing'],
-  ['/', 'attorney', { '/filings/summary': { draft: 0, returned: 0 } }, 'Your filings'],
+  ['/', 'attorney', { '/filings': filerOverview }, 'Your filings'],
   ['/', 'clerk', {
     '/auth/me': { id: 2, user_type: 'clerk', court_assignments: [{ court_id: 3, role: 'clerk', court_name: 'Third Circuit Court' }] },
-    '/clerk/queue': { filings: [], total: 0, page: 1, page_size: 1 },
-  }, 'Open Queue'],
+    '/clerk/queue': queueOverview,
+  }, 'Open review queue'],
 ])('claims no statewide court coverage at %s for a %s', async (entry, role, answers, loaded) => {
   serve(role, { '/public/stats': stats, ...answers });
   localStorage.setItem('demo_role', role);
@@ -412,7 +440,6 @@ it('heads the administration page and a case docket with their own names once th
 
 it('moves focus to the new page heading after a navigation, but not on the first page load', async () => {
   serve('attorney', {
-    '/filings/summary': { draft: 0, returned: 0 },
     '/filings': { filings: [], total: 0, status_counts: {}, court_names: {} },
   });
   openApp('/', 'attorney');
@@ -561,9 +588,9 @@ it('links to About from the app shell', async () => {
 
 it.each([
   ['/login', 'attorney', {}, 'Attorney'],
-  ['/', 'attorney', { '/filings/summary': { draft: 1, returned: 0 } }, 'Your filings'],
+  ['/', 'attorney', { '/filings': filerOverview }, 'Your filings'],
   ['/', 'public', {}, 'Public court records'],
-  ['/', 'clerk', { ...clerkAtThirdCircuit, '/clerk/queue': { filings: [], total: 0, page: 1, page_size: 1 } }, 'Open Queue'],
+  ['/', 'clerk', { ...clerkAtThirdCircuit, '/clerk/queue': queueOverview }, 'Open review queue'],
 ])('keeps the comparison and the platform statistics off %s for a %s', async (entry, role, answers, loaded) => {
   serve(role, { '/public/stats': stats, ...answers });
   openApp(entry, role);
@@ -572,4 +599,96 @@ it.each([
   expect(screen.queryByText(/MiFILE/)).toBeNull();
   expect(screen.queryByText('Courts accepting e-filing')).toBeNull();
   expect(requested('/public/stats')).toBe(false);
+});
+
+const filingsRequests = () => (get.mock.calls as unknown as [string, { params?: Record<string, unknown> }?][])
+  .filter(([url]) => url === '/filings')
+  .map(([, config]) => config?.params);
+
+const lastFilingsRequest = () => filingsRequests().slice(-1)[0];
+
+it('leads a filer with returned filings, drafts, recent filings and starting a filing', async () => {
+  serve('attorney', { '/filings': filerOverview });
+  openApp('/', 'attorney');
+
+  const main = await screen.findByRole('main');
+  expect(within(main).getByRole('link', { name: 'Start a filing' }).getAttribute('href')).toBe('/filing/new');
+  const returned = await within(main).findByRole('link', { name: /returned for correction/ });
+  const drafts = within(main).getByRole('link', { name: /drafts in progress/ });
+  expect(returned.textContent).toBe('1 returned for correction');
+  expect(drafts.getAttribute('href')).toBe('/filings?status=draft');
+  expect(returned.compareDocumentPosition(drafts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+  const recent = within(within(main).getByRole('region', { name: 'Recent filings' }));
+  expect(recent.getByRole('link', { name: 'Doe v. Roe' }).getAttribute('href')).toBe('/filing/new?filing_id=11');
+  expect(recent.getByRole('link', { name: 'Smith v. Jones' }).getAttribute('href')).toBe('/filings/12/history');
+  expect(recent.getByRole('link', { name: 'Untitled filing' }).getAttribute('href')).toBe('/filing/new?filing_id=13');
+  expect(recent.getByText('Accepted')).toBeTruthy();
+  expect(recent.getAllByText(/Third Circuit Court/)).toHaveLength(3);
+  expect(filingsRequests()[0]).toEqual({ page_size: 5 });
+  expect(within(main).queryByRole('link', { name: 'Search Cases' })).toBeNull();
+});
+
+it('tells a filer with no filings how to start', async () => {
+  serve('attorney', { '/filings': { filings: [], total: 0, status_counts: {}, court_names: {} } });
+  openApp('/', 'attorney');
+
+  expect(await screen.findByText(/You have no filings yet/)).toBeTruthy();
+  expect(screen.queryByRole('link', { name: /returned for correction/ })).toBeNull();
+  expect(screen.queryByRole('link', { name: /in progress/ })).toBeNull();
+});
+
+it('opens the filings filtered to returned ones from the dashboard', async () => {
+  serve('attorney', { '/filings': filerOverview });
+  openApp('/', 'attorney');
+
+  fireEvent.click(await screen.findByRole('link', { name: /returned for correction/ }));
+
+  const filter = await screen.findByLabelText('Filter by status') as HTMLSelectElement;
+  expect(filter.value).toBe('returned');
+  await waitFor(() => expect(lastFilingsRequest()).toMatchObject({ status: 'returned', page: 1 }));
+});
+
+it('ignores a status it does not know in the filings address', async () => {
+  serve('attorney', { '/filings': filerOverview });
+  openApp('/filings?status=constructor', 'attorney');
+
+  const filter = await screen.findByLabelText('Filter by status') as HTMLSelectElement;
+  expect(filter.value).toBe('');
+  await waitFor(() => expect(lastFilingsRequest()).toMatchObject({ status: undefined }));
+});
+
+it('lets the filter on the filings page change the status it asks for', async () => {
+  serve('attorney', { '/filings': filerOverview });
+  openApp('/filings?status=returned', 'attorney');
+
+  fireEvent.change(await screen.findByLabelText('Filter by status'), { target: { value: 'draft' } });
+
+  await waitFor(() => expect(lastFilingsRequest()).toMatchObject({ status: 'draft' }));
+  fireEvent.change(screen.getByLabelText('Filter by status'), { target: { value: '' } });
+  await waitFor(() => expect(lastFilingsRequest()).toMatchObject({ status: undefined }));
+});
+
+it('leads a clerk with the queue counts and the way into the queue', async () => {
+  serve('clerk', { ...clerkAtThirdCircuit, '/clerk/queue': queueOverview });
+  openApp('/', 'clerk');
+
+  const link = await screen.findByRole('link', { name: 'Open review queue' });
+  expect(link.getAttribute('href')).toBe('/clerk/queue');
+  expect(await screen.findByText('4 filings pending review')).toBeTruthy();
+  const count = (name: string) => screen.getByText(name).closest('div')!.querySelector('dd')!.textContent;
+  expect(count('Submitted')).toBe('3');
+  expect(count('Under review')).toBe('1');
+  expect(count('Waiting 48+ hours')).toBe('2');
+});
+
+it('leads the public home with a case search that opens the matching results', async () => {
+  serve('public', {});
+  openApp('/', 'public');
+
+  fireEvent.change(await screen.findByLabelText('Party name'), { target: { value: ' Smith ' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Search cases' }));
+
+  expect(await screen.findByRole('heading', { level: 1, name: 'Statewide case search' })).toBeTruthy();
+  expect((screen.getByLabelText('Party Name') as HTMLInputElement).value).toBe('Smith');
 });

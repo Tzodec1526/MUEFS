@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { listFilings, FilingSummary } from '../../api/filings';
 import LoadError from '../common/LoadError';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
+import { FILING_STATUS_LABELS, filingStatusLabel } from '../../utils/filingStatus';
 import { parseServerDate } from '../../utils/format';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
@@ -18,19 +19,19 @@ const STATUS_OPTIONS = [
   { value: 'served', label: 'Service documents recorded' },
 ];
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Draft', submitted: 'Submitted', under_review: 'Under review',
-  accepted: 'Accepted', rejected: 'Rejected', returned: 'Returned', served: 'Service documents recorded',
-};
-
 function MyFilings() {
   usePageTitle('My filings');
   const navigate = useNavigate();
   const [filings, setFilings] = useState<FilingSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [page, setPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedStatus = searchParams.get('status') ?? '';
+  const statusFilter = STATUS_OPTIONS.some(option => option.value === requestedStatus) ? requestedStatus : '';
+  const setStatusFilter = (status: string) => setSearchParams(status ? { status } : {}, { replace: true });
+  const [paged, setPaged] = useState({ status: statusFilter, page: 1 });
+  const page = paged.status === statusFilter ? paged.page : 1;
+  const setPage = (next: number) => setPaged({ status: statusFilter, page: next });
   const [courtNames, setCourtNames] = useState<Record<number, string>>({});
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [error, setError] = useState<LoadFailure | null>(null);
@@ -84,12 +85,12 @@ function MyFilings() {
 
       {/* Status summary cards */}
       <div className="status-summary">
-        {Object.entries(STATUS_LABELS).map(([s, label]) => {
+        {Object.entries(FILING_STATUS_LABELS).map(([s, label]) => {
           return (
             <button
               key={s}
               className={`status-card ${statusFilter === s ? 'active' : ''}`}
-              onClick={() => { setStatusFilter(statusFilter === s ? '' : s); setPage(1); }}
+              onClick={() => setStatusFilter(statusFilter === s ? '' : s)}
             >
               <span className="status-card-count">{statusCounts[s] || 0}</span>
               <span className={`status-badge ${s}`}>{label}</span>
@@ -103,7 +104,7 @@ function MyFilings() {
         <div className="form-group">
           <select
             value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            onChange={(e) => setStatusFilter(e.target.value)}
             aria-label="Filter by status"
           >
             {STATUS_OPTIONS.map(opt => (
@@ -136,7 +137,7 @@ function MyFilings() {
               <div key={filing.id} className="filing-card">
                 <div className="filing-card-header">
                   <span className="filing-card-id">#{filing.id}</span>
-                  <span className={`status-badge ${filing.status}`}>{STATUS_LABELS[filing.status] || filing.status}</span>
+                  <span className={`status-badge ${filing.status}`}>{filingStatusLabel(filing.status)}</span>
                 </div>
                 <h4 className="filing-card-title">{filing.case_title || 'Untitled Filing'}</h4>
                 <div className="filing-card-meta">
@@ -175,7 +176,7 @@ function MyFilings() {
           <button
             className="btn btn-secondary btn-small"
             disabled={page <= 1 || loading}
-            onClick={() => setPage(p => p - 1)}
+            onClick={() => setPage(page - 1)}
           >
             Previous
           </button>
@@ -183,7 +184,7 @@ function MyFilings() {
           <button
             className="btn btn-secondary btn-small"
             disabled={page >= Math.ceil(total / 25) || loading}
-            onClick={() => setPage(p => p + 1)}
+            onClick={() => setPage(page + 1)}
           >
             Next
           </button>
