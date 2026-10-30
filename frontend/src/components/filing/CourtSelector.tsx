@@ -3,6 +3,7 @@ import { listCourts, Court } from '../../api/courts';
 import { actionErrorMessage } from '../../api/client';
 import { listFavoriteCourts, addFavoriteCourt, removeFavoriteCourt } from '../../api/favorites';
 import LoadError from '../common/LoadError';
+import { courtTypeLabel } from '../../utils/courtTypes';
 import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { useToast } from '../common/Toast';
 
@@ -25,15 +26,6 @@ const MICHIGAN_COUNTIES = [
   'St. Clair', 'St. Joseph', 'Tuscola', 'Van Buren', 'Washtenaw', 'Wayne', 'Wexford',
 ];
 
-const COURT_TYPE_LABEL: Record<string, string> = {
-  circuit: 'Circuit Court',
-  district: 'District Court',
-  probate: 'Probate Court',
-  court_of_claims: 'Court of Claims',
-  court_of_appeals: 'Court of Appeals',
-  supreme_court: 'Supreme Court',
-  municipal: 'Municipal Court',
-};
 const APPELLATE_TYPES = new Set(['court_of_claims', 'court_of_appeals', 'supreme_court']);
 
 function CourtSelector({ selectedCourtId, onSelect }: Props) {
@@ -151,7 +143,7 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
   const renderCard = (court: Court) => {
     const isFav = favoritedCourtIds.has(court.id);
     const isAppellate = APPELLATE_TYPES.has(court.court_type);
-    const typeLabel = COURT_TYPE_LABEL[court.court_type] || court.court_type;
+    const typeLabel = courtTypeLabel(court.court_type);
     const detailsId = `court-card-${court.id}-details`;
     const addressId = `court-card-${court.id}-address`;
     // Selecting and starring are sibling buttons; the select button's click area covers the card.

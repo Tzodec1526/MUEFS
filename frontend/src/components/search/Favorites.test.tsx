@@ -55,6 +55,16 @@ it('shows a retry, not an empty list, when favorites fail to load; retrying relo
   expect(listFavorites).toHaveBeenCalledTimes(2);
 });
 
+it('names a favorite court by county and court type in words', async () => {
+  vi.mocked(listFavorites).mockResolvedValue({ favorites: [], total: 0 });
+  vi.mocked(listFavoriteCourts).mockResolvedValue({ favorites: [{
+    id: 1, court_id: 3, court_name: '3rd Circuit Court', county: 'Wayne', court_type: 'circuit', notes: null, created_at: '2026-09-01T12:00:00Z',
+  }], total: 1 });
+  renderFavorites();
+
+  expect(await screen.findByText('Wayne County · Circuit Court')).toBeTruthy();
+});
+
 it('drops a removed case from the list and keeps the others', async () => {
   vi.mocked(listFavorites).mockResolvedValue({
     favorites: [favorite(101, 'Smith v. Jones'), favorite(202, 'Doe v. Roe')], total: 2,

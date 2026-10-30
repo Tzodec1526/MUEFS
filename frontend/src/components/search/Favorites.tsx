@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { listFavorites, removeFavorite, FavoriteCase, listFavoriteCourts, removeFavoriteCourt, FavoriteCourt } from '../../api/favorites';
+import { courtTypeLabel } from '../../utils/courtTypes';
 import { formatShortDate } from '../../utils/format';
 import { actionErrorMessage } from '../../api/client';
 import LoadError from '../common/LoadError';
@@ -147,7 +148,7 @@ function Favorites() {
               <div className="favorite-card-body">
                 <div className="favorite-card-header">
                   <h3>{fav.court_name || `Court #${fav.court_id}`}</h3>
-                  <span className="favorite-card-number">{fav.county ? `${fav.county} County` : ''} {fav.court_type ? `| ${fav.court_type}` : ''}</span>
+                  <span className="favorite-card-number">{[fav.county && `${fav.county} County`, fav.court_type && courtTypeLabel(fav.court_type)].filter(Boolean).join(' · ')}</span>
                 </div>
                 {fav.notes && <p className="favorite-card-notes">{fav.notes}</p>}
                 <span className="favorite-card-date">
