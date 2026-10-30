@@ -20,9 +20,12 @@ function MyFilings() {
   const requestedStatus = searchParams.get('status') ?? '';
   const statusFilter = STATUSES.includes(requestedStatus) ? requestedStatus : '';
   const setStatusFilter = (status: string) => setSearchParams(status ? { status } : {}, { replace: true });
-  const [paged, setPaged] = useState({ status: statusFilter, page: 1 });
-  const page = paged.status === statusFilter ? paged.page : 1;
-  const setPage = (next: number) => setPaged({ status: statusFilter, page: next });
+  const [page, setPage] = useState(1);
+  const [pageStatus, setPageStatus] = useState(statusFilter);
+  if (pageStatus !== statusFilter) {
+    setPageStatus(statusFilter);
+    setPage(1);
+  }
   const [courtNames, setCourtNames] = useState<Record<number, string>>({});
   const [statusCounts, setStatusCounts] = useState<Record<string, number> | null>(null);
   const [error, setError] = useState<LoadFailure | null>(null);

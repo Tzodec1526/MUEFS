@@ -79,6 +79,37 @@ it('asks for the status chosen in the filter', async () => {
   expect(filter().value).toBe('accepted');
 });
 
+const lastRequest = () => vi.mocked(listFilings).mock.lastCall?.[0];
+
+async function goToPageTwo() {
+  serve([filing(1)], 30);
+  open();
+  fireEvent.click(await screen.findByRole('button', { name: 'Next' }));
+  await screen.findByText('Page 2 of 2');
+  expect(lastRequest()).toMatchObject({ status: undefined, page: 2 });
+}
+
+it('lands on page 1 of a status the filer paged, left and came back to', async () => {
+  await goToPageTwo();
+
+  fireEvent.change(filter(), { target: { value: 'returned' } });
+  await vi.waitFor(() => expect(lastRequest()).toMatchObject({ status: 'returned', page: 1 }));
+
+  fireEvent.change(filter(), { target: { value: '' } });
+
+  await vi.waitFor(() => expect(lastRequest()).toMatchObject({ status: undefined, page: 1 }));
+  expect(await screen.findByText('Page 1 of 2')).toBeTruthy();
+});
+
+it('lands on page 1 of each new status it moves to', async () => {
+  await goToPageTwo();
+
+  fireEvent.change(filter(), { target: { value: 'accepted' } });
+
+  await vi.waitFor(() => expect(lastRequest()).toMatchObject({ status: 'accepted', page: 1 }));
+  expect(await screen.findByText('Page 1 of 2')).toBeTruthy();
+});
+
 it('counts filings and documents in real plurals', async () => {
   serve([filing(1, { document_count: 1 }), filing(2, { document_count: 3 })]);
   open();
