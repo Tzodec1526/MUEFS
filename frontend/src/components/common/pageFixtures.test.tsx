@@ -104,7 +104,7 @@ const responses: Record<string, unknown> = {
   '/filings/2/fees': fees,
   '/filings/2/payments': { payments: [], total: 0, page: 1, payment_version: 1 },
   '/filings/2/history': {
-    filing_id: 2, status: 'accepted', submission_count: 1, total: 1, page: 1, page_size: 25, court_id: 3, can_manage_documents: true,
+    filing_id: 2, status: 'accepted', submission_count: 1, total: 2, page: 1, page_size: 25, court_id: 3, can_manage_documents: true,
     filing_date: '2026-03-02', filing_date_basis: null,
     fee_waiver: {
       granted: null, referred_at: null, decided_at: null, amount_due_cents: null, balance_due_cents: null, fee_version: 1,
@@ -112,7 +112,10 @@ const responses: Record<string, unknown> = {
     },
     transactions: [{
       id: 't-1', submission_number: 1, event_type: 'submitted', actor_name: 'Pat Lee', occurred_at: time,
-      details: { documents: [document], document_id: 2, public_copy: copy },
+      details: { document_id: 2, public_copy: copy },
+    }, {
+      id: 't-2', submission_number: 1, event_type: 'submitted', actor_name: 'Pat Lee', occurred_at: time,
+      details: { documents: [document] },
     }],
   },
   '/notifications': {

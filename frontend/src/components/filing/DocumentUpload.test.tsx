@@ -67,6 +67,14 @@ it('labels uploaded documents from the one catalog, and from the court for a typ
   ]));
 });
 
+it('labels the form and its button in sentence case', async () => {
+  vi.mocked(getFilingRequirements).mockResolvedValue([]);
+  renderUpload();
+
+  expect(await screen.findByRole('heading', { name: 'Upload documents' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Upload document' })).toBeTruthy();
+});
+
 it('offers companion documents by their catalog names, in real plurals', async () => {
   vi.mocked(getFilingRequirements).mockResolvedValue([]);
   render(<DocumentUpload filingId={7} courtId={3} caseTypeId={11} filingType="subsequent"
