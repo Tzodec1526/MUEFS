@@ -215,8 +215,8 @@ async def batch_review_filings(
                 continue
             if f is not None and f.cms_error:
                 failure = (
-                    "The court's case management system did not accept this filing. "
-                    "Open it to see its history."
+                    "The submission to the case management system failed. "
+                    "Open this filing to see its history."
                 )
         except Exception as exc:
             failure = _batch_failure(fid, exc)

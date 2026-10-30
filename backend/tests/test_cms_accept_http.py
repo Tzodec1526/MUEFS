@@ -84,6 +84,30 @@ async def cms_fail_app(monkeypatch, stored_document):
 
 
 @pytest.mark.asyncio
+async def test_batch_reports_a_cms_failure_as_a_failed_submission(cms_fail_app):
+    client, ids, factory = cms_fail_app
+    r = await client.post(
+        "/api/v1/clerk/queue/batch-review",
+        json={
+            "action": "accept",
+            "filings": [{"filing_id": ids["filing"], "expected_submission_count": 1}],
+        },
+        headers={"X-Demo-User-Id": str(ids["clerk"])},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["failed"] == [ids["filing"]]
+    assert r.json()["errors"][str(ids["filing"])] == (
+        "The submission to the case management system failed. "
+        "Open this filing to see its history."
+    )
+
+    async with factory() as s:
+        env = await s.get(FilingEnvelope, ids["filing"])
+        assert env is not None
+        assert env.status != FilingStatus.REJECTED
+
+
+@pytest.mark.asyncio
 async def test_cms_failure_persists_after_http_502(cms_fail_app):
     client, ids, factory = cms_fail_app
     r = await client.post(
