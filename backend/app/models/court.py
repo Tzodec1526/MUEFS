@@ -1,10 +1,10 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.database import Base, UTCDateTime
 
 
 class CourtType(enum.StrEnum):
@@ -45,7 +45,7 @@ class Court(Base):
     intake_version: Mapped[int] = mapped_column(default=0, server_default="0")
     intake_notice: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        UTCDateTime(), server_default=func.now()
     )
 
     case_types: Mapped[list["CaseType"]] = relationship(back_populates="court")
@@ -78,7 +78,7 @@ class FeeSchedule(Base):
     fee_type: Mapped[str] = mapped_column(String(100))
     amount_cents: Mapped[int] = mapped_column(Integer)
     description: Mapped[str | None] = mapped_column(Text)
-    effective_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    effective_date: Mapped[datetime] = mapped_column(UTCDateTime())
     is_active: Mapped[bool] = mapped_column(default=True)
 
     court: Mapped["Court"] = relationship(back_populates="fee_schedules")

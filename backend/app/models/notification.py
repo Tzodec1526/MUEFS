@@ -1,10 +1,10 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Index, String, Text, false, func
+from sqlalchemy import JSON, Enum, ForeignKey, Index, String, Text, false, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base
+from app.database import Base, UTCDateTime
 from app.models.retention import append_only
 
 
@@ -51,10 +51,10 @@ class ServiceContact(Base):
     participant_snapshot: Mapped[dict | None] = mapped_column(JSON)
     is_active: Mapped[bool] = mapped_column(default=False, server_default=false())
     authority: Mapped[str | None] = mapped_column(String(1000))
-    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     version: Mapped[int] = mapped_column(default=0, server_default="0")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), server_default=func.now())
 
     __table_args__ = (Index("uq_service_contact_participant", "participant_id", unique=True),)
 
@@ -78,11 +78,11 @@ class Notification(Base):
     email_message_id: Mapped[str | None] = mapped_column(String(255))
     email_message: Mapped[str | None] = mapped_column(Text)
     attempt_count: Mapped[int] = mapped_column(default=0, server_default="0")
-    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_attempt_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    last_attempt_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     last_error: Mapped[str | None] = mapped_column(String(1000))
-    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), server_default=func.now())
 
     __table_args__ = (
         Index("ix_notification_recipient_newest", "recipient_id", "created_at", "id"),
@@ -98,7 +98,7 @@ class NotificationDeliveryEvent(Base):
     notification_id: Mapped[int] = mapped_column(ForeignKey("notifications.id"), index=True)
     attempt_number: Mapped[int]
     outcome: Mapped[str] = mapped_column(String(32))
-    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    occurred_at: Mapped[datetime] = mapped_column(UTCDateTime())
     detail: Mapped[str | None] = mapped_column(String(1000))
     smtp_code: Mapped[int | None]
     actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))

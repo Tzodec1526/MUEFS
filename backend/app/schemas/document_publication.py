@@ -1,7 +1,7 @@
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.common import ExpectedVersion, RecordId
 
@@ -18,10 +18,6 @@ class PublicCopyResponse(BaseModel):
     is_text_searchable: bool
     pii_warnings: list[str]
     created_at: datetime
-
-    @field_serializer("created_at")
-    def utc_created_at(self, value: datetime) -> str:
-        return value.replace(tzinfo=value.tzinfo or UTC).isoformat()
 
 
 class WithholdDocument(BaseModel):

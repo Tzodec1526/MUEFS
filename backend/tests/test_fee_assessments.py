@@ -73,7 +73,7 @@ async def test_review_assessment_payment_and_submission_preserve_the_basis(
     pending = requested.json()
     assert pending["total_cents"] is None and pending["balance_due_cents"] is None
     assert pending["review_reason"] == "Please review the applicable exemption"
-    assert pending["review_requested_at"].endswith("+00:00")
+    assert pending["review_requested_at"].endswith("Z")
     filing = await filing_service.get_filing(db_session, fid)
     assert filing.status == FilingStatus.DRAFT and filing.submitted_at is None
     assert filing.submission_count == 0 and doc.retained_at is not None

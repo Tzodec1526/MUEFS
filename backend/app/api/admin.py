@@ -1,6 +1,5 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
@@ -338,9 +337,7 @@ async def account_history(
                 "actor_id": entry.user_id,
                 "action": entry.action,
                 "details": entry.details,
-                "occurred_at": entry.timestamp.replace(tzinfo=entry.timestamp.tzinfo or UTC)
-                .astimezone(UTC)
-                .isoformat(),
+                "occurred_at": entry.timestamp.isoformat(),
             }
             for entry in rows
         ],

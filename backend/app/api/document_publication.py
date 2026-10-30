@@ -1,6 +1,5 @@
 """Prepare, review, publish and withdraw public copies without rewriting filed originals."""
 
-from datetime import UTC
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
@@ -192,9 +191,7 @@ async def publication_history(
                 "action": row.action,
                 "details": row.details,
                 "actor_name": (row.details or {}).get("actor_name"),
-                "occurred_at": row.timestamp.replace(
-                    tzinfo=row.timestamp.tzinfo or UTC
-                ).isoformat(),
+                "occurred_at": row.timestamp.isoformat(),
             }
             for row in rows
         ],

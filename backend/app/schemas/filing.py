@@ -1,7 +1,7 @@
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from typing import Self
 
-from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.models.filing import FilingStatus, FilingType
 from app.schemas.common import MAX_RECORD_ID, RecordId
@@ -20,10 +20,6 @@ class FilingDocumentResponse(BaseModel):
     uploaded_at: datetime
 
     model_config = {"from_attributes": True}
-
-    @field_serializer("uploaded_at")
-    def serialize_uploaded_at(self, value: datetime) -> str:
-        return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
 
 
 class FilingEnvelopeCreate(BaseModel):
@@ -209,10 +205,6 @@ class FilingTransactionResponse(BaseModel):
     details: dict
 
     model_config = {"from_attributes": True}
-
-    @field_serializer("occurred_at")
-    def serialize_occurred_at(self, value: datetime) -> str:
-        return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
 
 
 class FeeWaiverState(BaseModel):

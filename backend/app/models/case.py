@@ -3,10 +3,10 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, Enum, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.database import Base, UTCDateTime
 
 if TYPE_CHECKING:
     from app.models.court import Court
@@ -48,7 +48,7 @@ class Case(Base):
     # Restricted docket access requires an explicit participant grant or court authority.
     is_sealed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     status: Mapped[CaseStatus] = mapped_column(Enum(CaseStatus), default=CaseStatus.OPEN)
-    filed_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    filed_date: Mapped[datetime] = mapped_column(UTCDateTime())
     filing_date: Mapped[date | None]
     filing_date_version: Mapped[int] = mapped_column(default=0, server_default="0")
     judge_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
@@ -64,10 +64,10 @@ class Case(Base):
         ).ddl_if(dialect="postgresql"),
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        UTCDateTime(), server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+        UTCDateTime(), server_default=func.now(), onupdate=func.now()
     )
 
     court: Mapped["Court"] = relationship()
@@ -86,7 +86,7 @@ class CaseParticipant(Base):
     represented_party_name: Mapped[str | None] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(default=True, server_default=sa.true())
     access_enabled: Mapped[bool] = mapped_column(default=False, server_default=sa.false())
-    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     contact_email: Mapped[str | None] = mapped_column(String(255))
     contact_phone: Mapped[str | None] = mapped_column(String(20))
     contact_address: Mapped[str | None] = mapped_column(Text)

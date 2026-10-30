@@ -5,7 +5,6 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     JSON,
-    DateTime,
     Enum,
     ForeignKey,
     Index,
@@ -18,7 +17,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.database import Base, UTCDateTime
 
 PRIVATE_DOCUMENT_TYPES = frozenset({"FEE_WAIVER", "FEE_WAIVER_ORDER"})
 COURT_DOCUMENT_TYPES = frozenset({"FEE_WAIVER_ORDER", "FILING_DATE_ORDER"})
@@ -83,8 +82,8 @@ class FilingEnvelope(Base):
     )
     case_title: Mapped[str | None] = mapped_column(String(500))
     filing_description: Mapped[str | None] = mapped_column(Text)
-    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    submitted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    reviewed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True)
     rejection_reason: Mapped[str | None] = mapped_column(Text)
     payment_id: Mapped[int | None] = mapped_column(ForeignKey("payments.id"), index=True)
@@ -92,24 +91,24 @@ class FilingEnvelope(Base):
     fee_waiver_requested: Mapped[bool] = mapped_column(default=False)
     fee_waiver_granted: Mapped[bool | None] = mapped_column(default=None)
     fee_waiver_reason: Mapped[str | None] = mapped_column(String(2000))
-    fee_waiver_referred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    fee_waiver_decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fee_waiver_referred_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    fee_waiver_decided_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     fee_waiver_amount_due_cents: Mapped[int | None] = mapped_column(Integer)
     cms_case_number: Mapped[str | None] = mapped_column(String(100))
     cms_filing_id: Mapped[str | None] = mapped_column(String(100))
     cms_error: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        UTCDateTime(), server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+        UTCDateTime(), server_default=func.now(), onupdate=func.now()
     )
     submission_count: Mapped[int] = mapped_column(default=0, server_default="0")
     filing_date: Mapped[date | None]
     filing_date_basis: Mapped[dict | None] = mapped_column(JSON)
     filing_date_version: Mapped[int] = mapped_column(default=0, server_default="0")
     fee_version: Mapped[int] = mapped_column(default=0, server_default="0")
-    fee_review_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fee_review_requested_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     fee_assessment_id: Mapped[str | None] = mapped_column(String(36), ForeignKey(
         "filing_transactions.id", use_alter=True, name="fk_filing_fee_assessment",
     ))
@@ -157,10 +156,10 @@ class FilingDocument(Base):
     is_text_searchable: Mapped[bool] = mapped_column(default=False)
     pii_warnings: Mapped[list[str] | None] = mapped_column(JSON)
     uploaded_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        UTCDateTime(), server_default=func.now()
     )
-    retained_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    retained_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    removed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     access_version: Mapped[int] = mapped_column(default=0, server_default="0")
     public_copy_id: Mapped[int | None] = mapped_column(ForeignKey(
         "document_public_copies.id", use_alter=True, name="fk_document_public_copy",
@@ -180,4 +179,4 @@ class DocumentUploadRequest(Base):
     document_id: Mapped[int | None] = mapped_column(
         ForeignKey("filing_documents.id", ondelete="SET NULL"), unique=True,
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), server_default=func.now())

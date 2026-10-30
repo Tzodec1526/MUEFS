@@ -208,9 +208,7 @@ async def service_instruction_history(
             {
                 "id": row.id,
                 "details": row.details,
-                "occurred_at": row.timestamp.replace(
-                    tzinfo=row.timestamp.tzinfo or UTC
-                ).isoformat(),
+                "occurred_at": row.timestamp.isoformat(),
             }
             for row in rows
         ],

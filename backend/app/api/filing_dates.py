@@ -63,10 +63,7 @@ async def filing_date_state(
         "court_id": filing.court_id,
         "status": filing.status,
         "submission_count": filing.submission_count,
-        "submitted_at": (
-            filing.submitted_at.replace(tzinfo=filing.submitted_at.tzinfo or UTC).astimezone(UTC)
-            if filing.submitted_at else None
-        ),
+        "submitted_at": filing.submitted_at,
         "filing_date": filing.filing_date,
         "filing_date_basis": filing.filing_date_basis,
         "version": filing.filing_date_version,

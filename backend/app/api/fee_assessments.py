@@ -246,9 +246,7 @@ async def fee_review_queue(
                 "case_title": filing.case_title,
                 "status": filing.status,
                 "filer_name": f"{filing.first_name} {filing.last_name}",
-                "requested_at": filing.fee_review_requested_at.replace(
-                    tzinfo=filing.fee_review_requested_at.tzinfo or UTC
-                ).astimezone(UTC),
+                "requested_at": filing.fee_review_requested_at,
             }
             for filing in rows
         ],

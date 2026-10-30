@@ -2,10 +2,10 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Date, DateTime, ForeignKey, Index, String
+from sqlalchemy import JSON, Date, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base
+from app.database import Base, UTCDateTime
 from app.models.retention import append_only
 
 
@@ -20,7 +20,7 @@ class CourtCalendar(Base):
     closed_dates: Mapped[dict] = mapped_column(JSON)
     authority_reference: Mapped[str] = mapped_column(String(1000))
     published_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    published_at: Mapped[datetime] = mapped_column(UTCDateTime())
 
     __table_args__ = (Index("ix_calendar_court_coverage", "court_id", "valid_through", "id"),)
 

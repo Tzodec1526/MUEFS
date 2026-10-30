@@ -2,6 +2,7 @@
 
 import hashlib
 import os
+import re
 from uuid import uuid4
 
 # Before any app.settings load: pin the test environment to demo mode (SQLite + local
@@ -14,7 +15,7 @@ os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["DEBUG"] = "true"
 os.environ["ALLOW_DEMO_MODE"] = "true"
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
 
 import pytest
 import pytest_asyncio
@@ -78,3 +79,54 @@ async def api_client(db_session):
             yield client
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+_TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}")
+_UTC_OFFSET = re.compile(r"(?:Z|[+-]\d{2}:\d{2})$")
+_checked_timestamps: list[int] = []
+
+
+def _timestamps(value: object) -> Iterator[str]:
+    if isinstance(value, dict):
+        for item in value.values():
+            yield from _timestamps(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _timestamps(item)
+    elif isinstance(value, str) and _TIMESTAMP.match(value):
+        yield value
+
+
+@pytest.fixture(autouse=True)
+def api_timestamps_carry_a_utc_offset(monkeypatch):
+    from httpx import AsyncClient
+
+    send = AsyncClient.send
+    naive: list[str] = []
+
+    async def checked_send(self, request, **kwargs):
+        response = await send(self, request, **kwargs)
+        if (
+            request.url.path.startswith("/api/")
+            and response.is_success
+            and response.headers.get("content-type", "").startswith("application/json")
+            and await response.aread()
+        ):
+            stamps = list(_timestamps(response.json()))
+            _checked_timestamps.append(len(stamps))
+            naive.extend(
+                f"{request.method} {request.url.path}: {stamp}"
+                for stamp in stamps if not _UTC_OFFSET.search(stamp)
+            )
+        return response
+
+    monkeypatch.setattr(AsyncClient, "send", checked_send)
+    yield
+    assert not naive, naive
+
+
+def pytest_terminal_summary(terminalreporter):
+    terminalreporter.write_line(
+        f"API timestamps checked for a UTC offset: {sum(_checked_timestamps)} "
+        f"in {len(_checked_timestamps)} JSON responses"
+    )

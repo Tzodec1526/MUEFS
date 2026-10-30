@@ -138,13 +138,7 @@ async def inbox(db: Db, actor: Actor, page: Page = 1):
     )
     # An inbox entry persists after access revocation, but discloses no case title or documents.
     return {
-        "deliveries": [
-            {
-                **dict(row),
-                "created_at": row["created_at"].replace(tzinfo=row["created_at"].tzinfo or UTC),
-            }
-            for row in rows.mappings()
-        ],
+        "deliveries": [dict(row) for row in rows.mappings()],
         "total": total,
         "page_size": 25,
     }
@@ -185,13 +179,7 @@ async def sent_deliveries(filing_id: RecordId, db: Db, actor: Actor, page: Page 
         .limit(25)
     )
     return {
-        "deliveries": [
-            {
-                **dict(row),
-                "created_at": row["created_at"].replace(tzinfo=row["created_at"].tzinfo or UTC),
-            }
-            for row in rows.mappings()
-        ],
+        "deliveries": [dict(row) for row in rows.mappings()],
         "total": total,
         "page_size": 25,
     }
@@ -216,7 +204,7 @@ async def delivery_details(delivery_id: UUID, db: Db, actor: Actor):
         "filing_id": packet.filing_id,
         "source_transaction_id": packet.source_transaction_id,
         "sender": packet.actor_name,
-        "created_at": packet.created_at.replace(tzinfo=packet.created_at.tzinfo or UTC),
+        "created_at": packet.created_at,
         **packet.details,
         "contact": recipient.contact_snapshot,
         "delivery_status": notice.delivery_status,
@@ -232,9 +220,7 @@ async def delivery_details(delivery_id: UUID, db: Db, actor: Actor):
             DeliveryStatus.UNKNOWN,
             DeliveryStatus.FAILURE_REPORTED,
         ),
-        "acknowledged_at": acknowledged.replace(tzinfo=acknowledged.tzinfo or UTC)
-        if acknowledged
-        else None,
+        "acknowledged_at": acknowledged,
         "can_acknowledge": actor.id == recipient.recipient_id and acknowledged is None,
         "can_retry": settings.service_delivery_enabled
         and settings.email_delivery_enabled
@@ -288,13 +274,7 @@ async def delivery_events(
     total = await db.scalar(select(func.count()).select_from(query.subquery()))
     rows = await db.execute(query.order_by(order).offset((page - 1) * 25).limit(25))
     return {
-        "events": [
-            {
-                **dict(row),
-                "occurred_at": row["occurred_at"].replace(tzinfo=row["occurred_at"].tzinfo or UTC),
-            }
-            for row in rows.mappings()
-        ],
+        "events": [dict(row) for row in rows.mappings()],
         "total": total,
         "page_size": 25,
     }
@@ -437,10 +417,7 @@ async def report_delivery_failure(
         or notice.last_attempt_at is None
         # Source notices and the review form commonly record whole seconds.
         or observed_at
-        < notice.last_attempt_at.replace(
-            tzinfo=notice.last_attempt_at.tzinfo or UTC,
-            microsecond=0,
-        )
+        < notice.last_attempt_at.replace(microsecond=0)
     ):
         raise HTTPException(
             422, "The report time must follow the transmission and cannot be in the future"

@@ -1,6 +1,5 @@
 """Court staff manage portal participant records and explicit restricted-case access."""
 
-from datetime import UTC
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, or_, select, update
@@ -87,11 +86,7 @@ async def participant_records(
             {
                 **participants.participant_snapshot(record),
                 "account_email": email,
-                "reviewed_at": record.reviewed_at.replace(
-                    tzinfo=record.reviewed_at.tzinfo or UTC
-                ).isoformat()
-                if record.reviewed_at
-                else None,
+                "reviewed_at": record.reviewed_at.isoformat() if record.reviewed_at else None,
             }
             for record, email in records
         ],
@@ -211,9 +206,7 @@ async def participant_history(
                 "id": row.id,
                 "action": row.action,
                 "details": row.details,
-                "occurred_at": row.timestamp.replace(
-                    tzinfo=row.timestamp.tzinfo or UTC
-                ).isoformat(),
+                "occurred_at": row.timestamp.isoformat(),
             }
             for row in rows
         ],

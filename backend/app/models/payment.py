@@ -4,7 +4,6 @@ from datetime import datetime
 from sqlalchemy import (
     DDL,
     JSON,
-    DateTime,
     Enum,
     ForeignKey,
     Index,
@@ -17,7 +16,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base
+from app.database import Base, UTCDateTime
 
 
 class PaymentStatus(enum.StrEnum):
@@ -56,9 +55,9 @@ class Payment(Base):
     transaction_ref: Mapped[str | None] = mapped_column(String(255))
     payer_id: Mapped[int | None] = mapped_column()
     description: Mapped[str | None] = mapped_column(String(500))
-    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    processed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        UTCDateTime(), server_default=func.now()
     )
 
     __table_args__ = (

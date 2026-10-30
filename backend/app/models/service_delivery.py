@@ -3,10 +3,10 @@
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base
+from app.database import Base, UTCDateTime
 from app.models.retention import append_only
 
 
@@ -19,7 +19,7 @@ class ServicePacket(Base):
     source_transaction_id: Mapped[str] = mapped_column(ForeignKey("filing_transactions.id"))
     actor_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     actor_name: Mapped[str] = mapped_column(String(255))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime())
     details: Mapped[dict] = mapped_column(JSON)
     idempotency_key: Mapped[str] = mapped_column(String(36))
     request_sha256: Mapped[str] = mapped_column(String(64))
@@ -55,7 +55,7 @@ class ServiceEvent(Base):
     action: Mapped[str] = mapped_column(String(32))
     actor_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     actor_name: Mapped[str] = mapped_column(String(255))
-    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    occurred_at: Mapped[datetime] = mapped_column(UTCDateTime())
     details: Mapped[dict] = mapped_column(JSON)
 
     __table_args__ = (Index("ix_service_events_recipient", "service_recipient_id", "id"),)

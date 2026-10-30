@@ -27,7 +27,6 @@ async def may_publish_calendar(db: AsyncSession, user_id: int | None, court_id: 
 
 def assess_date(calendars: list[CourtCalendar], received_at: datetime) -> FilingDateAssessment:
     """MCR 1.109(G)(5)(b), using the newest published revision covering each day."""
-    received_at = received_at.replace(tzinfo=received_at.tzinfo or UTC)
     initial = next(
         (
             c
@@ -70,7 +69,7 @@ async def filing_date_for_receipt(
     court_id: int,
     received_at: datetime,
 ) -> FilingDateAssessment:
-    utc_day: date = received_at.replace(tzinfo=received_at.tzinfo or UTC).astimezone(UTC).date()
+    utc_day: date = received_at.astimezone(UTC).date()
     # One query also covers a year boundary; adjacent published calendars may apply.
     calendars = list(
         await db.scalars(

@@ -112,8 +112,8 @@ async def test_receipts_keep_original_documents_through_correction(
         == hashlib.sha256(b"Original complaint").hexdigest()
     )
 
-    assert first_receipt["occurred_at"].endswith("+00:00")
-    assert first_receipt["details"]["documents"][0]["uploaded_at"].endswith("+00:00")
+    assert first_receipt["occurred_at"].endswith("Z")
+    assert first_receipt["details"]["documents"][0]["uploaded_at"].endswith("Z")
 
     api_client.headers["X-Demo-User-Id"] = str(clerk)
     blank = await api_client.post(

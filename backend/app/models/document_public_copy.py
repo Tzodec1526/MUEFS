@@ -2,10 +2,10 @@
 
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, func
+from sqlalchemy import JSON, ForeignKey, Index, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base
+from app.database import Base, UTCDateTime
 from app.models.retention import append_only
 
 
@@ -23,7 +23,7 @@ class DocumentPublicCopy(Base):
     sha256_hash: Mapped[str] = mapped_column(String(64))
     is_text_searchable: Mapped[bool]
     pii_warnings: Mapped[list[str]] = mapped_column(JSON)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), server_default=func.now())
 
     __table_args__ = (Index("ix_document_public_copies_history", "document_id", "id"),)
 

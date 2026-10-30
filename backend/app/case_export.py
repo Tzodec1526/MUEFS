@@ -76,7 +76,7 @@ class CaseExportError(ValueError):
 def _json(value: object) -> bytes:
     def encode(item: object) -> str:
         if isinstance(item, datetime):
-            return item.replace(tzinfo=item.tzinfo or UTC).astimezone(UTC).isoformat()
+            return item.astimezone(UTC).isoformat()
         if isinstance(item, date):
             return item.isoformat()
         raise TypeError(f"Unsupported record value: {type(item).__name__}")

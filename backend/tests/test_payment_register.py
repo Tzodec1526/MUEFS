@@ -68,7 +68,7 @@ async def test_reversal_of_an_older_credit_appears_in_its_recorded_day(
     assert entry["payment_id"] == credit.json()["id"]
     assert entry["reason"] == "Receipt belonged to another filing"
     assert entry["receipt_reference"] == "SYN-RECEIPT-1"
-    assert entry["received_at"] == "2026-01-01T17:00:00+00:00"
+    assert entry["received_at"] == "2026-01-01T17:00:00Z"
     both = (await api_client.get("/api/v1/clerk/payment-register", params={
         "court_id": court, **PERIOD, "date_from": "2026-03-07",
     })).json()
@@ -129,7 +129,7 @@ async def test_period_uses_inclusive_local_dates_and_exclusive_upper_boundary(
     assert report["total"] == 2
     # Local midnight is included and the next local midnight is not: [start, end).
     assert [row["occurred_at"] for row in report["entries"]] == [
-        "2026-11-02T04:59:59+00:00", "2026-11-01T04:00:00+00:00",
+        "2026-11-02T04:59:59Z", "2026-11-01T04:00:00Z",
     ]
     assert report["range_start"] == "2026-11-01T04:00:00Z"
     assert report["range_end"] == "2026-11-02T05:00:00Z"  # 25-hour DST day.

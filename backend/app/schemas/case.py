@@ -1,6 +1,6 @@
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 
-from pydantic import AliasPath, BaseModel, Field, field_serializer
+from pydantic import AliasPath, BaseModel, Field
 
 from app.models.case import CaseStatus, ParticipantRole
 
@@ -37,10 +37,6 @@ class CasePublicRecord(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
-
-    @field_serializer("filed_date", "created_at")
-    def serialize_timestamp(self, value: datetime) -> str:
-        return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
 
 
 class CaseDocketResponse(CasePublicRecord):

@@ -1,7 +1,7 @@
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from typing import Literal
 
-from pydantic import AwareDatetime, BaseModel, Field, field_serializer, field_validator
+from pydantic import AwareDatetime, BaseModel, Field, field_validator
 
 from app.models.payment import PaymentMethod, PaymentStatus
 from app.schemas.common import ExpectedVersion, RecordId
@@ -49,12 +49,6 @@ class FilingFeeState(BaseModel):
     payments_simulated: bool
     can_manage_external_payments: bool = False
     can_record_external_payment: bool = False
-
-    @field_serializer("review_requested_at")
-    def serialize_review_time(self, value: datetime | None) -> str | None:
-        return (
-            value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat() if value else None
-        )
 
 
 class FilingFeeDetails(FilingFeeState):
@@ -144,10 +138,6 @@ class PaymentRecord(BaseModel):
 
     model_config = {"from_attributes": True}
 
-    @field_serializer("created_at")
-    def serialize_created(self, value: datetime) -> str:
-        return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
-
 
 class PaymentRecords(BaseModel):
     payments: list[PaymentRecord]
@@ -170,10 +160,6 @@ class PaymentActivity(BaseModel):
     receipt_reference: str
     received_at: AwareDatetime
     reason: str
-
-    @field_serializer("occurred_at", "received_at")
-    def serialize_time(self, value: datetime) -> str:
-        return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
 
 
 class PaymentRegisterTotals(BaseModel):

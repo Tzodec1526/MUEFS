@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -30,7 +30,7 @@ class RetryRequest(BaseModel):
 
 
 def _timestamp(value: datetime | None) -> str | None:
-    return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat() if value else None
+    return value.isoformat() if value else None
 
 
 @router.get("")
