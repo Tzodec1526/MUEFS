@@ -1,5 +1,3 @@
-"""Verify upload retry serialization and its commit boundary on real PostgreSQL."""
-
 import asyncio
 from pathlib import Path
 from uuid import uuid4
@@ -86,7 +84,6 @@ async def test_simultaneous_upload_retries_commit_one_document(
                     b"Different bytes" if retry_kind == "changed" else content, "text/plain")}))
             tasks.append(second)
             await asyncio.wait_for(both_scanning.wait(), 5)
-            # Slow malware/storage work must not hold the envelope's database lock.
             assert attempts == 0
             assert not second.done()
             release.set()
@@ -100,7 +97,6 @@ async def test_simultaneous_upload_retries_commit_one_document(
         assert scans == 2
         if retry_kind != "independent":
             assert committed_at_headers == ([1] if retry_kind == "changed" else [1, 1])
-        # Losing retries reclaim their temporary bytes before completing the request.
         assert len([path for path in tmp_path.rglob("*") if path.is_file()]) == saved + 1
         async with postgres_sessions() as db:
             assert await db.scalar(select(func.count()).select_from(DocumentUploadRequest)) == saved
@@ -160,10 +156,8 @@ async def test_upload_request_migration_preserves_legacy_documents_and_retry_key
         assert retry.status_code == 409, retry.text
     async with postgres_sessions() as db:
         request = await db.get(DocumentUploadRequest, (fid, key))
-        assert request.document_id is None  # PostgreSQL preserves the key on document deletion.
+        assert request.document_id is None
         assert (await db.get(FilingDocument, original_id)).sha256_hash == digest
-        # These tests keep documents on local disk, which has no worker: the removed draft's
-        # file was deleted once its removal committed, and nothing is left queued.
         assert not await db.scalar(select(func.count()).select_from(StorageDeletion))
     assert await cleanup_next(postgres_sessions) is None
     assert [path.name for path in tmp_path.rglob("*") if path.is_file()] == [

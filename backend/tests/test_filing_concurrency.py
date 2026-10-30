@@ -1,8 +1,3 @@
-"""Run with MUEFS_TEST_POSTGRES_URL against a disposable PostgreSQL database.
-
-Each test uses a uniquely named schema and drops only that schema on completion.
-"""
-
 import asyncio
 import hashlib
 import os
@@ -104,7 +99,6 @@ async def test_fee_waiver_order_is_screened_before_the_filing_is_locked(
     probes = []
 
     async def screen(data):
-        # Screening can take many seconds; other requests must still reach the filing.
         async with postgres_sessions.begin() as other:
             for model, row in ((FilingEnvelope, fid), (User, clerk)):
                 await other.execute(
@@ -432,7 +426,6 @@ async def test_fee_screen_reads_documents_and_balance_from_one_revision(
                 data={"title": "New evidence", "document_type_code": "EXHIBIT"},
                 files={"file": ("evidence.pdf", decision_pdf(), "application/pdf")}))
             await asyncio.wait_for(upload_started.wait(), 10)
-            # The upload must wait for the fee read's share lock, not commit beside it.
             async with asyncio.timeout(5), postgres_sessions() as observer:
                 while not await observer.scalar(
                     text("SELECT cardinality(pg_blocking_pids(:pid))"), {"pid": upload_pid[0]},
@@ -502,8 +495,6 @@ async def test_concurrent_review_refreshes_previously_read_status(postgres_sessi
 
     async def review():
         async with postgres_sessions.begin() as db:
-            # Both requests have the old status in their identity map before either
-            # gets the row lock. The second must refresh it after the first commits.
             before = await filing_service.get_filing(db, fid)
             assert before.status == FilingStatus.SUBMITTED
             await ready.put(True)

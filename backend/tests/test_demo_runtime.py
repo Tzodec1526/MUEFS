@@ -1,5 +1,3 @@
-"""The local and hosted entry points must serve a refresh-safe browser bootstrap."""
-
 import os
 import subprocess
 import sys
@@ -24,7 +22,6 @@ async def test_browser_configuration_is_available_in_the_local_entry_point(
     assert config.status_code == 200, config.text
     assert config.headers["cache-control"] == "no-store"
     assert config.headers["content-type"].startswith("application/javascript")
-    # A shared database must not publish a token that impersonates any account.
     expected = '"browser-demo-secret"' if allow_demo and isolated else '""'
     assert config.text == f"window.__MUEFS_DEMO_SECRET__={expected};"
 

@@ -1,5 +1,3 @@
-"""Upgrade real historical schemas without coupling the fixture to today's models."""
-
 import os
 from datetime import UTC, datetime
 from pathlib import Path
@@ -32,7 +30,6 @@ async def test_search_index_upgrade_recovers_failed_build_and_preserves_records(
         await conn.run_sync(downgrade)
 
     async with postgres_sessions.begin() as db:
-        # This revision predates the current Court model's intake fields.
         court_id = await db.scalar(text(
             "INSERT INTO courts (name, county, court_type, state, is_efiling_enabled) "
             "VALUES ('Search Court', 'Wayne', 'CIRCUIT', 'MI', true) RETURNING id"
@@ -50,7 +47,6 @@ async def test_search_index_upgrade_recovers_failed_build_and_preserves_records(
 
     async with engine.connect() as conn:
         await conn.execution_options(isolation_level="AUTOCOMMIT")
-        # Emulate a partial migration: one completed build and one real failed build.
         await conn.execute(text("""CREATE INDEX CONCURRENTLY ix_cases_case_number_trgm
             ON cases USING gin (case_number public.gin_trgm_ops)"""))
         with pytest.raises(DBAPIError, match="invalid input syntax for type integer"):
@@ -99,7 +95,6 @@ def test_unversioned_demo_upgrade_preserves_filings(tmp_path):
         with engine.begin() as conn:
             config.attributes["connection"] = conn
             command.upgrade(config, "c4f8e2a91b0d")
-            # Use the actual old tables, not the current ORM followed by destructive surgery.
             metadata = MetaData()
             rows = [
                 (
@@ -235,7 +230,7 @@ def test_unversioned_demo_upgrade_preserves_filings(tmp_path):
             )
             conn.execute(text("DROP TABLE alembic_version"))
         prepare_demo_schema(engine)
-        prepare_demo_schema(engine)  # A second boot must not reapply or duplicate anything.
+        prepare_demo_schema(engine)
         with engine.connect() as conn:
             assert conn.scalar(text("SELECT file_key FROM filing_documents")) == "keep-me"
             assert conn.scalar(text("SELECT pii_warnings FROM filing_documents")) is None
@@ -404,7 +399,6 @@ async def test_filer_index_recovers_failed_build_without_changing_pages(postgres
 
     async with engine.connect() as conn:
         await conn.execution_options(isolation_level="AUTOCOMMIT")
-        # Failed expression conversion leaves a real invalid concurrent index.
         with pytest.raises(DBAPIError, match="invalid input syntax for type integer"):
             await conn.execute(text("""CREATE INDEX CONCURRENTLY ix_filing_filer_updated
                 ON filing_envelopes ((case_title::integer))"""))

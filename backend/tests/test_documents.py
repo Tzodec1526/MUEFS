@@ -1,6 +1,3 @@
-"""Tests for document-related functionality."""
-
-
 import io
 from pathlib import Path
 
@@ -73,7 +70,7 @@ def test_check_pii_financial():
 
 def test_pdf_inspection_samples_text_once_and_deduplicates_pii(monkeypatch):
     writer = PdfWriter()
-    writer.add_blank_page(width=300, height=300)  # A scanned cover must not hide later text.
+    writer.add_blank_page(width=300, height=300)
     for _ in range(2):
         page = writer.add_blank_page(width=300, height=300)
         page[NameObject("/Resources")] = DictionaryObject({
@@ -113,7 +110,6 @@ def test_pdf_inspection_handles_malformed_files_and_limits_sampling():
     assert not broken.is_text_searchable
     assert broken.pii_warnings == []
 
-    # A page with text and an SSN shows whether sampling actually stops at the limit.
     record = publication_pdf("SSN 123-45-6789")
     unsampled = inspect_pdf(record, max_pages=0)
     assert unsampled.page_count == 1

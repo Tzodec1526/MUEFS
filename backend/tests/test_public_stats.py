@@ -1,5 +1,3 @@
-"""Public platform stats endpoint."""
-
 from datetime import UTC, datetime
 
 import pytest

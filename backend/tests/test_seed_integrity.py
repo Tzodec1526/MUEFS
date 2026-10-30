@@ -1,12 +1,3 @@
-"""Integrity checks on the full Michigan seed data, run against a throwaway SQLite DB.
-
-These guard the curation rules behind the filing checklists:
-- one requirement row per (court, case type, document code) — no duplicate cards;
-- discovery papers that are served on parties rather than filed with the court
-  (MCR 2.302(H)) never appear on a filing checklist;
-- the circuit civil checklist stays limited to required / highly probable documents.
-"""
-
 import hashlib
 from io import BytesIO
 
@@ -27,7 +18,6 @@ from app.services.filing_service import requirements_for_filing_type
 from tests.test_filing_concurrency import POSTGRES_URL
 from tests.test_filing_concurrency import postgres_sessions as postgres_sessions
 
-# Served on parties, not filed with the court (MCR 2.302(H)).
 SERVED_NOT_FILED_DISCOVERY = {
     "DISC_INTERROG", "DISC_RFP", "DISC_RFA",
     "DISC_ANSWERS", "DISC_RFP_RESP", "DISC_RFA_RESP",
@@ -96,8 +86,6 @@ def test_circuit_civil_checklist_is_curated(seeded_session):
     }
 
     motion = requirements_for_filing_type(reqs, "motion")
-    # DISC_CERT_GF is recommended, not required: MCR 2.313(A)(5) makes a good-faith effort
-    # a factor in awarding motion expenses, not a required filing.
     assert {r.document_type_code for r in motion if r.is_required} == {
         "MOTION",
     }
@@ -114,8 +102,6 @@ def test_circuit_court_names_use_correct_ordinals(seeded_session):
         )
     }
     assert len(names) == 57
-    # One row per circuit number, so presence of the correct ordinal implies
-    # the naive "21th"-style name is gone.
     for good in (
         "1st", "2nd", "3rd", "4th", "11th", "12th", "13th",
         "21st", "22nd", "23rd", "31st", "32nd", "33rd",
@@ -125,7 +111,6 @@ def test_circuit_court_names_use_correct_ordinals(seeded_session):
 
 
 def test_seed_reset_flag_rebuilds_from_scratch(tmp_path, monkeypatch):
-    """--reset drops and reseeds the app tables; a plain rerun still skips."""
     url = f"sqlite:///{tmp_path / 'reset.db'}"
     monkeypatch.setattr(document_service, "_local_storage_path", lambda: tmp_path / "files")
     engine = create_engine(url)
@@ -136,12 +121,10 @@ def test_seed_reset_flag_rebuilds_from_scratch(tmp_path, monkeypatch):
             session.query(FilingRequirement).delete()
             session.commit()
 
-        # Without reset, seeding sees existing courts and skips — damage stays.
         seed_data.seed_database(url=url)
         with Session(engine) as session:
             assert session.query(FilingRequirement).count() == 0
 
-        # With reset, the schema is rebuilt and fully reseeded.
         seed_data.seed_database(reset=True, url=url)
         with Session(engine) as session:
             assert session.query(Court).count() == baseline_courts
@@ -187,7 +170,6 @@ async def test_sample_participants_can_file_only_on_their_reviewed_cases(seeded_
 
 
 def test_async_driver_seed_matches_sync_seed(seeded_session, tmp_path, monkeypatch):
-    """PostgreSQL seeds through asyncpg; aiosqlite exercises the same driver bridge."""
     url = f"sqlite+aiosqlite:///{tmp_path / 'async-seed.db'}"
     monkeypatch.setattr(document_service, "_local_storage_path", lambda: tmp_path / "files")
     engine = create_engine(f"sqlite:///{tmp_path / 'async-seed.db'}")
@@ -207,7 +189,7 @@ def test_async_driver_seed_matches_sync_seed(seeded_session, tmp_path, monkeypat
         with Session(engine) as session:
             session.query(FilingRequirement).delete()
             session.commit()
-        seed_data.seed_database(url=url)  # A rerun keeps existing data.
+        seed_data.seed_database(url=url)
         assert seeded_counts()[2] == 0
         seed_data.seed_database(reset=True, url=url)
         assert seeded_counts() == expected
@@ -218,7 +200,6 @@ def test_async_driver_seed_matches_sync_seed(seeded_session, tmp_path, monkeypat
 @pytest.mark.skipif(not POSTGRES_URL, reason="MUEFS_TEST_POSTGRES_URL not configured")
 @pytest.mark.parametrize("postgres_sessions", ["c39f64dbea05"], indirect=True)
 async def test_reset_rebuilds_a_postgresql_schema_from_an_earlier_release(postgres_sessions):
-    # Earlier releases left the notices' old enum type behind; the reset must not fail on it.
     engine = postgres_sessions.kw["bind"]
     async with engine.connect() as connection:
         await connection.run_sync(seed_data._prepare_schema, True)

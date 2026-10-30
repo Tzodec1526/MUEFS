@@ -1,5 +1,3 @@
-"""GET /auth/me includes court assignments for the SPA session."""
-
 import pytest
 from httpx import ASGITransport, AsyncClient
 

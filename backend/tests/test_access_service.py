@@ -1,5 +1,3 @@
-"""Authorization helpers for case and document access."""
-
 from datetime import UTC, datetime
 
 import pytest
@@ -263,7 +261,6 @@ async def test_sealed_counsel_requires_an_explicit_link_and_current_bar_verifica
     )
     db_session.add(record)
     await db_session.flush()
-    # Matching a public bar number never links an account automatically.
     assert not await access_service.user_may_read_case(db_session, counsel, case.id)
     record.user_id = counsel.id
     await db_session.flush()
@@ -281,8 +278,6 @@ async def test_sealed_counsel_requires_an_explicit_link_and_current_bar_verifica
     assert not await access_service.user_may_read_case(db_session, counsel, case.id)
 
 
-# ========== ANONYMOUS PUBLIC ACCESS (user_id=None) ==========
-
 
 async def _court_and_case_type(db_session):
     court = Court(name="Anon Court", county="A", court_type=CourtType.CIRCUIT)
@@ -299,7 +294,6 @@ async def _court_and_case_type(db_session):
 
 @pytest.mark.asyncio
 async def test_anonymous_reads_non_sealed_case_but_not_sealed(db_session):
-    """A visitor with no account sees open dockets, never sealed ones."""
     court, ct = await _court_and_case_type(db_session)
     open_case = Case(
         court_id=court.id, case_number="ANON-OPEN", case_type_id=ct.id,
@@ -320,7 +314,6 @@ async def test_anonymous_reads_non_sealed_case_but_not_sealed(db_session):
 
 @pytest.mark.asyncio
 async def test_anonymous_document_access_public_yes_confidential_no(db_session):
-    """Anonymous download is allowed for public docs, denied for confidential ones."""
     court, ct = await _court_and_case_type(db_session)
     filer = User(
         email="anon_doc_filer@test.com", first_name="F", last_name="iler",
@@ -361,7 +354,6 @@ async def test_anonymous_document_access_public_yes_confidential_no(db_session):
 
 @pytest.mark.asyncio
 async def test_anonymous_sees_accepted_envelope_not_draft(db_session):
-    """Anonymous docket shows accepted filings, never drafts."""
     court, ct = await _court_and_case_type(db_session)
     filer = User(
         email="anon_env_filer@test.com", first_name="F", last_name="iler",
@@ -448,4 +440,3 @@ async def test_sealed_draft_does_not_grant_stranger_case_access(db_session):
     ))
     await db_session.flush()
     assert await access_service.user_may_read_case(db_session, stranger, case.id) is False
-

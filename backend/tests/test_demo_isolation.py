@@ -1,6 +1,3 @@
-"""Per-visitor demo isolation: each browser session gets its own copy of the seeded
-template, and the per-session cap falls back to the shared sandbox."""
-
 import asyncio
 import os
 import time
@@ -23,11 +20,9 @@ from app.services import document_service
 
 @pytest.fixture
 def demo(tmp_path, monkeypatch):
-    """Point the demo data dir at a temp folder and build a tiny seeded template."""
     monkeypatch.setenv("DEMO_DATA_DIR", str(tmp_path))
     import app.demo.session_db as sdb
 
-    # Request history and the sweep clock are module state; start each test clean.
     monkeypatch.setattr(sdb, "_last_access", {})
     monkeypatch.setattr(sdb, "_last_sweep", 0.0)
     monkeypatch.setattr(sdb, "_engines", {})
@@ -78,7 +73,7 @@ async def test_demo_api_commits_to_the_visitors_copy_of_the_template(demo, monke
 
 def test_capacity_falls_back_to_shared(demo, monkeypatch):
     monkeypatch.setattr("app.config.settings.demo_max_sessions", 1)
-    demo.open_sandbox("d" * 32)  # one private sandbox => at capacity
+    demo.open_sandbox("d" * 32)
 
     class _Req:
         cookies: dict = {}
@@ -90,7 +85,6 @@ def test_cookieless_api_clients_share_one_sandbox(demo):
     class _Req:
         cookies: dict = {}
 
-    # Monitors and scripts that never load a page must not use up private sandboxes.
     assert demo.resolve_sid(_Req(), allocate=False) == demo.SHARED_SID
     assert demo._is_valid_sid(demo.resolve_sid(_Req()))
 
@@ -150,7 +144,6 @@ def test_client_chosen_ids_cannot_allocate_sandboxes_beyond_the_cap(demo, monkey
     class _Req:
         cookies = {demo.COOKIE_NAME: "3" * 32}
 
-    # A well-formed cookie the server never issued must not create a third copy.
     assert demo.resolve_sid(_Req()) == "3" * 32
     assert demo.open_sandbox("3" * 32) == demo._session_path(demo.SHARED_SID)
     assert demo.active_session_count() == 2
@@ -161,7 +154,6 @@ def test_sweep_keeps_recent_sandboxes_after_restart(demo, monkeypatch):
     recent, idle = demo.open_sandbox("4" * 32), demo.open_sandbox("5" * 32)
     expired = time.time() - demo.settings.demo_session_ttl_minutes * 60 - 1
     os.utime(idle, (expired, expired))
-    # A restarted process has no request history for either sandbox.
     monkeypatch.setattr(demo, "_last_access", {})
     monkeypatch.setattr(demo, "_last_sweep", 0.0)
     demo._sweep_idle()
@@ -200,7 +192,6 @@ async def test_sandbox_documents_stay_in_and_leave_with_their_sandbox(demo, monk
     async with _visitor(demo, sid) as client:
         uploaded = await _upload(client, await _draft(client), b"sandbox bytes")
         assert uploaded.status_code == 200, uploaded.text
-        # The download streams after the request transaction, still from this sandbox.
         downloaded = await client.get(f"/api/v1/documents/{uploaded.json()['id']}/download")
         assert downloaded.status_code == 200, downloaded.text
         assert downloaded.content == b"sandbox bytes"
@@ -235,7 +226,6 @@ async def test_a_full_sandbox_refuses_uploads_with_a_clear_message(demo, monkeyp
 def test_sandboxes_read_shared_samples_but_change_only_their_own_files(demo, monkeypatch, tmp_path):
     shared = tmp_path / "shared"
     monkeypatch.setattr(document_service, "_local_storage_path", lambda: shared)
-    # Seeding writes the samples every sandbox's copy of the template references.
     document_service.upload_document(b"seeded sample", "demo/sample.pdf", "application/pdf")
     first, second = demo.upload_scope("1" * 32), demo.upload_scope("2" * 32)
     token = document_service.storage_scope.set(first)
@@ -265,7 +255,6 @@ def test_sandbox_uploads_stop_at_the_quota_and_the_disk_reserve(demo, monkeypatc
         document_service.upload_document(b"12345678", "filings/1/a.txt", "text/plain")
         with pytest.raises(document_service.StorageQuotaExceededError, match="used its"):
             document_service.upload_document(b"123", "filings/1/b.txt", "text/plain")
-        # Removing a draft attachment frees its space.
         document_service.delete_document("filings/1/a.txt")
         document_service.upload_document(b"123", "filings/1/b.txt", "text/plain")
         monkeypatch.setattr(
@@ -285,7 +274,6 @@ def test_boot_removes_uploads_that_belong_to_no_current_sandbox(demo, monkeypatc
     live = "6" * 32
     demo.open_sandbox(live)
     uploads = demo._uploads_dir()
-    # The shared sandbox restarts from the template; "7" was swept without its folder.
     for sid in (live, "7" * 32, demo.SHARED_SID):
         (uploads / sid / "filings").mkdir(parents=True)
         (uploads / sid / "filings" / "record.txt").write_bytes(b"record")
@@ -304,7 +292,6 @@ async def test_removing_a_draft_frees_the_sandbox_quota(demo, monkeypatch, tmp_p
         assert first.status_code == 200, first.text
         removed = await client.delete(f"/api/v1/filings/{filing_id}/documents/{first.json()['id']}")
         assert removed.status_code == 204, removed.text
-        # The quota message says removing drafts makes room; it must.
         again = await _upload(client, filing_id, b"b" * 700_000)
         assert again.status_code == 200, again.text
     stored = [p for p in (demo._uploads_dir() / sid).rglob("*") if p.is_file()]
@@ -314,7 +301,7 @@ async def test_removing_a_draft_frees_the_sandbox_quota(demo, monkeypatch, tmp_p
 def test_a_sandbox_deleted_after_opening_is_not_recreated_empty(demo):
     sid = "9" * 32
     path = demo.open_sandbox(sid)
-    assert demo._last_access[sid]  # Marked in use under the same lock as the sweep.
+    assert demo._last_access[sid]
     path.unlink()
 
     class _Request:
@@ -331,7 +318,6 @@ def test_a_sandbox_deleted_after_opening_is_not_recreated_empty(demo):
     with pytest.raises(OperationalError):
         asyncio.run(open_session())
     assert not path.exists()
-    # The next request copies the template again instead of using an empty file.
     assert demo.open_sandbox(sid).read_bytes() == demo._template_db().read_bytes()
 
 

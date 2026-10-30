@@ -1,5 +1,3 @@
-"""Request-level protections that apply before any endpoint or account check."""
-
 import time
 from collections import defaultdict
 from datetime import timedelta
@@ -29,7 +27,6 @@ async def test_oversized_upload_is_refused_before_it_is_read(client, monkeypatch
         url, data=fields, files={"file": ("big.pdf", b"x" * 3 * 1024 * 1024, "application/pdf")},
     )
     assert oversized.status_code == 413, oversized.text
-    # A body within the limit reaches the endpoint, which then requires an account.
     small = await client.post(url, data=fields, files={"file": ("a.pdf", b"x", "application/pdf")})
     assert small.status_code == 401
 
@@ -46,8 +43,8 @@ async def test_streamed_body_without_a_length_is_cut_off(client):
 
 
 @pytest.mark.parametrize("forwarded, expected", [
-    ("6.6.6.6, 203.0.113.9", "203.0.113.9"),  # The client wrote the leftmost entry.
-    ("203.0.113.9, 10.0.0.2", "203.0.113.9"),  # Every trusted proxy is skipped.
+    ("6.6.6.6, 203.0.113.9", "203.0.113.9"),
+    ("203.0.113.9, 10.0.0.2", "203.0.113.9"),
     ("", "10.0.0.1"),
 ])
 def test_client_ip_is_the_last_untrusted_forwarded_hop(monkeypatch, forwarded, expected):
@@ -67,7 +64,6 @@ def test_forwarding_headers_from_untrusted_peers_are_ignored(monkeypatch):
 
 
 def test_trusted_proxies_may_be_listed_as_networks(monkeypatch):
-    # A platform load balancer connects from an address range, not one fixed address.
     monkeypatch.setattr(settings, "trusted_proxy_ips", "10.0.0.0/8, fd00::/8")
     for peer, forwarded in (("10.41.7.3", b"6.6.6.6, 203.0.113.9, 10.9.8.7"),
                             ("fd12::1", b"203.0.113.9")):
@@ -90,7 +86,6 @@ def test_settings_reject_proxy_entries_that_are_not_addresses_or_networks():
 def test_empty_settings_in_the_environment_file_mean_not_set(monkeypatch, tmp_path):
     from app.config import Settings
 
-    # .env.example leaves these blank to mean "use the default".
     env = tmp_path / ".env"
     blank = ["ENABLE_API_DOCS", "STRICT_MIME_DETECTION", "JWT_VERIFY_AUDIENCE",
              "RATE_LIMIT_FAIL_CLOSED", "MAX_FILE_SIZE_MB"]
@@ -135,13 +130,13 @@ async def test_identity_provider_outage_is_reported_as_unavailable(client, monke
         raise keycloak_jwt.IdentityProviderUnavailableError("realm keys unavailable")
 
     monkeypatch.setattr(keycloak_jwt, "_fetch_jwks", unavailable)
-    token = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImsxIn0.e30.c2ln"  # {"alg":"RS256","kid":"k1"}
+    token = "eyJhbGciOiJSUzI1NiIsImtpZCI6ImsxIn0.e30.c2ln"
     response = await client.get(path, headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 503, response.text
     assert response.headers["retry-after"] == "30"
 
 
-TOO_LARGE = str(2**63)  # Beyond SQLite's INTEGER; PostgreSQL's ends at 2**31 - 1
+TOO_LARGE = str(2**63)
 
 
 @pytest.mark.parametrize("url, headers", [
@@ -163,9 +158,9 @@ class _DriverError(Exception):
 
 
 @pytest.mark.parametrize("sqlstate, expected", [
-    ("22021", 422),  # PostgreSQL: a NUL character in text
-    ("22003", 422),  # PostgreSQL: numeric value out of range
-    ("40P01", 500),  # A deadlock is the server's problem, not the request's
+    ("22021", 422),
+    ("22003", 422),
+    ("40P01", 500),
 ])
 async def test_database_rejections_of_input_are_client_errors(monkeypatch, sqlstate, expected):
     from sqlalchemy.exc import DBAPIError
@@ -194,7 +189,6 @@ async def test_dates_at_the_edge_of_the_calendar_are_rejected_not_crashed(monkey
         yield Courts()
 
     async def overflowing(db, court_id, received_at):
-        # What the calendar lookup does with the date: a year past the receipt.
         return received_at + timedelta(days=367)
 
     monkeypatch.setitem(app.dependency_overrides, get_db, database)

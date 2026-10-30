@@ -1,5 +1,3 @@
-"""A storage outage is a retryable 503; a missing object stays a missing object."""
-
 from io import BytesIO
 from uuid import uuid4
 
@@ -67,7 +65,6 @@ def test_outages_and_missing_objects_are_distinguished(object_storage):
     object_storage(_Missing())
     with pytest.raises(FileNotFoundError):
         document_service.stored_integrity("filings/1/a.txt")
-    # A read that fails partway through is an outage, not a mismatched file.
     object_storage(_Interrupted())
     with pytest.raises(document_service.StorageUnavailableError):
         document_service.stored_integrity("filings/1/a.txt")

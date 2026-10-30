@@ -1,5 +1,3 @@
-"""Exercise the register's real PostgreSQL snapshots, totals and authority locks."""
-
 import asyncio
 from pathlib import Path
 
@@ -37,7 +35,6 @@ async def test_postgres_totals_and_pages_include_a_reversal_committed_between_re
     assert before["total"] == 52 and len(before["entries"]) == 50
     assert before["totals"] == {"credits_cents": 5_200_000_000, "reversals_cents": 0}
     assert all(row["amount_cents"] == 100_000_000 for row in before["entries"])
-    # Each read is a fresh snapshot: the next page counts a reversal committed in between.
     async with postgres_sessions.begin() as writer:
         writer.add(activity(fid, clerk, amount=-500))
     response = await payment_client.get("/api/v1/clerk/payment-register",

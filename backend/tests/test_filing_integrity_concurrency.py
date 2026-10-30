@@ -1,5 +1,3 @@
-"""Recheck filing authority after authentication and order competing batch locks."""
-
 import asyncio
 import threading
 from uuid import uuid4
@@ -209,8 +207,6 @@ async def test_slow_submission_does_not_block_same_filers_other_upload(
             ))
             try:
                 assert await asyncio.to_thread(started.wait, 5)
-                # The audit insert references this user. An exclusive user lock
-                # would block its FK check until the unrelated submission ends.
                 uploaded = await asyncio.wait_for(client.post(
                     f"/api/v1/filings/{second_id}/documents",
                     headers={"Idempotency-Key": str(uuid4())},

@@ -1,5 +1,3 @@
-"""Identity lifecycle, court delegation, revocation and atomic audit history."""
-
 import pytest
 import pytest_asyncio
 from sqlalchemy import func, select
@@ -319,6 +317,5 @@ async def test_account_records_helper_needs_no_court_filter(db_session):
     await db_session.flush()
     db_session.add(UserCourtRole(user_id=clerk.id, court_id=court.id, role=CourtRole.CLERK))
     await db_session.flush()
-    # A plain function default must not be a FastAPI parameter object.
     records = await admin._user_records(db_session, [clerk], include_identity=False)
     assert [grant["court_id"] for grant in records[0]["court_roles"]] == [court.id]

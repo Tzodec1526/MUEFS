@@ -1,5 +1,3 @@
-"""Exercise independent, nonpublic waiver decisions and the filer's payment path."""
-
 import io
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -28,7 +26,6 @@ def decision_pdf():
 
 
 def waiver(filing, action, **fields):
-    """A decision form for the fee version the reviewer is looking at."""
     return {"action": action, "expected_fee_version": filing.fee_version, **fields}
 
 
@@ -102,7 +99,6 @@ async def submit_application(api_client, filing):
         files={"file": ("mc20.pdf", decision_pdf(), "application/pdf")},
     )
     assert uploaded.status_code == 200, uploaded.text
-    # This fixture shares an identity map between HTTP requests.
     await async_object_session(filing).refresh(filing, ["documents"])
     submitted = await api_client.post(
         f"/api/v1/filings/{filing.id}/submit",
@@ -152,7 +148,7 @@ async def test_application_required_and_clerk_referral_has_no_filing_decision(
             "fee_waivers": True,
         },
     )
-    assert queue.json()["total"] == 1  # An accepted filing can still await a waiver decision.
+    assert queue.json()["total"] == 1
     assert queue.json()["filings"][0]["fee_waiver_granted"] is None
 
 
@@ -276,7 +272,6 @@ async def test_denial_can_be_paid_without_resubmission_or_fee_recalculation(
         f"/api/v1/filings/{filing.id}/submit",
         json=await submission_review(api_client, filing.id),
     )).status_code == 402
-    # Acceptance does not override denial; payment can be received afterward, too.
     filing.status = FilingStatus.SUBMITTED
     await db_session.flush()
     await filing_service.review_filing(
@@ -348,7 +343,6 @@ async def test_failed_decision_does_not_keep_an_order_or_change_waiver(
 
     monkeypatch.setattr(fee_waivers.audit_service, "log_action", unavailable)
     with pytest.raises(RuntimeError, match="Audit store unavailable"):
-        # Match the request transaction rollback supplied by get_db in production.
         async with db_session.begin_nested():
             await api_client.post(f"/api/v1/clerk/filings/{fid}/fee-waiver", data={
                 "action": "grant_public_assistance",
@@ -399,7 +393,6 @@ async def test_decision_recorded_during_screening_refuses_and_discards_the_order
     scan = document_upload.malware_scan.scan_upload
 
     async def decided_while_screening(data):
-        # Another reviewer's decision commits while this order is being screened.
         await db_session.execute(
             update(FilingEnvelope).where(FilingEnvelope.id == fid)
             .values(fee_waiver_granted=True, fee_waiver_decided_at=datetime.now(UTC))
@@ -424,8 +417,6 @@ async def test_decision_on_a_replaced_application_is_refused(waiver_case, api_cl
     await submit_application(api_client, filing)
     api_client.headers["X-Demo-User-Id"] = str(users[2].id)
     reviewed = (await api_client.get(f"/api/v1/filings/{filing.id}/history")).json()
-    # While the judge reads the application, the court returns the filing and the filer
-    # replaces the application.
     await filing_service.review_filing(
         db_session, filing.id, users[1].id, "return", "Replace the MC 20",
         expected_submission_count=1,

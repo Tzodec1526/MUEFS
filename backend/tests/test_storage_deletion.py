@@ -1,5 +1,3 @@
-"""Storage deletion survives rollbacks, outages and competing cleanup workers."""
-
 import asyncio
 import hashlib
 import os
@@ -103,8 +101,6 @@ async def test_removal_commits_before_physical_deletion(
         assert await db.get(FilingDocument, document_id) is None
         job = (await db.scalars(select(StorageDeletion))).one()
         assert job.file_key == key
-    # Local-storage deployments run no worker: they try the deletion as soon as the
-    # removal commits. Object storage leaves it to the worker.
     assert job.attempt_count == (1 if storage == "local" else 0)
     assert document_service.stored_integrity(key) == (digest, size)
     if storage != "local":
@@ -218,7 +214,7 @@ async def test_cleanup_preserves_objects_that_are_still_referenced(
     before = document_service.stored_integrity(key)
     sessions = async_sessionmaker(db_session.bind, expire_on_commit=False)
     assert await cleanup_next(sessions) == "retry"
-    assert await cleanup_next(sessions) is None  # A blocked key must not spin.
+    assert await cleanup_next(sessions) is None
     assert document_service.stored_integrity(key) == before
     async with sessions() as db:
         job = (await db.scalars(select(StorageDeletion))).one()

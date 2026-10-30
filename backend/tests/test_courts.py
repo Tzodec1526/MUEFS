@@ -1,5 +1,3 @@
-"""Court search applies literal filters before stable pagination."""
-
 import pytest
 
 from app.models.court import Court, CourtType

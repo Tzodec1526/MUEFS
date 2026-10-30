@@ -1,5 +1,3 @@
-"""Listing behavior with enough records to expose pagination and query growth bugs."""
-
 from datetime import UTC, datetime
 
 import pytest
@@ -189,7 +187,6 @@ async def test_case_search_treats_wildcards_as_literal_text(db_session, docket, 
     db_session.add_all([
         CaseParticipant(case_id=case.id, role=ParticipantRole.PLAINTIFF,
                         party_name=f"Party{literal}Name"),
-        # An unescaped % or _ would match this name too.
         CaseParticipant(case_id=distractor.id, role=ParticipantRole.PLAINTIFF,
                         party_name="Unrelated Party"),
     ])
@@ -304,7 +301,6 @@ async def test_summary_counts_current_attachments_without_loading_details(
         assert not {"documents", "fee_waiver_reason", "filing_date_basis"} & summary.keys()
         assert FilingDocument not in loaded and FilingEnvelope not in loaded
         assert len(selects) <= 3
-        # Opening the same filing still supplies its full, authorized current record.
         detail = await api_client.get(f"/api/v1/filings/{fid}")
         assert detail.status_code == 200
         assert len(detail.json()["documents"]) == summary["document_count"]

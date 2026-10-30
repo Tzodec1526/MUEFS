@@ -1,15 +1,8 @@
-"""Test configuration and fixtures."""
-
 import hashlib
 import os
 import re
 from uuid import uuid4
 
-# Before any app.settings load: pin the test environment to demo mode (SQLite + local
-# document storage) so tests never reach for Postgres / Redis / S3. This mirrors how the
-# hosted demo actually runs. Assign rather than default: a DATABASE_URL exported for the
-# app must not send test uploads to a real bucket. Service-backed tests opt in through
-# MUEFS_TEST_* variables instead.
 os.environ["RATE_LIMIT_ENABLED"] = "false"
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["DEBUG"] = "true"
@@ -59,7 +52,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         async with session_factory() as session:
             yield session
     finally:
-        await engine.dispose()  # Disposing the in-memory DB also drops its tables.
+        await engine.dispose()
 
 
 @pytest_asyncio.fixture

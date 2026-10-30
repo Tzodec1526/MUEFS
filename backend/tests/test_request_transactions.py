@@ -1,5 +1,3 @@
-"""Exercise the real request transaction, including its HTTP response boundary."""
-
 import asyncio
 import hashlib
 from uuid import uuid4
@@ -30,7 +28,6 @@ async def test_submission_commits_before_http_success(
 ):
     monkeypatch.setattr(document_service, "_local_storage_path", lambda: tmp_path)
     fid, filer, _clerk = await prepare_filing(postgres_sessions)
-    # Keep get_db itself: the usual API fixture replaces it and skips its commit.
     monkeypatch.setattr(database, "async_session", postgres_sessions)
     if deferred_failure:
         async with postgres_sessions.begin() as db:
@@ -88,7 +85,6 @@ async def test_submission_commits_before_http_success(
         assert response.status_code == 200, response.text
         assert visible_at_headers[-1] == (200, FilingStatus.SUBMITTED, 1, 1)
         assert response.json()["submission_count"] == 1
-        # The same client key remains safe after both a failed commit and a lost response.
         replay = await client.post(f"/api/v1/filings/{fid}/submit", json=review)
         assert replay.status_code == 200
         assert replay.json()["submission_count"] == 1
@@ -118,7 +114,6 @@ async def test_slow_document_transfer_releases_database_connection(
         database, "async_session", async_sessionmaker(engine, expire_on_commit=False)
     )
     transfer_started, finish_transfer = asyncio.Event(), asyncio.Event()
-    # Track the verified copy the response streams; the storage handle closes after hashing.
     streamed = []
     real_open_file = DocumentResponse.open_file
 
@@ -147,7 +142,6 @@ async def test_slow_document_transfer_releases_database_connection(
             transfer = asyncio.create_task(client.get(f"/api/v1/documents/{document_id}/download"))
             try:
                 await asyncio.wait_for(transfer_started.wait(), timeout=5)
-                # A client still reading a file must not monopolize the only DB connection.
                 other_request = await client.get(f"/api/v1/filings/{fid}")
                 assert other_request.status_code == 200, other_request.text
                 assert engine.pool.checkedout() == 0

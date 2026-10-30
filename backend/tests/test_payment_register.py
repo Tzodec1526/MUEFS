@@ -1,5 +1,3 @@
-"""Reconciliation reads retained events, with precise periods and court isolation."""
-
 import csv
 import io
 from datetime import UTC, datetime
@@ -40,7 +38,7 @@ async def test_reversal_of_an_older_credit_appears_in_its_recorded_day(
 ):
     fid, _, clerk, _, _ = external_filing
     court = (await db_session.get(FilingEnvelope, fid)).court_id
-    recorded_at = datetime(2026, 3, 8, 4, 30, tzinfo=UTC)  # March 7 in Detroit.
+    recorded_at = datetime(2026, 3, 8, 4, 30, tzinfo=UTC)
     monkeypatch.setattr(filing_record_service, "datetime",
                         SimpleNamespace(now=lambda _: recorded_at))
     base = f"/api/v1/filings/{fid}"
@@ -60,7 +58,7 @@ async def test_reversal_of_an_older_credit_appears_in_its_recorded_day(
     assert response.status_code == 200, response.text
     report = response.json()
     assert report["range_start"] == "2026-03-08T05:00:00Z"
-    assert report["range_end"] == "2026-03-09T04:00:00Z"  # 23-hour DST day.
+    assert report["range_end"] == "2026-03-09T04:00:00Z"
     assert report["totals"] == {"credits_cents": 0, "reversals_cents": 1000}
     assert report["total"] == 1
     entry = report["entries"][0]
@@ -127,12 +125,11 @@ async def test_period_uses_inclusive_local_dates_and_exclusive_upper_boundary(
         "timezone": "America/Detroit",
     })).json()
     assert report["total"] == 2
-    # Local midnight is included and the next local midnight is not: [start, end).
     assert [row["occurred_at"] for row in report["entries"]] == [
         "2026-11-02T04:59:59Z", "2026-11-01T04:00:00Z",
     ]
     assert report["range_start"] == "2026-11-01T04:00:00Z"
-    assert report["range_end"] == "2026-11-02T05:00:00Z"  # 25-hour DST day.
+    assert report["range_end"] == "2026-11-02T05:00:00Z"
 
 
 @pytest.mark.parametrize("change", [

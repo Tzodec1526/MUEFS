@@ -1,5 +1,3 @@
-"""Exercise durable delivery over a local SMTP socket; no external mail is sent."""
-
 import asyncio
 from datetime import UTC, datetime, timedelta
 from email import policy
@@ -36,7 +34,6 @@ async def smtp_sink(monkeypatch):
                 verb = line.strip().split(b" ", 1)[0].upper()
                 state["commands"].append(verb)
                 if verb == b"EHLO":
-                    # Offer TLS and authentication, so skipping them is the client's decision.
                     writer.write(
                         b"250-localhost\r\n250-STARTTLS\r\n250-AUTH PLAIN\r\n250 SIZE 100000\r\n"
                     )
@@ -118,7 +115,7 @@ async def prepare_notice(db):
 async def test_smtp_acceptance_retains_generic_message_and_attempts(mail_sessions, smtp_sink):
     async with mail_sessions.begin() as db:
         nid, _fid, _filer, _clerk, _other = await prepare_notice(db)
-    assert smtp_sink["messages"] == []  # Queuing a notice never opens SMTP.
+    assert smtp_sink["messages"] == []
     assert await delivery.deliver_next(mail_sessions)
     assert not await delivery.deliver_next(mail_sessions)
     async with mail_sessions() as db:
@@ -176,7 +173,7 @@ async def test_lost_final_smtp_response_requires_review_not_automatic_retry(
         notice = await db.get(Notification, nid)
         assert notice.delivery_status == DeliveryStatus.UNKNOWN
         assert notice.sent_at is None and notice.next_attempt_at is None
-    assert len(smtp_sink["messages"]) == 1  # The relay actually received the bytes.
+    assert len(smtp_sink["messages"]) == 1
 
 
 async def test_a_relay_that_disconnects_after_acceptance_still_counts_as_accepted(
@@ -333,7 +330,6 @@ async def test_oidc_verifies_email_and_revokes_mismatched_or_unverified_claims(
 
     async def sign_in_and_read_verified_email():
         assert (await api_client.get("/api/v1/auth/me")).status_code == 200
-        # A column query reads the flushed row, not the session's cached User object.
         return await db_session.scalar(select(User.verified_email).where(User.id == user.id))
 
     assert await sign_in_and_read_verified_email() == "identity@example.com"
@@ -341,7 +337,6 @@ async def test_oidc_verifies_email_and_revokes_mismatched_or_unverified_claims(
     assert await sign_in_and_read_verified_email() is None
     claims["email"] = user.email
     assert await sign_in_and_read_verified_email() == "identity@example.com"
-    # Revocation must start from a verified address, or it would prove nothing.
     claims["email_verified"] = False
     assert await sign_in_and_read_verified_email() is None
 
@@ -354,7 +349,6 @@ async def test_starttls_failure_does_not_send_credentials_or_message(
     monkeypatch.setattr(settings, "smtp_tls", "starttls")
     monkeypatch.setattr(settings, "smtp_username", "test-user")
     assert await delivery.deliver_next(mail_sessions)
-    # The sink offers AUTH and accepts any login, so only the client can stop at the refusal.
     commands = smtp_sink["commands"]
     assert b"STARTTLS" in commands
     assert [verb for verb in commands if verb in {b"AUTH", b"MAIL", b"RCPT", b"DATA"}] == []

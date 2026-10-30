@@ -1,5 +1,3 @@
-"""Audit restored bytes and receipt references without repairing or exposing records."""
-
 import asyncio
 import hashlib
 import json
@@ -218,7 +216,6 @@ async def test_audit_reports_discrepancies_and_never_repairs_them(
     assert report[-1]["complete"]
     assert report[-1]["results"][expected] >= 1
     if damage == "storage_outage":
-        # The report names the storage failure, not the wrapper around it.
         assert {r.get("error_type") for r in report} >= {"EndpointConnectionError"}
     assert data["path"].read_bytes() == before_db
     assert (path.read_bytes() if path.exists() else None) == before_file
@@ -371,7 +368,6 @@ async def test_audit_keeps_one_database_snapshot_during_storage_reads(
     finally:
         release.set()
         result = await pending
-    # The original snapshot is consistent. A second audit sees the later change.
     assert result == 0
     later = StringIO()
     assert await run_audit(later) == 1

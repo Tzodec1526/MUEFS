@@ -1,11 +1,3 @@
-"""End-to-end: the public docket is reachable WITHOUT an account.
-
-Exercises the real FastAPI app over HTTP with no Authorization or X-Demo-User-Id header,
-proving an anonymous visitor can search the index and open a non-sealed docket, while sealed
-matters and confidential documents stay locked. Uses a shared in-memory SQLite database
-(StaticPool) wired in through a get_db dependency override.
-"""
-
 from datetime import UTC, date, datetime
 
 import pytest
@@ -24,7 +16,6 @@ from app.models.user import User, UserType
 
 @pytest_asyncio.fixture
 async def public_app():
-    """App wired to a seeded, shared in-memory DB; yields (client, ids) with no auth."""
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -78,7 +69,6 @@ async def public_app():
         s.add(same_number)
         await s.flush()
 
-        # Litigant with contact PII — must NOT surface on the public docket.
         s.add(CaseParticipant(
             case_id=open_case.id, role=ParticipantRole.PLAINTIFF,
             party_name="Jane Public",
@@ -138,7 +128,7 @@ async def public_app():
 @pytest.mark.asyncio
 async def test_anonymous_search_returns_open_not_sealed(public_app):
     client, ids = public_app
-    r = await client.get("/api/v1/cases/search")  # no auth headers
+    r = await client.get("/api/v1/cases/search")
     assert r.status_code == 200
     body = r.json()
     numbers = {c["case_number"] for c in body["cases"]}
@@ -172,7 +162,7 @@ async def test_anonymous_search_distinguishes_courts_without_exposing_contacts(p
     assert sealed.json()["total"] == 0
     assert sealed.json()["cases"] == []
     invalid = await client.get("/api/v1/cases/search", params={"court_id": 2**31})
-    assert invalid.status_code == 422  # Reject IDs that PostgreSQL cannot represent.
+    assert invalid.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -186,7 +176,6 @@ async def test_anonymous_opens_non_sealed_docket(public_app):
 
 @pytest.mark.asyncio
 async def test_public_docket_strips_participant_contact_pii(public_app):
-    """The open docket shows party names but never litigant contact details."""
     client, ids = public_app
     r = await client.get(f"/api/v1/cases/{ids['open_case']}")
     assert r.status_code == 200
@@ -210,13 +199,12 @@ async def test_anonymous_lists_public_case_filings(public_app):
     client, ids = public_app
     r = await client.get(f"/api/v1/cases/{ids['open_case']}/filings")
     assert r.status_code == 200
-    assert len(r.json()) == 1  # the accepted envelope
+    assert len(r.json()) == 1
 
 
 @pytest.mark.asyncio
 async def test_anonymous_blocked_from_confidential_document(public_app):
     client, ids = public_app
-    # Access is denied before any storage read, so a 403 (not 404/500) is the contract.
     r = await client.get(f"/api/v1/documents/{ids['confidential_doc']}/download")
     assert r.status_code == 403
 
@@ -234,7 +222,6 @@ async def test_docket_lists_filings_newest_first_by_filing_date(db_session, api_
                 title="Order v Docket", filed_date=datetime.now(UTC))
     db_session.add(case)
     await db_session.flush()
-    # Drafted first, filed last: the draft's age says nothing about docket order.
     later, earlier = (
         FilingEnvelope(court_id=court.id, case_id=case.id, case_type_id=kind.id,
                        filer_id=filer.id, status=FilingStatus.ACCEPTED,
@@ -247,5 +234,4 @@ async def test_docket_lists_filings_newest_first_by_filing_date(db_session, api_
     await db_session.flush()
     listed = await api_client.get(f"/api/v1/cases/{case.id}/filings")
     assert [f["id"] for f in listed.json()] == [later.id, earlier.id]
-    # A missing case is not reported as sealed.
     assert (await api_client.get("/api/v1/cases/987654/filings")).status_code == 404

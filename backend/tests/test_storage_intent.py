@@ -1,5 +1,3 @@
-"""Commit-failure reclaim for uploads tracked on the request session."""
-
 import threading
 from contextlib import aclosing
 
@@ -119,7 +117,6 @@ async def test_a_commit_applied_before_failing_keeps_the_documents_it_saved(
         ))
 
         async def applied_then_lost():
-            # The database commits, but the client never learns it succeeded.
             await session.flush()
             await (await session.connection()).exec_driver_sql("COMMIT")
             raise ConnectionError("commit acknowledgement lost")
@@ -145,7 +142,6 @@ async def test_flush_success_keeps_key_tracked_until_commit(
     ))
     await db_session.flush()
     assert key in db_session.sync_session.info.get("pending_storage_keys", set())
-    # Releasing a savepoint also fires after_commit; only the outer commit may forget it.
     async with db_session.begin_nested():
         await db_session.execute(text("SELECT 1"))
     assert key in db_session.sync_session.info.get("pending_storage_keys", set())

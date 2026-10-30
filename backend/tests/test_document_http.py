@@ -1,5 +1,3 @@
-"""Exercise upload limits, stored bytes, and correction workflows through the API."""
-
 import asyncio
 import hashlib
 import threading
@@ -168,7 +166,6 @@ async def test_returned_filing_can_be_corrected_and_resubmitted(filing_client, d
         files={"file": ("complaint.txt", b"Corrected complaint", "text/plain")},
     )
     assert uploaded.status_code == 200, uploaded.text
-    # Production requests get a fresh session; discard this test session's cached list.
     db_session.expire(envelope, ["documents"])
     submitted = await client.post(
         f"/api/v1/filings/{original_id}/submit",

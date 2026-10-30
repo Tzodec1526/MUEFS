@@ -1,5 +1,3 @@
-"""Exercise retained receipts through submission, correction, and clerk acceptance."""
-
 import hashlib
 from io import BytesIO
 from uuid import uuid4
@@ -34,7 +32,6 @@ async def filing_fixture(db):
     )
     db.add_all([filer, clerk, other])
     await db.flush()
-    # Migration tests also seed this fixture before newer court columns exist.
     court_id = await db.scalar(text(
         "INSERT INTO courts (name, county, court_type, state, is_efiling_enabled) "
         "VALUES ('Records Court', 'Wayne', 'CIRCUIT', 'MI', true) RETURNING id"
@@ -49,7 +46,6 @@ async def filing_fixture(db):
     db.add(case_type)
     db.add(UserCourtRole(user_id=clerk.id, court_id=court_id, role=CourtRole.CLERK))
     await db.flush()
-    # Seed only baseline columns so migration tests can upgrade genuinely old filings.
     filing_id = await db.scalar(text(
         "INSERT INTO filing_envelopes (court_id, case_type_id, filer_id, case_title, "
         "filing_type, status, fee_waiver_requested) "
@@ -147,7 +143,6 @@ async def test_receipts_keep_original_documents_through_correction(
     assert submitted.json()["submission_count"] == 2
     assert [d["id"] for d in submitted.json()["documents"]] == [corrected]
     api_client.headers["X-Demo-User-Id"] = str(clerk)
-    # Another review window still holds the first submission's receipt and documents.
     for action in ("accept", "reject", "return"):
         stale = await api_client.post(
             f"/api/v1/clerk/filings/{fid}/review",

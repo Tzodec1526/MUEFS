@@ -1,5 +1,3 @@
-"""Court orders change civil dates while preserving receipt and document evidence."""
-
 import hashlib
 from datetime import UTC, date
 from unittest.mock import AsyncMock
@@ -93,7 +91,6 @@ async def test_order_preserves_receipt_and_acceptance_honors_it_without_calendar
             db_session, fid, clerk, "accept", expected_submission_count=1
         )
     document_service.upload_document(ORDER, doc.file_key, "application/pdf")
-    # A date order does not turn a failed CMS submission into an acceptance.
     with monkeypatch.context() as cms_failure:
         cms_failure.setattr(filing_service, "submit_filing_to_cms", AsyncMock(
             return_value=CMSFilingResult(success=False, error_message="CMS unavailable"),
@@ -121,7 +118,6 @@ async def test_acceptance_rechecks_a_date_order_recorded_during_verification(
 
     async def order_during_verification(filing, court_order=None):
         await verify(filing, court_order)
-        # Another request commits a signed date order while acceptance reads bytes.
         await db_session.execute(
             update(FilingEnvelope).where(FilingEnvelope.id == fid).values(
                 filing_date=date(2026, 9, 3),
@@ -419,7 +415,7 @@ async def test_staff_cannot_date_their_own_filing(date_record, db_session, api_c
     await db_session.flush()
     api_client.headers["X-Demo-User-Id"] = str(filer)
     url = f"/api/v1/clerk/filings/{fid}/filing-date"
-    assert (await api_client.get(url)).status_code == 200  # Reading the state is fine.
+    assert (await api_client.get(url)).status_code == 200
     response = await api_client.post(url, data=DECISION, files={"file": ("order.pdf", ORDER)})
     assert response.status_code == 403, response.text
     assert "Another court reviewer" in response.json()["detail"]

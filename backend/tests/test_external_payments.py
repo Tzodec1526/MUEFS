@@ -1,5 +1,3 @@
-"""External receipt credits preserve balances, source evidence and court boundaries."""
-
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4

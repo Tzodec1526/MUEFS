@@ -1,5 +1,3 @@
-"""Portable case archives retain evidence, stay consistent, and fail atomically."""
-
 import asyncio
 import hashlib
 import json
@@ -60,7 +58,6 @@ async def case_records(request, tmp_path, monkeypatch, stored_document):
         url = f"sqlite+aiosqlite:///{(tmp_path / 'records.db').as_posix()}"
     engine = create_async_engine(url)
     monkeypatch.setattr(settings, "database_url", url)
-    # Object storage is independent of the database dialect during these snapshot tests.
     monkeypatch.setattr(document_service, "uses_local_storage", lambda: True)
     try:
         async with engine.connect() as connection:
@@ -358,7 +355,6 @@ async def test_complete_archive_retains_private_evidence_without_changing_record
                 archive.read(row["object_path"]) == (data["storage"] / row["file_key"]).read_bytes()
             )
             assert archive.getinfo(row["object_path"]).compress_type == ZIP_STORED
-        # Two separate public-copy keys with identical contents occupy one archive object.
         assert len([name for name in archive.namelist() if name.startswith("objects/")]) == 5
         receipt = next(
             row for row in records("filing_transactions") if row["id"] == data["receipt"].id
@@ -573,7 +569,6 @@ async def test_verifier_rejects_unlisted_entries_without_extracting_files(
         extractions.append(args)
         raise AssertionError("Verification extracted archive entries")
 
-    # ZipFile strips "..", so extraction would write beside the archive, not above it.
     monkeypatch.setattr(ZipFile, "extract", refuse_extraction)
     monkeypatch.setattr(ZipFile, "extractall", refuse_extraction)
     files_before = sorted(tmp_path.rglob("*"))

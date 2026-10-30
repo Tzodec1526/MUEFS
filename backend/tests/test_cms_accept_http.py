@@ -1,5 +1,3 @@
-"""CMS failure must persist on the envelope after the HTTP 502 (get_db commits)."""
-
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient

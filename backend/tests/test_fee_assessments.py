@@ -1,5 +1,3 @@
-"""Court assessments, retained evidence, and balances exercised through the HTTP workflow."""
-
 from copy import deepcopy
 from uuid import uuid4
 
@@ -166,7 +164,7 @@ async def test_review_assessment_payment_and_submission_preserve_the_basis(
     assert receipt["details"]["fee_assessment"]["paid_cents"] == total
     assert receipt["details"]["fee_assessment"]["balance_due_cents"] == 0
     assert len(receipt["details"]["payments"]) == bool(total)
-    await db_session.refresh(assessed)  # Compare the stored row, not the cached object.
+    await db_session.refresh(assessed)
     assert assessed.details == retained
 
 
@@ -250,7 +248,7 @@ async def test_changed_documents_require_reassessment_and_credit_prior_payments(
         )
         == 0
     )
-    await db_session.refresh(first)  # Compare the stored row, not the cached object.
+    await db_session.refresh(first)
     assert first.details == first_details
     api_client.headers["X-Demo-User-Id"] = str(filer)
     assert (await api_client.post(
@@ -294,7 +292,7 @@ async def test_balance_ignores_invalid_credits_and_demo_funds_in_production(
         )
         db_session.add(payment)
     await db_session.flush()
-    filing.payment_id = payment.id  # The legacy pointer is not proof of a paid balance.
+    filing.payment_id = payment.id
     await db_session.flush()
     demo = await fee_state(db_session, filing, filer)
     assert demo.paid_cents == 500 and demo.balance_due_cents == 500 and not demo.obligation_met
@@ -320,7 +318,6 @@ async def test_balance_ignores_invalid_credits_and_demo_funds_in_production(
         assert await db_session.scalar(select(func.count()).select_from(Payment)) == 9
     finally:
         app.dependency_overrides.pop(get_current_user, None)
-    # A later signed waiver decision controls the balance, not an old manual assessment.
     filing.fee_version += 1
     filing.fee_waiver_requested = True
     filing.fee_waiver_granted = True

@@ -1,5 +1,3 @@
-"""A filing must target the court, case and intake configuration the filer selected."""
-
 from uuid import uuid4
 
 import pytest
@@ -176,7 +174,6 @@ async def test_review_checks_legacy_routing_but_can_finish_after_intake_closes(
         await db_session.flush()
         await filing_service.submit_filing(db_session, filing.id)
     bad, good = records
-    # A legacy/imported record cannot rely on validation at its original creation.
     bad.case_type_id = other_type.id
     court.is_efiling_enabled = case_type.is_active = False
     case.is_sealed = True

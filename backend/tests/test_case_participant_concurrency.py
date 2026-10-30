@@ -1,5 +1,3 @@
-"""Participant updates serialize on PostgreSQL and recheck revoked staff authority."""
-
 import asyncio
 from datetime import UTC, datetime
 
@@ -142,7 +140,6 @@ async def test_revocation_after_authentication_prevents_pending_case_edit(
             try:
                 await asyncio.wait_for(authenticated.wait(), 5)
                 async with postgres_sessions.begin() as db:
-                    # Administration changes lock this same account before retiring its role.
                     await db.scalar(select(User).where(User.id == users[0].id).with_for_update())
                     await db.execute(
                         delete(UserCourtRole).where(UserCourtRole.user_id == users[0].id)

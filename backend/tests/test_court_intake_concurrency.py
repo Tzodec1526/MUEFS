@@ -1,5 +1,3 @@
-"""Real transactions protect intake publications, authority, and received filings."""
-
 import asyncio
 from copy import deepcopy
 from pathlib import Path

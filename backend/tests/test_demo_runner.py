@@ -1,5 +1,3 @@
-"""Local demo failures must be visible and must not leave owned services running."""
-
 import os
 import socket
 import sys
@@ -117,7 +115,6 @@ def test_readiness_failure_has_a_deadline(monkeypatch):
 
 def refuses_connections(port):
     try:
-        # Windows retries a refused loopback connection for about two seconds.
         with socket.create_connection(("127.0.0.1", port), timeout=5):
             return False
     except ConnectionRefusedError:
@@ -164,7 +161,6 @@ while (remaining := deadline - time.monotonic()) > 0:
             pass
         run_demo.stop_process(process)
         assert process.poll() is not None
-        # The OS may release a killed descendant's socket slightly after the parent exits.
         deadline = time.monotonic() + 15
         while not refuses_connections(port):
             assert time.monotonic() < deadline, f"A descendant still listens on port {port}"
@@ -183,13 +179,11 @@ def test_an_ipv6_localhost_listener_counts_as_occupied():
     with listener:
         listener.listen()
         port = listener.getsockname()[1]
-        # Binding 127.0.0.1 succeeds here, yet a browser opening localhost reaches ::1.
         with pytest.raises(RuntimeError, match=f"Port {port} is unavailable"):
             run_demo.check_ports((port,))
 
 
 def test_occupied_port_fails_before_any_database_or_child_work(monkeypatch, capsys):
-    # Port allocation is represented here so the test never occupies another project port.
     monkeypatch.setattr(
         run_demo, "check_ports", Mock(side_effect=RuntimeError("Port 8000 is busy")),
     )

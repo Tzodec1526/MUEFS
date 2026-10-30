@@ -1,5 +1,3 @@
-"""A public copy must never expose or replace its retained original."""
-
 import hashlib
 from io import BytesIO
 from uuid import uuid4
@@ -152,7 +150,6 @@ async def test_prepare_publish_withdraw_preserves_original_and_receipt(
     assert (await api_client.get(f"/api/v1/cases/{cid}/filings", headers=other)).json()[0][
         "documents"
     ] == []
-    # A later explicit publication may restore a reviewed copy, never the original.
     data["expected_version"] = 2
     assert (await api_client.post(path + "/publication", json=data)).status_code == 200
     assert (await api_client.get(copy_url, headers=other)).content == payload
@@ -454,12 +451,11 @@ async def test_staff_cannot_decide_publication_of_their_own_filing(
     record = public_record
     did, fid = record["document_id"], record["filing_id"]
     filing = await db_session.get(FilingEnvelope, fid)
-    # The filer also holds a clerk assignment at this court.
     db_session.add(UserCourtRole(
         user_id=record["filer"], court_id=filing.court_id, role=CourtRole.CLERK,
     ))
     await db_session.flush()
-    copy, _ = await prepare_copy(api_client, did)  # prepared by an independent clerk
+    copy, _ = await prepare_copy(api_client, did)
     stored_before = sorted(p.name for p in record["storage"].rglob("*") if p.is_file())
     api_client.headers["X-Demo-User-Id"] = str(record["filer"])
     path = f"/api/v1/clerk/documents/{did}"
@@ -480,7 +476,6 @@ async def test_staff_cannot_decide_publication_of_their_own_filing(
     for response in refused:
         assert response.status_code == 403, response.text
         assert "Another court reviewer" in response.json()["detail"]
-    # The refused copy was never screened or stored.
     assert sorted(p.name for p in record["storage"].rglob("*") if p.is_file()) == stored_before
     history = (await api_client.get(f"/api/v1/filings/{fid}/history")).json()
     assert history["can_manage_documents"] is False
@@ -521,6 +516,5 @@ async def test_storage_outage_while_publishing_is_retryable(public_record, api_c
         "copy_id": copy["id"], "expected_version": 0, "reviewed": True,
         "reason": "Reviewed copy REF-10",
     })
-    # The copy is intact; the clerk should retry, not prepare it again.
     assert response.status_code == 503, response.text
     assert response.headers["retry-after"] == "30"

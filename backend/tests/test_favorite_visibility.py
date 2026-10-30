@@ -1,5 +1,3 @@
-"""Favorites must not preserve case access after sealing or account revocation."""
-
 from datetime import UTC, datetime
 
 from app.models.case import Case, CaseParticipant, ParticipantRole
@@ -70,7 +68,6 @@ async def test_removing_favorites_is_idempotent(db_session, api_client):
     assert (await api_client.post(
         "/api/v1/favorites/courts", json={"court_id": court.id},
     )).status_code == 201
-    # A second tab may already have removed it; the requested state still holds.
     for path in (f"/api/v1/favorites/{case.id}", f"/api/v1/favorites/courts/{court.id}") * 2:
         assert (await api_client.delete(path)).status_code == 204, path
     assert (await api_client.get("/api/v1/favorites")).json()["total"] == 0
@@ -90,14 +87,12 @@ async def test_duplicate_favorites_and_long_notes_are_client_errors(db_session, 
     db_session.add(case)
     await db_session.flush()
     api_client.headers["X-Demo-User-Id"] = str(owner.id)
-    # A request from a second tab reaches the unique constraint rather than a 500.
     for path, body in (("/api/v1/favorites", {"case_id": case.id}),
                        ("/api/v1/favorites/courts", {"court_id": court.id})):
         assert (await api_client.post(path, json=body)).status_code == 201
         again = await api_client.post(path, json=body)
         assert again.status_code == 409, again.text
         assert "already in favorites" in again.json()["detail"]
-        # The notes column holds 500 characters.
         long = await api_client.post(path, json={**body, "notes": "x" * 501})
         assert long.status_code == 422, long.text
     assert (await api_client.get("/api/v1/favorites")).json()["total"] == 1

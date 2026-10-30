@@ -1,5 +1,3 @@
-"""A submission must match the filing the filer reviewed."""
-
 from uuid import uuid4
 
 import pytest
@@ -19,7 +17,6 @@ from tests.test_filing_history import upload
 async def test_submission_requires_a_reviewed_version(api_client, record_filing, review):
     fid, *_ = record_filing
     await upload(api_client, fid, b"Complaint for review")
-    # With a JSON body, validation reaches the token field; a bodiless request fails earlier.
     response = await api_client.post(f"/api/v1/filings/{fid}/submit", json=review)
     assert response.status_code == 422, response.text
     locations = [error["loc"] for error in response.json()["detail"]]

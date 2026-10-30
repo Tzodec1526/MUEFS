@@ -1,5 +1,3 @@
-"""Exercise date decision conflicts and authority changes on PostgreSQL."""
-
 import asyncio
 from datetime import UTC, datetime
 

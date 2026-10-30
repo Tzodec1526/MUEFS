@@ -1,5 +1,3 @@
-"""Filing dates depend on the court calendar, not clerk acceptance or viewer timezone."""
-
 from datetime import UTC, date, datetime
 
 import pytest

@@ -1,5 +1,3 @@
-"""Ownership, registration and separation-of-duty boundaries on HTTP write paths."""
-
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -38,7 +36,6 @@ async def test_another_filer_cannot_edit_validate_or_change_documents(
     assert [response.status_code for response in attempts] == [403, 403, 403, 403]
     assert await db_session.scalar(select(func.count()).select_from(FilingDocument)) == 1
 
-    # The filer can remove drafts, but not documents from a received filing.
     await filing_service.submit_filing(db_session, fid)
     api_client.headers["X-Demo-User-Id"] = str(filer)
     removed = await api_client.delete(f"{url}/documents/{document.id}")
@@ -72,7 +69,6 @@ async def test_registration_rejects_case_variants_and_can_be_disabled(
     )
     assert variant.status_code == 409, variant.text
 
-    # The flag alone governs registration, even while demo sign-in stays on.
     monkeypatch.setattr(settings, "allow_public_registration", False)
     closed = await api_client.post(
         "/api/v1/auth/register", json={**person, "email": "bob@example.com"},

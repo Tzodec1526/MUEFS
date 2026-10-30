@@ -1,5 +1,3 @@
-"""A running process must not report readiness with an incompatible database."""
-
 import asyncio
 import logging
 import os
@@ -92,8 +90,6 @@ async def test_connection_failure_is_sanitized_and_does_not_affect_liveness(
         url = f"postgresql+asyncpg://probe:{secret}@db.internal:5432/absent"
     engine = create_async_engine(url)
 
-    # Real drivers omit these details, so fail the way drivers that quote their target do.
-    # No database or network connection is attempted.
     @event.listens_for(engine.sync_engine, "do_connect")
     def refuse(driver_dialect, _record, _args, _params):
         raise driver_dialect.loaded_dbapi.OperationalError(f"could not connect to {url}")
@@ -106,7 +102,6 @@ async def test_connection_failure_is_sanitized_and_does_not_affect_liveness(
             assert response.status_code == 503
             assert response.json()["reason"] == "database_unavailable"
             assert (await client.get("/health")).status_code == 200
-        # The failure itself was captured, so the secret's absence below is meaningful.
         logged = [record.getMessage() for record in caplog.records
                   if record.name == "app.readiness"]
         assert len(logged) == 1 and "OperationalError" in logged[0]
@@ -118,7 +113,7 @@ async def test_connection_failure_is_sanitized_and_does_not_affect_liveness(
 
 async def test_pool_wait_is_bounded_and_recovers(current_database):
     async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
-        async with current_database.connect():  # The single pool slot is occupied.
+        async with current_database.connect():
             check = asyncio.create_task(client.get("/ready"))
             assert (await asyncio.wait_for(client.get("/health"), timeout=1)).status_code == 200
             response = await asyncio.wait_for(check, timeout=5)
@@ -173,12 +168,10 @@ async def test_postgres_readiness_follows_each_committed_schema_revision(
             return response.status_code, response.json().get("reason")
 
         assert await probe() == (503, "schema_mismatch")
-        # Alembic must own transactions for concurrent index builds.
         async with engine.connect() as connection:
             await connection.run_sync(migrate)
             head = await connection.scalar(text("SELECT version_num FROM alembic_version"))
         assert await probe() == (200, None)
-        # Each probe must read the revision committed before it, in both directions.
         async with engine.begin() as connection:
             await connection.execute(text(
                 "UPDATE alembic_version SET version_num = 'd84a19f2c6b0'",
@@ -202,7 +195,6 @@ def test_migrations_accept_a_url_encoded_database_address(tmp_path, monkeypatch)
 
 
 def test_hosted_demo_probes_do_not_allocate_sessions_or_recreate_missing_storage(tmp_path):
-    # Importing this entry point mutates the global app; exercise it in its own process.
     code = r'''
 import asyncio
 from pathlib import Path

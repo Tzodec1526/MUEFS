@@ -1,5 +1,3 @@
-"""Administrative changes must remain safe with independent PostgreSQL connections."""
-
 import asyncio
 
 import pytest
@@ -65,9 +63,6 @@ async def test_concurrent_administration_cannot_remove_every_admin_or_lose_a_rol
         x_demo_user_id: int | None = Header(None, alias="X-Demo-User-Id"),
     ):
         nonlocal arrivals
-        # The function scope shares the session that authenticated this request, as
-        # production does. Flushing its verified-email update makes each request hold its
-        # own account row before either continues, so the overlap is not left to timing.
         actor = await auth.get_current_user(db, authorization, x_demo_user_id, None)
         await db.flush()
         arrivals += 1

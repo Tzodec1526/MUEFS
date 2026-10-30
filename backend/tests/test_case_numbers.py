@@ -1,5 +1,3 @@
-"""Assigned identifiers stay consistent across the case and retained receipt."""
-
 from datetime import UTC, date, datetime
 from unittest.mock import AsyncMock
 
@@ -38,7 +36,6 @@ async def test_acceptance_uses_filing_year_and_court_case_code(
         f"/api/v1/filings/{fid}/submit", json=await submission_review(api_client, fid),
     )
     assert submitted.status_code == 200, submitted.text
-    # A delayed review must use the assessed filing year, not the acceptance year.
     monkeypatch.setattr(filing_service, "filing_date_for_receipt", AsyncMock(
         return_value=FilingDateAssessment(filing_date=date(2024, 12, 31)),
     ))

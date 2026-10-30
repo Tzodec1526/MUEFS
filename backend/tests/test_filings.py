@@ -1,5 +1,3 @@
-"""Tests for filing-related functionality."""
-
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
@@ -16,7 +14,6 @@ from app.services import filing_service
 
 
 async def create_test_fixtures(db_session):
-    """Create common test fixtures."""
     user = User(
         email="test@example.com",
         first_name="Test",
@@ -72,7 +69,6 @@ async def test_create_filing(db_session):
 async def test_filing_lifecycle(db_session, stored_document):
     user, court, case_type = await create_test_fixtures(db_session)
 
-    # Create
     data = FilingEnvelopeCreate(
         filing_type="initial",
         court_id=court.id,
@@ -86,13 +82,11 @@ async def test_filing_lifecycle(db_session, stored_document):
     db_session.add(doc)
     await db_session.flush()
 
-    # Submit
     submitted = await filing_service.submit_filing(db_session, filing.id)
     assert submitted is not None
     assert submitted.status == FilingStatus.SUBMITTED
     assert submitted.submitted_at is not None
 
-    # Review - Accept
     clerk = User(
         email="clerk@example.com",
         first_name="Test",
@@ -107,14 +101,14 @@ async def test_filing_lifecycle(db_session, stored_document):
     )
     assert accepted is not None
     assert accepted.status == FilingStatus.ACCEPTED
-    assert accepted.case_id is not None  # Case should be created
+    assert accepted.case_id is not None
     assert accepted.cms_filing_id is not None
     assert accepted.cms_error is None
     part_q = await db_session.execute(
         select(CaseParticipant).where(CaseParticipant.case_id == accepted.case_id)
     )
     parts = list(part_q.scalars().all())
-    assert parts == []  # Acceptance does not establish party roles or restricted-case access.
+    assert parts == []
 
 
 @pytest.mark.asyncio
@@ -129,7 +123,6 @@ async def test_reject_filing(db_session, stored_document):
     )
     filing = await filing_service.create_filing(db_session, user.id, data)
 
-    # Add doc and submit
     doc = stored_document(filing.id, document_type_code="MOTION", title="Motion")
     db_session.add(doc)
     await db_session.flush()
@@ -162,7 +155,6 @@ async def test_reject_filing(db_session, stored_document):
 async def test_list_filings(db_session):
     user, court, case_type = await create_test_fixtures(db_session)
 
-    # Create multiple filings
     for i in range(3):
         data = FilingEnvelopeCreate(
             filing_type="initial",
@@ -198,7 +190,6 @@ async def test_validate_filing_no_documents(db_session):
 
 
 def _req(code: str) -> SimpleNamespace:
-    """Lightweight stand-in for a FilingRequirement row (only the code matters)."""
     return SimpleNamespace(document_type_code=code)
 
 
@@ -215,8 +206,6 @@ def test_requirements_for_filing_type_initial_keeps_only_initiating_docs():
         r.document_type_code
         for r in filing_service.requirements_for_filing_type(reqs, "initial")
     }
-    # Motion companions, responsive docs, and proof/cert of service are dropped --
-    # service happens after the case is filed (MCR 2.104 / 2.107).
     assert kept == {"COMPLAINT", "SUMMONS", "EXHIBIT", "JURY_DEMAND"}
 
 
@@ -395,7 +384,6 @@ async def test_create_filing_on_public_case_allowed_with_reviewed_participant(
     )
     filing = await filing_service.create_filing(db_session, user.id, data)
     assert filing.case_id == case.id
-    # Queues and receipts identify the case by the court's caption, not the client's.
     assert filing.case_title == "Public docket"
     path = f"/api/v1/cases/{case.id}"
     assert (await api_client.get(path)).json()["can_file"] is False
@@ -528,4 +516,3 @@ async def test_accept_does_not_decide_requested_fee_waiver(db_session, stored_do
     assert accepted is not None
     assert accepted.fee_waiver_granted is None
     assert accepted.status == FilingStatus.ACCEPTED
-

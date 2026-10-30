@@ -1,5 +1,3 @@
-"""Access-token validation against a realm key set, without stubbing the decoder."""
-
 import base64
 import hashlib
 import hmac
@@ -72,7 +70,7 @@ async def test_a_realm_signed_token_for_this_api_is_accepted(realm):
 
 
 @pytest.mark.parametrize("changes, reason", [
-    ({"aud": "account"}, "Audience"),  # Keycloak's generic audience is not this API.
+    ({"aud": "account"}, "Audience"),
     ({"aud": "another-app"}, "Audience"),
     ({"iss": "https://identity.example.gov/realms/other"}, "issuer"),
     ({"exp": -60}, "expired"),
@@ -80,8 +78,6 @@ async def test_a_realm_signed_token_for_this_api_is_accepted(realm):
     ({"sub": None}, "sub"),
 ], ids=["account-audience", "other-audience", "issuer", "expired", "no-expiry", "no-subject"])
 async def test_tokens_outside_this_realm_and_api_are_rejected(realm, changes, reason):
-    # Build the claims now: an expiry fixed at collection time could lapse before this runs
-    # and turn every case into an "expired" rejection.
     if changes.get("exp") is not None:
         changes = {**changes, "exp": time.time() + changes["exp"]}
     with pytest.raises(JWTError, match=reason):
@@ -110,7 +106,6 @@ async def test_tokens_not_signed_by_the_realm_key_are_rejected(realm):
     public_pem = PRIVATE_KEY.public_key().public_bytes(
         serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo,
     )
-    # Algorithm confusion: an HMAC signature keyed with the published public key.
     signing_input = _unsigned({"alg": "HS256", "kid": "k1", "typ": "JWT"}, _claims())
     signature = base64.urlsafe_b64encode(
         hmac.new(public_pem, signing_input.encode(), hashlib.sha256).digest(),
@@ -124,7 +119,6 @@ async def test_tokens_not_signed_by_the_realm_key_are_rejected(realm):
 
 
 async def test_rotated_keys_are_refetched_once_before_rejecting(realm, monkeypatch):
-    # Use the real key cache, with the realm's key endpoint stubbed.
     monkeypatch.setattr(keycloak_jwt, "_fetch_jwks", ORIGINAL_FETCH)
     rotated = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     published = {"keys": [_jwk(rotated.public_key(), "k2")]}
@@ -135,12 +129,10 @@ async def test_rotated_keys_are_refetched_once_before_rejecting(realm, monkeypat
         return httpx.Response(200, json=published, request=httpx.Request("GET", url))
 
     monkeypatch.setattr(httpx.AsyncClient, "get", serve)
-    # The cached set predates the rotation and is past the refresh interval.
     old = {"keys": [_jwk(PRIVATE_KEY.public_key(), "k1")]}
     monkeypatch.setattr(keycloak_jwt, "_jwks_cache", (time.time() - 60, old))
     assert await decode_keycloak_access_token(_token(key=rotated, kid="k2"))
     assert len(requests) == 1
-    # A kid that exists nowhere is rejected without another fetch: refreshes are bounded.
     with pytest.raises(JWTError, match="No JWKS key"):
         await decode_keycloak_access_token(_token(kid="unknown"))
     assert len(requests) == 1

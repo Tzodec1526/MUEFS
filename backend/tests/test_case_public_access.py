@@ -1,5 +1,3 @@
-"""Court instructions govern public visibility without rewriting retained documents."""
-
 from copy import deepcopy
 
 import pytest
@@ -70,10 +68,8 @@ async def test_public_access_changes_search_docket_downloads_and_favorites(
         f"/api/v1/documents/{original.id}/download", f"/api/v1/documents/{original.id}/verify",
     ]
     for sealed_path in sealed_paths:
-        # Verification always requires an account; the rest are public until sealed.
         expected = 401 if sealed_path.endswith("/verify") else 403
         assert (await api_client.get(sealed_path)).status_code == expected, sealed_path
-    # A signed-in account without a grant is as restricted as an anonymous visitor.
     api_client.headers["X-Demo-User-Id"] = str(visitor.id)
     for sealed_path in sealed_paths:
         assert (await api_client.get(sealed_path)).status_code == 403, sealed_path
@@ -147,7 +143,6 @@ async def test_participant_edits_and_public_access_invalidate_each_others_old_re
     proposal.update(expected_version=1, access_enabled=False)
     assert (await api_client.put(path + f"/participants/{participant.json()['id']}",
                                  json=proposal)).status_code == 409
-    # An unchanged instruction does not create another audit event or revision.
     same = deepcopy(instruction)
     same["expected_version"] = 2
     assert (await api_client.put(path + "/public-access", json=same)).status_code == 200

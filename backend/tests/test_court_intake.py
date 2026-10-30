@@ -1,5 +1,3 @@
-"""Administrators publish intake changes without rewriting received filing records."""
-
 from copy import deepcopy
 from uuid import uuid4
 

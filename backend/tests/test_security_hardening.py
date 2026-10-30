@@ -1,5 +1,3 @@
-"""Security hardening regression tests."""
-
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -72,7 +70,6 @@ def test_demo_secret_required_outside_debug(monkeypatch) -> None:
 
 
 def test_demo_headers_allowed_without_secret_when_isolated(monkeypatch) -> None:
-    """Hosted public demo must work when Render leaves DEMO_MODE_SECRET unset."""
     from app.config import settings
 
     monkeypatch.setattr(settings, "debug", False)

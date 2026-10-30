@@ -1,5 +1,3 @@
-"""Retained deliveries, scoped downloads, stale selections and real local SMTP."""
-
 import asyncio
 import json
 import os
@@ -168,7 +166,6 @@ async def test_delivery_grants_only_selected_bytes_and_retains_recipient_acknowl
         "action"
     ] == "queued"
     assert (await api_client.get("/api/v1/service/deliveries")).json()["total"] == 1
-    # Revocation removes content access; the inbox discloses no sealed caption.
     f["participant"].access_enabled = False
     await db_session.flush()
     assert (await api_client.get(path)).status_code == 403
@@ -191,7 +188,6 @@ async def test_revoking_a_staff_senders_assignment_ends_their_delivery_access(
     views = [path, path + "/events", f"{path}/documents/{f['documents'][0].id}"]
     for view in views:
         assert (await api_client.get(view)).status_code == 200, view
-    # Staff send for the court; the sealed caption and documents are not theirs to keep.
     await db_session.execute(delete(UserCourtRole).where(UserCourtRole.user_id == staff.id))
     await db_session.flush()
     for view in views:
@@ -301,7 +297,6 @@ async def test_accounts_without_filing_privileges_cannot_send_or_retry(
     notice = await db_session.get(Notification, recipient.notification_id)
     notice.delivery_status = DeliveryStatus.FAILED
     sender = await db_session.get(User, f["sender"])
-    # The court downgraded the sender to a public docket account.
     sender.user_type = UserType.PUBLIC
     await db_session.flush()
     for response in (
@@ -325,7 +320,6 @@ async def test_archive_keeps_delivery_contents_addresses_and_acknowledgment(
 ):
     monkeypatch.setattr(settings, "service_delivery_enabled", True)
     async with case_records["sessions"].begin() as db:
-        # Keep the pre-existing case as an exclusion check, with distinct accounts.
         for user in await db.scalars(select(User)):
             user.email = f"archive-{user.id}@test.com"
         await db.flush()

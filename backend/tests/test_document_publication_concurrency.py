@@ -1,5 +1,3 @@
-"""Exercise access decisions and retention against real PostgreSQL transactions."""
-
 import asyncio
 import threading
 
