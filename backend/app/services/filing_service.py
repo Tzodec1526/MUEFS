@@ -13,6 +13,7 @@ from app.integrations.cms_adapter import submit_filing_to_cms
 from app.models.case import Case, CaseStatus
 from app.models.court import CaseType, Court, FilingRequirement
 from app.models.filing import COURT_DOCUMENT_TYPES, FilingDocument, FilingEnvelope, FilingStatus
+from app.models.filing_transaction import FilingTransaction
 from app.schemas.common import MAX_RECORD_ID
 from app.schemas.filing import (
     ClerkQueueResponse,
@@ -22,6 +23,7 @@ from app.schemas.filing import (
 )
 from app.services import access_service, document_service
 from app.services.court_calendar_service import filing_date_for_receipt
+from app.services.fee_assessment_service import fee_state
 from app.services.filing_record_service import record_transaction
 
 
@@ -42,6 +44,19 @@ class FilingDocumentError(Exception):
 
 class StaleFilingReviewError(Exception):
     pass
+
+
+class FilingSubmissionError(Exception):
+    def __init__(self, status_code: int, detail: str):
+        self.status_code = status_code
+        self.detail = detail
+        super().__init__(detail)
+
+
+class SubmissionAlreadyRecordedError(Exception):
+    def __init__(self, filing: FilingEnvelope):
+        self.filing = filing
+        super().__init__(f"Filing {filing.id} already recorded this submission request")
 
 
 async def verify_filing_documents(
@@ -408,12 +423,52 @@ async def validate_filing(
     )
 
 
+async def check_submission(
+    db: AsyncSession,
+    filing: FilingEnvelope,
+    *, expected_submission_token: str, idempotency_key: str | None,
+) -> None:
+    if idempotency_key and await db.scalar(select(FilingTransaction.id).where(
+        FilingTransaction.filing_id == filing.id,
+        FilingTransaction.idempotency_key == idempotency_key,
+    )):
+        raise SubmissionAlreadyRecordedError(filing)
+    if expected_submission_token != filing.submission_token:
+        raise FilingSubmissionError(
+            409,
+            "This filing changed after you opened the review. "
+            "Refresh the review and check the saved details and documents "
+            "before submitting.",
+        )
+    if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
+        raise FilingSubmissionError(400, "Only draft or returned filings can be submitted")
+    if not (await fee_state(db, filing)).obligation_met:
+        raise FilingSubmissionError(402, "Payment required before submission")
+    validation = await validate_filing(db, filing.id)
+    if not validation.is_valid:
+        error_parts = []
+        if validation.errors:
+            error_parts.append("Errors: " + "; ".join(validation.errors))
+        if validation.missing_required_documents:
+            error_parts.append(
+                "Missing documents: " + "; ".join(validation.missing_required_documents)
+            )
+        raise FilingSubmissionError(
+            400, "Filing validation failed. " + " | ".join(error_parts),
+        )
+
+
 async def submit_filing(
     db: AsyncSession,
     filing_id: int,
-    *, idempotency_key: str | None = None,
+    *, idempotency_key: str | None = None, expected_submission_token: str | None = None,
 ) -> FilingEnvelope | None:
     probe = await get_filing(db, filing_id)
+    if probe and expected_submission_token is not None:
+        await check_submission(
+            db, probe, expected_submission_token=expected_submission_token,
+            idempotency_key=idempotency_key,
+        )
     if not probe or probe.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
         return None
     await validate_filing_destination(db, probe, filer_id=probe.filer_id)
@@ -421,6 +476,11 @@ async def submit_filing(
     fingerprints = [(doc.id, doc.sha256_hash, doc.file_size_bytes) for doc in probe.documents]
 
     filing = await get_filing(db, filing_id, for_update=True)
+    if filing and expected_submission_token is not None:
+        await check_submission(
+            db, filing, expected_submission_token=expected_submission_token,
+            idempotency_key=idempotency_key,
+        )
     if not filing or filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
         return None
     await validate_filing_destination(db, filing, filer_id=filing.filer_id)

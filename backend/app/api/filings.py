@@ -55,7 +55,6 @@ from app.services import (
     filing_service,
     storage_intent,
 )
-from app.services.fee_assessment_service import fee_state
 from app.services.fee_waiver_service import waiver_state
 from app.utils.http_context import client_ip, client_user_agent
 
@@ -264,9 +263,8 @@ async def submit_filing(
     idempotency_key: uuid.UUID | None = Header(None),
 ):
     user_id = current_user.id
-    # Ownership check
     await require_user_may_manage_efilings(await lock_current_user(db, user_id))
-    filing_check = await filing_service.get_filing(db, filing_id, for_update=True)
+    filing_check = await filing_service.get_filing(db, filing_id)
     if not filing_check:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
     if filing_check.filer_id != user_id:
@@ -275,49 +273,16 @@ async def submit_filing(
             detail="Not authorized to access this filing",
         )
 
-    if idempotency_key and await db.scalar(select(FilingTransaction.id).where(
-        FilingTransaction.filing_id == filing_id,
-        FilingTransaction.idempotency_key == str(idempotency_key),
-    )):
-        return filing_check
-    if data.expected_submission_token != filing_check.submission_token:
-        raise HTTPException(
-            status_code=409,
-            detail="This filing changed after you opened the review. "
-                   "Refresh the review and check the saved details and documents "
-                   "before submitting.",
-        )
-    if filing_check.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
-        raise HTTPException(
-            status_code=400, detail="Only draft or returned filings can be submitted",
-        )
-
-    if not (await fee_state(db, filing_check)).obligation_met:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Payment required before submission",
-        )
-
-    # Validate before submitting
-    validation = await filing_service.validate_filing(db, filing_id)
-    if not validation.is_valid:
-        error_parts = []
-        if validation.errors:
-            error_parts.append("Errors: " + "; ".join(validation.errors))
-        if validation.missing_required_documents:
-            error_parts.append(
-                "Missing documents: " + "; ".join(validation.missing_required_documents)
-            )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Filing validation failed. " + " | ".join(error_parts),
-        )
-
     try:
         filing = await filing_service.submit_filing(
             db, filing_id, idempotency_key=str(idempotency_key) if idempotency_key else None,
+            expected_submission_token=data.expected_submission_token,
         )
-    except filing_service.FilingDestinationError as exc:
+    except filing_service.SubmissionAlreadyRecordedError as exc:
+        return exc.filing
+    except (
+        filing_service.FilingDestinationError, filing_service.FilingSubmissionError,
+    ) as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     except filing_service.FilingDocumentError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
