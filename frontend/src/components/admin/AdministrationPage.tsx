@@ -206,6 +206,9 @@ function AccountDirectory({ access }: { access: Access }) {
   const [editor, setEditor] = useState<Account | 'new' | null>(null);
   const [message, setMessage] = useState('');
   const editorRef = useRef<HTMLElement>(null);
+  const directoryRef = useRef<HTMLElement>(null);
+  const setUpRef = useRef<HTMLButtonElement>(null);
+  const closedEditor = useRef<number | 'new' | undefined>(undefined);
   const selectedId = editor === 'new' ? 'new' : editor?.id;
   const key = `${court}:${email}:${page}:${attempt}`;
   const current = result?.key === key ? result : undefined;
@@ -217,6 +220,19 @@ function AccountDirectory({ access }: { access: Access }) {
     return () => controller.abort();
   }, [court, email, page, key]);
   useEffect(() => { if (selectedId != null) editorRef.current?.focus(); }, [selectedId]);
+  useEffect(() => {
+    const closed = closedEditor.current;
+    if (closed === undefined || !current) return;
+    closedEditor.current = undefined;
+    if (document.activeElement !== document.body) return;
+    const trigger = closed === 'new' ? setUpRef.current : document.getElementById(`manage-account-${closed}`);
+    (trigger ?? directoryRef.current)?.focus();
+  }, [current]);
+  function closeEditor() {
+    closedEditor.current = selectedId;
+    setEditor(null);
+    setAttempt(n => n + 1);
+  }
   function saved(user: Account) {
     setMessage(editor !== 'new' && editor?.administration_version === user.administration_version
       ? 'No changes to record.' : 'Change recorded. Earlier values remain in the change history.');
@@ -225,7 +241,7 @@ function AccountDirectory({ access }: { access: Access }) {
   return <>
     <div className="page-header"><div><PageHeading>People and court access</PageHeading>
       <p>{access.system_admin ? 'Set up accounts and assign court access.' : 'Manage staff access for your assigned courts.'}</p></div>
-      {access.system_admin && <button className="btn btn-primary" onClick={() => setEditor('new')}>Set up account</button>}</div>
+      {access.system_admin && <button className="btn btn-primary" ref={setUpRef} onClick={() => setEditor('new')}>Set up account</button>}</div>
     <form className="admin-directory-filter" onSubmit={event => {
       event.preventDefault(); setEmail(String(new FormData(event.currentTarget).get('email') || '').trim()); setPage(1); setEditor(null);
       setAttempt(n => n + 1); setMessage('');
@@ -243,7 +259,7 @@ function AccountDirectory({ access }: { access: Access }) {
     {!access.system_admin && <p>Search the exact email of a known staff member to assign access. A system administrator must set up their account first.</p>}
     {message && <p className="alert alert-success" role="status">{message}</p>}
     <div className={`admin-workspace${editor ? ' editor-open' : ''}`}>
-      <section aria-label="Account directory">
+      <section aria-label="Account directory" ref={directoryRef} tabIndex={-1}>
         {!current && <p role="status">Loading accounts…</p>}
         {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
         {current?.data && <>
@@ -255,7 +271,7 @@ function AccountDirectory({ access }: { access: Access }) {
                 <p>{user.email}</p>
                 <p>{accountTypes[user.user_type]} · {user.is_active ? 'Active' : 'Inactive'}</p>
               </div>
-              <button className="btn btn-secondary btn-small" onClick={() => setEditor(user)}>Manage {user.first_name} {user.last_name}</button>
+              <button id={`manage-account-${user.id}`} className="btn btn-secondary btn-small" onClick={() => setEditor(user)}>Manage {user.first_name} {user.last_name}</button>
             </li>)}
           </ul>
           {current.data.total > 25 && <nav className="pagination" aria-label="Account directory pages">
@@ -267,7 +283,7 @@ function AccountDirectory({ access }: { access: Access }) {
       </section>
       {editor && <section className="review-card admin-editor" ref={editorRef} tabIndex={-1}>
         <div className="history-summary"><h2>{editor === 'new' ? 'New account' : `${editor.first_name} ${editor.last_name}`}</h2>
-          <button className="btn btn-secondary btn-small" onClick={() => { setEditor(null); setAttempt(n => n + 1); }}>Close &amp; refresh list</button></div>
+          <button className="btn btn-secondary btn-small" onClick={closeEditor}>Close &amp; refresh list</button></div>
         {access.system_admin && <AccountForm key={editor === 'new' ? 'new' : `${editor.id}:${editor.administration_version}`}
           user={editor === 'new' ? undefined : editor} self={editor !== 'new' && editor.id === access.user_id} onSaved={saved} />}
         {editor !== 'new' && <>
