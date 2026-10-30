@@ -38,7 +38,6 @@ vi.mock('../../api/cases', async (importOriginal) => ({
 }));
 
 const FORGED_LINK = '/filing/new?case_id=42&court_id=3&case_type_id=11&case_title=Forged';
-// What the docket's "File in this case" link opens.
 const CASE_LINK = '/filing/new?case_id=42&court_id=3&case_type_id=11';
 
 const court: Court = {
