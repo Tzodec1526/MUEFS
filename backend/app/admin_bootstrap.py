@@ -17,7 +17,7 @@ async def bootstrap(data: AccountChange) -> int:
     if settings.demo_isolated_sessions:
         raise ValueError("Bootstrap operates on the shared database, not isolated demo sessions")
     async with async_session() as db:
-        if db.bind.dialect.name == "postgresql":
+        if db.get_bind().dialect.name == "postgresql":
             await db.execute(text("LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE"))
         else:
             await db.execute(text("BEGIN IMMEDIATE"))
