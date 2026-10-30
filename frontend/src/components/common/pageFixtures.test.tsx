@@ -47,7 +47,10 @@ const fees = {
   balance_due_cents: 17500, overpaid_cents: 0, review_requested_at: null, review_reason: null, assessment_stale: false,
   can_request_review: false, can_assess: true, can_pay: true, can_request_waiver: true, obligation_met: false,
   payments_simulated: true, can_manage_external_payments: true, can_record_external_payment: true,
-  filing: { id: 2, details_token: 't', documents: [], fee_waiver_requested: false, fee_waiver_granted: null },
+  filing: {
+    id: 2, details_token: 't', documents: [], fee_waiver_requested: false, fee_waiver_granted: null,
+    case_title: 'Doe v. Roe', filing_type: 'service_only', status: 'under_review',
+  },
 };
 const delivery = {
   id: 'd-1', packet_id: 'p-1', source_transaction_id: 't-1', filing_id: 2, sender: 'Pat Lee', created_at: time,
@@ -112,7 +115,10 @@ const responses: Record<string, unknown> = {
     },
     transactions: [{
       id: 't-1', submission_number: 1, event_type: 'submitted', actor_name: 'Pat Lee', occurred_at: time,
-      details: { document_id: 2, public_copy: copy },
+      details: {
+        document_id: 2, public_copy: copy,
+        fee_assessment: { source: 'court', assessment_id: 'a-1', total_cents: 100, paid_cents: 0, balance_due_cents: 100 },
+      },
     }, {
       id: 't-2', submission_number: 1, event_type: 'submitted', actor_name: 'Pat Lee', occurred_at: time,
       details: { documents: [document] },
@@ -137,7 +143,7 @@ const responses: Record<string, unknown> = {
     documents: [document], total: 1, page_size: 25,
     recipients: [{
       participant_id: 1, name: 'Sam Roe', role: 'defendant', represented_party_name: null, contact_id: 5, version: 1,
-      method: 'portal', email: 'sam@example.com', address: null, authority: 'Registration', issues: [],
+      method: 'electronic', email: 'sam@example.com', address: null, authority: 'Registration', issues: [],
     }],
   },
   '/favorites': {
@@ -230,6 +236,28 @@ it.each([
 ])('counts %s in the singular', async (_name, url, path, page, count) => {
   show(url, path, page);
   expect(await screen.findByText(count)).toBeTruthy();
+});
+
+it('names case types without their internal codes on the intake page', async () => {
+  show('/courts/3/intake', '/courts/:courtId/intake', <CourtIntakePage />);
+  await screen.findByRole('cell', { name: 'General Civil' });
+  expect(window.document.body.textContent).not.toContain('(CZ)');
+});
+
+it.each([
+  ['a document filing status', '/documents/2/publication', '/documents/:documentId/publication', <DocumentPublicationPage key="p" />, /· Accepted$/],
+  ['a fee source', '/filings/2/history', '/filings/:filingId/history', <FilingHistoryPage key="p" />, /^Fee record at submission: Court assessment · total/],
+  ['a recipient role', '/filings/2/deliveries/new', '/filings/:filingId/deliveries/new', <DeliveryComposePage key="p" />, /· Defendant/],
+  ['a service method', '/filings/2/deliveries/new', '/filings/:filingId/deliveries/new', <DeliveryComposePage key="p" />, /^Electronic through portal · /],
+])('shows %s in words', async (_name, url, path, page, words) => {
+  show(url, path, page);
+  expect(await screen.findByText(words)).toBeTruthy();
+});
+
+it('shows the filing type and status in words on the fee assessment form', async () => {
+  show('/filings/2/fees', '/filings/:filingId/fees', <FilingFeesPage />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Review fee assessment' }));
+  expect((await screen.findByText(/Service only · Under review/)).textContent).toBe('Doe v. Roe · Service only · Under review');
 });
 
 it('counts a selected delivery in the singular', async () => {

@@ -57,13 +57,12 @@ function unrenderedClasses(selector: string): string[] {
   });
 }
 
-it('styles every alert variant, status badge and muted text the pages render', () => {
+it('styles every alert variant and status badge the pages render', () => {
   const alerts = new Set([...corpus.matchAll(/(?<![\w-])alert-[a-z]+(?![\w-])/g)].map(match => match[0]));
   expect([...alerts].sort()).toEqual(['alert-error', 'alert-info', 'alert-success', 'alert-warning']);
   const missing = [
     ...[...alerts].map(name => `.${name}`),
     ...BADGE_STATUSES.map(status => `.status-badge.${status}`),
-    '.text-muted',
   ].filter(selector => !definedSelectors.has(selector));
   expect(missing).toEqual([]);
 });

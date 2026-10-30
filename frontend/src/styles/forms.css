@@ -172,10 +172,6 @@ input[type="radio"] {
   margin-bottom: 1rem;
 }
 
-.text-muted {
-  color: var(--muted);
-}
-
 .alert {
   padding: 0.8rem 1rem;
   border-radius: var(--radius);

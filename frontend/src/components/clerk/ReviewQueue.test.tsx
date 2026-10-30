@@ -210,7 +210,7 @@ it('writes a two-word status in words on its badge', async () => {
   openQueue();
   await screen.findByText('Case 11');
 
-  expect(within(row(11)).getAllByRole('cell')[6].textContent).toBe('under review');
+  expect(within(row(11)).getAllByRole('cell')[6].textContent).toBe('Under review');
 });
 
 it('keeps Select all usable when the column headings are hidden on a phone', async () => {

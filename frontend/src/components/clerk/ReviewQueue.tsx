@@ -3,6 +3,7 @@ import { batchReview, getFiling, reviewFiling, FilingEnvelope, FilingSummary, Cl
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import { formatDateTime, parseServerDate, plural } from '../../utils/format';
+import { filingStatusLabel } from '../../utils/filingStatus';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
@@ -276,7 +277,7 @@ function ReviewQueue() {
                     <td data-label="Documents">{filing.document_count}</td>
                     <td data-label="Status">
                       <span className={`status-badge ${filing.status}`}>
-                        {filing.status.replace('_', ' ')}
+                        {filingStatusLabel(filing.status)}
                       </span>
                     </td>
                   </tr>

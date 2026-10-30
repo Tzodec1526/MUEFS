@@ -9,6 +9,7 @@ import FeeWaiverPanel, { waiverActionLabels } from './FeeWaiverPanel';
 import FilingDateEvidence from './FilingDateEvidence';
 import { getDocumentLabel } from '../../utils/documentTypes';
 import { formatBytes, formatCents, formatCourtDate, formatDateTime, parseServerDate, plural } from '../../utils/format';
+import { feeSourceLabel } from '../../utils/filingStatus';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
 
@@ -135,7 +136,7 @@ export default function FilingHistoryPage() {
             {transaction.details.payment.is_simulated && ' (simulated)'}
           </p>}
           {transaction.details.payment?.fee_basis && <p>
-            Payment basis: {transaction.details.payment.fee_basis.source} · total {formatCents(transaction.details.payment.fee_basis.total_cents)}
+            Payment basis: {feeSourceLabel(transaction.details.payment.fee_basis.source)} · total {formatCents(transaction.details.payment.fee_basis.total_cents)}
             {' · '}previous payments {formatCents(transaction.details.payment.fee_basis.previous_paid_cents)}
             {transaction.details.payment.fee_basis.assessment_id && ` · assessment #${transaction.details.payment.fee_basis.assessment_id}`}
           </p>}
@@ -158,7 +159,7 @@ export default function FilingHistoryPage() {
               : transaction.details.fee_waiver_requested ? 'Fee waiver requested' : 'No payment recorded'}</dd></div>
           </dl>}
           {transaction.details.fee_assessment && <p>
-            Fee record at submission: {transaction.details.fee_assessment.source}
+            Fee record at submission: {feeSourceLabel(transaction.details.fee_assessment.source)}
             {' · '}total {transaction.details.fee_assessment.total_cents === null ? 'not established' : formatCents(transaction.details.fee_assessment.total_cents)}
             {' · '}completed payments {formatCents(transaction.details.fee_assessment.paid_cents)}
             {' · '}balance {transaction.details.fee_assessment.balance_due_cents === null ? 'not established' : formatCents(transaction.details.fee_assessment.balance_due_cents)}

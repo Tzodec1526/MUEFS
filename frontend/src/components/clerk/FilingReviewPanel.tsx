@@ -5,6 +5,7 @@ import LoadError from '../common/LoadError';
 import DocumentDownload from '../common/DocumentDownload';
 import { getDocumentLabel } from '../../utils/documentTypes';
 import { formatBytes, formatDateTime, plural } from '../../utils/format';
+import { filingStatusLabel } from '../../utils/filingStatus';
 import { focusQueueRow } from './useClerkQueue';
 import type { LoadFailure } from '../../utils/errors';
 
@@ -41,7 +42,7 @@ function FilingReviewPanel({
       <div className="detail-panel-header">
         <h2 ref={reviewHeading} tabIndex={-1}>Filing #{review.id}</h2>
         {selectedFiling && <span className={`status-badge ${selectedFiling.status}`}>
-          {selectedFiling.status.replace('_', ' ')}
+          {filingStatusLabel(selectedFiling.status)}
         </span>}
         <button type="button" className="btn btn-secondary btn-small" disabled={actionInProgress}
           onClick={() => {

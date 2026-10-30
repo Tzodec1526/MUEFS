@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { formatBytes, formatDateTime, plural } from '../../utils/format';
+import { filingStatusLabel } from '../../utils/filingStatus';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
 import { usePageTitle } from '../../utils/pageTitle';
@@ -131,7 +132,7 @@ export default function DocumentPublicationPage() {
       <Link to={`/filings/${current.data.filing_id}/history`}>Back to filing receipts and history</Link>
       <div className="publication-grid">
         <section className="review-card"><h2 className="card-heading">Filed original</h2><p><strong>{current.data.document.title}</strong></p>
-          <p>{formatBytes(current.data.document.file_size_bytes)} · {current.data.filing_status}</p>
+          <p>{formatBytes(current.data.document.file_size_bytes)} · {filingStatusLabel(current.data.filing_status)}</p>
           <p>{current.data.document.is_confidential ? 'Restricted to the filer and assigned court staff.' : 'Available through the case docket, subject to case access.'}</p>
           <DocumentDownload id={current.data.document.id} title={current.data.document.title} />
           <details><summary>Original fingerprint</summary><code>{current.data.document.sha256_hash}</code></details>

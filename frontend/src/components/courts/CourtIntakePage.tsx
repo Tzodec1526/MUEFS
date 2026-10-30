@@ -71,7 +71,7 @@ function IntakeEditor({ current, onSaved, onReload }: {
           <input type="checkbox" checked={types[index].is_active} onChange={event => {
             const active = event.target.checked;
             setTypes(items => items.map(entry => entry.id === item.id ? { ...entry, is_active: active } : entry));
-          }} /> {item.name} ({item.code})
+          }} /> {item.name}
         </label>)}
       </fieldset>
       <div className="form-group"><label htmlFor="intake-notice">Public intake notice{needsNotice ? ' (required)' : ' (optional)'}</label>
@@ -183,7 +183,7 @@ export default function CourtIntakePage() {
       <p>For deadlines or alternative filing arrangements, follow the court&apos;s instructions.</p>
       <table className="intake-table"><thead><tr><th scope="col">Case type</th><th scope="col">Electronic intake</th></tr></thead>
         <tbody>{data.case_types.map(item => <tr key={item.id}>
-          <td>{item.name} <span className="text-muted">({item.code})</span></td>
+          <td>{item.name}</td>
           <td>{data.is_efiling_enabled && item.is_active ? 'Accepting filings' : 'Not accepting filings'}</td>
         </tr>)}</tbody></table>
       {data.case_types.length === 0 && <p>No case types are available for electronic filing.</p>}

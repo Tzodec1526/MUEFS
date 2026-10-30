@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
-import type { DeliveryContact, DeliveryOptions } from '../../api/serviceDeliveries';
+import { participantRoles } from '../../api/cases';
+import { serviceMethodLabels, type DeliveryContact, type DeliveryOptions } from '../../api/serviceDeliveries';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { formatBytes, plural } from '../../utils/format';
 import DocumentDownload from '../common/DocumentDownload';
@@ -92,9 +93,9 @@ export default function DeliveryComposePage() {
             <label className="checkbox-label"><input type="checkbox" disabled={contact.issues.length > 0}
               checked={selection.contacts.some(c => c.contact_id === contact.contact_id && c.participant_id === contact.participant_id)}
               onChange={event => { setReviewed(false); setSelection(s => ({ ...s, contacts: event.target.checked ? [...s.contacts, contact] : s.contacts.filter(c => c.participant_id !== contact.participant_id) })); }} />
-              <span><strong>{contact.name}</strong> · {contact.role.replace(/_/g, ' ')}
+              <span><strong>{contact.name}</strong> · {participantRoles[contact.role] || contact.role}
                 {contact.represented_party_name && <span> · Represents {contact.represented_party_name}</span>}</span></label>
-            <p>{contact.method?.replace(/_/g, ' ') || 'Instructions needed'} · {contact.email || contact.address || 'No destination recorded'}</p>
+            <p>{contact.method ? serviceMethodLabels[contact.method] : 'Instructions needed'} · {contact.email || contact.address || 'No destination recorded'}</p>
             {contact.authority && <p>Authority: {contact.authority}</p>}
             {contact.issues.map(issue => <p className="service-issue" key={issue}>{issue}</p>)}
           </div>)}

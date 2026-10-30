@@ -2,6 +2,7 @@ import { useContext, useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { participantRoles } from '../../api/cases';
+import { serviceMethodLabels } from '../../api/serviceDeliveries';
 import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import { formatDateTime } from '../../utils/format';
 import LoadError from '../common/LoadError';
@@ -9,7 +10,7 @@ import { CourtContext } from '../auth/CourtSession';
 import { usePageTitle } from '../../utils/pageTitle';
 import PageHeading from '../common/PageHeading';
 
-const methods = { electronic: 'Electronic through portal', mail: 'Mail', hand_delivery: 'Hand delivery' };
+const methods = serviceMethodLabels;
 interface Contact {
   id: number; name: string; method: keyof typeof methods; email: string | null;
   address: string | null; is_active: boolean; authority: string; version: number;
