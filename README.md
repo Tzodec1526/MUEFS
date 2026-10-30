@@ -15,22 +15,8 @@ with one login and one interface for filing in Michigan's courts.
 
 ## MUEFS compared with MiFILE
 
-| Capability | MiFILE and current systems | MUEFS (this demo) |
-|---|---|---|
-| Court coverage | Not all courts or case types | Demo portal (seeded courts) |
-| Public docket search | Varies by court; often separate portals | Built in; no account needed in the demo |
-| Document types | Varies by vendor | A catalog tied to the Michigan Court Rules (MCR); the count comes from the live seed data |
-| Upload limit | 25 MB (SCAO standard) | 100 MB |
-| Fee waiver (MCR 2.002) | Payment screen; court must grant | Part of the filing wizard (demo payments) |
-| Motion companions | Filers must know MCR rules | Checks for them and prompts the filer (MCR 2.119) |
-| File from the case docket | Existing-case filing supported | Filled in from the case page |
-| Case favorites | Not available | Star cases for quick access |
-| Service-only records | Varies; often a separate workflow | Keeps the documents, with opt-in delivery to reviewed recipients; other service methods stay outside the app |
-| Draft editing | Depends on the vendor | Save to your account, recover edits in the same tab and compare conflicting versions |
-| Clerk review tools | Queue tools vary by court | Batch accept, age badges and quick reject reasons |
-| Case participants and access | Depends on the court | Assigned staff record roles and explicit access grants, and changes are kept |
-| Reviewed public copies | Depends on the court | Prepare, check, publish and withdraw a separate PDF; the filed original is kept |
-| Cost and license | Per-transaction vendor fees | AGPL-3.0 (no license fee) |
+The About page in the portal (`/about`, no sign-in needed) compares MUEFS with MiFILE and
+shows the platform statistics. The login screen and the page footer link to it.
 
 Status: this is an open-source demo. Filing, clerk review, public records, self-represented
 filing and court administration work today. The payment processor and the live link to a
@@ -41,7 +27,8 @@ those services as part of an implementation.
 
 You can run the full demo with 4 commands. You don't need Docker or any database setup.
 
-You need Python 3.11 or newer and Node.js 22.12 or newer (with npm).
+You need Python 3.11 or newer and Node.js 22.12 or newer (with npm). CI and the container
+images use Node 22.23.4.
 
 ```bash
 git clone https://github.com/Tzodec1526/MUEFS.git
@@ -62,7 +49,7 @@ upgrades it when needed, and it does not change your saved environment files. If
 already in use, stop that service before you run the demo. Restart the launcher after you
 change backend code. It does not run a file watcher, which could interrupt a presentation.
 
-Sign in as an Attorney, Court Clerk, System Administrator or Self-Represented Litigant, or
+Sign in as an attorney, court clerk, system administrator or self-represented litigant, or
 browse public court records without signing in.
 
 The [demo walkthrough](demo/README.md) follows one fictional filing from start to finish:
@@ -93,6 +80,9 @@ cp .env.example .env
 docker compose up --build
 ```
 
+`.env.example` carries no notes. The [environment variable tables](docs/DEPLOYMENT.md#environment-variables)
+in the deployment guide are the reference for every setting.
+
 Before the API and workers start, the one-time `migrate` service creates the document
 bucket, applies the database migrations and seeds the demo data.
 
@@ -104,7 +94,7 @@ Services:
 - Keycloak admin: http://localhost:8080
 - Document storage (S3 API): http://localhost:7070
 
-Besides the demo role cards, the stack loads a local Keycloak realm
+Besides the demo roles, the stack loads a local Keycloak realm
 ([keycloak/muefs-realm.json](keycloak/muefs-realm.json)). It has one self-represented
 litigant account, so you can try signing in through the identity provider. The account's
 credentials are in that file. They are for local evaluation only.
@@ -123,9 +113,13 @@ MUEFS/
 │   └── tests/         # backend tests (pytest + HTTP smoke)
 ├── frontend/          # React frontend
 │   └── src/
-│       ├── components/  # Filing wizard, clerk queue, case search
+│       ├── components/  # Filing wizard, clerk queue, case search, About page
 │       ├── api/         # API client
-│       └── styles/      # Global CSS
+│       ├── assets/fonts/  # Self-hosted Public Sans
+│       └── styles/      # Stylesheets by area
+├── demo/              # Walkthrough and sample PDFs
+├── docs/              # Deployment, readiness, recovery, export and court-rule notes
+├── scripts/           # Comment guard
 └── docker-compose.yml
 ```
 
@@ -135,7 +129,7 @@ MUEFS/
 
 - File with Michigan courts from a single login.
 - Pick from document types tied to the Michigan Court Rules, with court-rule guidance. The
-  dashboard shows the current count.
+  About page shows the current count.
 - The system tells you when a motion needs a companion document: a brief (MCR 2.119), a
   meet-and-confer certification (MCR 2.313) or a proposed order.
 - File from the docket: open a case and click "File in this case". The court, case and case
@@ -190,7 +184,8 @@ MUEFS/
   record of changes.
 - Scoped administration: court delegates manage their own court's staff. System
   administrators control identity bindings and administrator rights.
-- The system shows counts of courts, users, cases, filings and pending reviews.
+- System administrators can read counts of courts, users, cases, filings and pending reviews
+  from `GET /api/v1/admin/stats`. The portal does not show them.
 - The code is open source.
 
 ### For the public and press
@@ -233,6 +228,14 @@ rather than defaulting them, so tests run on SQLite and local storage, and a `DA
 exported for the app cannot send test uploads to a real bucket. Service-backed tests opt in
 through the `MUEFS_TEST_*` variables instead.
 
+#### Row-lock order
+
+On PostgreSQL, a transaction that takes several row locks takes them in this order: `users`,
+then `filing_envelopes` in ascending id, then `courts` and `case_types`, then `cases`. No path
+may hold a court, case-type or case lock while it waits for an envelope. Checks made before the
+envelope lock call `validate_filing_destination(..., lock=False)` so that they take no lock.
+`tests/test_filing_lock_order.py` pins the order for uploads, submission and batch review.
+
 #### Reseeding demo data
 
 Seeding runs only once. After that it skips, so a database keeps its old seed data even
@@ -269,6 +272,24 @@ npm run build             # Production build
 ```
 
 From the repo root you can also run `npm run dev` (full demo stack), `npm test`, and `npm run lint`.
+
+The build self-hosts Public Sans as WOFF2 from `frontend/src/assets/fonts`, with its license in
+`OFL.txt`. It puts React and the router in a `vendor` chunk, so a deploy that changes only app
+code keeps that file's name and browsers keep it cached. `index.html` loads `/config.js` with
+`defer`. It still runs before the app, because deferred scripts and module scripts run in
+document order.
+
+### Comment guard
+
+The code and config carry no comments. From the repo root, once `frontend/node_modules` exists:
+
+```bash
+python scripts/check_comments.py
+```
+
+The CI `frontend-build` job runs the same command and fails on any comment outside
+`scripts/comment-allowlist.json`, which is empty. A new file type fails until the guard has a
+scanner for it or lists it as having no comment syntax.
 
 ## Security and compliance
 
@@ -311,6 +332,8 @@ model, the threat boundaries and the hardening guide.
 - MCR 2.002: fee waivers for filers who cannot afford the fees.
 - MCR 2.119: companion documents for motions (brief, proposed order).
 - MCR 2.313: a meet-and-confer certification for discovery motions.
+- [Court rules the code applies](docs/COURT_RULES.md) explains how the checklists, the
+  validator and the seed data use these rules.
 - Accessibility needs an independent conformance evaluation. Responsive layouts and keyboard
   controls alone do not show WCAG compliance.
 
