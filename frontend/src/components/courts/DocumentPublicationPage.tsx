@@ -161,7 +161,7 @@ export default function DocumentPublicationPage() {
             <input id="public-pdf" name="file" type="file" accept="application/pdf,.pdf" required /></div>
           <button className="btn btn-secondary" disabled={busy}>{busy ? 'Working…' : 'Prepare copy for review'}</button>
         </form>
-        {selected && <form className="review-card publication-review" key={`review:${documentId}:${selected.id}:${current.data.version}`} onSubmit={event => change(event, true)}>
+        {selected && <form className="review-card" key={`review:${documentId}:${selected.id}:${current.data.version}`} onSubmit={event => change(event, true)}>
           <h3 ref={reviewHeading} tabIndex={-1}>Review prepared copy</h3><p><strong>{selected.title}</strong> · {selected.page_count} page{selected.page_count === 1 ? '' : 's'} · {formatBytes(selected.file_size_bytes)}</p>
           <DocumentDownload id={current.data.document.id} copyId={selected.id} title={selected.title} />
           <details><summary>Prepared copy fingerprint</summary><code>{selected.sha256_hash}</code></details>

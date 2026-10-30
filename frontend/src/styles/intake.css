@@ -43,7 +43,6 @@
   min-width: 0;
   padding: 1rem;
   margin: 1rem 0;
-  border: 1px solid var(--rule);
   border-radius: var(--radius);
 }
 
