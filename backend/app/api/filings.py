@@ -61,6 +61,31 @@ from app.utils.http_context import client_ip, client_user_agent
 router = APIRouter(prefix="/filings", tags=["Filings"])
 
 
+async def _owned_filing(
+    db: AsyncSession,
+    filing_id: int,
+    user_id: int,
+    *,
+    for_update: bool = False,
+    refusal: str = "Not your filing",
+) -> FilingEnvelope:
+    filing = await filing_service.get_filing(db, filing_id, for_update=for_update)
+    if not filing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
+    if filing.filer_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=refusal)
+    return filing
+
+
+def _upload_response(doc: FilingDocument) -> DocumentUploadResponse:
+    return DocumentUploadResponse(
+        id=doc.id, title=doc.title, file_size_bytes=doc.file_size_bytes,
+        mime_type=doc.mime_type, sha256_hash=doc.sha256_hash,
+        is_text_searchable=doc.is_text_searchable, page_count=doc.page_count,
+        warnings=doc.pii_warnings or [],
+    )
+
+
 @router.post(
     "", response_model=FilingEnvelopeResponse, status_code=status.HTTP_201_CREATED,
     responses={200: {"model": FilingEnvelopeResponse, "description": "Existing creation request"}},
@@ -177,12 +202,7 @@ async def update_filing(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
-    user_id = current_user.id
-    filing = await filing_service.get_filing(db, filing_id, for_update=True)
-    if not filing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
-    if filing.filer_id != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your filing")
+    filing = await _owned_filing(db, filing_id, current_user.id, for_update=True)
     if (
         data.expected_details_token is not None
         and data.expected_details_token != filing.details_token
@@ -238,14 +258,9 @@ async def validate_filing(
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
-    filing = await filing_service.get_filing(db, filing_id)
-    if not filing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
-    if filing.filer_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this filing",
-        )
+    filing = await _owned_filing(
+        db, filing_id, user_id, refusal="Not authorized to access this filing",
+    )
     try:
         await filing_service.validate_filing_destination(db, filing, filer_id=user_id)
     except filing_service.FilingDestinationError as exc:
@@ -264,14 +279,7 @@ async def submit_filing(
 ):
     user_id = current_user.id
     await require_user_may_manage_efilings(await lock_current_user(db, user_id))
-    filing_check = await filing_service.get_filing(db, filing_id)
-    if not filing_check:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
-    if filing_check.filer_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this filing",
-        )
+    await _owned_filing(db, filing_id, user_id, refusal="Not authorized to access this filing")
 
     try:
         filing = await filing_service.submit_filing(
@@ -317,11 +325,7 @@ async def upload_document(
 ):
     user_id = current_user.id
     # Authorization and status checks without locking across AV / S3 I/O.
-    filing = await filing_service.get_filing(db, filing_id)
-    if not filing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
-    if filing.filer_id != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your filing")
+    filing = await _owned_filing(db, filing_id, user_id)
 
     def fingerprint(sha256: str, size: int) -> str:
         fields = [document_type_code, title, is_confidential,
@@ -340,12 +344,7 @@ async def upload_document(
                 "This document was already uploaded and later removed. "
                 "Review the saved filing before starting another upload."
             ))
-        return DocumentUploadResponse(
-            id=doc.id, title=doc.title, file_size_bytes=doc.file_size_bytes,
-            mime_type=doc.mime_type, sha256_hash=doc.sha256_hash,
-            is_text_searchable=doc.is_text_searchable, page_count=doc.page_count,
-            warnings=doc.pii_warnings or [],
-        )
+        return _upload_response(doc)
 
     key = str(idempotency_key)
     recorded = await db.get(DocumentUploadRequest, (filing_id, key))
@@ -368,8 +367,8 @@ async def upload_document(
         await require_user_may_manage_efilings(await lock_current_user(db, user_id))
         # Insert only after locking: an earlier document INSERT takes a foreign-key
         # lock that can deadlock when simultaneous uploads upgrade the envelope lock.
-        filing = await filing_service.get_filing(db, filing_id, for_update=True)
-        if not filing or filing.filer_id != user_id:
+        locked = await filing_service.get_filing(db, filing_id, for_update=True)
+        if not locked or locked.filer_id != user_id:
             raise HTTPException(status_code=403, detail="Not your filing")
         recorded = await db.get(DocumentUploadRequest, (filing_id, key), populate_existing=True)
         if recorded:
@@ -377,7 +376,7 @@ async def upload_document(
             await run_in_threadpool(document_service.delete_document, doc.file_key)
             storage_intent.release_upload(db.sync_session, doc.file_key)
             return response
-        if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
+        if locked.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
             raise HTTPException(status_code=400, detail="Cannot upload documents to this filing")
         db.add(doc)
         await db.flush()
@@ -385,7 +384,7 @@ async def upload_document(
             envelope_id=filing_id, key=key, document_id=doc.id,
             fingerprint=fingerprint(doc.sha256_hash, doc.file_size_bytes),
         ))
-        filing.fee_version += 1
+        locked.fee_version += 1
         await audit_service.log_action(
             db, user_id=user_id, action="upload_document", entity_type="filing_document",
             entity_id=doc.id, details={"filing_id": filing_id, "filename": file.filename},
@@ -394,12 +393,7 @@ async def upload_document(
     except Exception:
         await run_in_threadpool(storage_intent.purge_keys, {doc.file_key})
         raise
-    return DocumentUploadResponse(
-        id=doc.id, title=doc.title, file_size_bytes=doc.file_size_bytes,
-        mime_type=doc.mime_type, sha256_hash=doc.sha256_hash,
-        is_text_searchable=doc.is_text_searchable, page_count=doc.page_count,
-        warnings=doc.pii_warnings or [],
-    )
+    return _upload_response(doc)
 
 
 @router.delete("/{filing_id}/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -411,11 +405,7 @@ async def remove_document(
     current_user: User = Depends(require_user_may_manage_efilings),
 ):
     user_id = current_user.id
-    filing = await filing_service.get_filing(db, filing_id, for_update=True)
-    if not filing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found")
-    if filing.filer_id != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your filing")
+    filing = await _owned_filing(db, filing_id, user_id, for_update=True)
 
     # Record immutability: only draft/returned envelopes may drop attachments (court retention).
     if filing.status not in (FilingStatus.DRAFT, FilingStatus.RETURNED):
