@@ -447,6 +447,48 @@ it('shows a failed queue load inline and loads it again on retry', async () => {
   expect(screen.queryByRole('alert')).toBeNull();
 });
 
+const queueBusy = () => document.querySelector('.queue-layout')?.getAttribute('aria-busy');
+
+it('marks the queue busy from its first render until the response arrives', async () => {
+  let respond = (_queue: ClerkQueue) => {};
+  vi.mocked(getClerkQueue).mockReturnValue(new Promise<ClerkQueue>(resolve => { respond = resolve; }));
+  openQueue();
+  expect(queueBusy()).toBe('true');
+
+  respond({
+    filings: [summary(11)], total: 1, page_size: 25, submitted_count: 1, under_review_count: 0,
+    waiting_48h: 0, oldest_submitted_at: null, as_of: '2026-09-28T13:00:00Z',
+  });
+
+  await screen.findByText('Case 11');
+  expect(queueBusy()).toBe('false');
+});
+
+it('stops showing the queue as busy once a load fails', async () => {
+  vi.mocked(getClerkQueue).mockRejectedValue(new Error('Network Error'));
+  openQueue();
+
+  await screen.findByRole('alert');
+  await waitFor(() => expect(queueBusy()).toBe('false'));
+});
+
+it('falls back to the last page when the requested page has emptied', async () => {
+  serveQueuePage([11], 26);
+  openQueue();
+  await screen.findByText('Case 11');
+  vi.mocked(getClerkQueue).mockImplementation(async (_court, options): Promise<ClerkQueue> => ({
+    filings: options?.page === 2 ? [] : [summary(11)], total: 25, page_size: 25,
+    submitted_count: 25, under_review_count: 0, waiting_48h: 0,
+    oldest_submitted_at: null, as_of: '2026-09-28T13:00:00Z',
+  }));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+  await screen.findByText('Case 11');
+  await waitFor(() => expect(queueOptions()).toMatchObject({ page: 1 }));
+  await waitFor(() => expect(queueBusy()).toBe('false'));
+});
+
 it('shows a filing that fails to open inline in the review panel', async () => {
   serveQueues([11]);
   vi.mocked(getFiling).mockRejectedValueOnce({ response: { status: 404, data: { detail: 'Filing not found' } } })
