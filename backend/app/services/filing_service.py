@@ -14,6 +14,7 @@ from app.models.case import Case, CaseStatus
 from app.models.court import CaseType, Court, FilingRequirement
 from app.models.filing import COURT_DOCUMENT_TYPES, FilingDocument, FilingEnvelope, FilingStatus
 from app.models.filing_transaction import FilingTransaction
+from app.models.user import User
 from app.schemas.common import MAX_RECORD_ID
 from app.schemas.filing import (
     ClerkQueueResponse,
@@ -192,8 +193,10 @@ async def validate_filing_destination(
         )
         if case is None:
             raise FilingDestinationError(404, "Case not found")
-        if filer_id is not None and not await access_service.user_may_file_on_case(
-            db, filer_id, data.case_id,
+        filer = await db.get(User, filer_id) if filer_id is not None else None
+        if filer_id is not None and (
+            filer is None
+            or not await access_service.user_may_file_on_case(db, filer, data.case_id)
         ):
             raise FilingDestinationError(
                 403, "Court-reviewed case participation is required to file on this case",

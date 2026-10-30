@@ -5,10 +5,12 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+from fastapi import Depends
 from sqlalchemy import func, select
 
-from app.api.auth import get_current_user_id
+from app.api.auth import get_current_user
 from app.config import settings
+from app.database import get_db
 from app.main import app
 from app.models.court import CaseType
 from app.models.filing import FilingEnvelope, FilingStatus
@@ -300,7 +302,10 @@ async def test_balance_ignores_invalid_credits_and_demo_funds_in_production(
     production = await fee_state(db_session, filing, filer)
     assert production.paid_cents == 200 and production.balance_due_cents == 800
     assert not production.obligation_met and not production.payments_simulated
-    app.dependency_overrides[get_current_user_id] = lambda: filer
+    async def filer_account(db=Depends(get_db, scope="function")):
+        return await db.get(User, filer)
+
+    app.dependency_overrides[get_current_user] = filer_account
     try:
         unavailable = await api_client.post(
             "/api/v1/payments/process",
@@ -314,7 +319,7 @@ async def test_balance_ignores_invalid_credits_and_demo_funds_in_production(
         assert unavailable.status_code == 503, unavailable.text
         assert await db_session.scalar(select(func.count()).select_from(Payment)) == 9
     finally:
-        app.dependency_overrides.pop(get_current_user_id, None)
+        app.dependency_overrides.pop(get_current_user, None)
     # A later signed waiver decision controls the balance, not an old manual assessment.
     filing.fee_version += 1
     filing.fee_waiver_requested = True

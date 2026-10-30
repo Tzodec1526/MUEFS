@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from app.api.auth import get_current_user_id, require_user_may_manage_efilings
+from app.api.auth import get_current_user, require_user_may_manage_efilings
 from app.main import app
 from app.models.audit import AuditLog
 from app.models.filing import DocumentUploadRequest, FilingDocument, FilingEnvelope, FilingStatus
@@ -156,7 +156,7 @@ async def test_replay_after_submission_and_keys_are_scoped_to_the_filing(filing_
     assert distinct.status_code == 200 and distinct.json()["id"] != first.json()["id"]
     # Replay still goes through the current account and filing-ownership checks.
     app.dependency_overrides.pop(require_user_may_manage_efilings, None)
-    app.dependency_overrides.pop(get_current_user_id, None)
+    app.dependency_overrides.pop(get_current_user, None)
     user = await db_session.get(User, filing.filer_id)
     user.is_active = False
     await db_session.flush()

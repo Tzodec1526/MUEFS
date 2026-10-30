@@ -3,13 +3,13 @@ from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.auth import get_optional_user_id
+from app.api.auth import get_optional_user
 from app.api.params import Page, RecordId
 from app.database import get_db
 from app.models.case import Case, CaseStatus
 from app.models.document_public_copy import DocumentPublicCopy
 from app.models.filing import PRIVATE_DOCUMENT_TYPES, FilingDocument, FilingEnvelope
-from app.models.user import CourtRole, UserCourtRole
+from app.models.user import CourtRole, User, UserCourtRole
 from app.schemas.case import (
     CaseDocketResponse,
     CaseSearchResponse,
@@ -57,7 +57,7 @@ async def search_cases(
 async def get_case(
     case_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
-    user_id: int | None = Depends(get_optional_user_id),
+    user: User | None = Depends(get_optional_user),
 ):
     """Public docket for a single case. Non-sealed: open to anyone; sealed: restricted."""
     result = await db.execute(
@@ -66,7 +66,7 @@ async def get_case(
     case = result.scalar_one_or_none()
     if not case:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
-    if not await access_service.user_may_read_case(db, user_id, case_id):
+    if not await access_service.user_may_read_case(db, user, case_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access this case",
@@ -74,10 +74,10 @@ async def get_case(
     profile = CaseDocketResponse.model_validate(case)
     return profile.model_copy(update={
         "can_manage_records": await access_service.user_is_court_staff_for_court(
-            db, user_id, case.court_id,
+            db, user.id if user else None, case.court_id,
         ),
-        "can_file": user_id is not None and await access_service.user_may_file_on_case(
-            db, user_id, case_id,
+        "can_file": user is not None and await access_service.user_may_file_on_case(
+            db, user, case_id,
         ),
     })
 
@@ -88,12 +88,13 @@ async def get_case_filings(
     page: Page = 1,
     page_size: int = Query(25, ge=1, le=100),
     db: AsyncSession = Depends(get_db, scope="function"),
-    user_id: int | None = Depends(get_optional_user_id),
+    user: User | None = Depends(get_optional_user),
 ):
+    user_id = user.id if user else None
     case = await db.get(Case, case_id)
     if case is None:
         raise HTTPException(status_code=404, detail="Case not found")
-    if not await access_service.user_may_read_case(db, user_id, case_id):
+    if not await access_service.user_may_read_case(db, user, case_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access filings for this case",

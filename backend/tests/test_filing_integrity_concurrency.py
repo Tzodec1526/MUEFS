@@ -5,6 +5,7 @@ import threading
 from uuid import uuid4
 
 import pytest
+from fastapi import Depends
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
 
@@ -40,13 +41,14 @@ async def test_deactivation_after_authentication_blocks_filing_transition(
         async with postgres_sessions.begin() as db:
             yield db
 
-    async def authenticated_id():
+    async def authenticated_account(db=Depends(get_db, scope="function")):
+        account = await db.get(User, actor)
         authenticated.set()
         await asyncio.wait_for(revoked.wait(), 5)
-        return actor
+        return account
 
     app.dependency_overrides[get_db] = database
-    app.dependency_overrides[auth.get_current_user_id] = authenticated_id
+    app.dependency_overrides[auth.get_current_user] = authenticated_account
     try:
         async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
             pending = asyncio.create_task(
@@ -79,7 +81,7 @@ async def test_deactivation_after_authentication_blocks_filing_transition(
             )
     finally:
         app.dependency_overrides.pop(get_db, None)
-        app.dependency_overrides.pop(auth.get_current_user_id, None)
+        app.dependency_overrides.pop(auth.get_current_user, None)
 
 
 async def test_competing_reverse_order_batches_finish_without_duplicate_acceptance(

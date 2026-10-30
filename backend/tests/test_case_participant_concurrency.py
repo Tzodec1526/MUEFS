@@ -4,7 +4,7 @@ import asyncio
 from datetime import UTC, datetime
 
 import pytest
-from fastapi import Depends
+from fastapi import Depends, Header
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, func, select
 
@@ -117,8 +117,8 @@ async def test_revocation_after_authentication_prevents_pending_case_edit(
         async with postgres_sessions.begin() as db:
             yield db
 
-    async def pause_after_auth(db=Depends(get_db), user_id=Depends(auth.get_current_user_id)):
-        actor = await auth.get_current_user(db, user_id)
+    async def pause_after_auth(db=Depends(get_db), user_id: int = Header(alias="X-Demo-User-Id")):
+        actor = await auth.get_current_user(db, None, user_id, None)
         authenticated.set()
         await asyncio.wait_for(revoked.wait(), 5)
         return actor

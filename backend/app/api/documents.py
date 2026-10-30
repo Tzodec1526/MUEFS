@@ -12,11 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import iterate_in_threadpool, run_in_threadpool
 from starlette.types import Receive, Scope, Send
 
-from app.api.auth import get_current_user_id, get_optional_user_id
+from app.api.auth import get_current_user, get_optional_user
 from app.api.params import RecordId
 from app.database import get_db
 from app.models.document_public_copy import DocumentPublicCopy
 from app.models.filing import FilingDocument
+from app.models.user import User
 from app.schemas.document import DocumentVerifyResponse
 from app.services import access_service, audit_service, document_service
 from app.utils.http_context import client_ip, client_user_agent
@@ -96,7 +97,7 @@ async def download_document(
     request: Request,
     document_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
-    user_id: int | None = Depends(get_optional_user_id),
+    user: User | None = Depends(get_optional_user),
 ):
     """Public download for non-confidential documents on non-sealed, accepted
     filings. Confidential documents and sealed matters require an authorized account."""
@@ -107,7 +108,7 @@ async def download_document(
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    if not await access_service.user_may_read_document(db, user_id, doc):
+    if not await access_service.user_may_read_document(db, user, doc):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access this document",
@@ -115,7 +116,7 @@ async def download_document(
 
     await audit_service.log_action(
         db,
-        user_id=user_id,
+        user_id=user.id if user else None,
         action="document_download",
         entity_type="filing_document",
         entity_id=document_id,
@@ -131,7 +132,7 @@ async def download_document(
 async def verify_document(
     document_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
-    user_id: int = Depends(get_current_user_id),
+    user: User = Depends(get_current_user),
 ):
     result = await db.execute(
         select(FilingDocument).where(FilingDocument.id == document_id)
@@ -140,7 +141,7 @@ async def verify_document(
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    if not await access_service.user_may_read_document(db, user_id, doc):
+    if not await access_service.user_may_read_document(db, user, doc):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access this document",

@@ -20,6 +20,7 @@ import app.seed_data as seed_data
 from app.models.case import Case
 from app.models.court import CaseType, Court, CourtType, FilingRequirement
 from app.models.filing import FilingDocument
+from app.models.user import User
 from app.readiness import EXPECTED_HEADS
 from app.services import access_service, document_service
 from app.services.filing_service import requirements_for_filing_type
@@ -175,12 +176,12 @@ async def test_sample_participants_can_file_only_on_their_reviewed_cases(seeded_
     engine = create_async_engine(f"sqlite+aiosqlite:///{seeded_session.bind.url.database}")
     try:
         async with AsyncSession(engine) as db:
-            assert await access_service.user_may_file_on_case(db, 1, 1)
-            assert await access_service.user_may_file_on_case(db, 1, 2)
-            assert await access_service.user_may_file_on_case(db, 4, 2)
-            assert not await access_service.user_may_file_on_case(db, 4, 1)
-            assert not await access_service.user_may_file_on_case(db, 1, 3)
-            assert not await access_service.user_may_file_on_case(db, 5, 1)
+            assert await access_service.user_may_file_on_case(db, await db.get(User, 1), 1)
+            assert await access_service.user_may_file_on_case(db, await db.get(User, 1), 2)
+            assert await access_service.user_may_file_on_case(db, await db.get(User, 4), 2)
+            assert not await access_service.user_may_file_on_case(db, await db.get(User, 4), 1)
+            assert not await access_service.user_may_file_on_case(db, await db.get(User, 1), 3)
+            assert not await access_service.user_may_file_on_case(db, await db.get(User, 5), 1)
     finally:
         await engine.dispose()
 

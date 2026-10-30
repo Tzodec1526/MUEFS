@@ -81,21 +81,17 @@ def case_visibility_filter(user: User | None) -> ColumnElement[bool]:
     return or_(public, participant_grant, staff_grant)
 
 
-async def user_may_read_sealed_case(db: AsyncSession, user_id: int | None, case_id: int) -> bool:
+async def user_may_read_sealed_case(db: AsyncSession, user: User | None, case_id: int) -> bool:
     """Sealed docket: explicit participant grants, court staff and system administrators."""
-    if user_id is None:
+    if user is None:
         return False
-    user = await db.get(User, user_id)
-    return bool(user and await db.scalar(select(Case.id).where(
+    return bool(await db.scalar(select(Case.id).where(
         Case.id == case_id, Case.is_sealed.is_(True), case_visibility_filter(user),
     )))
 
 
-async def user_may_read_case(db: AsyncSession, user_id: int | None, case_id: int) -> bool:
+async def user_may_read_case(db: AsyncSession, user: User | None, case_id: int) -> bool:
     """Non-sealed: anyone, including anonymous public visitors. Sealed: restricted list."""
-    user = await db.get(User, user_id) if user_id is not None else None
-    if user_id is not None and user is None:
-        return False
     return bool(await db.scalar(select(Case.id).where(
         Case.id == case_id, case_visibility_filter(user),
     )))
@@ -104,10 +100,9 @@ async def user_may_read_case(db: AsyncSession, user_id: int | None, case_id: int
 PUBLIC_ACCOUNT_REFUSAL = "Public docket accounts cannot create or manage e-filings."
 
 
-async def user_may_file_on_case(db: AsyncSession, user_id: int, case_id: int) -> bool:
+async def user_may_file_on_case(db: AsyncSession, user: User, case_id: int) -> bool:
     """Subsequent filings require a court-reviewed participant grant, not public docket read."""
-    user = await db.get(User, user_id)
-    if user is None or not user.is_active or user.user_type == UserType.PUBLIC:
+    if not user.is_active or user.user_type == UserType.PUBLIC:
         return False
     counsel = (
         CaseParticipant.attorney_bar_number == user.bar_number
@@ -128,12 +123,13 @@ async def user_may_file_on_case(db: AsyncSession, user_id: int, case_id: int) ->
     )
     if not participation:
         return False
-    return await user_may_read_case(db, user_id, case_id)
+    return await user_may_read_case(db, user, case_id)
 
 
 async def user_may_read_filing_envelope(
-    db: AsyncSession, user_id: int | None, envelope: FilingEnvelope
+    db: AsyncSession, user: User | None, envelope: FilingEnvelope
 ) -> bool:
+    user_id = user.id if user else None
     if envelope.filer_id == user_id:
         return True
     if await user_is_court_staff_for_court(db, user_id, envelope.court_id):
@@ -151,14 +147,15 @@ async def user_may_read_filing_envelope(
         return False
 
     if case.is_sealed:
-        return await user_may_read_sealed_case(db, user_id, envelope.case_id)
+        return await user_may_read_sealed_case(db, user, envelope.case_id)
 
     return True
 
 
 async def user_may_read_document(
-    db: AsyncSession, user_id: int | None, doc: FilingDocument
+    db: AsyncSession, user: User | None, doc: FilingDocument
 ) -> bool:
+    user_id = user.id if user else None
     env_row = await db.execute(
         select(FilingEnvelope).where(FilingEnvelope.id == doc.envelope_id)
     )
@@ -174,4 +171,4 @@ async def user_may_read_document(
             return True
         return await user_is_court_staff_for_court(db, user_id, envelope.court_id)
 
-    return await user_may_read_filing_envelope(db, user_id, envelope)
+    return await user_may_read_filing_envelope(db, user, envelope)

@@ -203,9 +203,10 @@ async def withhold_document(
 
 async def may_read_public_copy(
     db: AsyncSession,
-    user_id: int | None,
+    user: User | None,
     copy: DocumentPublicCopy,
 ) -> bool:
+    user_id = user.id if user else None
     doc = await db.get(FilingDocument, copy.document_id)
     filing = await db.get(FilingEnvelope, doc.envelope_id) if doc else None
     if doc is None or filing is None:
@@ -227,4 +228,4 @@ async def may_read_public_copy(
         )
     if doc.public_copy_id != copy.id or publication_block(doc, filing) or filing.case_id is None:
         return False
-    return await access_service.user_may_read_case(db, user_id, filing.case_id)
+    return await access_service.user_may_read_case(db, user, filing.case_id)

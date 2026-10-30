@@ -120,7 +120,11 @@ async def test_public_docket_accounts_are_never_offered_filing(db_session):
         access_enabled=True, reviewed_at=datetime.now(UTC),
     ))
     await db_session.flush()
-    assert await access_service.user_may_file_on_case(db_session, filer, case.id)
+    assert await access_service.user_may_file_on_case(
+        db_session, await db_session.get(User, filer), case.id,
+    )
     (await db_session.get(User, filer)).user_type = UserType.PUBLIC
     await db_session.flush()
-    assert not await access_service.user_may_file_on_case(db_session, filer, case.id)
+    assert not await access_service.user_may_file_on_case(
+        db_session, await db_session.get(User, filer), case.id,
+    )

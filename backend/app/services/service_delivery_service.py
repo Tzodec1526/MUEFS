@@ -89,7 +89,7 @@ async def require_sender(
             )
             .limit(1)
         )
-        if not participation or not await access_service.user_may_read_case(db, actor.id, case.id):
+        if not participation or not await access_service.user_may_read_case(db, actor, case.id):
             raise HTTPException(
                 403, "Court-reviewed case participation is required to send documents"
             )
@@ -352,7 +352,7 @@ async def require_delivery_viewer(
                 or not actor.bar_number
                 or actor.bar_number != participant.attorney_bar_number
             )
-            or not await access_service.user_may_read_case(db, actor.id, case.id)
+            or not await access_service.user_may_read_case(db, actor, case.id)
         ):
             raise HTTPException(403, "Current case participation and access are required")
         # The stable account retains past deliveries when its service email changes.

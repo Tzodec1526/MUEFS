@@ -11,8 +11,8 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
 from app.api.auth import (
-    get_current_user_id,
-    get_optional_user_id,
+    get_current_user,
+    get_optional_user,
     require_user_may_manage_efilings,
 )
 from app.config import settings
@@ -42,8 +42,8 @@ async def filing_client(db_session, monkeypatch, tmp_path):
 
     app.dependency_overrides[get_db] = override_db
     app.dependency_overrides[require_user_may_manage_efilings] = lambda: user
-    app.dependency_overrides[get_optional_user_id] = lambda: user.id
-    app.dependency_overrides[get_current_user_id] = lambda: user.id
+    app.dependency_overrides[get_optional_user] = lambda: user
+    app.dependency_overrides[get_current_user] = lambda: user
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             yield client, envelope, tmp_path

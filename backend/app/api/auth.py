@@ -35,36 +35,22 @@ def _bearer_token(authorization: str | None) -> str | None:
     return raw or None
 
 
-async def _resolve_demo_user_id(db: AsyncSession, x_demo_user_id: int) -> int:
-    """Validate demo header belongs to an active user; there is no default account."""
-    result = await db.execute(select(User.id).where(
-        User.id == x_demo_user_id, User.is_active.is_(True),
-    ))
-    uid = result.scalar_one_or_none()
-    if uid is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unknown or disabled demo user id",
-        )
-    return uid
-
-
-async def get_current_user_id(
-    db: AsyncSession = Depends(get_db, scope="function"),
-    authorization: str | None = Header(None),
-    x_demo_user_id: int | None = Header(
-        default=None, alias="X-Demo-User-Id", le=MAX_RECORD_ID,
-    ),
-    x_demo_auth_secret: str | None = Header(default=None, alias="X-Demo-Auth-Secret"),
-) -> int:
-    """Resolve the authenticated internal user id. Fail closed.
-
-    - Production (allow_demo_mode=False): valid Keycloak Bearer JWT only; user must
-      exist with matching keycloak_id (OIDC 'sub').
-    - Demo (allow_demo_mode=True): JWT if valid and provisioned, else X-Demo-User-Id
-      when the user id exists in the database (no default user).
-    """
+async def _resolve_user(
+    db: AsyncSession,
+    authorization: str | None,
+    x_demo_user_id: int | None,
+    x_demo_auth_secret: str | None,
+    *,
+    required: bool,
+) -> User | None:
     token = _bearer_token(authorization)
+
+    def demo_permitted() -> bool:
+        return (
+            settings.allow_demo_mode
+            and x_demo_user_id is not None
+            and demo_headers_permitted(x_demo_auth_secret)
+        )
 
     if token:
         try:
@@ -72,60 +58,95 @@ async def get_current_user_id(
         except IdentityProviderUnavailableError:
             raise _identity_provider_unavailable() from None
         except JWTError:
-            if (
-                settings.allow_demo_mode
-                and x_demo_user_id is not None
-                and demo_headers_permitted(x_demo_auth_secret)
-            ):
-                return await _resolve_demo_user_id(db, x_demo_user_id)
+            if required and not demo_permitted():
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid or expired token",
+                ) from None
+            claims = None
+        if claims is not None:
+            sub = claims.get("sub")
+            if not sub and required:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token: missing subject",
+                )
+            if sub:
+                user = await db.scalar(select(User).where(User.keycloak_id == sub))
+                if not user and settings.provision_user_on_first_oidc_login:
+                    user = await provision_user_from_oidc(db, sub=sub, claims=claims)
+                if not user and required:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="User not provisioned for this system",
+                    )
+                if user and not user.is_active and required:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Account disabled",
+                    )
+                if user and user.is_active:
+                    sync_verified_email(user, claims)
+                    return user
+
+    if demo_permitted():
+        user = await db.scalar(select(User).where(
+            User.id == x_demo_user_id, User.is_active.is_(True),
+        ))
+        if user is None and required:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or expired token",
-            ) from None
-        sub = claims.get("sub")
-        if not sub:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token: missing subject",
+                detail="Unknown or disabled demo user id",
             )
-        result = await db.execute(select(User).where(User.keycloak_id == sub))
-        user = result.scalar_one_or_none()
-        if not user and settings.provision_user_on_first_oidc_login:
-            user = await provision_user_from_oidc(db, sub=sub, claims=claims)
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not provisioned for this system",
-            )
-        if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Account disabled",
-            )
-        sync_verified_email(user, claims)
-        return user.id
+        return user
 
-    if (
-        settings.allow_demo_mode
-        and x_demo_user_id is not None
-        and demo_headers_permitted(x_demo_auth_secret)
-    ):
-        return await _resolve_demo_user_id(db, x_demo_user_id)
-
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Authentication required",
-    )
+    return None
 
 
-async def get_optional_user_id(
+async def get_current_user(
     db: AsyncSession = Depends(get_db, scope="function"),
     authorization: str | None = Header(None),
     x_demo_user_id: int | None = Header(
         default=None, alias="X-Demo-User-Id", le=MAX_RECORD_ID,
     ),
     x_demo_auth_secret: str | None = Header(default=None, alias="X-Demo-Auth-Secret"),
-) -> int | None:
+) -> User:
+    user = await _resolve_user(
+        db, authorization, x_demo_user_id, x_demo_auth_secret, required=True,
+    )
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    return user
+
+
+async def get_current_user_id(current_user: User = Depends(get_current_user)) -> int:
+    """Resolve the authenticated internal user id. Fail closed.
+
+    - Production (allow_demo_mode=False): valid Keycloak Bearer JWT only; user must
+      exist with matching keycloak_id (OIDC 'sub').
+    - Demo (allow_demo_mode=True): JWT if valid and provisioned, else X-Demo-User-Id
+      when the user id exists in the database (no default user).
+    """
+    return current_user.id
+
+
+async def get_optional_user(
+    db: AsyncSession = Depends(get_db, scope="function"),
+    authorization: str | None = Header(None),
+    x_demo_user_id: int | None = Header(
+        default=None, alias="X-Demo-User-Id", le=MAX_RECORD_ID,
+    ),
+    x_demo_auth_secret: str | None = Header(default=None, alias="X-Demo-Auth-Secret"),
+) -> User | None:
+    return await _resolve_user(
+        db, authorization, x_demo_user_id, x_demo_auth_secret, required=False,
+    )
+
+
+async def get_optional_user_id(user: User | None = Depends(get_optional_user)) -> int | None:
     """Resolve the user id if valid credentials are present, else return None (anonymous).
 
     Used by public-docket read endpoints (case search, docket, public document download).
@@ -136,48 +157,7 @@ async def get_optional_user_id(
     returns an id for a valid token bound to an active provisioned user, or a valid demo id
     when allow_demo_mode is on. Anything else resolves to None, not an error.
     """
-    token = _bearer_token(authorization)
-    if token:
-        try:
-            claims = await decode_keycloak_access_token(token)
-        except IdentityProviderUnavailableError:
-            # Answering anonymously would hide records the caller may be entitled to.
-            raise _identity_provider_unavailable() from None
-        except JWTError:
-            claims = None
-        if claims is not None:
-            sub = claims.get("sub")
-            if sub:
-                result = await db.execute(select(User).where(User.keycloak_id == sub))
-                user = result.scalar_one_or_none()
-                if not user and settings.provision_user_on_first_oidc_login:
-                    user = await provision_user_from_oidc(db, sub=sub, claims=claims)
-                if user and user.is_active:
-                    sync_verified_email(user, claims)
-                    return user.id
-
-    if (
-        settings.allow_demo_mode
-        and x_demo_user_id is not None
-        and demo_headers_permitted(x_demo_auth_secret)
-    ):
-        demo_result = await db.execute(select(User.id).where(
-            User.id == x_demo_user_id, User.is_active.is_(True),
-        ))
-        return demo_result.scalar_one_or_none()
-
-    return None
-
-
-async def get_current_user(
-    db: AsyncSession = Depends(get_db, scope="function"),
-    user_id: int = Depends(get_current_user_id),
-) -> User:
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    return user
+    return user.id if user else None
 
 
 async def require_user_may_manage_efilings(current_user: User = Depends(get_current_user)) -> User:

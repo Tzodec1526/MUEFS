@@ -274,7 +274,7 @@ async def test_create_filing_on_sealed_case_denied_to_stranger(db_session):
     assert exc.value.status_code == 403
     assert "participation" in str(exc.value).lower() or "authorized" in str(exc.value).lower()
     from app.services import access_service
-    assert await access_service.user_may_read_case(db_session, stranger.id, case.id) is False
+    assert await access_service.user_may_read_case(db_session, stranger, case.id) is False
 
 
 @pytest.mark.asyncio
@@ -301,7 +301,7 @@ async def test_create_filing_on_public_case_denied_without_participant(db_sessio
     db_session.add(case)
     await db_session.flush()
     from app.services import access_service
-    assert await access_service.user_may_read_case(db_session, stranger.id, case.id) is True
+    assert await access_service.user_may_read_case(db_session, stranger, case.id) is True
     data = FilingEnvelopeCreate(
         court_id=court.id,
         case_type_id=case_type.id,

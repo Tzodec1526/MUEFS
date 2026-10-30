@@ -7,7 +7,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
-from app.api.auth import get_current_user, get_optional_user_id
+from app.api.auth import get_current_user, get_optional_user
 from app.api.document_upload import inspect_upload
 from app.api.documents import DocumentResponse
 from app.api.params import Page, RecordId
@@ -203,16 +203,16 @@ async def download_public_copy(
     copy_id: RecordId,
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),
-    user_id: int | None = Depends(get_optional_user_id),
+    user: User | None = Depends(get_optional_user),
 ):
     copy = await db.get(DocumentPublicCopy, copy_id)
     if not copy:
         raise HTTPException(404, "Public copy not found")
-    if not await publication.may_read_public_copy(db, user_id, copy):
+    if not await publication.may_read_public_copy(db, user, copy):
         raise HTTPException(403, "Not authorized to access this copy")
     await audit_service.log_action(
         db,
-        user_id=user_id,
+        user_id=user.id if user else None,
         action="public_copy.downloaded",
         entity_type="document_public_copy",
         entity_id=copy.id,

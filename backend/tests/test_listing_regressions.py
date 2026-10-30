@@ -3,10 +3,11 @@
 from datetime import UTC, datetime
 
 import pytest
+from fastapi import Depends
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event
 
-from app.api.auth import get_current_user_id, get_optional_user_id
+from app.api.auth import get_current_user_id, get_optional_user
 from app.database import get_db
 from app.main import app
 from app.models.case import Case, CaseParticipant, ParticipantRole
@@ -71,7 +72,10 @@ async def test_docket_filters_before_paging_with_bounded_queries(db_session, doc
         yield db_session
 
     app.dependency_overrides[get_db] = override_db
-    app.dependency_overrides[get_optional_user_id] = lambda: user_id
+    async def actor_account(db=Depends(get_db, scope="function")):
+        return await db.get(User, user_id) if user_id is not None else None
+
+    app.dependency_overrides[get_optional_user] = actor_account
     selects = []
     loaded_filings = []
 
@@ -169,7 +173,7 @@ async def test_sealed_access_uses_explicit_grants_not_accepted_filings(db_sessio
             for role in [CourtRole.CLERK, CourtRole.ADMIN]
         ])
     await db_session.flush()
-    assert await access_service.user_may_read_case(db_session, owner.id, case.id) is (
+    assert await access_service.user_may_read_case(db_session, owner, case.id) is (
         grant != "accepted_filings"
     )
 
@@ -217,7 +221,7 @@ async def test_public_copy_docket_loads_only_page_copies_in_one_query(
         doc.public_copy_id = copy.id
         doc.is_confidential = True
     await db_session.flush()
-    app.dependency_overrides[get_optional_user_id] = lambda: None
+    app.dependency_overrides[get_optional_user] = lambda: None
     queries, loaded = [], []
 
     def query(_conn, _cursor, statement, *_args):
@@ -246,7 +250,7 @@ async def test_public_copy_docket_loads_only_page_copies_in_one_query(
     finally:
         event.remove(engine, "before_cursor_execute", query)
         event.remove(db_session.sync_session, "loaded_as_persistent", load)
-        app.dependency_overrides.pop(get_optional_user_id, None)
+        app.dependency_overrides.pop(get_optional_user, None)
 
 
 @pytest.mark.parametrize("view", ["mine", "clerk", "waivers"])
