@@ -31,7 +31,7 @@ That runs `backend/run_demo.py` (same as `npm run dev`): SQLite seed, uvicorn on
 
 3. Teardown: `node .cursor/skills/verify-muefs/helpers/control-muefs.mjs cleanup` kills only the PID tree this run started. Proof artifacts stay in `.cursor/skills/verify-muefs/artifacts/`.
 
-First-time machine: `pip install -e ".[test]"` in `backend/` and `npm install` in `frontend/` (Playwright lives there). Chromium: `cd frontend && npx playwright install chromium`.
+First-time machine: `pip install -e ".[test]" -c constraints.txt` in `backend/` and `npm install` in `frontend/` (Playwright lives there). Chromium: `cd frontend && npx playwright install chromium`.
 
 ## Doctor
 

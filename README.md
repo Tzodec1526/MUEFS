@@ -33,7 +33,7 @@ images use Node 22.23.4.
 ```bash
 git clone https://github.com/Tzodec1526/MUEFS.git
 cd MUEFS/backend
-pip install -e ".[test]"
+pip install -e ".[test]" -c constraints.txt
 python run_demo.py
 ```
 
@@ -204,7 +204,7 @@ MUEFS/
 
 ```bash
 cd backend
-pip install -e ".[test]"
+pip install -e ".[test]" -c constraints.txt
 pytest tests/ -v          # Run full suite (includes HTTP smoke: /health, /docs)
 DEBUG=true uvicorn app.main:app --reload   # Without DEBUG, production startup checks apply
 ```

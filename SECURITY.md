@@ -169,8 +169,10 @@ Configuration:
 Scan before and after changes:
 
 ```bash
-# Python dependency CVEs
-pip install pip-audit && pip-audit
+# Python dependency CVEs, from backend/
+pip install -e . -c constraints.txt
+pip install pip-audit==2.10.1 -c constraints.txt
+pip-audit
 
 # Filesystem / image vulnerability + secret scan
 trivy fs .
