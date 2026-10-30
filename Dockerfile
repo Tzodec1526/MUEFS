@@ -13,8 +13,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY backend/pyproject.toml ./
-RUN pip install --no-cache-dir -e . aiosqlite
+COPY backend/pyproject.toml backend/constraints.txt ./
+RUN pip install --no-cache-dir -e . aiosqlite -c constraints.txt
 
 COPY backend/ ./
 COPY --from=frontend /fe/dist ./static

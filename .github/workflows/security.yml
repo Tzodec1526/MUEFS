@@ -45,8 +45,8 @@ jobs:
         run: |
           cd backend
           python -m pip install --upgrade pip
-          pip install -e .
-          pip install pip-audit==2.10.1
+          pip install -e . -c constraints.txt
+          pip install pip-audit==2.10.1 -c constraints.txt
           pip-audit --desc on
 
   npm-audit:
@@ -74,5 +74,5 @@ jobs:
           python-version: "3.12"
       - name: Run Bandit on backend application code
         run: |
-          pip install bandit==1.9.4
+          pip install bandit==1.9.4 -c backend/constraints.txt
           bandit -r backend/app -ll -q

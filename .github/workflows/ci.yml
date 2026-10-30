@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          pip install -e ".[dev]"
+          pip install -e ".[dev]" -c constraints.txt
       - name: Lint with ruff
         run: |
           cd backend
@@ -74,7 +74,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          pip install -e ".[dev]"
+          pip install -e ".[dev]" -c constraints.txt
       - name: Wait for storage and scanner
         run: |
           for attempt in {1..180}; do

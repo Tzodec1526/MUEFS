@@ -542,6 +542,15 @@ disable demo mode and isolated sessions, and serve the built frontend with its p
 configuration. Supervise the notice worker as a separate process. Pin base images to a
 digest in the production build pipeline; `render.yaml` is a demo deployment example.
 
+`backend/constraints.txt` pins every Python package CI and the images install; `pyproject.toml`
+keeps the lower bounds. To refresh it, resolve in a Linux Python 3.12 container so that packages
+such as `uvloop` are included, then run the full test suite and `pip-audit` on the result:
+
+```sh
+docker run --rm -v "$PWD/backend:/in" python:3.12-slim sh -c 'cd /tmp && cp /in/pyproject.toml . \
+  && pip install -q -e ".[dev]" aiosqlite && pip freeze --exclude-editable > /in/constraints.txt'
+```
+
 Both frontend builds use `node:22.23.4-alpine`, and CI uses the same Node version. The build
 puts React and the router in a `vendor` chunk, so a deploy that changes only app code keeps
 that file's name. The demo server caches `assets/` as immutable, answers a missing asset with
