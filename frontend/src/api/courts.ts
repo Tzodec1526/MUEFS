@@ -23,7 +23,6 @@ interface DirectoryRequest {
   session: SessionSnapshot;
   controller: AbortController;
   callers: number;
-  loaded: boolean;
   entries: Promise<CourtDirectoryEntry[]>;
 }
 
@@ -34,11 +33,8 @@ function requestDirectory(): DirectoryRequest {
   const controller = new AbortController();
   const session = sessionSnapshot();
   const request: DirectoryRequest = {
-    session, controller, callers: 0, loaded: false,
-    entries: apiClient.get<CourtDirectoryEntry[]>('/courts/directory', { signal: controller.signal }).then(({ data }) => {
-      request.loaded = true;
-      return data;
-    }),
+    session, controller, callers: 0,
+    entries: apiClient.get<CourtDirectoryEntry[]>('/courts/directory', { signal: controller.signal }).then(({ data }) => data),
   };
   request.entries.catch(() => { if (directory === request) directory = undefined; });
   directory = request;
@@ -53,7 +49,7 @@ export function listCourtDirectory(signal?: AbortSignal): Promise<CourtDirectory
     const leave = () => {
       reject(new CanceledError());
       request.callers -= 1;
-      if (request.loaded || request.callers > 0) return;
+      if (request.callers > 0) return;
       request.controller.abort();
       if (directory === request) directory = undefined;
     };
