@@ -1,6 +1,6 @@
 import { clearFilingDrafts } from '../../utils/filingDraft';
 import { useContext } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { isDemoBuild } from '../../config/demoMode';
 import { signOut } from '../../auth/keycloak';
 import { CourtContext } from '../auth/CourtSession';
@@ -9,7 +9,7 @@ import NotificationBell from './NotificationBell';
 
 function Header() {
   const navigate = useNavigate();
-  const { court, role } = useContext(CourtContext)!;
+  const { role } = useContext(CourtContext)!;
 
   const handleSwitchRole = () => {
     clearFilingDrafts();
@@ -32,35 +32,24 @@ function Header() {
   return (
     <>
       {isDemoBuild() && (
-        <div className="demo-stakeholder-banner" role="status" aria-live="polite">
-          <span>Demo — not for real filings.</span>
+        <p className="demo-stakeholder-banner">
+          Demo — not for real filings.
           <a href="/login" className="demo-banner-link">
             Roles
           </a>
-        </div>
+        </p>
       )}
     <header className="app-header">
       <div className="header-brand">
         <div className="header-seal">
           <MichiganMark size={24} />
         </div>
-        <div>
-          <p className="header-title">Michigan Unified E-Filing System</p>
-          <span className="header-subtitle">Statewide Electronic Filing Portal</span>
-        </div>
+        <p className="header-title">Michigan Unified E-Filing System</p>
       </div>
-      <nav className="header-nav">
-        {role && <Link to="/">Dashboard</Link>}
-        {(role === 'attorney' || role === 'srl') && <Link to="/filing/new">New Filing</Link>}
-        <Link to="/cases/search">Case Search</Link>
-        {court && <Link to="/clerk/queue">Review Queue</Link>}
-      </nav>
       <div className="header-user">
         <NotificationBell />
         {role ? (
-          <span className={`user-badge ${role === 'srl' ? 'user-badge-srl' : ''}`}>
-            {roleLabel}
-          </span>
+          <span className="user-badge">{roleLabel}</span>
         ) : (
           <span>Public visitor</span>
         )}

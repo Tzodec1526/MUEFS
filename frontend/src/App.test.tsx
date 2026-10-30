@@ -432,3 +432,76 @@ it('puts the sign-in page inside a main landmark', async () => {
   expect(within(main).getByRole('heading', { level: 1, name: 'Sign in' })).toBeTruthy();
   expect(within(main).getByRole('button', { name: 'Sign in as Attorney' })).toBeTruthy();
 });
+
+const mainNavigation = () => screen.findByRole('navigation', { name: 'Main' });
+const linkNames = (navigation: HTMLElement) => within(navigation).getAllByRole('link').map(link => link.textContent);
+
+it.each([
+  ['attorney', 'New Filing'],
+  ['srl', 'New Filing'],
+  ['clerk', 'Review Queue'],
+  ['admin', 'People & access'],
+  ['public', 'Case Search'],
+])('leads the one navigation with the main task of a %s', async (role, mainTask) => {
+  serve({ srl: 'self_represented' }[role] ?? role, role === 'clerk' ? clerkAtThirdCircuit : {});
+  openApp('/no-such-page', role);
+
+  const navigation = await mainNavigation();
+  await waitFor(() => expect(linkNames(navigation)[0]).toBe(mainTask));
+  expect(screen.getAllByRole('navigation')).toHaveLength(1);
+});
+
+it('gives an administrator no Dashboard item, since the dashboard is the People & access page', async () => {
+  serve('admin', {});
+  openApp('/no-such-page', 'admin');
+
+  expect(linkNames(await mainNavigation())).not.toContain('Dashboard');
+});
+
+it('keeps the navigation to plain text links with no filler block', async () => {
+  serve('clerk', clerkAtThirdCircuit);
+  openApp('/no-such-page', 'clerk');
+
+  const navigation = await mainNavigation();
+  await waitFor(() => expect(linkNames(navigation)).toContain('Filing Intake'));
+  expect(new Set(linkNames(navigation)).size).toBe(linkNames(navigation).length);
+  expect(navigation.querySelector('svg')).toBeNull();
+  expect(screen.queryByText('Quick Info')).toBeNull();
+});
+
+it('marks the current page in the navigation', async () => {
+  serve('attorney', { '/filings': { filings: [], total: 0, status_counts: {}, court_names: {} } });
+  openApp('/filings', 'attorney');
+
+  const navigation = await mainNavigation();
+  expect(within(navigation).getByRole('link', { name: 'My Filings' }).getAttribute('aria-current')).toBe('page');
+  expect(within(navigation).getByRole('link', { name: 'Case Search' }).getAttribute('aria-current')).toBeNull();
+});
+
+it('opens the small-screen menu and closes it when a link is chosen', async () => {
+  serve('attorney', { '/filings': { filings: [], total: 0, status_counts: {}, court_names: {} } });
+  openApp('/no-such-page', 'attorney');
+  const navigation = await mainNavigation();
+  const toggle = screen.getByRole('button', { name: 'Menu' });
+  expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  expect(document.getElementById(toggle.getAttribute('aria-controls')!)).toBe(within(navigation).getByRole('list'));
+
+  fireEvent.click(toggle);
+
+  expect(screen.getByRole('button', { name: 'Close menu' }).getAttribute('aria-expanded')).toBe('true');
+  expect(screen.getByRole('complementary').className).toContain('open');
+
+  fireEvent.click(within(navigation).getByRole('link', { name: 'My Filings' }));
+
+  expect(screen.getByRole('button', { name: 'Menu' }).getAttribute('aria-expanded')).toBe('false');
+  expect(screen.getByRole('complementary').className).not.toContain('open');
+});
+
+it('shows the demo notice as plain text, not a live region', async () => {
+  serve('attorney', {});
+  openApp('/no-such-page', 'attorney');
+
+  const notice = await screen.findByText(/not for real filings/);
+  expect(notice.tagName).toBe('P');
+  expect(notice.closest('[aria-live], [role="status"], [role="alert"]')).toBeNull();
+});
