@@ -37,9 +37,12 @@ These rules explain why the checklists, the validator and the seed data behave a
 ## Filing dates
 
 - **The filing date is the date filed.** It comes from the first receipt (MCR 1.109(G)(5)(b)).
-  Acceptance does not move it. Neither does a correction: a returned filing that is resubmitted
-  gets a new numbered receipt and keeps its filing date.
+  Acceptance never substitutes the acceptance time or a later receipt. It recomputes the civil
+  date from the first receipt only when the published calendar changed. A correction never moves
+  the date: a returned filing that is resubmitted gets a new numbered receipt and keeps its
+  filing date.
 - **Court orders.** A signed filing-date order sets the date, and a later resubmission keeps it.
+  A court-ordered date is never recomputed.
 
 ## Seed data
 
