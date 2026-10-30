@@ -11,6 +11,7 @@ middleware, database override and SPA routes.
 
 from __future__ import annotations
 
+import mimetypes
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -35,6 +36,7 @@ app.dependency_overrides[get_db] = session_db.get_demo_db
 app.add_middleware(session_db.DemoSessionMiddleware)
 
 _STATIC_ROOT = Path(settings.demo_static_dir).resolve()
+mimetypes.add_type("font/woff2", ".woff2")
 
 
 @app.get("/{full_path:path}", include_in_schema=False)

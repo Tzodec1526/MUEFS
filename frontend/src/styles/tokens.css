@@ -21,7 +21,7 @@
   --danger-tint: #fbe9ec;
 
   --font-sans: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'IBM Plex Mono', 'Cascadia Code', Consolas, monospace;
+  --font-mono: 'Cascadia Code', Consolas, Menlo, monospace;
 
   --radius: 6px;
   --shadow: 0 8px 24px rgba(14, 36, 68, 0.2);

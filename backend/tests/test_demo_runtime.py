@@ -32,6 +32,7 @@ async def test_browser_configuration_is_available_in_the_local_entry_point(
 def test_hosted_asset_responses(tmp_path):
     code = r'''
 import asyncio
+import mimetypes
 import os
 from pathlib import Path
 from httpx import ASGITransport, AsyncClient
@@ -49,6 +50,9 @@ async def exercise():
     (static / "assets").mkdir(parents=True)
     (static / "index.html").write_text("<html>Current demo</html>")
     (static / "assets" / "app-12345678.js").write_text("console.log('current bundle')")
+    (static / "assets" / "public-sans-12345678.woff2").write_bytes(b"wOF2")
+    mimetypes.init()
+    mimetypes.types_map.pop(".woff2", None)
     from app.demo.server import app as hosted
     from app.demo import session_db
 
@@ -68,6 +72,11 @@ async def exercise():
         assert bundle.status_code == 200
         assert bundle.headers["cache-control"] == "public, max-age=31536000, immutable"
         assert "javascript" in bundle.headers["content-type"]
+        font = await client.get("/assets/public-sans-12345678.woff2")
+        assert font.status_code == 200
+        assert font.headers["content-type"] == "font/woff2"
+        assert font.headers["cache-control"] == "public, max-age=31536000, immutable"
+        assert "set-cookie" not in font.headers
         for path in ["/assets/old-deploy.js", "/api/v1/no-such-route"]:
             missing = await client.get(path)
             assert missing.status_code == 404, (path, missing.text)

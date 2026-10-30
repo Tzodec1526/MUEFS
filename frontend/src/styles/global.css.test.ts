@@ -110,6 +110,23 @@ it('gives the court rule links in the wizard checklist a 24 px target', () => {
   expect(selectorLists.find(list => list.includes('.requirement-list a'))).toContain('td > a');
 });
 
+it('serves every font from this origin, in the weights the stylesheets use', () => {
+  expect(read('../../index.html')).not.toMatch(/https?:/);
+  const faces = [...css.matchAll(/@font-face \{([^}]*)\}/g)].map(match => match[1]);
+  expect(faces).toHaveLength(3);
+  for (const face of faces) {
+    expect(face).toMatch(/font-family: 'Public Sans';/);
+    expect(face).toMatch(/font-weight: 400 700;/);
+    expect(face).toMatch(/font-display: swap;/);
+    expect(face).toMatch(/src: url\('\.\.\/assets\/fonts\/public-sans-[\w-]+\.woff2'\) format\('woff2'\);/);
+    expect(face).toMatch(/unicode-range: /);
+  }
+  const weights = new Set([...css.matchAll(/font-weight: (\w+);/g)].map(match => match[1]));
+  expect([...weights].filter(weight => !['normal', '400', '500', '600', '700'].includes(weight))).toEqual([]);
+  expect(css).not.toMatch(/font-style:\s*italic/);
+  expect(css).not.toContain('IBM Plex');
+});
+
 it('keeps every design token in one place', () => {
   const declared = stylesheets.filter(name => /^\s*--[\w-]+:/m.test(read(name)));
   expect(declared).toEqual(['tokens.css']);

@@ -44,6 +44,9 @@ async def test_browser_policy_allows_configured_identity_exchange_only(
     directives = callback.headers["content-security-policy"].split("; ")
     assert f"connect-src 'self' {origin}" in directives
     assert "script-src 'self'" in directives
+    assert "style-src 'self' 'unsafe-inline'" in directives
+    assert "font-src 'self'" in directives
+    assert "fonts.g" not in callback.headers["content-security-policy"]
     assert (
         api.headers["content-security-policy"]
         == "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
