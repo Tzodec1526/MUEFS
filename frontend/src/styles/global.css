@@ -1998,9 +1998,12 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 }
 
 .case-detail-number {
-  font-size: 0.82rem;
+  margin-top: 0.25rem;
   color: var(--muted);
-  margin-bottom: 0.25rem;
+}
+
+.case-detail-number .status-badge {
+  margin-left: 0.35rem;
 }
 
 .case-detail-header h1 {
@@ -2009,6 +2012,7 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 
 .case-detail-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
   flex-shrink: 0;
 }
@@ -2039,9 +2043,8 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
   margin-bottom: 1rem;
 }
 
-.case-detail-card h3 {
+.case-detail-card h2 {
   font-size: 0.95rem;
-  font-weight: 700;
   color: var(--ink);
   margin-bottom: 0.75rem;
 }
@@ -2082,7 +2085,7 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
   margin-bottom: 0.75rem;
 }
 
-.docket-header h3 {
+.docket-header h2 {
   margin: 0;
 }
 

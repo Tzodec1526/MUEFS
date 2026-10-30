@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Link2 } from 'lucide-react';
 import { actionErrorMessage, apiClient } from '../../api/client';
 import { participantRoles, type CaseDocket } from '../../api/cases';
 import { addFavorite, removeFavorite, listFavorites } from '../../api/favorites';
@@ -85,20 +84,27 @@ function CaseDetailPage() {
         setFilings(filingsRes.data);
         setHasMoreFilings(filingsRes.data.length === 25);
         // Fetch court name + case type label for a credible docket header
-        try {
-          const [courtRes, types] = await Promise.all([
-            apiClient.get(`/courts/${caseRes.data.court_id}`, { signal: controller.signal }),
-            // Include types the court has closed to new cases: existing dockets still carry them.
-            getCaseTypes(caseRes.data.court_id, true),
-          ]);
-          if (controller.signal.aborted) return;
-          setCourtName(courtRes.data.name);
-          const ct = types.find((t) => t.id === caseRes.data.case_type_id);
-          if (ct) setCaseTypeName(ct.name);
-        } catch {
-          if (controller.signal.aborted) return;
-          setCourtName(`Court #${caseRes.data.court_id}`);
-        }
+        const report = (err: unknown, fallback: string) => {
+          const message = !controller.signal.aborted && actionErrorMessage(err, fallback);
+          if (message) pushToast(message, 'error');
+        };
+        const [court, types] = await Promise.all([
+          apiClient.get<{ name: string }>(`/courts/${caseRes.data.court_id}`, { signal: controller.signal })
+            .then(({ data }) => data.name)
+            .catch((err: unknown) => {
+              report(err, "Could not load the court's name.");
+              return `Court #${caseRes.data.court_id}`;
+            }),
+          // Include types the court has closed to new cases: existing dockets still carry them.
+          getCaseTypes(caseRes.data.court_id, true).catch((err: unknown) => {
+            report(err, 'Could not load the case type name.');
+            return [];
+          }),
+        ]);
+        if (controller.signal.aborted) return;
+        setCourtName(court);
+        const ct = types.find((t) => t.id === caseRes.data.case_type_id);
+        if (ct) setCaseTypeName(ct.name);
         setIsFavorited(favsRes.favorites.some((f: { case_id: number }) => f.case_id === Number(caseId)));
       } catch (err: unknown) {
         if (controller.signal.aborted) return;
@@ -188,19 +194,13 @@ function CaseDetailPage() {
       {/* Case Header */}
       <div className="case-detail-header">
         <div>
-          <div className="case-detail-number">{caseData.case_number}</div>
           <PageHeading>{caseData.title}</PageHeading>
+          <p className="case-detail-number">
+            {caseData.case_number} <span className={`status-badge ${caseData.status}`}>{caseData.status}</span>
+          </p>
         </div>
         <div className="case-detail-actions">
-          <button
-            type="button"
-            className="btn btn-secondary btn-icon"
-            onClick={copyShareLink}
-            title="Copy shareable case link"
-          >
-            <Link2 size={16} aria-hidden="true" />
-            <span className="sr-only">Copy shareable case link</span>
-          </button>
+          <button type="button" className="btn btn-secondary" onClick={copyShareLink}>Copy link</button>
           {caseData.can_manage_records && <Link to={`/cases/${caseData.id}/participants`} className="btn btn-secondary">Manage case access</Link>}
           {isFiler && (
             <button
@@ -231,7 +231,7 @@ function CaseDetailPage() {
         </div>
       </div>
 
-      {isFiler && !caseData.can_file && <p className="alert alert-info" role="status">
+      {isFiler && !caseData.can_file && <p className="alert alert-info">
         Court-reviewed case participation is required to file documents in this case.
         Contact the court to confirm your access.
       </p>}
@@ -239,20 +239,18 @@ function CaseDetailPage() {
       {/* Case Info */}
       <div className="case-detail-grid">
         <div className="case-detail-card">
-          <h3>Case Information</h3>
+          <h2>Case information</h2>
           <div className="detail-grid">
-            <div><label>Case number</label><span>{caseData.case_number}</span></div>
             <div><label>Case type</label><span>{caseTypeName || '--'}</span></div>
-            <div><label>Status</label><span className={`status-badge ${caseData.status}`}>{caseData.status}</span></div>
             <div><label>Court</label><span>{courtName}</span></div>
             <div><label>Filing date</label><span>{formatCourtDate(caseData.filing_date)}</span></div>
-            {!caseData.filing_date && <div><label>Stored date (not calendar-verified)</label><span>{formatShortDate(caseData.filed_date)}</span></div>}
+            {!caseData.filing_date && <div><label>Date on record (not yet confirmed by the court)</label><span>{formatShortDate(caseData.filed_date)}</span></div>}
           </div>
         </div>
 
         {/* Parties */}
         <div className="case-detail-card">
-          <h3>Participants ({caseData.participants.length})</h3>
+          <h2>Participants ({caseData.participants.length})</h2>
           <div className="parties-list">
             {caseData.participants.map((p) => (
               <div key={p.id} className="party-item">
@@ -274,7 +272,7 @@ function CaseDetailPage() {
       {/* Filing History / Docket */}
       <div className="case-detail-card">
         <div className="docket-header">
-          <h3>Docket / Filing History ({filings.length})</h3>
+          <h2>Docket</h2>
           {isFiler && caseData.can_file && (
             <Link
               to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}`}

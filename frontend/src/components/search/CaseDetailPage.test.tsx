@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { CanceledError } from 'axios';
+import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { apiClient } from '../../api/client';
 import type { CaseDocket } from '../../api/cases';
@@ -54,6 +55,11 @@ function showCase(caseRecord: CaseDocket, caseTypes: CaseType[] = [civil]) {
   );
 }
 
+const serve = (responses: Record<string, () => Promise<unknown>>) => get.mockImplementation(async (url) => {
+  if (!(url in responses)) throw new Error(`Unexpected request: ${url}`);
+  return { data: await responses[url]() };
+});
+
 function filingLinks(): string[] {
   return screen.queryAllByRole('link').map(link => link.getAttribute('href') ?? '')
     .filter(href => href.startsWith('/filing/new'));
@@ -86,6 +92,128 @@ describe.each(['attorney', 'srl'])('for the %s filer role', (role) => {
     }
     expect(screen.queryByText(PARTICIPATION_NOTICE)).toBeNull();
   });
+});
+
+it('shows the case number once, under the title, with the status beside it', async () => {
+  localStorage.setItem('demo_role', 'public');
+  showCase(docket(false));
+
+  const number = await screen.findByText(/^2026-000042-CZ/);
+  expect(number.textContent).toBe('2026-000042-CZ open');
+  expect(number.previousElementSibling).toBe(screen.getByRole('heading', { level: 1, name: 'Smith v. Jones' }));
+  expect(screen.getAllByText(/2026-000042-CZ/)).toHaveLength(1);
+  expect(screen.queryByText('Status')).toBeNull();
+});
+
+it('heads the filings list "Docket" and steps down one heading level from the title', async () => {
+  localStorage.setItem('demo_role', 'public');
+  showCase(docket(false));
+
+  expect(await screen.findByRole('heading', { level: 2, name: 'Docket' })).toBeTruthy();
+  expect(screen.getAllByRole('heading').map(heading => heading.tagName)).toEqual(['H1', 'H2', 'H2', 'H2']);
+});
+
+it('says in plain words when the court has not confirmed the filing date', async () => {
+  localStorage.setItem('demo_role', 'public');
+  showCase({ ...docket(false), filing_date: null, filed_date: '2026-03-02T12:00:00Z' });
+
+  const label = await screen.findByText('Date on record (not yet confirmed by the court)');
+  expect(label.nextElementSibling?.textContent).toBe('Mar 2, 2026');
+  expect(screen.getByText('Not established')).toBeTruthy();
+  expect(document.body.textContent).not.toMatch(/calendar-verified|Stored date/i);
+});
+
+it('leaves out the unconfirmed date once the court has set a filing date', async () => {
+  localStorage.setItem('demo_role', 'public');
+  showCase(docket(false));
+
+  await screen.findByText('Mar 2, 2026');
+  expect(screen.queryByText(/not yet confirmed/)).toBeNull();
+});
+
+it('offers a labeled Copy link', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+  localStorage.setItem('demo_role', 'public');
+  showCase(docket(false));
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Copy link' }));
+
+  await screen.findByText('Case link copied to clipboard');
+  expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/cases/42`);
+});
+
+it('does not announce the participation note as a live update', async () => {
+  localStorage.setItem('demo_role', 'attorney');
+  showCase(docket(false));
+
+  expect((await screen.findByText(PARTICIPATION_NOTICE)).closest('[role],[aria-live]')).toBeNull();
+});
+
+it("reports once that the court's name could not load, and keeps the rest of the docket", async () => {
+  localStorage.setItem('demo_role', 'public');
+  showCase(docket(false));
+  serve({
+    '/cases/42': async () => docket(false), '/cases/42/filings': async () => [],
+    '/courts/3': async () => { throw new Error('Network Error'); },
+  });
+
+  expect(await screen.findAllByText("Could not load the court's name.")).toHaveLength(1);
+  expect(screen.getByText('Court #3')).toBeTruthy();
+  expect(screen.getByText('General Civil')).toBeTruthy();
+});
+
+it('reports once that the case type name could not load, and keeps the court name', async () => {
+  localStorage.setItem('demo_role', 'public');
+  showCase(docket(false));
+  vi.mocked(getCaseTypes).mockRejectedValue(new Error('Network Error'));
+
+  expect(await screen.findAllByText('Could not load the case type name.')).toHaveLength(1);
+  expect(screen.getByText('Third Circuit Court')).toBeTruthy();
+});
+
+it('stays silent when a label lookup was cancelled', async () => {
+  localStorage.setItem('demo_role', 'public');
+  showCase(docket(false));
+  vi.mocked(getCaseTypes).mockRejectedValue(new CanceledError());
+
+  await screen.findByText('Third Circuit Court');
+  expect(screen.queryByText('Could not load the case type name.')).toBeNull();
+});
+
+it('ignores a failed lookup for a case the reader has already left', async () => {
+  localStorage.setItem('demo_role', 'public');
+  let failFirstCourtLookup: (reason: Error) => void = () => {};
+  const courtLookups = [
+    () => new Promise((_, reject) => { failFirstCourtLookup = reject; }),
+    async () => ({ name: 'Third Circuit Court' }),
+  ];
+  serve({
+    '/cases/42': async () => docket(false), '/cases/42/filings': async () => [],
+    '/courts/3': () => courtLookups.shift()!(),
+    '/cases/43': async () => ({ ...docket(false), id: 43, title: 'Doe v. Roe' }), '/cases/43/filings': async () => [],
+  });
+  vi.mocked(getCaseTypes).mockResolvedValue([civil]);
+  render(
+    <MemoryRouter initialEntries={['/cases/42']}>
+      <ToastProvider>
+        <CourtContext.Provider value={{ role: 'public', courts: [], court: undefined, loading: false, selectCourt: () => {}, refresh: () => {} }}>
+          <Link to="/cases/43">Next case</Link>
+          <Routes><Route path="/cases/:caseId" element={<CaseDetailPage />} /></Routes>
+        </CourtContext.Provider>
+      </ToastProvider>
+    </MemoryRouter>,
+  );
+  await waitFor(() => expect(get).toHaveBeenCalledWith('/courts/3', expect.anything()));
+
+  fireEvent.click(screen.getByRole('link', { name: 'Next case' }));
+  await screen.findByRole('heading', { level: 1, name: 'Doe v. Roe' });
+  failFirstCourtLookup(new Error('Network Error'));
+
+  await screen.findByText('Third Circuit Court');
+  await new Promise(resolve => { setTimeout(resolve); });
+  expect(screen.queryByText("Could not load the court's name.")).toBeNull();
+  expect(within(document.body).queryByRole('alert')).toBeNull();
 });
 
 it('names the case type even after the court closed that type to new cases', async () => {
