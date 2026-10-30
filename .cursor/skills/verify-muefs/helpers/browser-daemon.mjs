@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-/**
- * Long-lived Chromium + HTTP command port so fill → click keeps in-page state.
- */
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
@@ -15,7 +12,6 @@ const repoRoot = resolve(skillDir, '../../..');
 const runDir = join(skillDir, '.run');
 const artifactsDir = join(skillDir, 'artifacts');
 mkdirSync(runDir, { recursive: true });
-// Only the local control script, which reads this file, may drive the browser.
 const token = randomBytes(32).toString('hex');
 writeFileSync(join(runDir, 'browser.token'), token, { encoding: 'utf8', mode: 0o600 });
 
@@ -36,7 +32,6 @@ function outputPath(out) {
   if (!out) throw new Error('missing --path');
   const abs = resolve(skillDir, out);
   const inside = relative(artifactsDir, abs);
-  // A path on another drive comes back absolute; ".." means it leaves the folder.
   if (!inside || isAbsolute(inside) || inside === '..' || inside.startsWith(`..${sep}`)) {
     throw new Error('--path must be inside the artifacts/ folder of this skill');
   }
@@ -45,8 +40,6 @@ function outputPath(out) {
 }
 
 function authorized(req) {
-  // A JSON content type forces a CORS preflight, which this server never answers, so a
-  // web page cannot post here; the token keeps other local processes out.
   const provided = Buffer.from(String(req.headers['x-verify-token'] || ''));
   const expected = Buffer.from(token);
   return req.headers['content-type'] === 'application/json'

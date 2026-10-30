@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-/**
- * Drive the MUEFS demo the way a user does.
- * Invoke from the repo root:
- *   node .cursor/skills/verify-muefs/helpers/control-muefs.mjs <command>
- */
 import { spawn, spawnSync } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
@@ -81,7 +76,6 @@ async function checkHealth() {
   try {
     apiJson = JSON.parse(api.text);
   } catch {
-    /* ignore */
   }
   const fe = await httpGet(`${FRONTEND}/`);
   const apiOk = api.ok && apiJson?.status === 'healthy' && apiJson?.service === 'muefs-api';
@@ -195,7 +189,6 @@ function killOwned(pid) {
       try {
         process.kill(pid, 'SIGTERM');
       } catch {
-        /* already gone */
       }
     }
   }
