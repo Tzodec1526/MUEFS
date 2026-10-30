@@ -51,6 +51,7 @@ function locator(flags) {
     const opts = {};
     if (flags.name) {
       opts.name = flags.exact ? String(flags.name) : new RegExp(escapeRegExp(String(flags.name)), 'i');
+      opts.exact = Boolean(flags.exact);
     }
     return page.getByRole(String(flags.role), opts);
   }
