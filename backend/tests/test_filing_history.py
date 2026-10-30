@@ -251,7 +251,7 @@ async def test_failed_batch_item_rolls_back_its_records_only(
         )
         corrected = await filing_service.submit_filing(db_session, fid)
         assert corrected.submission_count == 2
-    real_review = filing_service.review_filing
+    real_review = filing_service.record_review
 
     async def interrupted_review(db, filing_id, **kwargs):
         result = await real_review(db, filing_id, **kwargs)
@@ -259,7 +259,7 @@ async def test_failed_batch_item_rolls_back_its_records_only(
             raise RuntimeError("Failure after acceptance writes")
         return result
 
-    monkeypatch.setattr(filing_service, "review_filing", interrupted_review)
+    monkeypatch.setattr(filing_service, "record_review", interrupted_review)
     api_client.headers["X-Demo-User-Id"] = str(clerk)
     if failure == "after_acceptance":
         for body in (

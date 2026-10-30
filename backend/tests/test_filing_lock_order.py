@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import threading
 from datetime import UTC, date, datetime
 from uuid import uuid4
@@ -11,8 +12,9 @@ from sqlalchemy import event, select, text
 from app.database import get_db
 from app.main import app
 from app.models.case import Case, CaseParticipant, ParticipantRole
-from app.models.filing import FilingEnvelope, FilingStatus
+from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.models.filing_transaction import FilingTransaction
+from app.models.user import CourtRole, User, UserCourtRole, UserType
 from app.services import document_service, filing_service
 from tests.filing_requests import submission_review
 from tests.test_filing_concurrency import POSTGRES_URL, prepare_filing
@@ -293,3 +295,125 @@ async def test_resubmission_and_a_case_date_order_on_the_same_filing_both_finish
     assert sorted(events) == [
         ("filing_date_ordered", 1), ("returned", 1), ("submitted", 1), ("submitted", 2),
     ]
+
+
+async def two_submitted_filings_on_one_case(factory):
+    first, filer, clerk, case_id = await returned_subsequent_filing(factory)
+    content = b"Synthetic answer"
+    file_key = f"postgres-tests/{uuid4()}.txt"
+    document_service.upload_document(content, file_key, "text/plain")
+    async with factory.begin() as db:
+        filing = await db.get(FilingEnvelope, first)
+        second = FilingEnvelope(
+            court_id=filing.court_id, case_id=case_id, case_type_id=filing.case_type_id,
+            filer_id=filer, filing_type="subsequent", case_title=filing.case_title,
+        )
+        reviewer = User(email="second-clerk@test.com", first_name="Second", last_name="Clerk",
+                        user_type=UserType.CLERK)
+        db.add_all([second, reviewer])
+        await db.flush()
+        db.add_all([
+            FilingDocument(
+                envelope_id=second.id, title="Answer", document_type_code="ANSWER",
+                file_key=file_key, mime_type="text/plain", file_size_bytes=len(content),
+                sha256_hash=hashlib.sha256(content).hexdigest(), pii_warnings=[],
+            ),
+            UserCourtRole(user_id=reviewer.id, court_id=filing.court_id, role=CourtRole.CLERK),
+        ])
+        await db.flush()
+        for fid in (first, second.id):
+            assert await filing_service.submit_filing(db, fid)
+    return first, second.id, file_key, clerk, reviewer.id, case_id
+
+
+@pytest.mark.parametrize("pause", ["verification", "acceptance"])
+async def test_batch_acceptance_and_a_case_date_order_in_the_same_case_both_finish(
+    postgres_sessions, monkeypatch, pause,
+):
+    first, second, second_key, clerk, reviewer, case_id = (
+        await two_submitted_filings_on_one_case(postgres_sessions)
+    )
+    started, release = threading.Event(), threading.Event()
+    integrity = document_service.stored_integrity
+    cms = filing_service.submit_filing_to_cms
+
+    def slow_integrity(file_key):
+        if file_key == second_key:
+            started.set()
+            assert release.wait(10), "Test did not release the storage read"
+        return integrity(file_key)
+
+    async def slow_cms(case_number, filing_id):
+        if filing_id == first:
+            started.set()
+            assert await asyncio.to_thread(release.wait, 10), "Test did not release acceptance"
+        return await cms(case_number, filing_id)
+
+    if pause == "verification":
+        monkeypatch.setattr(document_service, "stored_integrity", slow_integrity)
+    else:
+        monkeypatch.setattr(filing_service, "submit_filing_to_cms", slow_cms)
+    order_pid = None
+
+    async def sessions(request: Request):
+        nonlocal order_pid
+        async with postgres_sessions.begin() as db:
+            if request.method == "POST" and request.url.path.endswith("/filing-date"):
+                order_pid = await db.scalar(text("SELECT pg_backend_pid()"))
+            yield db
+
+    monkeypatch.setitem(app.dependency_overrides, get_db, sessions)
+    url = f"/api/v1/clerk/filings/{second}/filing-date"
+    as_clerk, as_reviewer = {"X-Demo-User-Id": str(clerk)}, {"X-Demo-User-Id": str(reviewer)}
+    batch = {"action": "accept", "filings": [
+        {"filing_id": first, "expected_submission_count": 2},
+        {"filing_id": second, "expected_submission_count": 1},
+    ]}
+    pending = []
+    async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
+        state = (await client.get(url, headers=as_reviewer)).json()
+        try:
+            pending.append(asyncio.create_task(client.post(
+                "/api/v1/clerk/queue/batch-review", headers=as_clerk, json=batch,
+            )))
+            assert await asyncio.to_thread(started.wait, 5)
+            order = asyncio.create_task(client.post(url, headers=as_reviewer, data={
+                **DECISION, "expected_version": str(state["version"]), "update_case_date": "true",
+                "expected_case_version": str(state["case_date_version"]),
+            }, files={"file": ("order.pdf", ORDER, "application/pdf")}))
+            pending.append(order)
+            async with asyncio.timeout(10), postgres_sessions() as observer:
+                while not order.done() and await observer.scalar(text(
+                    "SELECT wait_event_type FROM pg_stat_activity WHERE pid = :pid",
+                ), {"pid": order_pid}) != "Lock":
+                    await asyncio.sleep(0.01)
+        finally:
+            release.set()
+            outcomes = await asyncio.wait_for(asyncio.gather(*pending, return_exceptions=True), 15)
+    returned = [
+        (o.status_code, o.text[:300]) if isinstance(o, Response) else repr(o) for o in outcomes
+    ]
+    statuses = [o.status_code if isinstance(o, Response) else None for o in outcomes]
+    async with postgres_sessions() as db:
+        accepted = await db.get(FilingEnvelope, first)
+        dated = await db.get(FilingEnvelope, second)
+        case = await db.get(Case, case_id)
+    assert accepted.status == FilingStatus.ACCEPTED
+    if pause == "verification":
+        assert statuses == [200, 201], returned
+        assert outcomes[0].json() == {"succeeded": [first], "failed": [second], "errors": {
+            str(second): "The filing date changed while this review was in progress. Refresh the "
+                         "filing and review its date before deciding.",
+        }}
+        assert dated.status == FilingStatus.SUBMITTED and dated.filing_date == date(2026, 9, 3)
+        assert dated.filing_date_basis["source"] == "court_order"
+        assert case.filing_date == date(2026, 9, 3) and case.filing_date_version == 1
+    else:
+        assert statuses == [200, 409], returned
+        assert outcomes[0].json() == {"succeeded": [first, second], "failed": [], "errors": {}}
+        assert outcomes[1].json()["detail"] == (
+            "This filing changed. Refresh and review its date and status"
+        )
+        assert dated.status == FilingStatus.ACCEPTED
+        assert dated.filing_date_basis.get("source") != "court_order"
+        assert case.filing_date_version == 0

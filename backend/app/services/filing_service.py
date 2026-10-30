@@ -1,5 +1,6 @@
 import hashlib
 import json
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
@@ -575,15 +576,20 @@ async def submit_filing(
     return filing
 
 
-async def review_filing(
+@dataclass(frozen=True)
+class ReviewEvidence:
+    date_version: int
+    ordered_date: bool
+    fingerprints: list[tuple[int, str, int]] | None
+
+
+async def verify_review(
     db: AsyncSession,
     filing_id: int,
-    reviewer_id: int,
     action: Literal["accept", "reject", "return"],
-    reason: str | None = None,
     *,
     expected_submission_count: int,
-) -> FilingEnvelope | None:
+) -> ReviewEvidence | None:
     # Verify stored bytes before taking the write lock. Re-check cheap metadata after.
     probe = await get_filing(db, filing_id)
     if not probe:
@@ -620,7 +626,20 @@ async def review_filing(
             fingerprints.append(
                 (court_order.id, court_order.sha256_hash, court_order.file_size_bytes)
             )
+    return ReviewEvidence(date_version, ordered_date, fingerprints)
 
+
+async def record_review(
+    db: AsyncSession,
+    filing_id: int,
+    reviewer_id: int,
+    action: Literal["accept", "reject", "return"],
+    reason: str | None = None,
+    *,
+    expected_submission_count: int,
+    evidence: ReviewEvidence,
+) -> FilingEnvelope | None:
+    ordered_date, fingerprints = evidence.ordered_date, evidence.fingerprints
     filing = await get_filing(db, filing_id, for_update=True)
     if not filing:
         return None
@@ -635,7 +654,7 @@ async def review_filing(
     case = None
     if action == "accept":
         # A date order recorded during verification must not be replaced by the calendar.
-        if filing.filing_date_version != date_version:
+        if filing.filing_date_version != evidence.date_version:
             raise StaleFilingReviewError(
                 "The filing date changed while this review was in progress. Refresh the "
                 "filing and review its date before deciding."
@@ -728,6 +747,33 @@ async def review_filing(
     await db.refresh(filing)
     await db.refresh(filing, ["documents"])
     return filing
+
+
+async def review_filing(
+    db: AsyncSession,
+    filing_id: int,
+    reviewer_id: int,
+    action: Literal["accept", "reject", "return"],
+    reason: str | None = None,
+    *,
+    expected_submission_count: int,
+) -> FilingEnvelope | None:
+    evidence = await verify_review(
+        db, filing_id, action, expected_submission_count=expected_submission_count,
+    )
+    if evidence is None:
+        return None
+    return await record_review(
+        db, filing_id, reviewer_id, action, reason,
+        expected_submission_count=expected_submission_count, evidence=evidence,
+    )
+
+
+async def lock_filings(db: AsyncSession, filing_ids: list[int]) -> None:
+    await db.execute(
+        select(FilingEnvelope.id).where(FilingEnvelope.id.in_(filing_ids))
+        .order_by(FilingEnvelope.id).with_for_update()
+    )
 
 
 async def get_clerk_queue(
