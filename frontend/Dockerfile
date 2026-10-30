@@ -9,6 +9,4 @@ COPY . .
 
 EXPOSE 3000
 
-# Inside the container the dev server must listen beyond loopback; Compose publishes
-# the port on this computer only.
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
