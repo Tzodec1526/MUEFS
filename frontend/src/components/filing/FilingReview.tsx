@@ -125,7 +125,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
           </div>
         </div>
         <p className="success-note">
-          You can track the status of your filing from your dashboard under &quot;My Filings.&quot;
+          You can track the status of your filing from your dashboard under &quot;My filings.&quot;
         </p>
         <div className="success-actions">
           <Link to={`/filings/${filingId}/history`} className="btn btn-primary">View submission receipt</Link>

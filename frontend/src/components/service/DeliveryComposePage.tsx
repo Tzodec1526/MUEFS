@@ -61,7 +61,7 @@ export default function DeliveryComposePage() {
   }
 
   return <section className="service-page">
-    <div className="page-header"><div><PageHeading>Send selected documents</PageHeading>
+    <div className="page-header"><div><PageHeading>Send documents</PageHeading>
       <p>Filing #{filingId} · Subsequent documents on an existing case</p></div>
       <Link className="btn btn-secondary" to={`/filings/${filingId}/deliveries`}>Delivery records</Link></div>
     <p>Select the documents and recipients required by the court&apos;s service instructions. Case-initiating service and recipients who require mail or hand delivery use the applicable procedure outside this workflow.</p>

@@ -223,7 +223,7 @@ function AccountDirectory({ access }: { access: Access }) {
     setEditor(user); setAttempt(n => n + 1);
   }
   return <>
-    <div className="page-header"><div><PageHeading>People &amp; court access</PageHeading>
+    <div className="page-header"><div><PageHeading>People and court access</PageHeading>
       <p>{access.system_admin ? 'Provision identities and delegate court access.' : 'Manage staff access for your assigned courts.'}</p></div>
       {access.system_admin && <button className="btn btn-primary" onClick={() => setEditor('new')}>Provision account</button>}</div>
     <form className="admin-directory-filter" onSubmit={event => {

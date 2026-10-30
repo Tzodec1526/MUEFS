@@ -16,7 +16,7 @@ interface DeliveryList {
 
 export default function DeliveriesPage() {
   const { filingId } = useParams();
-  usePageTitle(filingId ? `Filing #${filingId} deliveries` : 'Document delivery inbox');
+  usePageTitle(filingId ? `Filing #${filingId}: document deliveries` : 'Document delivery inbox');
   const location = useLocation();
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);

@@ -65,8 +65,8 @@ function MyFilings() {
   return (
     <div className="my-filings">
       <div className="page-header">
-        <PageHeading>My Filings</PageHeading>
-        <Link to="/filing/new" className="btn btn-primary">New Filing</Link>
+        <PageHeading>My filings</PageHeading>
+        <Link to="/filing/new" className="btn btn-primary">New filing</Link>
       </div>
 
       {/* Filters */}

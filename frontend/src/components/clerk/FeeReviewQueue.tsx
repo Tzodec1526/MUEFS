@@ -28,7 +28,7 @@ export default function FeeReviewQueue() {
   }, [courtId, page, key]);
   return <section>
     <StaffCourtSelect />
-    <div className="page-header"><div><PageHeading>Court fee reviews</PageHeading><p>Requests awaiting an itemized assessment.</p></div>
+    <div className="page-header"><div><PageHeading>Fee reviews</PageHeading><p>Requests awaiting an itemized assessment.</p></div>
       <button className="btn btn-secondary" onClick={() => setAttempt(n => n + 1)}>Refresh requests</button></div>
     <p>Reviewing fees does not submit or accept a filing. Fee waiver applications follow their separate court procedure.</p>
     {!current && <p role="status">Loading fee review requests…</p>}

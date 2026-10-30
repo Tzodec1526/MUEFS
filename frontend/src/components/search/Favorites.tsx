@@ -126,7 +126,7 @@ function Favorites() {
 
       <div className="page-header" style={{ marginTop: '2rem' }}>
         <h2>Favorite Courts</h2>
-        <Link to="/filing/new" className="btn btn-secondary">New Filing</Link>
+        <Link to="/filing/new" className="btn btn-secondary">New filing</Link>
       </div>
       <p className="info-text">
         Your frequently used courts (attorneys often practice across many). Star courts in the court selector during filing.

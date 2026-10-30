@@ -143,6 +143,7 @@ it('heads a filing in an existing case with its case number and does not call it
 
   expect(await screen.findByText('Case 2026-000042-CZ')).toBeTruthy();
   expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('File in an existing case');
+  await waitFor(() => expect(document.title).toBe('File in an existing case · MUEFS'));
   expect(document.body.textContent).not.toMatch(/motion/i);
   expect((screen.getByRole('textbox', { name: /Filing Description/ }) as HTMLTextAreaElement).placeholder).not.toMatch(/motion/i);
 });
@@ -663,7 +664,7 @@ it('saves edits to a saved filing against the version it loaded', async () => {
 
   fireEvent.click(button('Save draft'));
 
-  await screen.findByText('Draft saved to your account. You can continue it from My Filings.');
+  await screen.findByText('Draft saved to your account. You can continue it from My filings.');
   expect(updateFiling).toHaveBeenCalledWith(7, {
     expected_details_token: SAVED_TOKEN, case_title: 'Doe v. Roe, amended',
     filing_description: 'Complaint for breach of contract',
@@ -721,7 +722,7 @@ it('keeps the edits after a conflict and saves them against the latest version',
 
   fireEvent.click(button('Save draft'));
 
-  await screen.findByText('Draft saved to your account. You can continue it from My Filings.');
+  await screen.findByText('Draft saved to your account. You can continue it from My filings.');
   expect(vi.mocked(updateFiling).mock.lastCall).toEqual([7, {
     expected_details_token: LATEST_TOKEN, case_title: 'Doe v. Roe, amended',
     filing_description: 'Complaint for breach of contract',

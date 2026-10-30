@@ -101,7 +101,7 @@ it.each([
 
   await screen.findByText('No filings match these filters in this court.');
   await waitFor(() => expect(document.activeElement)
-    .toBe(screen.getByRole('heading', { name: 'Clerk Review Queue' })));
+    .toBe(screen.getByRole('heading', { name: 'Review queue' })));
   expect(reviewFiling).toHaveBeenCalledWith(expect.objectContaining({ id: 11 }), action, 'Missing required documents');
   confirm.mockRestore();
 });
@@ -232,7 +232,7 @@ it('puts the working court in the heading row, with no count tiles', async () =>
   openQueue();
   await screen.findByText('Case 11');
 
-  const heading = screen.getByRole('heading', { level: 1, name: 'Clerk Review Queue' });
+  const heading = screen.getByRole('heading', { level: 1, name: 'Review queue' });
   expect(heading.parentElement?.contains(screen.getByLabelText('Working court'))).toBe(true);
   expect(screen.queryByText('Matching filings')).toBeNull();
   expect(screen.queryByText('Waiting 48+ hours')).toBeNull();

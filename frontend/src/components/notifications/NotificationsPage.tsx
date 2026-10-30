@@ -107,7 +107,7 @@ export default function NotificationsPage() {
     {staff && scope === 'court' && <StaffCourtSelect disabled={selected != null} onChange={() => {
       setPage(1); setSelected(null); setMessage('');
     }} />}
-    <div className="page-header"><div><PageHeading>Notices &amp; email status</PageHeading>
+    <div className="page-header"><div><PageHeading>Notices and email status</PageHeading>
       <p>Read filing updates and track email attempts.</p></div>
       <button className="btn btn-secondary" onClick={() => setAttempt(n => n + 1)}>Refresh notices</button></div>
     <p>Updates remain available in the portal even when email fails. Acceptance by an email relay does not confirm inbox delivery or legal service.</p>

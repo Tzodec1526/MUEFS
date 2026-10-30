@@ -40,7 +40,7 @@ function saveReceipt(filingId: number, transaction: FilingTransaction) {
 
 export default function FilingHistoryPage() {
   const { filingId } = useParams();
-  usePageTitle(`Filing #${filingId} history`);
+  usePageTitle(`Filing #${filingId}: receipts and history`);
   const [history, setHistory] = useState<FilingHistory | null>(null);
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
@@ -69,10 +69,10 @@ export default function FilingHistoryPage() {
 
   return <section className="filing-history">
     <div className="page-header">
-      <div><PageHeading>Filing #{filingId}: receipts &amp; history</PageHeading>
+      <div><PageHeading>Filing #{filingId}: receipts and history</PageHeading>
         <p>Submission records and clerk decisions, newest first.</p></div>
       <Link className="btn btn-secondary" to={backTo}>
-        {role === 'admin' ? 'People & access' : role === 'clerk' ? 'Back to queue' : 'My Filings'}
+        {role === 'admin' ? 'People and court access' : role === 'clerk' ? 'Back to queue' : 'My filings'}
       </Link>
     </div>
     {loading && <p role="status">Loading filing history…</p>}

@@ -160,7 +160,7 @@ function ReviewQueue() {
   return (
     <div className="clerk-review">
       <div className="clerk-header">
-        <PageHeading headingRef={queueHeading}>Clerk Review Queue</PageHeading>
+        <PageHeading headingRef={queueHeading}>Review queue</PageHeading>
         <StaffCourtSelect disabled={!!review || actionInProgress} />
       </div>
 

@@ -59,7 +59,8 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
   });
   const [showDraftBanner, setShowDraftBanner] = useState(!!draft);
   const [saving, setSaving] = useState(false);
-  usePageTitle(loadError ? `Filing #${requestedFilingId} not loaded` : requestedFilingId ? `Filing #${requestedFilingId}` : 'New filing');
+  usePageTitle(loadError ? `Filing #${requestedFilingId} not loaded` : requestedFilingId ? `Filing #${requestedFilingId}`
+    : filingData.filingType !== 'initial' ? 'File in an existing case' : 'New filing');
   const [reloadKey, setReloadKey] = useState(0);
   const [saveError, setSaveError] = useState('');
   const saveErrorBox = useRef<HTMLDivElement>(null);
@@ -239,9 +240,9 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
       setFilingData(previous => ({ ...previous, filingId: filing.id, detailsToken: filing.details_token }));
       clearFilingDraft(draftKey, filing.id);
       setShowDraftBanner(false);
-      setSaveNotice('Draft saved to your account. You can continue it from My Filings.');
+      setSaveNotice('Draft saved to your account. You can continue it from My filings.');
       if (!filingData.filingId) {
-        emitToast('Draft saved to your account. Continue it from My Filings.', 'success');
+        emitToast('Draft saved to your account. Continue it from My filings.', 'success');
         setSearchParams({ filing_id: String(filing.id), step: advance ? 'documents' : 'details' }, { replace: true });
       }
       return true;
@@ -329,7 +330,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
   if (readOnly) {
     return (
       <div className="filing-wizard">
-        <Link to="/filings">Back to My Filings</Link>
+        <Link to="/filings">Back to My filings</Link>
         <PageHeading>Filing #{loadedFiling.id}</PageHeading>
         {conflictView}
         <p>Status: <span className={`status-badge ${loadedFiling.status}`}>{loadedFiling.status.replace('_', ' ')}</span></p>
@@ -350,7 +351,7 @@ function FilingForm({ userId, role }: { userId: number; role: string | null }) {
                 : 'File in an existing case'
               : plainLanguage
                 ? 'Start a new court filing'
-                : 'New E-Filing'}
+                : 'New filing'}
           </PageHeading>
           {filingData.caseNumber && <p className="wizard-case-number">Case {filingData.caseNumber}</p>}
         </div>

@@ -75,7 +75,7 @@ it('heads a failed court workspace with one h1, an alert and a retry', () => {
 
 it('still moves focus to the court page heading after a navigation that waited on the workspace', async () => {
   function Page() {
-    return <PageHeading>Clerk Review Queue</PageHeading>;
+    return <PageHeading>Review queue</PageHeading>;
   }
   function Shell() {
     const [loading, setLoading] = useState(false);
@@ -98,7 +98,7 @@ it('still moves focus to the court page heading after a navigation that waited o
   await screen.findByText('Loading court assignments…');
   fireEvent.click(screen.getByRole('button', { name: 'Assignments loaded' }));
 
-  expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1, name: 'Clerk Review Queue' }));
+  expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1, name: 'Review queue' }));
 });
 
 it('keeps keyboard focus on the working-court select while the page resets for the new court', () => {

@@ -112,7 +112,7 @@ it('shows a system administrator the account directory at /admin', async () => {
   });
   openApp('/admin', 'admin');
 
-  expect(await screen.findByRole('heading', { name: 'People & court access' })).toBeTruthy();
+  expect(await screen.findByRole('heading', { name: 'People and court access' })).toBeTruthy();
   expect(await screen.findByRole('button', { name: 'Manage Grace Hopper' })).toBeTruthy();
   expect(screen.getByText('grace.hopper@example.gov')).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Provision account' })).toBeTruthy();
@@ -131,7 +131,7 @@ it.each(['attorney', 'srl', 'clerk', 'public'])('tells a %s that /admin needs ad
   expect(await screen.findByRole('heading', { name: 'Administrator access required' })).toBeTruthy();
   expect(screen.queryByRole('alert')).toBeNull();
   expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
-  expect(screen.queryByRole('heading', { name: 'People & court access' })).toBeNull();
+  expect(screen.queryByRole('heading', { name: 'People and court access' })).toBeNull();
   expect(screen.queryByText(/Grace Hopper|grace\.hopper@example\.gov/)).toBeNull();
   expect(screen.queryByRole('button', { name: 'Provision account' })).toBeNull();
   expect(requested('/admin/access')).toBe(false);
@@ -146,7 +146,7 @@ it('shows a delegated court administrator the account directory at /admin', asyn
   });
   openApp('/admin', 'clerk');
 
-  expect(await screen.findByRole('heading', { name: 'People & court access' })).toBeTruthy();
+  expect(await screen.findByRole('heading', { name: 'People and court access' })).toBeTruthy();
   expect(await screen.findByRole('button', { name: 'Manage Grace Hopper' })).toBeTruthy();
 });
 
@@ -322,9 +322,9 @@ it.each([
   ['/about', 'attorney', 'About'],
   ['/filing/new', 'attorney', 'New filing'],
   ['/filings', 'attorney', 'My filings'],
-  ['/filings/7/history', 'attorney', 'Filing #7 history'],
-  ['/filings/7/fees', 'attorney', 'Filing #7 fees and payments'],
-  ['/filings/7/filing-date', 'clerk', 'Filing #7 filing date · Third Circuit Court'],
+  ['/filings/7/history', 'attorney', 'Filing #7: receipts and history'],
+  ['/filings/7/fees', 'attorney', 'Filing #7: fees and payments'],
+  ['/filings/7/filing-date', 'clerk', 'Filing #7: record a filing-date order · Third Circuit Court'],
   ['/cases/search', 'public', 'Case search'],
   ['/cases/42', 'public', 'Case docket'],
   ['/courts/3/calendar', 'clerk', 'Filing calendar'],
@@ -332,7 +332,7 @@ it.each([
   ['/notifications', 'attorney', 'Notices and email status'],
   ['/service/deliveries', 'attorney', 'Document delivery inbox'],
   ['/service/deliveries/5', 'attorney', 'Document delivery record'],
-  ['/filings/7/deliveries', 'attorney', 'Filing #7 deliveries'],
+  ['/filings/7/deliveries', 'attorney', 'Filing #7: document deliveries'],
   ['/filings/7/deliveries/new', 'attorney', 'Send documents · Filing #7'],
   ['/admin', 'admin', 'People and court access'],
   ['/admin', 'attorney', 'Administrator access required'],
@@ -359,26 +359,26 @@ it.each([
   ['/', 'public', 'Public court records'],
   ['/', 'clerk', 'Third Circuit Court'],
   ['/about', 'public', 'About MUEFS'],
-  ['/filing/new', 'attorney', 'New E-Filing'],
-  ['/filings', 'attorney', 'My Filings'],
-  ['/filings/7/history', 'attorney', 'Filing #7: receipts & history'],
-  ['/filings/7/fees', 'attorney', 'Filing #7: fees & payments'],
+  ['/filing/new', 'attorney', 'New filing'],
+  ['/filings', 'attorney', 'My filings'],
+  ['/filings/7/history', 'attorney', 'Filing #7: receipts and history'],
+  ['/filings/7/fees', 'attorney', 'Filing #7: fees and payments'],
   ['/filings/7/filing-date', 'clerk', 'Filing #7: record a filing-date order'],
   ['/cases/search', 'public', 'Case search'],
-  ['/notifications', 'attorney', 'Notices & email status'],
+  ['/notifications', 'attorney', 'Notices and email status'],
   ['/service/deliveries', 'attorney', 'Document delivery inbox'],
   ['/service/deliveries/5', 'attorney', 'Document delivery record'],
   ['/filings/7/deliveries', 'attorney', 'Filing #7: document deliveries'],
-  ['/filings/7/deliveries/new', 'attorney', 'Send selected documents'],
+  ['/filings/7/deliveries/new', 'attorney', 'Send documents'],
   ['/admin', 'attorney', 'Administrator access required'],
   ['/cases/42/participants', 'clerk', 'Case access and participants'],
   ['/cases/42/participants/9/service-contact', 'clerk', 'Service instructions'],
   ['/clerk/cases', 'clerk', 'Court cases'],
   ['/documents/5/publication', 'clerk', 'Document public access'],
   ['/favorites', 'attorney', 'Favorites'],
-  ['/clerk/queue', 'clerk', 'Clerk Review Queue'],
-  ['/clerk/fee-reviews', 'clerk', 'Court fee reviews'],
-  ['/clerk/payment-register', 'clerk', 'External receipt register'],
+  ['/clerk/queue', 'clerk', 'Review queue'],
+  ['/clerk/fee-reviews', 'clerk', 'Fee reviews'],
+  ['/clerk/payment-register', 'clerk', 'Receipt register'],
   ['/no-such-page', 'attorney', 'Page not found'],
 ])('heads %s for a %s with one h1, "%s"', async (entry, role, heading) => {
   serve({ srl: 'self_represented' }[role] ?? role, role === 'clerk' ? clerkAtThirdCircuit : {});
@@ -419,7 +419,7 @@ it('heads the administration page and a case docket with their own names once th
   });
   const admin = openApp('/admin', 'admin');
   await waitFor(() => expect(screen.getAllByRole('heading', { level: 1 }).map(h1 => h1.textContent))
-    .toEqual(['People & court access']));
+    .toEqual(['People and court access']));
   admin.unmount();
   localStorage.clear();
 
@@ -446,9 +446,9 @@ it('moves focus to the new page heading after a navigation, but not on the first
   await screen.findByRole('heading', { level: 1, name: 'Your filings' });
   expect(document.activeElement).toBe(document.body);
 
-  fireEvent.click(within(screen.getByRole('complementary')).getByRole('link', { name: 'My Filings' }));
+  fireEvent.click(within(screen.getByRole('complementary')).getByRole('link', { name: 'My filings' }));
 
-  const heading = await screen.findByRole('heading', { level: 1, name: 'My Filings' });
+  const heading = await screen.findByRole('heading', { level: 1, name: 'My filings' });
   await waitFor(() => expect(document.activeElement).toBe(heading));
 });
 
@@ -465,11 +465,11 @@ const mainNavigation = () => screen.findByRole('navigation', { name: 'Main' });
 const linkNames = (navigation: HTMLElement) => within(navigation).getAllByRole('link').map(link => link.textContent);
 
 it.each([
-  ['attorney', 'New Filing'],
-  ['srl', 'New Filing'],
-  ['clerk', 'Review Queue'],
-  ['admin', 'People & access'],
-  ['public', 'Case Search'],
+  ['attorney', 'New filing'],
+  ['srl', 'New filing'],
+  ['clerk', 'Review queue'],
+  ['admin', 'People and court access'],
+  ['public', 'Case search'],
 ])('leads the one navigation with the main task of a %s', async (role, mainTask) => {
   serve({ srl: 'self_represented' }[role] ?? role, role === 'clerk' ? clerkAtThirdCircuit : {});
   openApp('/no-such-page', role);
@@ -479,7 +479,7 @@ it.each([
   expect(screen.getAllByRole('navigation')).toHaveLength(1);
 });
 
-it('gives an administrator no Dashboard item, since the dashboard is the People & access page', async () => {
+it('gives an administrator no Dashboard item, since the dashboard is the People and court access page', async () => {
   serve('admin', {});
   openApp('/no-such-page', 'admin');
 
@@ -491,7 +491,7 @@ it('keeps the navigation to plain text links with no filler block', async () => 
   openApp('/no-such-page', 'clerk');
 
   const navigation = await mainNavigation();
-  await waitFor(() => expect(linkNames(navigation)).toContain('Filing Intake'));
+  await waitFor(() => expect(linkNames(navigation)).toContain('Filing intake'));
   expect(new Set(linkNames(navigation)).size).toBe(linkNames(navigation).length);
   expect(navigation.querySelector('svg')).toBeNull();
   expect(screen.queryByText('Quick Info')).toBeNull();
@@ -502,8 +502,8 @@ it('marks the current page in the navigation', async () => {
   openApp('/filings', 'attorney');
 
   const navigation = await mainNavigation();
-  expect(within(navigation).getByRole('link', { name: 'My Filings' }).getAttribute('aria-current')).toBe('page');
-  expect(within(navigation).getByRole('link', { name: 'Case Search' }).getAttribute('aria-current')).toBeNull();
+  expect(within(navigation).getByRole('link', { name: 'My filings' }).getAttribute('aria-current')).toBe('page');
+  expect(within(navigation).getByRole('link', { name: 'Case search' }).getAttribute('aria-current')).toBeNull();
 });
 
 it('opens the small-screen menu and closes it when a link is chosen', async () => {
@@ -519,7 +519,7 @@ it('opens the small-screen menu and closes it when a link is chosen', async () =
   expect(screen.getByRole('button', { name: 'Close menu' }).getAttribute('aria-expanded')).toBe('true');
   expect(screen.getByRole('complementary').className).toContain('open');
 
-  fireEvent.click(within(navigation).getByRole('link', { name: 'My Filings' }));
+  fireEvent.click(within(navigation).getByRole('link', { name: 'My filings' }));
 
   expect(screen.getByRole('button', { name: 'Menu' }).getAttribute('aria-expanded')).toBe('false');
   expect(screen.getByRole('complementary').className).not.toContain('open');
