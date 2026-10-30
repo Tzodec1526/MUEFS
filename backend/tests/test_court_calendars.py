@@ -182,6 +182,100 @@ async def test_acceptance_uses_receipt_date_and_preserves_old_calendar_evidence(
     assert reassessment.details["filing_date_basis"]["calendar_ids"] == [2]
 
 
+async def returned_and_resubmitted(
+    db_session, monkeypatch, stored_document, *, publish_first=True,
+):
+    fid, filer, clerk, _ = await filing_fixture(db_session)
+    db_session.add(stored_document(fid))
+    await db_session.flush()
+    filing = await filing_service.get_filing(db_session, fid)
+
+    async def publish():
+        published = calendar()
+        published.court_id, published.published_by = filing.court_id, clerk
+        db_session.add(published)
+        await db_session.flush()
+
+    if publish_first:
+        await publish()
+    received = datetime(2026, 9, 4, 20, tzinfo=UTC)
+    corrected = datetime(2026, 9, 16, 20, tzinfo=UTC)
+    clock = {"now": received}
+
+    class ReceiptClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return clock["now"]
+
+    monkeypatch.setattr(filing_service, "datetime", ReceiptClock)
+    await filing_service.submit_filing(db_session, fid)
+    await filing_service.review_filing(
+        db_session, fid, clerk, "return", "Correct attachment", expected_submission_count=1
+    )
+    if not publish_first:
+        await publish()
+    clock["now"] = corrected
+    await filing_service.submit_filing(db_session, fid)
+    monkeypatch.setattr(filing_service, "datetime", datetime)
+    return fid, clerk, received, corrected
+
+
+async def test_a_resubmission_keeps_the_date_the_filing_was_filed(
+    db_session, monkeypatch, stored_document,
+):
+    fid, clerk, received, corrected = await returned_and_resubmitted(
+        db_session, monkeypatch, stored_document,
+    )
+    filing = await filing_service.get_filing(db_session, fid)
+    assert filing.filing_date == date(2026, 9, 4)
+    assert filing.filing_date_basis["local_received_date"] == "2026-09-04"
+    assert filing.submitted_at.replace(tzinfo=UTC) == corrected
+    receipts = list(await db_session.scalars(
+        select(FilingTransaction).where(FilingTransaction.event_type == "submitted")
+        .order_by(FilingTransaction.submission_number)
+    ))
+    assert [item.submission_number for item in receipts] == [1, 2]
+    assert [item.occurred_at.replace(tzinfo=UTC) for item in receipts] == [received, corrected]
+    assert receipts[1].details["filing_date_basis"]["filing_date"] == "2026-09-04"
+
+    accepted = await filing_service.review_filing(
+        db_session, fid, clerk, "accept", expected_submission_count=2
+    )
+    case = await db_session.get(Case, accepted.case_id)
+    assert accepted.filing_date == case.filing_date == date(2026, 9, 4)
+    assert case.filed_date.replace(tzinfo=UTC) == received
+
+
+async def test_a_resubmission_resolves_an_unset_date_from_the_first_receipt(
+    db_session, monkeypatch, stored_document,
+):
+    fid, *_ = await returned_and_resubmitted(
+        db_session, monkeypatch, stored_document, publish_first=False,
+    )
+    filing = await filing_service.get_filing(db_session, fid)
+    assert filing.filing_date == date(2026, 9, 4)
+    assert filing.filing_date_basis["local_received_date"] == "2026-09-04"
+
+
+async def test_acceptance_reassesses_the_first_receipt_after_a_resubmission(
+    db_session, monkeypatch, stored_document,
+):
+    fid, clerk, received, _ = await returned_and_resubmitted(
+        db_session, monkeypatch, stored_document,
+    )
+    filing = await filing_service.get_filing(db_session, fid)
+    newer = calendar(id=2, closed={"2026-09-04": "Emergency closure", "2026-09-07": "Labor Day"})
+    newer.court_id, newer.published_by = filing.court_id, clerk
+    db_session.add(newer)
+    await db_session.flush()
+    accepted = await filing_service.review_filing(
+        db_session, fid, clerk, "accept", expected_submission_count=2
+    )
+    case = await db_session.get(Case, accepted.case_id)
+    assert accepted.filing_date == case.filing_date == date(2026, 9, 8)
+    assert case.filed_date.replace(tzinfo=UTC) == received
+
+
 async def test_production_acceptance_requires_calendar_coverage(
     db_session, monkeypatch, stored_document,
 ):

@@ -251,7 +251,8 @@ independent accessibility conformance.
    a notification. Court staff can open the same history from the review queue.
 3. A returned filing can be corrected. Removing a previously submitted document removes
    it from the next attempt, while keeping its stored bytes and original receipt private.
-4. Resubmission creates another numbered receipt. A clerk decision is recorded separately.
+4. Resubmission creates another numbered receipt and keeps the filing date. A clerk decision
+   is recorded separately.
    CMS failure is retained as a failed attempt and does not become an acceptance.
 5. Receipt history is paginated. Each transaction can be downloaded as JSON; the displayed
    page can be printed. Downloads use the authenticated client, including for retained files.
@@ -544,11 +545,11 @@ coverage or a timezone change before the next business day produces an unresolve
 The calculation loads the relevant revisions in one query, with no database query per day.
 
 Submission preserves the UTC receipt instant and calendar assessment, including revision
-IDs and skipped dates. Unless a court order has established the date for that submission,
-acceptance reassesses the same receipt instant against the published calendar and records
-a separate event if the assessment changed. New cases keep the receipt
-instant in `filed_date` and the civil date in `filing_date`; neither uses the clerk's acceptance
-time. Date-only fields display consistently across viewer timezones. Search and docket
+IDs and skipped dates. A resubmission records its own receipt but keeps the filing date.
+Unless a court order has established the date, acceptance reassesses the first receipt
+against the published calendar and records a separate event if the assessment changed.
+New cases keep the first receipt instant in `filed_date` and the civil date in `filing_date`;
+neither uses the clerk's acceptance time or a later resubmission. Date-only fields display consistently across viewer timezones. Search and docket
 detail share the same public response schema, and timestamp responses include a UTC offset.
 
 If coverage is unresolved, submission still records receipt. Production acceptance returns
@@ -578,7 +579,7 @@ order, its signing date and reference, the ordered filing date, the reason, and 
 attestation that staff reviewed the order. Recording requires a court assignment; being a
 system administrator alone is insufficient. Drafts and service-only records are ineligible.
 An order can be recorded against a pending, accepted, returned or rejected submission;
-this action does not accept or reopen it. Legacy records keep missing receipt times missing.
+this action does not accept or reopen it, and a later resubmission keeps the ordered date. Legacy records keep missing receipt times missing.
 
 This supports recording the outcome of a court procedure. MCR 1.109(G)(7)(a) permits a
 motion for a court order establishing an earlier filing date after a transmission failure,

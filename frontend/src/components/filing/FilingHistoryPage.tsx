@@ -91,8 +91,8 @@ export default function FilingHistoryPage() {
       <div className="review-card">
         <h2 className="card-heading">Filing date: {formatCourtDate(history.filing_date)}</h2>
         {history.filing_date_basis && <FilingDateEvidence basis={history.filing_date_basis} />}
-        {history.filing_date_basis?.source !== 'court_order' && <p>This date uses the court&apos;s published business-day calendar. It does not decide relief from
-          a deadline, the effect of a correction, or timely payment after a fee-waiver denial.</p>
+        {history.filing_date_basis?.source !== 'court_order' && <p>This date uses the court&apos;s published business-day calendar. A correction keeps this date.
+          It does not decide relief from a deadline or timely payment after a fee-waiver denial.</p>
         }
         <div className="participant-actions">
           <Link to={`/courts/${history.court_id}/calendar`}>View filing calendar and revisions</Link>

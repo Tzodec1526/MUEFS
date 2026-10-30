@@ -221,7 +221,7 @@ async def test_case_date_is_explicit_and_old_orders_remain_publishable(
     ).content == ORDER
 
 
-async def test_return_and_resubmission_reset_date_without_rewriting_prior_order(
+async def test_return_and_resubmission_keep_the_ordered_date(
     date_record,
     db_session,
     api_client,
@@ -252,7 +252,8 @@ async def test_return_and_resubmission_reset_date_without_rewriting_prior_order(
     await filing_service.submit_filing(db_session, fid)
     state = (await api_client.get(url)).json()
     assert state["submission_count"] == 2 and state["version"] == 4
-    assert state["filing_date_basis"].get("source") != "court_order"
+    assert state["filing_date"] == DECISION["filing_date"]
+    assert state["filing_date_basis"] == old_state["filing_date_basis"]
     assert (
         await api_client.post(
             url,
@@ -265,6 +266,28 @@ async def test_return_and_resubmission_reset_date_without_rewriting_prior_order(
     order_event = next(event for event in history if event["event_type"] == "filing_date_ordered")
     assert order_event["submission_number"] == 1
     assert order_event["details"]["filing_date_basis"] == old_state["filing_date_basis"]
+
+
+async def test_a_resubmitted_filing_is_accepted_on_its_ordered_date(
+    date_record,
+    db_session,
+    api_client,
+):
+    fid, _, clerk, _ = date_record
+    url = f"/api/v1/clerk/filings/{fid}/filing-date"
+    assert (
+        await api_client.post(url, data=DECISION, files={"file": ("order.pdf", ORDER)})
+    ).status_code == 201
+    await filing_service.review_filing(
+        db_session, fid, clerk, "return", "Correct attachment", expected_submission_count=1
+    )
+    await filing_service.submit_filing(db_session, fid)
+    accepted = await filing_service.review_filing(
+        db_session, fid, clerk, "accept", expected_submission_count=2
+    )
+    case = await db_session.get(Case, accepted.case_id)
+    assert accepted.status == FilingStatus.ACCEPTED
+    assert case.filing_date == accepted.filing_date == date(2026, 9, 3)
 
 
 async def test_authority_and_validation_block_unreviewed_or_unreceived_orders(

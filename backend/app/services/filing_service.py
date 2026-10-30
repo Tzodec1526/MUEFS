@@ -510,6 +510,7 @@ async def submit_filing(
             "Stored documents changed after integrity verification. Review the draft and try again."
         )
     now = datetime.now(UTC)
+    received_at = await first_receipt(db, filing) or now
     filing.submitted_at = now
     filing.reviewed_at = None
     filing.reviewer_id = None
@@ -517,8 +518,8 @@ async def submit_filing(
     filing.cms_error = None
     filing.submission_count += 1
     filing.filing_date_version += 1
-    if filing.filing_type != "service_only":
-        assessment = await filing_date_for_receipt(db, filing.court_id, now)
+    if filing.filing_type != "service_only" and filing.filing_date is None:
+        assessment = await filing_date_for_receipt(db, filing.court_id, received_at)
         filing.filing_date = assessment.filing_date
         filing.filing_date_basis = assessment.model_dump(mode="json")
 
@@ -575,8 +576,7 @@ async def verify_review(
                 FilingDocument.document_type_code == "FILING_DATE_ORDER",
                 FilingDocument.retained_at.is_not(None),
             ))
-            if (court_order is None or probe.filing_date is None
-                    or basis.get("submission_number") != probe.submission_count):
+            if court_order is None or probe.filing_date is None:
                 raise FilingDateUnavailableError("The filing-date order requires court review")
         await verify_filing_documents(probe, court_order)
         fingerprints = [
@@ -587,6 +587,16 @@ async def verify_review(
                 (court_order.id, court_order.sha256_hash, court_order.file_size_bytes)
             )
     return ReviewEvidence(date_version, ordered_date, fingerprints)
+
+
+async def first_receipt(db: AsyncSession, filing: FilingEnvelope) -> datetime | None:
+    if filing.submission_count <= 1:
+        return filing.submitted_at
+    first = await db.scalar(select(func.min(FilingTransaction.occurred_at)).where(
+        FilingTransaction.filing_id == filing.id,
+        FilingTransaction.event_type == "submitted",
+    ))
+    return first or filing.submitted_at
 
 
 async def record_review(
@@ -638,10 +648,11 @@ async def record_review(
     filing.reviewed_at = now
 
     if action == "accept":
-        if filing.submitted_at is None:
+        received_at = await first_receipt(db, filing)
+        if received_at is None:
             raise FilingDateUnavailableError("The filing has no recorded receipt time")
         if not ordered_date:
-            assessment = await filing_date_for_receipt(db, filing.court_id, filing.submitted_at)
+            assessment = await filing_date_for_receipt(db, filing.court_id, received_at)
             if assessment.filing_date is None and not settings.allow_demo_mode:
                 raise FilingDateUnavailableError(
                     assessment.error or "The court filing date is unresolved"
@@ -662,7 +673,7 @@ async def record_review(
                 .join(CaseType, CaseType.court_id == Court.id)
                 .where(Court.id == filing.court_id, CaseType.id == filing.case_type_id)
             )).one()
-            year = (filing.filing_date or filing.submitted_at).year
+            year = (filing.filing_date or received_at).year
             suffix = case_number_code(court_type, code)
             case = Case(
                 court_id=filing.court_id,
@@ -670,7 +681,7 @@ async def record_review(
                 case_type_id=filing.case_type_id,
                 title=filing.case_title or "Untitled Case",
                 status=CaseStatus.OPEN,
-                filed_date=filing.submitted_at,
+                filed_date=received_at,
                 filing_date=filing.filing_date,
             )
         cms_result = await submit_filing_to_cms(case.case_number, filing.id)

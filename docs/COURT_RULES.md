@@ -34,6 +34,13 @@ These rules explain why the checklists, the validator and the seed data behave a
 - **Proposed order.** Not required at filing. MCR 2.602 governs entry of orders, so a proposed
   order is recommended practice, not a prerequisite.
 
+## Filing dates
+
+- **The filing date is the date filed.** It comes from the first receipt (MCR 1.109(G)(5)(b)).
+  Acceptance does not move it. Neither does a correction: a returned filing that is resubmitted
+  gets a new numbered receipt and keeps its filing date.
+- **Court orders.** A signed filing-date order sets the date, and a later resubmission keeps it.
+
 ## Seed data
 
 - **One row per document.** Each court, case type and document code has one requirement row.
