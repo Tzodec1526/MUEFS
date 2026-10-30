@@ -76,12 +76,6 @@ async def review_filing(
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
-    if data.action not in ("accept", "reject", "return"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Action must be 'accept', 'reject', or 'return'",
-        )
-
     reason = data.reason.strip() if data.reason else None
     if data.action in ("reject", "return") and not reason:
         raise HTTPException(
@@ -157,15 +151,6 @@ async def batch_review_filings(
     """Batch accept filings (UI multi-select).
     Rejects/returns remain single-file (reasons required per item).
     """
-    if data.action != "accept":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Batch review currently supports only 'accept' "
-                "(per-item reasons required for reject/return)"
-            ),
-        )
-
     await lock_current_user(db, user_id)
     succeeded: list[int] = []
     failed: list[int] = []

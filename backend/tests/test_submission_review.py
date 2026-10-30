@@ -116,3 +116,24 @@ async def test_retry_recovers_receipt_but_old_review_cannot_resubmit_returned_fi
     )
     assert resubmitted.status_code == 200, resubmitted.text
     assert resubmitted.json()["submission_count"] == 2
+
+
+async def test_an_unknown_review_action_is_an_invalid_request(api_client, record_filing):
+    fid, _filer, clerk, _other = record_filing
+    await upload(api_client, fid, b"Complaint awaiting review")
+    submitted = await api_client.post(
+        f"/api/v1/filings/{fid}/submit", json=await submission_review(api_client, fid),
+    )
+    assert submitted.status_code == 200, submitted.text
+    api_client.headers["X-Demo-User-Id"] = str(clerk)
+    single = await api_client.post(f"/api/v1/clerk/filings/{fid}/review", json={
+        "action": "approve", "expected_submission_count": 1,
+    })
+    batch = await api_client.post("/api/v1/clerk/queue/batch-review", json={
+        "action": "reject", "filings": [{"filing_id": fid, "expected_submission_count": 1}],
+    })
+    for response in (single, batch):
+        assert response.status_code == 422, response.text
+        assert [error["loc"] for error in response.json()["detail"]] == [["body", "action"]]
+    filing = (await api_client.get(f"/api/v1/filings/{fid}")).json()
+    assert filing["status"] == "submitted" and filing["reviewed_at"] is None

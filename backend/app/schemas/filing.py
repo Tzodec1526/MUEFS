@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -166,7 +166,7 @@ class MyFilingsResponse(FilingListResponse):
 
 
 class ClerkReviewRequest(BaseModel):
-    action: str  # "accept", "reject", "return"
+    action: Literal["accept", "reject", "return"]
     expected_submission_count: int = Field(..., ge=0, strict=True)
     reason: str | None = Field(None, max_length=5000)
 
@@ -179,7 +179,7 @@ class BatchReviewItem(BaseModel):
 class BatchReviewRequest(BaseModel):
     """Batch accept support (reject/return require per-filing reasons so are single only)."""
     filings: list[BatchReviewItem] = Field(..., min_length=1, max_length=100)
-    action: str  # currently only "accept" supported for batch
+    action: Literal["accept"]
 
     @field_validator("filings")
     @classmethod

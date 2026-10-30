@@ -1,6 +1,7 @@
 import hashlib
 import json
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from sqlalchemy import false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -525,7 +526,7 @@ async def review_filing(
     db: AsyncSession,
     filing_id: int,
     reviewer_id: int,
-    action: str,
+    action: Literal["accept", "reject", "return"],
     reason: str | None = None,
     *,
     expected_submission_count: int,
@@ -668,8 +669,6 @@ async def review_filing(
         filing.filing_date_version += 1
         filing.status = FilingStatus.RETURNED
         filing.rejection_reason = reason
-    else:
-        return None
 
     await record_transaction(db, filing, filing.status.value, reviewer_id, reason=reason)
     await db.flush()
