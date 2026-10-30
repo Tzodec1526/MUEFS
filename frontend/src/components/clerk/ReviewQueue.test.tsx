@@ -363,6 +363,18 @@ it('counts the pages of a document in a real plural', async () => {
   expect(screen.getByText(/2 KB · 3 pages$/)).toBeTruthy();
 });
 
+it('leaves the page count off a document with no counted pages', async () => {
+  serveQueues([11]);
+  vi.mocked(getFiling).mockResolvedValue({ ...envelope(11), documents: [
+    { id: 1, document_type_code: 'MOTION', title: 'Scan', file_size_bytes: 2048, mime_type: 'image/tiff', page_count: 0,
+      sha256_hash: 'a'.repeat(64), is_confidential: false, is_text_searchable: false, uploaded_at: '2026-09-28T12:00:00Z' },
+  ] });
+  openQueue();
+  fireEvent.click(await screen.findByText('Case 11'));
+
+  expect((await screen.findByText(/2 KB/)).textContent).toMatch(/2 KB$/);
+});
+
 it('requires a reason before a filing can be returned or rejected', async () => {
   serveQueues([11]);
   openQueue();

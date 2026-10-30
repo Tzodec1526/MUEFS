@@ -5,7 +5,7 @@ import { participantRoles, type CaseDocket } from '../../api/cases';
 import { addFavorite, removeFavorite, listFavorites } from '../../api/favorites';
 import { getCaseTypes } from '../../api/courts';
 import { getDocumentLabel } from '../../utils/documentTypes';
-import { formatBytes, formatCourtDate, formatShortDate } from '../../utils/format';
+import { formatBytes, formatCourtDate, formatShortDate, plural } from '../../utils/format';
 import { errorMessage } from '../../utils/errors';
 import { CourtContext } from '../auth/CourtSession';
 import { useToast } from '../common/Toast';
@@ -300,8 +300,8 @@ function CaseDetailPage() {
                       key={doc.id}
                       className="docket-doc"
                     >
-                      {doc.title} ({getDocumentLabel(doc.document_type_code)}, {formatBytes(doc.file_size_bytes)}
-                      {doc.page_count ? `, ${doc.page_count}p` : ''})
+                      <span>{doc.title} ({getDocumentLabel(doc.document_type_code)}, {formatBytes(doc.file_size_bytes)}
+                        {doc.page_count ? `, ${plural(doc.page_count, 'page')}` : ''})</span>
                       <DocumentDownload id={doc.id} copyId={doc.copy_id ?? undefined} title={doc.title} />
                       {caseData.can_manage_records && <Link to={`/documents/${doc.id}/publication`}>Manage public access</Link>}
                     </div>

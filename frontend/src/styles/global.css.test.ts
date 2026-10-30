@@ -116,6 +116,10 @@ it('keeps every design token in one place', () => {
   expect(declared).toEqual(['tokens.css']);
 });
 
+it('keeps space between a docket document and its download button', () => {
+  expect(css).toMatch(/\.docket-doc \{[^}]*display: inline-flex;[^}]*gap: 0\.5rem;/);
+});
+
 it('styles the heading of every empty state, whatever its level', () => {
   expect(definedSelectors.has('.empty-state h2')).toBe(true);
   expect(definedSelectors.has('.empty-state h3')).toBe(true);

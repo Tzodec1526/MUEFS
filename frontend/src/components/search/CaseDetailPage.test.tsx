@@ -32,10 +32,10 @@ const civil: CaseType = {
   description: null, is_active: true,
 };
 
-function showCase(caseRecord: CaseDocket, caseTypes: CaseType[] = [civil]) {
+function showCase(caseRecord: CaseDocket, caseTypes: CaseType[] = [civil], filings: unknown[] = []) {
   get.mockImplementation(async (url) => {
     const responses: Record<string, unknown> = {
-      '/cases/42': caseRecord, '/cases/42/filings': [], '/courts/3': { id: 3, name: 'Third Circuit Court' },
+      '/cases/42': caseRecord, '/cases/42/filings': filings, '/courts/3': { id: 3, name: 'Third Circuit Court' },
     };
     if (!(url in responses)) throw new Error(`Unexpected request: ${url}`);
     return { data: responses[url] };
@@ -253,6 +253,22 @@ it("reports once that the filer's favorite cases could not load", async () => {
 
   expect(await screen.findAllByText('Could not load your favorite cases.')).toHaveLength(1);
   expect(screen.getByRole('button', { name: '☆ Favorite' })).toBeTruthy();
+});
+
+it.each([
+  [1, /, 1 page\)$/],
+  [3, /, 3 pages\)$/],
+  [0, /2 KB\)$/],
+])('writes out a docket document of %i counted pages', async (pageCount, shown) => {
+  localStorage.setItem('demo_role', 'public');
+  showCase(docket(false), [civil], [{
+    id: 1, status: 'accepted', case_title: 'Smith v. Jones', filing_description: 'Complaint', submitted_at: '2026-03-02T12:00:00Z',
+    filing_date: '2026-03-02', reviewed_at: null, rejection_reason: null,
+    documents: [{ id: 5, title: 'Complaint', document_type_code: 'COMPLAINT', file_size_bytes: 2048, page_count: pageCount }],
+  }]);
+
+  const row = (await screen.findByRole('button', { name: 'Download Complaint' })).closest('.docket-doc')!;
+  expect(row.firstElementChild?.textContent).toMatch(shown);
 });
 
 it('explains why more filings could not load when the server limits requests', async () => {

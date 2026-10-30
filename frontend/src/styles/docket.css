@@ -138,7 +138,10 @@
 }
 
 .docket-doc {
-  display: inline-block;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
   background: var(--tint);
   padding: 0.2rem 0.5rem;
   border-radius: var(--radius);
