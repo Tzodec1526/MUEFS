@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';

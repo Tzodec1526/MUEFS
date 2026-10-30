@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { spawn, spawnSync } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
