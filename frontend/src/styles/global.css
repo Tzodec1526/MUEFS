@@ -1684,16 +1684,19 @@ tr.selected {
 
 .doc-item {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 0.5rem;
   padding: 0.55rem 0.65rem;
   background: var(--tint);
   border-radius: var(--radius);
 }
 
+.doc-info { flex: 1 1 10rem; min-width: 0; }
 .doc-info strong { font-size: 0.85rem; display: block; }
 .doc-meta { font-size: 0.75rem; color: var(--muted); }
-.doc-flags { display: flex; gap: 0.25rem; }
+.doc-flags { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
 .flag-badge { font-size: 0.8rem; padding: 0.1rem 0.35rem; border-radius: var(--radius); font-weight: 700; }
 .flag-badge.warning { background: var(--warning-tint); color: var(--warning-ink); }
 .flag-badge.confidential { background: var(--success-tint); color: var(--success-ink); }
