@@ -2718,7 +2718,7 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 .receipt-documents details { color: var(--muted); font-size: .85rem; }
 .receipt-documents summary { cursor: pointer; padding-block: .35rem; }
 .receipt-documents code { overflow-wrap: anywhere; }
-.document-download { display: inline-flex; gap: .4rem; flex-direction: column; }
+.document-download { display: inline-flex; flex-shrink: 0; gap: .4rem; flex-direction: column; }
 .download-error { color: var(--danger); font-size: .85rem; }
 @media (max-width: 600px) {
   .receipt-card { padding: 1rem; }
