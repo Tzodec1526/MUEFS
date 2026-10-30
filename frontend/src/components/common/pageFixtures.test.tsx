@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi, type Mock } from 'vitest';
@@ -247,6 +247,18 @@ it.each([
   const link = await screen.findByRole('link', { name });
 
   expect(link.getAttribute('href')).toBe('/courts/3/calendar');
+});
+
+it.each([
+  ['calendar', '/courts/3/calendar', '/courts/:courtId/calendar', <CourtCalendarPage key="p" />, 'Filing calendar', 'Calendar revision #1'],
+  ['intake', '/courts/3/intake', '/courts/:courtId/intake', <CourtIntakePage key="p" />, 'Filing intake', 'Notice from the court'],
+])('leads the %s title and heading with the page name and keeps the court in view', async (_name, url, path, page, name, loaded) => {
+  show(url, path, page);
+  await screen.findByRole('heading', { name: loaded });
+
+  expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(name);
+  await waitFor(() => expect(window.document.title).toBe(`${name} · 3rd Circuit Court · MUEFS`));
+  expect(screen.getByText('3rd Circuit Court')).toBeTruthy();
 });
 
 it('names case types without their internal codes on the intake page', async () => {

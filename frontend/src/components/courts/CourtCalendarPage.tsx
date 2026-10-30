@@ -88,7 +88,8 @@ export default function CourtCalendarPage() {
   }
 
   return <section className="court-calendar-page">
-    <div className="page-header"><div><PageHeading>{courtName}: filing calendar</PageHeading>
+    <div className="page-header"><div><PageHeading>Filing calendar</PageHeading>
+      {data && <p>{courtName}</p>}
       <p>Published timezones, legal holidays and court-ordered closures.</p></div>
       <Link className="btn btn-secondary" to={`/courts/${courtId}/intake`}>Electronic intake status</Link></div>
     <p>Electronic submissions can arrive at any time. Under MCR 1.109(G)(5)(b), weekend and closed-day

@@ -170,7 +170,8 @@ export default function CourtIntakePage() {
   }
   const data = current.data;
   return <section className="court-intake-page">
-    <div className="page-header"><div><PageHeading>{data.court_name}: filing intake</PageHeading>
+    <div className="page-header"><div><PageHeading>Filing intake</PageHeading>
+      <p>{data.court_name}</p>
       <p>Current availability and instructions published by the court.</p></div>
       <Link className="btn btn-secondary" to={`/courts/${data.court_id}/calendar`}>Filing calendar</Link></div>
     <div className="review-card">
