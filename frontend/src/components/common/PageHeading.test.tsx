@@ -108,3 +108,16 @@ it('focuses the heading when the user goes back to the first page of the session
   const heading = await screen.findByRole('heading', { level: 1, name: 'Drafts' });
   await waitFor(() => expect(document.activeElement).toBe(heading));
 });
+
+it('leaves focus alone when the page is reloaded on an entry the router had already visited', async () => {
+  render(
+    <MemoryRouter initialEntries={[{ pathname: '/cases/search', key: 'visited' }]}>
+      <Routes>
+        <Route path="/cases/search" element={<PageHeading>Case search</PageHeading>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  await screen.findByRole('heading', { level: 1, name: 'Case search' });
+  expect(document.activeElement).toBe(document.body);
+});
