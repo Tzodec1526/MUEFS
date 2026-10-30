@@ -17,10 +17,12 @@ logger = logging.getLogger(__name__)
 
 class StorageUnavailableError(OSError):
     """Storage could not complete the operation. A missing file is FileNotFoundError."""
+    pass
 
 
 class StorageQuotaExceededError(Exception):
     """The upload does not fit in the storage allotted to it."""
+    pass
 
 
 @dataclass(frozen=True)

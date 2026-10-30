@@ -71,6 +71,7 @@ _ACTOR_FIELDS = {
 
 class CaseExportError(ValueError):
     """A safe diagnostic that identifies incomplete or inconsistent evidence."""
+    pass
 
 
 def _json(value: object) -> bytes:

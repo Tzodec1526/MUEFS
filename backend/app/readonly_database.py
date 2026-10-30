@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
 
 class ReadOnlyDatabaseError(ValueError):
     """Operator guidance that does not disclose connection credentials."""
+    pass
 
 
 @asynccontextmanager

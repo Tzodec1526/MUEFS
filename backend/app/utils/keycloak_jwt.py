@@ -30,6 +30,7 @@ __all__ = ["IdentityProviderUnavailableError", "JWTError", "decode_keycloak_acce
 
 class IdentityProviderUnavailableError(Exception):
     """The realm's signing keys could not be retrieved; the token was not judged."""
+    pass
 
 
 async def _fetch_jwks(*, refresh: bool = False) -> dict[str, Any]:

@@ -9,6 +9,7 @@ from app.models.payment import Payment, PaymentMethod, PaymentStatus
 
 class PaymentsNotConfiguredError(Exception):
     """PAYMENTS_ARE_SIMULATED is off and no processor is wired."""
+    pass
 
 
 async def process_payment(
