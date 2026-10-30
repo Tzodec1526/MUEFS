@@ -9,6 +9,7 @@ it.each([
   ['BRIEF_SUPPORT', 'Brief in Support of Motion'],
   ['BRIEF', 'Brief in Support of Motion'],
   ['ANSWER', 'Answer'],
+  ['REPLY', 'Answer/Reply'],
   ['MOT_FEES', 'Motion for Attorney Fees and Costs'],
   ['POS_ELECTRONIC', 'Proof of Service - Electronic'],
   ['DISC_CERT_GF', 'Certification of Good Faith Discovery Effort'],

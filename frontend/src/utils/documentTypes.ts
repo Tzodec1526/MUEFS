@@ -16,7 +16,7 @@ export const FILING_CATEGORIES = [
     label: 'Responsive Pleadings',
     types: [
       { code: 'ANSWER', label: 'Answer', mcr: 'MCR 2.111(F)' },
-      { code: 'REPLY', label: 'Reply to Counterclaim', mcr: 'MCR 2.110(B)' },
+      { code: 'REPLY', label: 'Answer/Reply', mcr: 'MCR 2.110(B)' },
       { code: 'RESPONSE', label: 'Response to Motion', mcr: 'MCR 2.119(A)(2)' },
       { code: 'REPLY_BRIEF', label: 'Reply Brief', mcr: 'MCR 2.119(A)(2)' },
       { code: 'OBJECTION', label: 'Objection', mcr: '' },
