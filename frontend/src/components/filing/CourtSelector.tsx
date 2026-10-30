@@ -239,12 +239,12 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
         <>
           {visibleStatewide.length > 0 && (
             <div className="court-group">
-              <h4 className="court-group-title">Statewide &amp; Appellate Courts</h4>
+              <h4 className="court-group-title">Statewide &amp; appellate courts</h4>
               <div className="court-list">{sortByFav(visibleStatewide).map(renderCard)}</div>
             </div>
           )}
           <div className="court-group">
-            <h4 className="court-group-title">Trial Courts</h4>
+            <h4 className="court-group-title">Trial courts</h4>
             {loading && <p>Loading courts…</p>}
             <div className="court-list">
               {sortByFav(trialCourts).map(renderCard)}

@@ -261,11 +261,11 @@ function CaseSearch() {
                 <thead>
                   <tr>
                     {showFavorites && <th className="th-fav"></th>}
-                    <th>Case Number</th>
+                    <th>Case number</th>
                     <th>Court</th>
                     <th>Title</th>
                     <th>Status</th>
-                    <th>Filed Date</th>
+                    <th>Filed date</th>
                     <th>Parties</th>
                   </tr>
                 </thead>

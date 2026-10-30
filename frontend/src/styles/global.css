@@ -340,8 +340,6 @@ h1, h2 {
 .sidebar-info h4 {
   font-size: 0.68rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
   color: var(--muted);
   margin-bottom: 0.5rem;
 }
@@ -807,10 +805,8 @@ input[type="radio"] {
 }
 
 .court-group-title {
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
   color: var(--muted);
   margin-bottom: 0.4rem;
 }
@@ -863,11 +859,10 @@ input[type="radio"] {
 }
 
 .case-type-category {
-  font-size: 0.72rem;
+  display: inline-block;
+  font-size: 0.8rem;
   font-weight: 600;
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
 }
 
 /* ============================================
@@ -911,10 +906,8 @@ th, td {
 }
 
 th {
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--muted);
   background: var(--tint);
   border-bottom: 1px solid var(--rule);
@@ -937,24 +930,17 @@ tr.selected {
    ============================================ */
 
 .status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
+  display: inline-block;
   padding: 0.18rem 0.6rem;
   border-radius: var(--radius);
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
-.status-badge::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
+.status-badge::first-letter,
+.case-type-category::first-letter {
+  text-transform: uppercase;
 }
 
 .status-badge.draft { background: var(--rule); color: var(--ink); }
@@ -1038,12 +1024,10 @@ tr.selected {
 }
 
 .detail-section h4 {
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 700;
   color: var(--muted);
   margin-bottom: 0.5rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
 }
 
 .review-buttons {
@@ -1389,10 +1373,8 @@ tr.selected {
 }
 
 .req-group-header {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   padding: 0.5rem 0;
   margin-bottom: 0.5rem;
 }
@@ -1427,10 +1409,8 @@ tr.selected {
   display: inline-block;
   padding: 0.1rem 0.45rem;
   border-radius: var(--radius);
-  font-size: 0.65rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
 }
 
 .req-badge.required { background: var(--danger-tint); color: var(--danger-ink); }
@@ -1541,10 +1521,8 @@ tr.selected {
 }
 
 .review-item label {
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   font-weight: 700;
 }
 
@@ -1641,10 +1619,8 @@ tr.selected {
 
 .stat-label {
   display: block;
-  font-size: 0.65rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 
 /* Batch Actions */
@@ -1702,9 +1678,7 @@ tr.selected {
 }
 
 .detail-grid label {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 0.8rem;
   color: var(--muted);
   font-weight: 700;
 }
@@ -1731,7 +1705,7 @@ tr.selected {
 .doc-info strong { font-size: 0.85rem; display: block; }
 .doc-meta { font-size: 0.75rem; color: var(--muted); }
 .doc-flags { display: flex; gap: 0.25rem; }
-.flag-badge { font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: var(--radius); font-weight: 700; }
+.flag-badge { font-size: 0.8rem; padding: 0.1rem 0.35rem; border-radius: var(--radius); font-weight: 700; }
 .flag-badge.warning { background: var(--warning-tint); color: var(--warning-ink); }
 .flag-badge.confidential { background: var(--success-tint); color: var(--success-ink); }
 
@@ -2178,10 +2152,8 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 }
 
 .party-role {
-  font-size: 0.65rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   color: var(--muted);
 }
 
@@ -2508,8 +2480,6 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 
 .login-card-role {
   font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
   color: var(--ink);
   font-weight: 700;
   margin-bottom: 0.5rem;
@@ -2685,9 +2655,7 @@ h1[tabindex="-1"]:focus:not(:focus-visible) {
 }
 
 .mifile-comparison-table thead th {
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 0.8rem;
   color: var(--muted);
   background: var(--tint);
 }

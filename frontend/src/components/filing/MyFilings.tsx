@@ -11,7 +11,7 @@ const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
   { value: 'draft', label: 'Drafts' },
   { value: 'submitted', label: 'Submitted' },
-  { value: 'under_review', label: 'Under Review' },
+  { value: 'under_review', label: 'Under review' },
   { value: 'accepted', label: 'Accepted' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'returned', label: 'Returned' },
@@ -19,7 +19,7 @@ const STATUS_OPTIONS = [
 ];
 
 const STATUS_LABELS: Record<string, string> = {
-  draft: 'Draft', submitted: 'Submitted', under_review: 'Under Review',
+  draft: 'Draft', submitted: 'Submitted', under_review: 'Under review',
   accepted: 'Accepted', rejected: 'Rejected', returned: 'Returned', served: 'Service documents recorded',
 };
 

@@ -56,7 +56,7 @@ function FilingReviewPanel({
         This filing is no longer awaiting intake review. Refresh the queue for current work.
       </p>}
       <div className="detail-section">
-        <h4>Case Information</h4>
+        <h4>Case information</h4>
         <p>{selectedFiling.submission_count ? `Reviewing submission ${selectedFiling.submission_count}` : 'Reviewing a legacy submission without a recorded submission number'}</p>
         <Link to={`/filings/${selectedFiling.id}/history`} className="btn btn-secondary btn-small">Receipts &amp; history</Link>
         {selectedFiling.fee_waiver_requested && <p>
@@ -105,7 +105,7 @@ function FilingReviewPanel({
       </div>
 
       <div className="detail-section">
-        <h4>Review Actions</h4>
+        <h4>Review actions</h4>
 
         <div className="form-group">
           <label htmlFor="quickReason">Reason (required for reject/return)</label>

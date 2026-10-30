@@ -21,10 +21,10 @@ function Header() {
 
   const roleLabelMap: Record<string, string> = {
     attorney: 'Attorney',
-    clerk: 'Court Clerk',
-    srl: 'Self-Represented Litigant',
+    clerk: 'Court clerk',
+    srl: 'Self-represented litigant',
     public: 'Public',
-    admin: 'System Administrator',
+    admin: 'System administrator',
   };
 
   const roleLabel = role ? roleLabelMap[role] || role : '';

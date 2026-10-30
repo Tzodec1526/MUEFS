@@ -239,7 +239,7 @@ function ReviewQueue() {
                   />
                 </th>
                 <th>Filing #</th>
-                <th>Case Title</th>
+                <th>Case title</th>
                 <th>Submitted</th>
                 <th>Age</th>
                 <th>Docs</th>

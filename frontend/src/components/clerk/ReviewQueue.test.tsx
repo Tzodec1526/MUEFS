@@ -248,7 +248,7 @@ it('opens a filing for review and closes the review back to its row', async () =
   await openReview(12);
 
   expect(vi.mocked(getFiling).mock.lastCall?.[0]).toBe(12);
-  expect(screen.getByRole('heading', { name: 'Review Actions' })).toBeTruthy();
+  expect(screen.getByRole('heading', { name: 'Review actions' })).toBeTruthy();
 
   fireEvent.click(screen.getByRole('button', { name: 'Close review' }));
 

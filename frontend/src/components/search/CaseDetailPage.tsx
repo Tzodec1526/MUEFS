@@ -240,11 +240,11 @@ function CaseDetailPage() {
         <div className="case-detail-card">
           <h3>Case Information</h3>
           <div className="detail-grid">
-            <div><label>Case Number</label><span>{caseData.case_number}</span></div>
-            <div><label>Case Type</label><span>{caseTypeName || '--'}</span></div>
+            <div><label>Case number</label><span>{caseData.case_number}</span></div>
+            <div><label>Case type</label><span>{caseTypeName || '--'}</span></div>
             <div><label>Status</label><span className={`status-badge ${caseData.status}`}>{caseData.status}</span></div>
             <div><label>Court</label><span>{courtName}</span></div>
-            <div><label>Filing Date</label><span>{formatCourtDate(caseData.filing_date)}</span></div>
+            <div><label>Filing date</label><span>{formatCourtDate(caseData.filing_date)}</span></div>
             {!caseData.filing_date && <div><label>Stored date (not calendar-verified)</label><span>{formatShortDate(caseData.filed_date)}</span></div>}
           </div>
         </div>

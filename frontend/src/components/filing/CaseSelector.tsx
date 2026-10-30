@@ -139,7 +139,7 @@ function CaseSelector({
             results.length > 0 ? (
               <table className="review-table case-results">
                 <thead>
-                  <tr><th></th><th>Case Number</th><th>Title</th><th>Status</th></tr>
+                  <tr><th></th><th>Case number</th><th>Title</th><th>Status</th></tr>
                 </thead>
                 <tbody>
                   {results.map((c) => (

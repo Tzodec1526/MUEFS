@@ -194,7 +194,7 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
 
           {requiredDocs.length > 0 && (
             <div className="requirements-group">
-              <h5 className="req-group-header req-required">Required Documents ({requiredDocs.length})</h5>
+              <h5 className="req-group-header req-required">Required documents ({requiredDocs.length})</h5>
               <div className="requirements-cards">
                 {requiredDocs.map((req) => (
                   <div key={req.id} className="requirement-card required">
@@ -230,7 +230,7 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
 
           {optionalDocs.length > 0 && (
             <div className="requirements-group">
-              <h5 className="req-group-header req-optional">Optional Documents ({optionalDocs.length})</h5>
+              <h5 className="req-group-header req-optional">Optional documents ({optionalDocs.length})</h5>
               <div className="requirements-cards">
                 {optionalDocs.map((req) => (
                   <div key={req.id} className="requirement-card optional">

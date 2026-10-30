@@ -162,11 +162,11 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
             <span>{courtName || 'Not selected'}</span>
           </div>
           <div className="review-item">
-            <label>Case Type</label>
+            <label>Case type</label>
             <span>{caseTypeName || 'Not selected'}</span>
           </div>
           <div className="review-item">
-            <label>Case Title</label>
+            <label>Case title</label>
             <span>{filing.case_title || 'Not provided'}</span>
           </div>
         </div>
@@ -188,7 +188,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
                 <th>Title</th>
                 <th>Type</th>
                 <th>Size</th>
-                <th>Text Searchable</th>
+                <th>Text searchable</th>
                 <th>Confidential</th>
               </tr>
             </thead>
