@@ -2,8 +2,11 @@ import { expect, it } from 'vitest';
 
 // Vitest serves stylesheet imports (even ?raw) as empty strings, so read the file itself.
 const fsModule = 'node:fs';
-const { readFileSync } = await import(/* @vite-ignore */ fsModule);
-const css: string = readFileSync(new URL('./global.css', import.meta.url), 'utf8');
+const { readdirSync, readFileSync } = await import(/* @vite-ignore */ fsModule);
+const stylesDir = new URL('.', import.meta.url);
+const read = (name: string): string => readFileSync(new URL(name, stylesDir), 'utf8');
+const stylesheets: string[] = readdirSync(stylesDir).filter((name: string) => name.endsWith('.css')).sort();
+const css = stylesheets.filter(name => name !== 'global.css').map(read).join('\n');
 
 const corpus = Object.values({
   ...import.meta.glob<string>(['../**/*.{ts,tsx}', '!../**/*.test.{ts,tsx}'], { query: '?raw', import: 'default', eager: true }),
@@ -71,15 +74,23 @@ it('keeps no rules for classes that nothing renders', () => {
   expect(unused).toEqual([]);
 });
 
+const below600 = [...css.matchAll(/@media \(max-width: 599px\) \{([\s\S]*?)\n\}/g)].map(match => match[1]).join('\n');
+
+it('imports every stylesheet from global.css, except the one the intake page loads itself', () => {
+  const imports = [...read('global.css').matchAll(/^@import '\.\/([\w-]+\.css)';$/gm)].map(match => match[1]);
+  expect(read('global.css').trim().split('\n')).toHaveLength(imports.length);
+  expect([...imports].sort()).toEqual(stylesheets.filter(name => name !== 'global.css' && name !== 'intake.css'));
+  expect(imports[0]).toBe('tokens.css');
+  expect(stylesheets.length).toBeGreaterThan(10);
+});
+
 it('stacks the case search rows below 600 px instead of scrolling them sideways', () => {
-  const below600 = css.slice(css.indexOf('@media (max-width: 599px) {\n  .case-search-table table'));
   expect(below600).toMatch(/\.case-search-table tr \{\s+display: block;/);
   expect(below600).toMatch(/\.case-search-table td\[data-label\]::before \{\s+content: attr\(data-label\);/);
   expect(css).toMatch(/@media \(min-width: 600px\) and \(max-width: 760px\) \{\s+\.search-results table,/);
 });
 
 it('stacks the queue rows below 600 px and keeps Select all on screen there', () => {
-  const below600 = css.slice(css.indexOf('@media (max-width: 599px) {\n  .case-search-table table'));
   expect(below600).toMatch(/\.queue-list tbody tr \{\s+display: grid;/);
   expect(below600).toMatch(/\.queue-list td\[data-label\]::before \{\s+content: attr\(data-label\);/);
   expect(below600).toMatch(/\.queue-list thead \.th-checkbox \{\s+position: static;/);
@@ -98,6 +109,11 @@ it('sentence-cases only status badges, whose values never reach the screen with 
 
 it('gives the court rule links in the wizard checklist a 24 px target', () => {
   expect(selectorLists.find(list => list.includes('.requirement-list a'))).toContain('td > a');
+});
+
+it('keeps every design token in one place', () => {
+  const declared = stylesheets.filter(name => /^\s*--[\w-]+:/m.test(read(name)));
+  expect(declared).toEqual(['tokens.css']);
 });
 
 it('hides the outline of a focused page heading only when the browser would not show a focus ring', () => {

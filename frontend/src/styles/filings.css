@@ -1,0 +1,108 @@
+.filings-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+}
+
+.filings-controls .form-group {
+  flex: 0 1 20rem;
+  margin-bottom: 0;
+}
+
+.filings-controls .results-count {
+  padding-bottom: 0.6rem;
+}
+
+.results-count {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.filings-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.filing-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+}
+
+.filing-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.filing-card-id {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.filing-card-title {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.filing-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+
+.filing-card-reason {
+  background: var(--warning-tint);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.filing-card-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.filing-history { max-width: 1060px; margin-inline: auto; }
+.history-summary, .receipt-heading, .receipt-document-heading {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+}
+.history-summary { margin-bottom: 1rem; }
+.filing-timeline, .receipt-documents { list-style: none; padding: 0; }
+.receipt-card {
+  margin-block: 1.25rem; padding: 1.5rem; border-radius: var(--radius); background: var(--white);
+}
+.receipt-heading h3 { margin: 0; }
+.receipt-heading > span { color: var(--muted); font-size: .9rem; }
+.receipt-reference { color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+.receipt-details { display: grid; gap: .9rem; margin-block: 1.25rem; }
+.receipt-details dt { color: var(--muted); font-size: .85rem; }
+.receipt-details dd { margin: .2rem 0 0; overflow-wrap: anywhere; }
+.receipt-documents li { padding-block: 1rem; }
+.receipt-documents p { margin: .35rem 0; }
+.receipt-documents details { color: var(--muted); font-size: .85rem; }
+.receipt-documents summary { cursor: pointer; padding-block: .35rem; }
+.receipt-documents code { overflow-wrap: anywhere; }
+.document-download { display: inline-flex; flex-shrink: 0; gap: .4rem; flex-direction: column; }
+.download-error { color: var(--danger); font-size: .85rem; }
+
+@media (max-width: 600px) {
+  .receipt-card { padding: 1rem; }
+  .receipt-document-heading { align-items: flex-start; }
+}
+
+@media print {
+  body:has(.filing-history) header, body:has(.filing-history) footer,
+  body:has(.filing-history) .sidebar, .filing-history button,
+  .filing-history .page-header > a, .filing-history .pagination,
+  .fee-waiver-panel form, .waiver-payment { display: none !important; }
+  body:has(.filing-history) .main-content { margin: 0; padding: 0; }
+  .filing-history { max-width: none; color: #000; }
+  .receipt-card { break-inside: avoid; }
+}
