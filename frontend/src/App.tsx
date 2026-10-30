@@ -1,23 +1,21 @@
 import { lazy, Suspense, useState, useEffect, useContext } from 'react';
 import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { FilePlus2, FolderOpen, Search, ClipboardCheck } from 'lucide-react';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Footer from './components/layout/Footer';
 import LoginScreen from './components/auth/LoginScreen';
-import { CourtContext, CourtSession, CourtWorkspace, StaffCourtSelect } from './components/auth/CourtSession';
-import PlatformStats from './components/marketing/PlatformStats';
-import MifileComparison from './components/marketing/MifileComparison';
-import { getFilingStatusCounts, getClerkQueue } from './api/filings';
+import { CourtContext, CourtSession, CourtWorkspace } from './components/auth/CourtSession';
 import { oidcSessionExpected, SESSION_KEY } from './auth/keycloak';
 import { isPublicPath } from './auth/publicPath';
 import { hasAdministrationAccess, hasSession } from './auth/session';
-import LoadError from './components/common/LoadError';
-import { loadFailure, type LoadFailure } from './utils/errors';
+import type { LoadFailure } from './utils/errors';
 import { usePageTitle } from './utils/pageTitle';
 import PageHeading, { HeadingFocusScope } from './components/common/PageHeading';
 import PageLoadError from './components/common/PageLoadError';
 
+const FilerDashboard = lazy(() => import('./components/dashboard/FilerDashboard'));
+const PublicDashboard = lazy(() => import('./components/dashboard/PublicDashboard'));
+const ClerkDashboard = lazy(() => import('./components/dashboard/ClerkDashboard'));
 const FilingWizard = lazy(() => import('./components/filing/FilingWizard'));
 const MyFilings = lazy(() => import('./components/filing/MyFilings'));
 const FilingHistoryPage = lazy(() => import('./components/filing/FilingHistoryPage'));
@@ -80,150 +78,6 @@ function RequireAdministration({ children }: { children: React.ReactNode }) {
   if (error) return <AdministrationAccessUnchecked failure={error} onRetry={refresh} />;
   if (!hasAdministrationAccess()) return <AdministrationAccessRequired />;
   return <>{children}</>;
-}
-
-function FilerDashboard() {
-  usePageTitle('Your filings');
-  const [draftCount, setDraftCount] = useState<number | null>(null);
-  const [returnedCount, setReturnedCount] = useState<number | null>(null);
-  const [countsError, setCountsError] = useState<LoadFailure | null>(null);
-  const [countsAttempt, setCountsAttempt] = useState(0);
-  useEffect(() => {
-    let current = true;
-    getFilingStatusCounts().then((counts) => {
-      if (!current) return;
-      setCountsError(null);
-      setDraftCount(counts.draft);
-      setReturnedCount(counts.returned);
-    }).catch((err) => {
-      if (current) setCountsError(loadFailure(err, 'Could not load your filing counts.'));
-    });
-    return () => { current = false; };
-  }, [countsAttempt]);
-
-  return (
-    <div className="dashboard">
-      <div className="dashboard-welcome">
-        <PageHeading>Your filings</PageHeading>
-        <p>File court documents electronically.</p>
-      </div>
-
-      {countsError && <LoadError failure={countsError} onRetry={() => setCountsAttempt(n => n + 1)} />}
-
-      {(draftCount || returnedCount) ? (
-        <div className="dashboard-alert-row">
-          {draftCount ? (
-            <Link to="/filings" className="dashboard-alert">
-              <strong>{draftCount}</strong> draft{draftCount === 1 ? '' : 's'} in progress
-            </Link>
-          ) : null}
-          {returnedCount ? (
-            <Link to="/filings" className="dashboard-alert dashboard-alert-warn">
-              <strong>{returnedCount}</strong> returned for correction
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
-
-      <div className="dashboard-cards">
-        <div className="card card-primary">
-          <div className="card-icon"><FilePlus2 size={22} aria-hidden="true" /></div>
-          <h3>New Filing</h3>
-          <p>Start a new case or file in an existing one.</p>
-          <Link to="/filing/new" className="btn btn-primary">Start Filing</Link>
-        </div>
-        <div className="card">
-          <div className="card-icon"><FolderOpen size={22} aria-hidden="true" /></div>
-          <h3>My Filings</h3>
-          <p>View and manage your submitted filings.</p>
-          <Link to="/filings" className="btn btn-secondary">View Filings</Link>
-        </div>
-        <div className="card">
-          <div className="card-icon"><Search size={22} aria-hidden="true" /></div>
-          <h3>Case Search</h3>
-          <p>Search court case records.</p>
-          <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>
-        </div>
-      </div>
-      <PlatformStats />
-      <MifileComparison variant="dashboard" />
-    </div>
-  );
-}
-
-function PublicDashboard() {
-  usePageTitle('Public court records');
-  return (
-    <div className="dashboard">
-      <div className="dashboard-welcome">
-        <PageHeading>Public court records</PageHeading>
-        <p>
-          No account needed: search and open non-sealed matters. Draft filings and sealed cases
-          stay restricted to parties, counsel, and court staff.
-        </p>
-      </div>
-      <div className="dashboard-cards">
-        <div className="card card-primary">
-          <div className="card-icon"><Search size={22} aria-hidden="true" /></div>
-          <h3>Case Search</h3>
-          <p>Browse the public docket index (sealed cases are excluded from search).</p>
-          <Link to="/cases/search" className="btn btn-primary">Search Cases</Link>
-        </div>
-      </div>
-      <PlatformStats />
-      <MifileComparison variant="dashboard" />
-    </div>
-  );
-}
-
-function ClerkDashboard() {
-  const { court } = useContext(CourtContext)!;
-  const courtId = court!.court_id;
-  usePageTitle('Clerk dashboard', court!.court_name || `Court ${courtId}`);
-  const [pending, setPending] = useState<number | null>(null);
-  const [pendingError, setPendingError] = useState<LoadFailure | null>(null);
-  const [pendingAttempt, setPendingAttempt] = useState(0);
-  useEffect(() => {
-    const controller = new AbortController();
-    getClerkQueue(courtId, { page_size: 1, signal: controller.signal }).then((r) => {
-      if (controller.signal.aborted) return;
-      setPendingError(null);
-      setPending(r.total);
-    }).catch((err) => {
-      if (!controller.signal.aborted) setPendingError(loadFailure(err, 'Could not load the number of filings pending review.'));
-    });
-    return () => controller.abort();
-  }, [courtId, pendingAttempt]);
-
-  return (
-    <div className="dashboard">
-      <StaffCourtSelect />
-      <div className="dashboard-welcome">
-        <PageHeading>{court!.court_name || `Court ${courtId}`}</PageHeading>
-        <p>
-          Clerk Review Dashboard
-          {pending !== null ? ` — ${pending} filing${pending === 1 ? '' : 's'} pending review` : ''}
-        </p>
-      </div>
-      {pendingError && <LoadError failure={pendingError} onRetry={() => setPendingAttempt(n => n + 1)} />}
-
-      <div className="dashboard-cards">
-        <div className="card card-primary">
-          <div className="card-icon"><ClipboardCheck size={22} aria-hidden="true" /></div>
-          <h3>Review Queue</h3>
-          <p>Review and process pending filings for your court.</p>
-          <Link to="/clerk/queue" className="btn btn-primary">Open Queue</Link>
-        </div>
-        <div className="card">
-          <div className="card-icon"><Search size={22} aria-hidden="true" /></div>
-          <h3>Case Search</h3>
-          <p>Search court case records.</p>
-          <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>
-        </div>
-      </div>
-      <PlatformStats />
-    </div>
-  );
 }
 
 function Dashboard() {
