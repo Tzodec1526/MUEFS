@@ -16,11 +16,7 @@ x-storage-environment: &storage-environment
   S3_SECRET_KEY: ${S3_SECRET_KEY:-muefs_storage_secret}
   S3_BUCKET_NAME: ${S3_BUCKET_NAME:-muefs-documents}
 
-# A local evaluation stack: demo sign-in and development credentials are enabled, so
-# every published port listens on this computer only. See docs/DEPLOYMENT.md for a
-# court deployment.
 services:
-  # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
     environment:
@@ -41,7 +37,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis rate limiting
   redis:
     image: redis:7-alpine
     ports:
@@ -58,8 +53,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # S3-compatible document storage: Versity Gateway serving a local volume. The
-  # migrate service creates the bucket.
   storage:
     image: versity/versitygw:v1.8.0@sha256:30292fc2eeacc67a36993b01f7a7a5e3361a19cced0e80c1d71cfa2a4b0a2499
     command: ["posix", "/data"]
@@ -77,16 +70,12 @@ services:
       timeout: 5s
       retries: 10
 
-  # Keycloak identity provider with the local realm in keycloak/muefs-realm.json
-  # (imported on first start). Its one sign-in account is for local evaluation only.
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.4@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
     command: ["start-dev", "--import-realm"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
-      # Tokens name the address browsers use; the API fetches keys over the internal
-      # network (KEYCLOAK_INTERNAL_URL) and still requires this issuer.
       KC_HOSTNAME: ${KEYCLOAK_URL:-http://localhost:8080}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-muefs}
@@ -100,9 +89,6 @@ services:
       postgres:
         condition: service_healthy
 
-  # Creates the document bucket, applies migrations, then seeds the demo courts and
-  # accounts once. Services that read the schema wait for it; rerunning skips an
-  # already seeded database.
   migrate:
     build: ./backend
     command: ["python", "-m", "app.seed_data"]
@@ -119,7 +105,6 @@ services:
       storage:
         condition: service_healthy
 
-  # Backend API
   backend:
     build:
       context: ./backend
@@ -134,13 +119,11 @@ services:
       KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8080}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-muefs}
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-muefs-api}
-      # Local stack: true (X-Demo-User-Id). Production deploys: must be false.
       ALLOW_DEMO_MODE: ${ALLOW_DEMO_MODE:-true}
       ALLOW_PUBLIC_REGISTRATION: ${ALLOW_PUBLIC_REGISTRATION:-true}
       PROVISION_USER_ON_FIRST_OIDC_LOGIN: ${PROVISION_USER_ON_FIRST_OIDC_LOGIN:-true}
       RATE_LIMIT_BACKEND: ${RATE_LIMIT_BACKEND:-redis}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
-      # Empty values mean "use the default" (several follow DEBUG).
       DEMO_MODE_SECRET: ${DEMO_MODE_SECRET:-}
       ENABLE_API_DOCS: ${ENABLE_API_DOCS:-}
       TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-}
@@ -150,9 +133,6 @@ services:
       RATE_LIMIT_FAIL_CLOSED: ${RATE_LIMIT_FAIL_CLOSED:-}
       PAYMENTS_ARE_SIMULATED: ${PAYMENTS_ARE_SIMULATED:-true}
       EXTERNAL_PAYMENTS_ENABLED: ${EXTERNAL_PAYMENTS_ENABLED:-false}
-      # Optional ClamAV scanning. Off by default; enable with the `security` profile and
-      # MALWARE_SCAN_CLAMAV_ENABLED=true (see the clamav service below). Built-in heuristic
-      # screening runs regardless.
       MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-100}
       MALWARE_SCAN_CLAMAV_ENABLED: ${MALWARE_SCAN_CLAMAV_ENABLED:-false}
       CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
@@ -176,7 +156,6 @@ services:
       storage:
         condition: service_healthy
 
-  # Deletes only draft objects whose removal has committed.
   storage-worker:
     build: ./backend
     restart: unless-stopped
@@ -194,7 +173,6 @@ services:
       storage:
         condition: service_healthy
 
-  # Opt-in notice sender; configure the relay before starting it.
   notice-worker:
     profiles: ["email"]
     build: ./backend
@@ -210,7 +188,6 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  # Frontend
   frontend:
     build:
       context: ./frontend
@@ -224,22 +201,17 @@ services:
       VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
       VITE_ALLOW_DEMO_MODE: ${VITE_ALLOW_DEMO_MODE:-true}
       VITE_DEMO_MODE_SECRET: ${VITE_DEMO_MODE_SECRET:-}
-      # The dev server proxies /config.js (and /api) to the API container.
       API_PROXY_TARGET: http://backend:8000
       VITE_KEYCLOAK_URL: ${VITE_KEYCLOAK_URL:-http://localhost:8080}
       VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM:-muefs}
       VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID:-muefs-frontend}
 
-  # Optional malware scanner — opt-in so the default stack stays fast.
-  #   docker compose --profile security up   (and set MALWARE_SCAN_CLAMAV_ENABLED=true)
-  # First boot downloads the signature database (a few minutes); it persists in a volume.
   clamav:
     image: clamav/clamav:1.4
     profiles: ["security"]
     volumes:
       - clamav_data:/var/lib/clamav
       - ./clamav/clamd.conf:/etc/clamav/clamd.conf:ro
-      # The official entrypoint chowns database files, so this mount must allow it.
       - ./clamav/muefs-limits.cdb:/var/lib/clamav/muefs-limits.cdb
 
 volumes:
