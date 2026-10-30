@@ -214,7 +214,7 @@ it('steps down from a notice to its opened email history', async () => {
 it('keeps the fees heading a level under the wizard step when no level is passed', async () => {
   const { default: PaymentForm } = await import('../filing/PaymentForm');
   show('/filing', '/filing', <><h2>Review your filing</h2><PaymentForm filingId={2} /></>);
-  const heading = await screen.findByRole('heading', { name: 'Filing fees & payments' });
+  const heading = await screen.findByRole('heading', { name: 'Filing fees and payments' });
   expect(heading.tagName).toBe('H3');
   expect(screen.getByRole('heading', { name: 'Payment or waiver' }).tagName).toBe('H4');
   expect(skips()).toEqual([]);

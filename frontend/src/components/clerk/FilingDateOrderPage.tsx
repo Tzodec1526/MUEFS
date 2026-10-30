@@ -62,7 +62,7 @@ export default function FilingDateOrderPage() {
     <div className="page-header">
       <div><PageHeading>Filing #{filingId}: record a filing-date order</PageHeading>
         <p>Enter the date established by an existing signed court order.</p></div>
-      <Link className="btn btn-secondary" to={`/filings/${filingId}/history`}>Receipts &amp; history</Link>
+      <Link className="btn btn-secondary" to={`/filings/${filingId}/history`}>Receipts and history</Link>
     </div>
     {receipt && <div className="alert alert-success" role="status">Court-ordered filing date recorded. Transaction <code>{receipt}</code>.</div>}
     {error && <p className="alert alert-error" role="alert">{error}</p>}

@@ -82,7 +82,7 @@ export default function FilingHistoryPage() {
         <span className={`status-badge ${history.status}`}>{history.status === 'served' ? 'Service documents recorded' : history.status.replace(/_/g, ' ')}</span>
         <span>{plural(history.submission_count, 'recorded submission')}</span>
         <button className="btn btn-secondary btn-small" onClick={() => window.print()}>Print this page</button>
-        <Link to={`/filings/${filingId}/fees`}>View fees &amp; payments</Link>
+        <Link to={`/filings/${filingId}/fees`}>View fees and payments</Link>
         <Link to={`/filings/${filingId}/deliveries`}>Document deliveries</Link>
       </div>
       <p className="info-text">A receipt records what this system received. Court acceptance is a separate decision.

@@ -91,7 +91,7 @@ export default function PaymentForm({ filingId, headingLevel = 3, onFeesChange }
     (fees.can_pay && fees.payments_simulated) || fees.can_request_waiver
   );
   return <div className="review-card filing-fees">
-    <div className="page-header"><Heading className="card-heading">Filing fees &amp; payments</Heading>
+    <div className="page-header"><Heading className="card-heading">Filing fees and payments</Heading>
       <button className="btn btn-secondary btn-small" disabled={busy} onClick={() => { setError(''); setAttempt(n => n + 1); }}>Refresh fees</button></div>
     {notice && <p className="alert alert-success" role="status">{notice}</p>}
     {error && <p className="alert alert-error" role="alert">{error}</p>}

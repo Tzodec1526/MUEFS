@@ -60,7 +60,7 @@ function FilingReviewPanel({
       <div className="detail-section">
         <h3>Case information</h3>
         <p>{selectedFiling.submission_count ? `Reviewing submission ${selectedFiling.submission_count}` : 'Reviewing an older submission without a recorded submission number'}</p>
-        <Link to={`/filings/${selectedFiling.id}/history`} className="btn btn-secondary btn-small">Receipts &amp; history</Link>
+        <Link to={`/filings/${selectedFiling.id}/history`} className="btn btn-secondary btn-small">Receipts and history</Link>
         {selectedFiling.fee_waiver_requested && <p>
           Fee waiver: {selectedFiling.fee_waiver_granted === true ? 'granted'
             : selectedFiling.fee_waiver_granted === false ? 'denied'

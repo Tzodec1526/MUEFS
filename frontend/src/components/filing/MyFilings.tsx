@@ -130,7 +130,7 @@ function MyFilings() {
                   ) : (
                     <button className="btn btn-secondary btn-small" onClick={() => navigate(`/filing/new?filing_id=${filing.id}`)}>View filing</button>
                   )}
-                  {filing.submitted_at && <Link className="btn btn-secondary btn-small" to={`/filings/${filing.id}/history`}>Receipts &amp; history</Link>}
+                  {filing.submitted_at && <Link className="btn btn-secondary btn-small" to={`/filings/${filing.id}/history`}>Receipts and history</Link>}
                 </div>
               </div>
             );

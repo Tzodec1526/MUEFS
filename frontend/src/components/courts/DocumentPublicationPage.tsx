@@ -128,7 +128,7 @@ export default function DocumentPublicationPage() {
     {notice && <p className="alert alert-success" role="status">{notice}</p>}
     {error && <p className="alert alert-error" role="alert">{error}</p>}
     {current?.data && <>
-      <Link to={`/filings/${current.data.filing_id}/history`}>Back to filing receipts &amp; history</Link>
+      <Link to={`/filings/${current.data.filing_id}/history`}>Back to filing receipts and history</Link>
       <div className="publication-grid">
         <section className="review-card"><h2 className="card-heading">Filed original</h2><p><strong>{current.data.document.title}</strong></p>
           <p>{formatBytes(current.data.document.file_size_bytes)} · {current.data.filing_status}</p>

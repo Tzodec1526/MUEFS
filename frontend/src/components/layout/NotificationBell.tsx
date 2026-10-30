@@ -101,7 +101,7 @@ function NotificationBell() {
               ))}
             </ul>
           )}
-          <Link to="/notifications" onClick={() => setOpen(false)}>All notices &amp; email status</Link>
+          <Link to="/notifications" onClick={() => setOpen(false)}>All notices and email status</Link>
         </div>
       )}
     </div>

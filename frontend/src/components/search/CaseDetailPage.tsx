@@ -280,7 +280,7 @@ function CaseDetailPage() {
               <div key={f.id} className="docket-entry">
                 <div className="docket-entry-header">
                   <span className="docket-entry-id">#{f.id}</span>
-                  {caseData.can_manage_records && <Link to={`/filings/${f.id}/history`}>Receipts &amp; history</Link>}
+                  {caseData.can_manage_records && <Link to={`/filings/${f.id}/history`}>Receipts and history</Link>}
                   <span className={`status-badge ${docketStatus(f.status).cls}`}>{docketStatus(f.status).label}</span>
                   <span className="docket-entry-date">{f.filing_date
                     ? `Filing date: ${formatCourtDate(f.filing_date)}`

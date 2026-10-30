@@ -8,7 +8,7 @@ export default function FilingFeesPage() {
   usePageTitle(`Filing #${filingId}: fees and payments`);
   return <section className="filing-fees-page">
     <div className="page-header"><PageHeading>Filing #{filingId}: fees and payments</PageHeading>
-      <Link className="btn btn-secondary" to={`/filings/${filingId}/history`}>Receipts &amp; history</Link></div>
+      <Link className="btn btn-secondary" to={`/filings/${filingId}/history`}>Receipts and history</Link></div>
     <PaymentForm filingId={Number(filingId)} headingLevel={2} />
   </section>;
 }
