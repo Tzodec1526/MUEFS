@@ -190,7 +190,7 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
 
   return (
     <div className="form-section">
-      <h3>Select Court</h3>
+      <h2>Select Court</h2>
       <p className="info-text">
         Search by court name, or browse by county. Statewide and appellate courts (Court of Appeals,
         Supreme Court, Court of Claims) are listed in their own group below.
@@ -239,12 +239,12 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
         <>
           {visibleStatewide.length > 0 && (
             <div className="court-group">
-              <h4 className="court-group-title">Statewide &amp; appellate courts</h4>
+              <h3 className="court-group-title">Statewide &amp; appellate courts</h3>
               <div className="court-list">{sortByFav(visibleStatewide).map(renderCard)}</div>
             </div>
           )}
           <div className="court-group">
-            <h4 className="court-group-title">Trial courts</h4>
+            <h3 className="court-group-title">Trial courts</h3>
             {loading && <p>Loading courts…</p>}
             <div className="court-list">
               {sortByFav(trialCourts).map(renderCard)}

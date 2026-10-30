@@ -481,6 +481,61 @@ it('skips the case type step for a filing in an existing case', async () => {
   await screen.findByText('Third Circuit Court');
 });
 
+const headingLevels = () => screen.getAllByRole('heading').map(heading => Number(heading.tagName[1]));
+
+function expectNoSkippedHeadingLevels() {
+  const levels = headingLevels();
+  expect(levels[0]).toBe(1);
+  expect(levels.filter((level, index) => index > 0 && level > levels[index - 1] + 1)).toEqual([]);
+}
+
+it('steps down one heading level at a time on the court, case and case type steps', async () => {
+  serveCourtsAndTypes();
+  openWizard('/filing/new');
+  await screen.findByRole('button', { name: 'Third Circuit Court' });
+  expectNoSkippedHeadingLevels();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Third Circuit Court' }));
+  fireEvent.click(button('Continue'));
+  await screen.findByRole('heading', { name: 'Existing case or new case?' });
+  expectNoSkippedHeadingLevels();
+
+  fireEvent.click(screen.getByRole('button', { name: /Start a new case/ }));
+  fireEvent.click(button('Continue'));
+  vi.mocked(getFilingRequirements).mockResolvedValue([{
+    id: 1, document_type_code: 'COMPLAINT', is_required: true, description: 'Complaint', mcr_reference: null,
+    local_rule_reference: null, page_limit: null, format_notes: null,
+  }]);
+  fireEvent.click(await screen.findByRole('radio', { name: /General Civil/ }));
+  await screen.findByRole('heading', { name: 'Required documents (1)' });
+  expectNoSkippedHeadingLevels();
+});
+
+it('steps down one heading level at a time on the documents and review steps', async () => {
+  const draft = savedFiling({ documents: [complaint] });
+  vi.mocked(getFiling).mockResolvedValue(draft);
+  vi.mocked(getFilingRequirements).mockResolvedValue([]);
+  vi.mocked(validateFiling).mockResolvedValue({
+    is_valid: false, errors: ['A summons is required.'], warnings: ['Check the caption.'], missing_required_documents: ['Summons'],
+  });
+  vi.mocked(getFilingFees).mockResolvedValue(paidFees(draft));
+  openWizard('/filing/new?filing_id=7');
+  await screen.findByRole('heading', { name: 'Upload Documents' });
+  expectNoSkippedHeadingLevels();
+
+  fireEvent.click(button('Review Filing'));
+
+  await screen.findByRole('heading', { name: 'Issues Found' });
+  await screen.findByText('No additional payment is required for the current filing.');
+  expectNoSkippedHeadingLevels();
+});
+
+it('steps down one heading level at a time in the conflict comparison', async () => {
+  await openConflict();
+
+  expectNoSkippedHeadingLevels();
+});
+
 it('returns to a completed step from the progress bar, and back one step with Back', async () => {
   serveCourtsAndTypes();
   openWizard('/filing/new?court_id=3');
@@ -491,7 +546,7 @@ it('returns to a completed step from the progress bar, and back one step with Ba
 
   fireEvent.click(stepButton('Court'));
 
-  expect(await screen.findByRole('heading', { name: 'Select Court', level: 3 })).toBeTruthy();
+  expect(await screen.findByRole('heading', { name: 'Select Court', level: 2 })).toBeTruthy();
   expect(stepButton('Court').getAttribute('aria-current')).toBe('step');
   expect(stepButton('Case').disabled).toBe(true);
 });

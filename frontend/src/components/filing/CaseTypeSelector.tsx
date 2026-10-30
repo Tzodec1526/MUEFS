@@ -143,7 +143,7 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
 
   return (
     <div className="form-section">
-      <h3>Select Case Type & Review Requirements</h3>
+      <h2>Select Case Type & Review Requirements</h2>
       <p className="info-text">
         Choose the type of case for your filing. After selecting, review the filing
         requirements below to ensure you have all necessary documents.
@@ -207,22 +207,22 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
         onRetry={() => setRequirementsAttempt(attempt => attempt + 1)} />}
       {selectedCaseTypeId && requirements.length > 0 && (
         <div className="requirements-section">
-          <h4>Filing Requirements & Court Rules</h4>
+          <h3>Filing Requirements & Court Rules</h3>
           <p className="info-text">
             Review these requirements carefully. Missing required documents may cause the
             clerk to return your filing for correction.
           </p>
 
           {requiredDocs.length > 0 && <>
-            <h5>Required documents ({requiredDocs.length})</h5>
+            <h4>Required documents ({requiredDocs.length})</h4>
             <RequirementList requirements={requiredDocs} />
           </>}
           {optionalDocs.length > 0 && <>
-            <h5>Optional documents ({optionalDocs.length})</h5>
+            <h4>Optional documents ({optionalDocs.length})</h4>
             <RequirementList requirements={optionalDocs} />
           </>}
 
-          <h5>Michigan Court Rules</h5>
+          <h4>Michigan Court Rules</h4>
           <ul className="requirement-list">
             {COURT_RULE_LINKS.map(([href, label]) => (
               <li key={href}><a href={href} target="_blank" rel="noopener noreferrer">{label}</a></li>

@@ -481,7 +481,7 @@ function DocumentUpload({
 
   return (
     <div className="form-section">
-      <h3>Upload Documents</h3>
+      <h2>Upload Documents</h2>
       <p className="info-text">
         Select the document type, upload your file, and add it to the filing.
         All PDFs must be text-searchable per MCR 1.109. Maximum file size: 100MB.
@@ -607,7 +607,7 @@ function DocumentUpload({
       {/* Uploaded Documents List */}
       {documents.length > 0 && (
         <div className="uploaded-documents">
-          <h4>Documents in This Filing ({documents.length})</h4>
+          <h3>Documents in This Filing ({documents.length})</h3>
           <table>
             <thead>
               <tr>

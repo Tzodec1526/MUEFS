@@ -98,8 +98,8 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
     return (
       <div className="form-section success-section">
         <div className="success-icon">&#10003;</div>
-        <h3>{submission.status === 'served' ? 'Service Documents Recorded'
-          : submission.status === 'submitted' ? 'Filing Submitted Successfully' : 'Submission Already Recorded'}</h3>
+        <h2>{submission.status === 'served' ? 'Service Documents Recorded'
+          : submission.status === 'submitted' ? 'Filing Submitted Successfully' : 'Submission Already Recorded'}</h2>
         <p>
           {submission.status === 'served'
             ? 'This service-only filing has been recorded. It does not enter clerk review or deliver documents to other parties.'
@@ -141,7 +141,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
 
   return (
     <div className="form-section">
-      <h3>{canSubmit ? 'Review Your Filing' : 'Filing Details'}</h3>
+      <h2>{canSubmit ? 'Review Your Filing' : 'Filing Details'}</h2>
       {canSubmit && (
         <p className="info-text">
           Review all information carefully before submitting. Submitted filings
@@ -154,8 +154,8 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
       </p>}
 
       {/* Filing Summary */}
-      <div className="review-card">
-        <h4>Court & Case Information</h4>
+      <div className="review-card review-summary">
+        <h3>Court & Case Information</h3>
         <div className="review-grid">
           <div className="review-item">
             <label>Court</label>
@@ -179,8 +179,8 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
       </div>
 
       {/* Documents */}
-      <div className="review-card">
-        <h4>Documents ({filing.documents.length})</h4>
+      <div className="review-card review-summary">
+        <h3>Documents ({filing.documents.length})</h3>
         {filing.documents.length > 0 ? (
           <table className="review-table">
             <thead>
@@ -223,10 +223,10 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
       {/* Validation Results */}
       {validation && (
         <div className={`validation-results ${validation.is_valid ? 'valid' : 'invalid'}`} role="alert">
-          <h4>{validation.is_valid ? 'Validation Passed' : 'Issues Found'}</h4>
+          <h3>{validation.is_valid ? 'Validation Passed' : 'Issues Found'}</h3>
           {validation.errors.length > 0 && (
             <div className="validation-errors">
-              <h5>Errors (must fix before submitting):</h5>
+              <h4>Errors (must fix before submitting):</h4>
               <ul>
                 {validation.errors.map((err, i) => <li key={i}>{err}</li>)}
               </ul>
@@ -234,7 +234,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
           )}
           {validation.missing_required_documents.length > 0 && (
             <div className="validation-missing">
-              <h5>Missing Required Documents:</h5>
+              <h4>Missing Required Documents:</h4>
               <ul>
                 {validation.missing_required_documents.map((doc, i) => <li key={i}>{doc}</li>)}
               </ul>
@@ -242,7 +242,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
           )}
           {validation.warnings.length > 0 && (
             <div className="validation-warnings">
-              <h5>Warnings:</h5>
+              <h4>Warnings:</h4>
               <ul>
                 {validation.warnings.map((warn, i) => <li key={i}>{warn}</li>)}
               </ul>

@@ -18,7 +18,7 @@ function DetailsStep({
 }: DetailsStepProps) {
   return (
     <div className="form-section">
-      <h3>{existingCase ? 'Filing Details' : 'Case Details'}</h3>
+      <h2>{existingCase ? 'Filing Details' : 'Case Details'}</h2>
 
       {captionMissing && caseLookupError && (
         <LoadError failure={{ ...caseLookupError, message: `${caseLookupError.message} Retry, or go Back to choose the case.` }}

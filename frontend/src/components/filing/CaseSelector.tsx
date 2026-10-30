@@ -87,7 +87,7 @@ function CaseSelector({
 
   return (
     <div className="form-section">
-      <h3>Existing case or new case?</h3>
+      <h2>Existing case or new case?</h2>
       <p className="info-text">
         Most filings go into a case that already exists. Search for it below, or start a new case.
       </p>
@@ -99,7 +99,7 @@ function CaseSelector({
           onClick={() => { setMode('existing'); onChooseExisting(); }}
           aria-pressed={mode === 'existing'}
         >
-          <h4>File in an existing case</h4>
+          <h3>File in an existing case</h3>
           <p>Search by case number or party name in {courtName || 'this court'}.</p>
         </button>
         <button
@@ -108,7 +108,7 @@ function CaseSelector({
           onClick={() => { setMode('new'); if (!isNewChosen) onSelectNew(); }}
           aria-pressed={mode === 'new'}
         >
-          <h4>Start a new case</h4>
+          <h3>Start a new case</h3>
           <p>Initiate a new matter, e.g. a complaint or petition.</p>
         </button>
       </div>

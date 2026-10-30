@@ -12,11 +12,11 @@ interface DraftConflictProps {
 function DraftConflict({ conflict, edits, headingRef, onResolve }: DraftConflictProps) {
   return (
     <section className="review-card draft-conflict" aria-labelledby="draft-conflict-heading">
-      <h3 id="draft-conflict-heading" ref={headingRef} tabIndex={-1}>Compare changes before saving</h3>
+      <h2 id="draft-conflict-heading" ref={headingRef} tabIndex={-1}>Compare changes before saving</h2>
       <p>Your changes are still here. Compare them with the saved details before continuing.</p>
       <div className="draft-comparison">
-        <div><h4>Your edits</h4><strong>{edits.caseTitle || '(No title)'}</strong><p>{edits.filingDescription || '(No description)'}</p></div>
-        <div><h4>Saved to your account</h4><strong>{conflict.case_title || '(No title)'}</strong><p>{conflict.filing_description || '(No description)'}</p></div>
+        <div><h3>Your edits</h3><strong>{edits.caseTitle || '(No title)'}</strong><p>{edits.filingDescription || '(No description)'}</p></div>
+        <div><h3>Saved to your account</h3><strong>{conflict.case_title || '(No title)'}</strong><p>{conflict.filing_description || '(No description)'}</p></div>
       </div>
       <div className="draft-actions">
         <button className="btn btn-secondary" onClick={() => onResolve(false)}>Use saved details</button>
