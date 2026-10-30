@@ -10,7 +10,7 @@ def check_pii_patterns(text: str) -> list[str]:
     # SSN pattern: XXX-XX-XXXX
     if re.search(r"\b\d{3}-\d{2}-\d{4}\b", text):
         warnings.append(
-            "Possible Social Security Number detected. "
+            "Possible Social Security number detected. "
             "MCR 1.109 requires Social Security number redaction."
         )
 
