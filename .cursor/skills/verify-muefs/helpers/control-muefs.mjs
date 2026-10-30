@@ -308,17 +308,18 @@ async function cmdApi(argv) {
 const argv = process.argv.slice(2);
 const cmd = argv[0];
 if (!cmd || cmd === '-h' || cmd === '--help') {
-  console.log(`control-muefs — drive the MUEFS demo filing portal
+  console.log(`control-muefs: drive the MUEFS demo filing portal
 
 Usage (repo root):
   node .cursor/skills/verify-muefs/helpers/control-muefs.mjs launch
   node .cursor/skills/verify-muefs/helpers/control-muefs.mjs doctor
   node .cursor/skills/verify-muefs/helpers/control-muefs.mjs cleanup
   node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser goto /login?role=attorney
+  node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser goto /cases/search
+  node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser fill --label "Party name" --value Smith
   node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser click --role button --name "Search"
-  node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser fill --label "Party Name" --value Smith
   node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser wait --role heading --name "Results"
-  node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser snapshot --aria --path artifacts/case-search/results.aria.txt
+  node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser snapshot --path artifacts/case-search/results.aria.txt
   node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser screenshot --path artifacts/case-search/results.png
   node .cursor/skills/verify-muefs/helpers/control-muefs.mjs api get /api/v1/cases/search?party_name=Smith --path artifacts/case-search/search.json
 `);
