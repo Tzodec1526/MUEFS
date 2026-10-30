@@ -9,11 +9,14 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from alembic.config import Config
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from alembic import command
 from app import database
+from app.config import settings
 from app.demo.schema import prepare_demo_schema
 from app.main import app
 from tests.test_filing_concurrency import POSTGRES_URL
@@ -185,6 +188,17 @@ async def test_postgres_readiness_follows_each_committed_schema_revision(
             await connection.execute(text("UPDATE alembic_version SET version_num = :head"),
                                      {"head": head})
         assert await probe() == (200, None)
+
+
+def test_migrations_accept_a_url_encoded_database_address(tmp_path, monkeypatch):
+    database_file = tmp_path / "p%40ss.db"
+    monkeypatch.setattr(settings, "database_url", f"sqlite:///{database_file.as_posix()}")
+    config = Config()
+    config.set_main_option(
+        "script_location", str(Path(__file__).resolve().parents[1] / "alembic"),
+    )
+    command.current(config)
+    assert database_file.exists()
 
 
 def test_hosted_demo_probes_do_not_allocate_sessions_or_recreate_missing_storage(tmp_path):

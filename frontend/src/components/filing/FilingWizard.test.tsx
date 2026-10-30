@@ -554,7 +554,11 @@ it('returns to a completed step from the progress bar, and back one step with Ba
 it('saves a new filing as a draft and locks the court and case choices', async () => {
   serveCourtsAndTypes();
   const created = savedFiling();
-  vi.mocked(createFiling).mockResolvedValue(created);
+  let storedAtSend = '';
+  vi.mocked(createFiling).mockImplementation(async () => {
+    storedAtSend = Object.values({ ...sessionStorage }).join();
+    return created;
+  });
   vi.mocked(getFiling).mockResolvedValue(created);
   openWizard('/filing/new?court_id=3');
   await chooseNewCaseAndType();
@@ -571,6 +575,7 @@ it('saves a new filing as a draft and locks the court and case choices', async (
     case_title: 'Doe v. Roe', filing_description: 'Complaint for breach of contract',
   });
   expect(creationKey).toMatch(/^[0-9a-f-]{36}$/);
+  expect(storedAtSend).toContain(creationKey);
   await waitFor(() => expect(caption().value).toBe('Doe v. Roe'));
   expect([stepButton('Court').disabled, stepButton('Case type').disabled, button('Back').disabled])
     .toEqual([true, true, true]);

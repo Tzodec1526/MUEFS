@@ -93,6 +93,11 @@ async def test_listed_extra_audiences_are_accepted(realm, monkeypatch):
     assert await decode_keycloak_access_token(_token(_claims(aud="account")))
 
 
+async def test_a_token_issued_through_the_browser_client_is_accepted(realm):
+    claims = await decode_keycloak_access_token(_token(_claims(azp="muefs-frontend")))
+    assert claims["azp"] == "muefs-frontend"
+
+
 async def test_tokens_not_signed_by_the_realm_key_are_rejected(realm):
     with pytest.raises(JWTError):
         await decode_keycloak_access_token(_token(key=OTHER_KEY))

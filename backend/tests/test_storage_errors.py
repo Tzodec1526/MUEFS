@@ -22,6 +22,20 @@ class _Missing:
         raise ClientError({"Error": {"Code": "NoSuchKey"}}, "GetObject")
 
 
+def test_the_s3_client_never_touches_the_shared_default_session(monkeypatch):
+    import boto3
+
+    def shared_session(*args, **kwargs):
+        raise AssertionError("boto3's default session is not thread-safe here")
+
+    monkeypatch.setattr(boto3, "_get_default_session", shared_session)
+    document_service.get_s3_client.cache_clear()
+    try:
+        assert document_service.get_s3_client().meta.service_model.service_name == "s3"
+    finally:
+        document_service.get_s3_client.cache_clear()
+
+
 class _Interrupted:
     def get_object(self, **kwargs):
         class Body(BytesIO):

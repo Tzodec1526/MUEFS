@@ -1,5 +1,6 @@
 """Request-level protections that apply before any endpoint or account check."""
 
+import time
 from collections import defaultdict
 from datetime import timedelta
 
@@ -117,6 +118,15 @@ async def test_rate_limited_responses_stay_readable_and_preflights_are_free(clie
     assert limited.status_code == 429
     assert limited.headers["access-control-allow-origin"] == origin
     assert limited.headers["x-content-type-options"] == "nosniff"
+
+
+def test_a_full_memory_limiter_store_drops_stale_clients_before_the_next_interval(monkeypatch):
+    now = time.time()
+    stale = {f"default:{n}": [now - 120] for n in range(rate_limit._MEM_MAX_KEYS + 1)}
+    monkeypatch.setattr(rate_limit, "_mem_store", defaultdict(list, stale))
+    monkeypatch.setattr(rate_limit, "_mem_last_cleanup", now)
+    assert rate_limit._memory_check_allow("visitor", "default")
+    assert list(rate_limit._mem_store) == ["default:visitor"]
 
 
 @pytest.mark.parametrize("path", ["/api/v1/auth/me", "/api/v1/cases/1"])

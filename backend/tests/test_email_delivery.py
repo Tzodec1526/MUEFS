@@ -23,7 +23,10 @@ from tests.test_filing_history import filing_fixture
 
 @pytest_asyncio.fixture
 async def smtp_sink(monkeypatch):
-    state = {"rcpt_code": 250, "lose_reply": False, "messages": [], "commands": []}
+    state = {
+        "rcpt_code": 250, "lose_reply": False, "drop_after_acceptance": False,
+        "messages": [], "commands": [],
+    }
 
     async def smtp(reader, writer):
         writer.write(b"220 localhost test mail sink\r\n")
@@ -55,6 +58,9 @@ async def smtp_sink(monkeypatch):
                     if state["lose_reply"]:
                         break
                     writer.write(b"250 Message accepted\r\n")
+                    if state["drop_after_acceptance"]:
+                        await writer.drain()
+                        break
                 elif verb == b"QUIT":
                     writer.write(b"221 Goodbye\r\n")
                     break
@@ -171,6 +177,18 @@ async def test_lost_final_smtp_response_requires_review_not_automatic_retry(
         assert notice.delivery_status == DeliveryStatus.UNKNOWN
         assert notice.sent_at is None and notice.next_attempt_at is None
     assert len(smtp_sink["messages"]) == 1  # The relay actually received the bytes.
+
+
+async def test_a_relay_that_disconnects_after_acceptance_still_counts_as_accepted(
+    mail_sessions, smtp_sink
+):
+    smtp_sink["drop_after_acceptance"] = True
+    async with mail_sessions.begin() as db:
+        nid, *_ = await prepare_notice(db)
+    assert await delivery.deliver_next(mail_sessions)
+    async with mail_sessions() as db:
+        notice = await db.get(Notification, nid)
+        assert notice.delivery_status == DeliveryStatus.SENT and notice.attempt_count == 1
 
 
 @pytest.mark.parametrize("smtp_code, attempts", [(550, 1), (451, 5)])
