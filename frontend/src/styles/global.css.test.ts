@@ -90,6 +90,12 @@ it('keeps the Menu button on the right of the main link, though it comes first i
   expect(css).toMatch(/@media \(max-width: 768px\) \{[^@]*\.sidebar-toggle \{\s+display: block;\s+order: 1;/);
 });
 
+it('sentence-cases only status badges, whose values never reach the screen with an underscore', () => {
+  const firstLetter = selectorLists.flatMap(splitSelectors).filter(selector => selector.includes('::first-letter'));
+  expect(firstLetter).toEqual(['.status-badge::first-letter']);
+  expect(corpus).not.toMatch(/status-badge[^\n]*>\{[\w.]*filing\.status\}/);
+});
+
 it('hides the outline of a focused page heading only when the browser would not show a focus ring', () => {
   const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)]
     .filter(([, , body]) => /outline:\s*(none|0)/.test(body))

@@ -182,6 +182,16 @@ it('labels every result cell with its column, so a row still reads when it stack
   expect(cells[5].textContent).toBe('Mar 2, 2026');
 });
 
+it('names party roles in words, not as stored values', async () => {
+  serveResults([{ ...smith, participants: [
+    { party_name: 'Ann Smith', role: 'plaintiff' }, { party_name: 'Jane Doe', role: 'attorney_plaintiff' },
+  ] }]);
+  openSearch('/cases/search?party=Smith');
+
+  expect(await screen.findByText('Ann Smith, Plaintiff; Jane Doe, Attorney (Plaintiff)')).toBeTruthy();
+  expect(document.body.textContent).not.toContain('attorney_plaintiff');
+});
+
 it('says in plain words when the court has not confirmed a filed date', async () => {
   serveResults([{ ...smith, filing_date: null, filed_date: '2026-03-02T12:00:00Z' }]);
   openSearch('/cases/search?party=Smith');

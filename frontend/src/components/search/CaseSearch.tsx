@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { actionErrorMessage } from '../../api/client';
-import { CaseSearchResult, searchCases } from '../../api/cases';
+import { CaseSearchResult, participantRoles, searchCases } from '../../api/cases';
 import { CourtDirectoryEntry, listCourtDirectory } from '../../api/courts';
 import { listFavorites, addFavorite, removeFavorite } from '../../api/favorites';
 import { CourtContext } from '../auth/CourtSession';
@@ -279,7 +279,7 @@ function CaseSearch() {
                       <td data-label="Filed date">{c.filing_date ? formatCourtDate(c.filing_date)
                         : `${formatShortDate(c.filed_date)} (not yet confirmed by the court)`}</td>
                       <td data-label="Parties">
-                        {c.participants.map((p) => `${p.party_name} (${p.role})`).join(', ')}
+                        {c.participants.map((p) => `${p.party_name}, ${participantRoles[p.role] || p.role}`).join('; ')}
                       </td>
                     </tr>
                   ))}

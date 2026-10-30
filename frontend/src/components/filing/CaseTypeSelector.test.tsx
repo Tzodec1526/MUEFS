@@ -87,6 +87,18 @@ it('finds case types by name, not by internal code', async () => {
   expect(screen.getAllByRole('radio')).toHaveLength(1);
 });
 
+it('spells out a category made of two words', async () => {
+  const smallClaims = { ...civil, id: 13, name: 'Small Claims Court', category: 'small_claims' };
+  vi.mocked(getCaseTypes).mockResolvedValue([civil, smallClaims]);
+  render(<Harness />);
+
+  await screen.findByText('Small Claims Court');
+
+  expect(within(screen.getByLabelText('Category')).getAllByRole('option').map(option => option.textContent))
+    .toEqual(['All Categories', 'Civil', 'Small Claims']);
+  expect(document.body.textContent).not.toMatch(/small_claims/i);
+});
+
 it('narrows the list by category', async () => {
   render(<Harness />);
   await screen.findByRole('radio', { name: /General Civil/ });

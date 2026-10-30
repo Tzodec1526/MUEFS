@@ -202,6 +202,17 @@ it('labels every row value with its column, so a row still reads when it stacks 
   expect(cells[3].textContent).toMatch(/^Sep 28, 2026, \d{1,2}:00 [AP]M \S+/);
 });
 
+it('writes a two-word status in words on its badge', async () => {
+  vi.mocked(getClerkQueue).mockResolvedValue({
+    filings: [{ ...summary(11), status: 'under_review' }], total: 1, page_size: 25, submitted_count: 0,
+    under_review_count: 1, waiting_48h: 0, oldest_submitted_at: null, as_of: '2026-09-28T13:00:00Z',
+  });
+  openQueue();
+  await screen.findByText('Case 11');
+
+  expect(within(row(11)).getAllByRole('cell')[6].textContent).toBe('under review');
+});
+
 it('keeps Select all usable when the column headings are hidden on a phone', async () => {
   serveQueues([11, 12]);
   openQueue();
