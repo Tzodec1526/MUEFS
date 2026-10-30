@@ -71,9 +71,6 @@ async def cleanup_next(
 
 async def drain(sessions: async_sessionmaker[AsyncSession]) -> None:
     """Delete every object that is due now, for deployments that run no worker."""
-    async with sessions() as db:
-        if await db.scalar(select(StorageDeletion.id).limit(1)) is None:
-            return
     while await cleanup_next(sessions) == "deleted":
         pass
 

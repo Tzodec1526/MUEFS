@@ -263,9 +263,11 @@ async def get_demo_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
             except BaseException:
                 await storage_intent.rollback_with_upload_cleanup(session, verify_with=factory)
                 raise
+            queued = storage_intent.queued_deletion(session.sync_session)
         # No worker serves sandbox databases: delete removed drafts' files now, so they
         # stop counting against the sandbox's quota.
-        await storage_cleanup.drain(factory)
+        if queued:
+            await storage_cleanup.drain(factory)
     finally:
         with anyio.CancelScope(shield=True):
             await engine.dispose()

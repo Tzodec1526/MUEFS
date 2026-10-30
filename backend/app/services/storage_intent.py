@@ -14,10 +14,19 @@ from app.services import document_service
 logger = logging.getLogger(__name__)
 
 _PENDING = "pending_storage_keys"
+_DELETIONS = "queued_storage_deletions"
 
 
 def track_upload(session: Session, file_key: str) -> None:
     session.info.setdefault(_PENDING, set()).add(file_key)
+
+
+def track_deletion(session: Session) -> None:
+    session.info[_DELETIONS] = True
+
+
+def queued_deletion(session: Session) -> bool:
+    return bool(session.info.get(_DELETIONS))
 
 
 def release_upload(session: Session, file_key: str) -> None:

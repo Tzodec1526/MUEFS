@@ -477,6 +477,7 @@ async def remove_document(
         db.add(StorageDeletion(
             document_id=doc.id, envelope_id=filing_id, file_key=doc.file_key,
         ))
+        storage_intent.track_deletion(db.sync_session)
         await db.delete(doc)
         await db.flush()
 

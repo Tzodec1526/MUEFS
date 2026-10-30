@@ -39,7 +39,8 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
                 session, verify_with=async_session,
             )
             raise
-    if document_service.uses_local_storage():
+        queued = storage_intent.queued_deletion(session.sync_session)
+    if queued and document_service.uses_local_storage():
         # Deployments that keep documents on local disk (the demos) run no storage
         # worker: delete removed drafts' files once their removal has committed.
         from app import storage_cleanup  # it imports this module

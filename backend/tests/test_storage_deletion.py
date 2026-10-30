@@ -9,11 +9,13 @@ from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import func, inspect, select, text
+from sqlalchemy import event, func, inspect, select, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app import database
+from app.database import get_db
 from app.main import app
 from app.models.audit import AuditLog
 from app.models.document_public_copy import DocumentPublicCopy
@@ -21,6 +23,8 @@ from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.models.storage_deletion import StorageDeletion
 from app.services import document_service
 from app.storage_cleanup import cleanup_next
+from tests.test_demo_isolation import _draft, _upload, _visitor
+from tests.test_demo_isolation import demo as demo
 from tests.test_filing_concurrency import POSTGRES_URL, prepare_filing
 from tests.test_filing_concurrency import postgres_sessions as postgres_sessions
 from tests.test_filing_history import filing_fixture
@@ -117,6 +121,53 @@ async def test_removal_commits_before_physical_deletion(
     async with sessions() as db:
         actions = (await db.scalars(select(AuditLog.action).order_by(AuditLog.id))).all()
         assert actions == ["remove_document", "purge_draft_document"]
+
+
+@pytest.mark.parametrize("provider", ["regular", "demo"])
+async def test_only_a_request_that_queues_a_deletion_visits_the_deletion_queue(
+    db_session, stored_document, monkeypatch, request, provider,
+):
+    statements: list[str] = []
+
+    def record(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    if provider == "regular":
+        fid, filer, _clerk, _other = await filing_fixture(db_session)
+        doc = stored_document(fid)
+        db_session.add(doc)
+        await db_session.commit()
+        document_id, key = doc.id, doc.file_key
+        monkeypatch.setattr(database, "async_session", async_sessionmaker(
+            db_session.bind, expire_on_commit=False,
+        ))
+        client = AsyncClient(transport=ASGITransport(app), base_url="http://test",
+                             headers={"X-Demo-User-Id": str(filer)})
+    else:
+        demo = request.getfixturevalue("demo")
+        monkeypatch.setitem(app.dependency_overrides, get_db, demo.get_demo_db)
+        client = _visitor(demo, "e" * 32)
+        key = None
+    try:
+        async with client:
+            if provider == "demo":
+                fid = await _draft(client)
+                uploaded = await _upload(client, fid, b"Draft bytes for removal")
+                assert uploaded.status_code == 200, uploaded.text
+                document_id = uploaded.json()["id"]
+            event.listen(Engine, "before_cursor_execute", record)
+            assert (await client.get(f"/api/v1/filings/{fid}")).status_code == 200
+            assert (await client.get("/api/v1/filings")).status_code == 200
+            assert not [s for s in statements if "storage_deletions" in s]
+            response = await client.delete(f"/api/v1/filings/{fid}/documents/{document_id}")
+            assert response.status_code == 204, response.text
+    finally:
+        if event.contains(Engine, "before_cursor_execute", record):
+            event.remove(Engine, "before_cursor_execute", record)
+    assert [s for s in statements if s.lstrip().startswith("DELETE FROM storage_deletions")]
+    if key is not None:
+        with pytest.raises(FileNotFoundError):
+            document_service.stored_integrity(key)
 
 
 @pytest.mark.parametrize("retention", ["document", "filing"])
