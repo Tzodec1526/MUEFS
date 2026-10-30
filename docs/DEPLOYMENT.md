@@ -114,6 +114,83 @@ Copy `.env.example` to `.env` and change every demo value:
 Generate secrets with `openssl rand -hex 32` and store them in your platform's secret
 manager — never in the repo.
 
+### Environment variables
+
+`.env.example` (Michigan Unified E-Filing System - Environment Configuration) lists these
+variables in this order, with no notes of its own. "(empty)" means
+the line has no value, which selects the default.
+
+| Group | Variable | `.env.example` value | Note |
+| --- | --- | --- | --- |
+| Database | `DATABASE_URL` | `postgresql+asyncpg://muefs:muefs_dev@postgres:5432/muefs` | |
+| Database | `POSTGRES_USER` | `muefs` | |
+| Database | `POSTGRES_PASSWORD` | `muefs_dev` | |
+| Database | `POSTGRES_DB` | `muefs` | |
+| Redis | `REDIS_URL` | `redis://redis:6379/0` | |
+| S3-compatible document storage (the local stack runs Versity Gateway with these keys) | `S3_ENDPOINT_URL` | `http://storage:7070` | |
+| S3-compatible document storage | `S3_ACCESS_KEY` | `muefs_storage` | |
+| S3-compatible document storage | `S3_SECRET_KEY` | `muefs_storage_secret` | |
+| S3-compatible document storage | `S3_BUCKET_NAME` | `muefs-documents` | |
+| Keycloak | `KEYCLOAK_URL` | `http://localhost:8080` | KEYCLOAK_URL is the browser-facing address and the issuer tokens must name. The API fetches signing keys from KEYCLOAK_INTERNAL_URL when that is set. |
+| Keycloak | `KEYCLOAK_INTERNAL_URL` | `http://keycloak:8080` | Optional. Use it when `KEYCLOAK_URL` is not reachable from the API's network, such as inside Docker Compose. |
+| Keycloak | `KEYCLOAK_REALM` | `muefs` | |
+| Keycloak | `KEYCLOAK_CLIENT_ID` | `muefs-api` | |
+| Keycloak | `KEYCLOAK_ADMIN_USER` | `admin` | |
+| Keycloak | `KEYCLOAK_ADMIN_PASSWORD` | `admin` | |
+| Backend | `DEBUG` | `true` | Local tooling sets `DEBUG=true`. An unset value keeps production startup checks on. |
+| Backend | `ALLOW_DEMO_MODE` | `true` | Court systems: set false in production; use Keycloak Bearer JWT only. It allows `X-Demo-User-Id` header authentication. |
+| Backend | `DEMO_MODE_SECRET` | (empty) | Required when ALLOW_DEMO_MODE=true and DEBUG=false. Isolated public sandboxes serve it to browsers through /config.js; other builds need VITE_DEMO_MODE_SECRET. Browsers receive this value, so it deters casual header use but is not authentication. |
+| Backend | `ENABLE_API_DOCS` | (empty) | Hide /docs and /redoc outside DEBUG (default: follows DEBUG). |
+| Backend | `SECURITY_STRICT_STARTUP` | `false` | Fail startup on unsafe production config (court deploys). Missing ClamAV and placeholder secrets always refuse to start outside demo or debug mode; this setting also raises on the advisory findings. |
+| Backend | `TRUSTED_PROXY_IPS` | (empty) | Reverse proxies whose X-Forwarded-For is trusted: comma-separated addresses or networks (CIDR), for example 10.0.0.0/8 for a platform load balancer. |
+| Backend | `ALLOW_PUBLIC_REGISTRATION` | `true` | Local dev: often true. Production: false (use IdP + admin invite). It controls self-serve `POST /auth/register`. |
+| Backend | `PROVISION_USER_ON_FIRST_OIDC_LOGIN` | `true` | First Bearer login creates User from token claims (requires email in token). |
+| Backend | `RATE_LIMIT_BACKEND` | `redis` | Use redis when Redis service is available (docker-compose); memory for laptop-only API. |
+| Backend | `ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5173` | |
+| Frontend | `VITE_API_URL` | `http://localhost:8000` | Same-origin by default: the hosted demo serves the API and UI together, and the Vite dev proxy forwards `/api` to the backend. Set it only for a split deployment with separate frontend and backend hosts. |
+| Frontend | `VITE_ALLOW_DEMO_MODE` | `true` | Must match backend ALLOW_DEMO_MODE for local role-picker demo (sends X-Demo-User-Id). |
+| Frontend | `VITE_DEMO_MODE_SECRET` | (empty) | Only for builds without isolated sessions and with DEBUG=false; must then match DEMO_MODE_SECRET. The hosted demo reads the secret from /config.js instead, so leave this empty there: a build-time value is baked into the JavaScript bundle. |
+| Frontend | `VITE_KEYCLOAK_URL` | `http://localhost:8080` | |
+| Frontend | `VITE_KEYCLOAK_REALM` | `muefs` | |
+| Frontend | `VITE_KEYCLOAK_CLIENT_ID` | `muefs-frontend` | |
+| Document Processing | `MAX_FILE_SIZE_MB` | `100` | |
+| Document Processing | `LOCAL_STORAGE_PATH` | `demo_uploads` | Local document root for SQLite demos and restored local collections; ignored for S3. |
+| Upload malware screening | `MALWARE_SCAN_CLAMAV_ENABLED` | `false` | Upload malware screening. The built-in heuristic scan (native executables + EICAR) is offline and always on. Enable ClamAV for real signature-based scanning in production. |
+| Upload malware screening | `CLAMAV_HOST` | `clamav` | |
+| Upload malware screening | `CLAMAV_PORT` | `3310` | |
+| Upload malware screening | `CLAMAV_TIMEOUT_SECONDS` | `30` | Total seconds for scanner connection, transfer and verdict. Failure always rejects the upload. |
+| Upload malware screening | `STRICT_MIME_DETECTION` | (empty) | Reject uploads when libmagic cannot identify type (default: true when DEBUG=false). |
+| Tokens | `JWT_VERIFY_AUDIENCE` | (empty) | Validate JWT aud claim (default: true when DEBUG=false). It checks `aud` against `KEYCLOAK_CLIENT_ID` and `JWT_AUDIENCES`. Keycloak's generic `account` audience is not accepted unless it is listed. |
+| Tokens | `JWT_AUDIENCES` | (empty) | Optional extra audiences, comma-separated, such as `muefs-frontend,muefs-api`. |
+| Rate limiting | `RATE_LIMIT_FAIL_CLOSED` | (empty) | Reject requests when Redis rate limiter is unreachable (default: true when DEBUG=false). |
+| Payments | `EXTERNAL_PAYMENTS_ENABLED` | `false` | Enable only after the court approves external receipt verification and credit corrections. |
+| Payments | `PAYMENTS_ARE_SIMULATED` | `true` | No payment processor is integrated. false removes the demo payment path; it does not connect one. |
+| Notices | `EMAIL_DELIVERY_ENABLED` | `false` | Filing notice email. Disabled by default; configure both API and notice worker. Notices are queued only when this is enabled, and a separate worker sends them. |
+| Notices | `SERVICE_DELIVERY_ENABLED` | `false` | Separately opt in to selected document delivery after court workflow evaluation. |
+| Notices | `PORTAL_BASE_URL` | (empty) | |
+| Notices | `SMTP_HOST` | (empty) | |
+| Notices | `SMTP_PORT` | `587` | |
+| Notices | `SMTP_TLS` | `starttls` | One of `starttls`, `ssl` or `plain`. |
+| Notices | `SMTP_FROM` | (empty) | |
+| Notices | `SMTP_USERNAME` | (empty) | |
+| Notices | `SMTP_PASSWORD` | (empty) | |
+
+These settings have defaults in `backend/app/config.py` and no `.env.example` line:
+
+| Variable | Default | Note |
+| --- | --- | --- |
+| `DATABASE_ECHO` | `false` | Logs every SQL statement and its parameters. For development diagnostics only. |
+| `CLAMAV_SOCKET` | (empty) | Unix socket path. Preferred over host and port when set. |
+| `RATE_LIMIT_ENABLED` | `true` | |
+| `RATE_LIMIT_DEFAULT_PER_MINUTE` | `120` | |
+| `RATE_LIMIT_SEARCH_PER_MINUTE` | `30` | |
+| `RATE_LIMIT_DOCUMENT_PER_MINUTE` | `60` | Applies to every route that streams or re-hashes stored document bytes. |
+| `DEMO_ISOLATED_SESSIONS` | `false` | Hosted demo only. Each browser session gets its own copy of a seeded template database. A court deployment leaves this false and uses one shared database. |
+| `DEMO_MAX_SESSIONS` | `100` | Private sandboxes before visitors share the common one. |
+| `DEMO_SESSION_TTL_MINUTES` | `60` | |
+| `DEMO_STORAGE_QUOTA_MB` | `200` | Uploads each sandbox may keep. Its folder is deleted with the sandbox. |
+| `DEMO_STATIC_DIR` | `static` | The built frontend the demo server serves. |
+
 `PAYMENTS_ARE_SIMULATED=false` disables the demo payment path. It does not connect a payment
 processor; online collection remains unavailable until that integration exists.
 
