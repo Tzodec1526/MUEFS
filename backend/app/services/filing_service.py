@@ -717,7 +717,7 @@ async def record_review(
             )
         cms_result = await submit_filing_to_cms(case.case_number, filing.id)
         if not cms_result.success:
-            filing.cms_error = cms_result.error_message or "The submission failed"
+            filing.cms_error = cms_result.error_message or "No reason was given"
             filing.cms_filing_id = None
             filing.cms_case_number = None
             await record_transaction(db, filing, "cms_failed", reviewer_id, reason=filing.cms_error)

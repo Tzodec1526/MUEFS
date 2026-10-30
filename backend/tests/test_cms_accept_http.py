@@ -116,7 +116,9 @@ async def test_cms_failure_persists_after_http_502(cms_fail_app):
         headers={"X-Demo-User-Id": str(ids["clerk"])},
     )
     assert r.status_code == 502
-    assert "JIS unavailable" in r.text
+    assert r.json()["detail"] == (
+        "The submission to the case management system failed: JIS unavailable"
+    )
 
     async with factory() as s:
         env = await s.get(FilingEnvelope, ids["filing"])

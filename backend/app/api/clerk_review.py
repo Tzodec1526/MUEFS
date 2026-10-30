@@ -134,8 +134,8 @@ async def review_filing(
             status_code=status.HTTP_502_BAD_GATEWAY,
             content={
                 "detail": (
-                    f"The court's case management system rejected the filing: "
-                    f"{filing.cms_error or 'The submission failed'}"
+                    "The submission to the case management system failed: "
+                    f"{filing.cms_error or 'no reason was given'}"
                 )
             },
         )
