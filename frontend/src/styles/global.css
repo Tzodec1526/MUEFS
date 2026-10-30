@@ -1123,16 +1123,10 @@ tr.selected {
 /* Responsive */
 @media (max-width: 768px) {
   .app-header {
-  background: var(--accent-dark);
-  color: var(--white);
-  padding: 0.7rem 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  position: relative;
-  z-index: 10;
-}
+    flex-wrap: wrap;
+    row-gap: 0.4rem;
+    padding: 0.6rem 1rem;
+  }
 
   .header-title {
     font-size: 0.98rem;
