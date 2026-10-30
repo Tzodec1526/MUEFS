@@ -1,10 +1,8 @@
-"""${message}
-
-Revision ID: ${up_revision}
-Revises: ${down_revision | comma,n}
-Create Date: ${create_date}
-"""
-from typing import Sequence, Union
+<%!
+    def without_comments(block):
+        lines = [line for line in (block or "").splitlines() if not line.lstrip().startswith("#")]
+        return "\n".join(lines) or "pass"
+%>from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
@@ -17,8 +15,8 @@ depends_on: Union[str, Sequence[str], None] = ${repr(depends_on)}
 
 
 def upgrade() -> None:
-    ${upgrades if upgrades else "pass"}
+    ${without_comments(upgrades)}
 
 
 def downgrade() -> None:
-    ${downgrades if downgrades else "pass"}
+    ${without_comments(downgrades)}
