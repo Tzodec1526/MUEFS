@@ -1,5 +1,3 @@
-"""Court-scoped waiver authority, independent from review of the filing itself."""
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

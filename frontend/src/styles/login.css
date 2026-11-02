@@ -1,0 +1,67 @@
+.login-screen {
+  max-width: 40rem;
+  min-height: 100vh;
+  margin-inline: auto;
+  padding: 3rem 1.5rem;
+}
+
+.login-product {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 2rem;
+  color: var(--accent);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.login-screen h1 {
+  font-size: 1.5rem;
+}
+
+.login-demo-note {
+  margin-top: 0.25rem;
+  color: var(--muted);
+}
+
+.login-roles {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 1.5rem;
+  list-style: none;
+}
+
+.login-roles li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.login-roles strong,
+.login-roles span {
+  display: block;
+}
+
+.login-roles span {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.login-roles .btn {
+  flex-shrink: 0;
+}
+
+.login-keycloak {
+  margin-top: 2rem;
+}
+
+.login-keycloak p {
+  margin-top: 0.5rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.login-about {
+  margin-top: 2rem;
+}

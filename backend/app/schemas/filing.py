@@ -1,9 +1,10 @@
-from datetime import UTC, date, datetime
-from typing import Self
+from datetime import date, datetime
+from typing import Literal, Self
 
-from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.models.filing import FilingStatus, FilingType
+from app.schemas.common import MAX_RECORD_ID, RecordId
 
 
 class FilingDocumentResponse(BaseModel):
@@ -20,15 +21,11 @@ class FilingDocumentResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
-    @field_serializer("uploaded_at")
-    def serialize_uploaded_at(self, value: datetime) -> str:
-        return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
-
 
 class FilingEnvelopeCreate(BaseModel):
-    court_id: int = Field(ge=1, le=2_147_483_647)
-    case_id: int | None = Field(None, ge=1, le=2_147_483_647)
-    case_type_id: int = Field(ge=1, le=2_147_483_647)
+    court_id: RecordId
+    case_id: RecordId | None = None
+    case_type_id: RecordId
     filing_type: FilingType = FilingType.SUBSEQUENT
     case_title: str | None = Field(None, max_length=500)
     filing_description: str | None = Field(None, max_length=5000)
@@ -107,8 +104,6 @@ class FilingEnvelopeResponse(BaseModel):
 
 
 class FilingSummary(BaseModel):
-    """Fields used by filing lists; documents and private details load on opening."""
-
     id: int
     court_id: int
     case_id: int | None
@@ -148,8 +143,6 @@ class CaseDocumentResponse(FilingDocumentResponse):
 
 
 class CaseFilingResponse(BaseModel):
-    """Docket fields only; payment references and waiver applications are private."""
-
     id: int
     status: FilingStatus
     case_title: str | None
@@ -169,20 +162,19 @@ class MyFilingsResponse(FilingListResponse):
 
 
 class ClerkReviewRequest(BaseModel):
-    action: str  # "accept", "reject", "return"
+    action: Literal["accept", "reject", "return"]
     expected_submission_count: int = Field(..., ge=0, strict=True)
     reason: str | None = Field(None, max_length=5000)
 
 
 class BatchReviewItem(BaseModel):
-    filing_id: int = Field(..., ge=1, strict=True)
+    filing_id: int = Field(..., ge=1, le=MAX_RECORD_ID, strict=True)
     expected_submission_count: int = Field(..., ge=0, strict=True)
 
 
 class BatchReviewRequest(BaseModel):
-    """Batch accept support (reject/return require per-filing reasons so are single only)."""
     filings: list[BatchReviewItem] = Field(..., min_length=1, max_length=100)
-    action: str  # currently only "accept" supported for batch
+    action: Literal["accept"]
 
     @field_validator("filings")
     @classmethod
@@ -208,10 +200,6 @@ class FilingTransactionResponse(BaseModel):
     details: dict
 
     model_config = {"from_attributes": True}
-
-    @field_serializer("occurred_at")
-    def serialize_occurred_at(self, value: datetime) -> str:
-        return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
 
 
 class FeeWaiverState(BaseModel):

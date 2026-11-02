@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from app.models.user import CourtRole, UserType
+from app.schemas.common import ExpectedVersion
 
 
 class AccountChange(BaseModel):
@@ -32,7 +33,7 @@ class AccountChange(BaseModel):
 
 
 class AccountUpdate(AccountChange):
-    expected_version: int = Field(ge=0)
+    expected_version: ExpectedVersion
 
 
 class CourtRoleChange(BaseModel):
@@ -40,4 +41,4 @@ class CourtRoleChange(BaseModel):
     role: Literal[CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]
     action: Literal["grant", "revoke"]
     reason: str = Field(min_length=1, max_length=1000)
-    expected_version: int = Field(ge=0)
+    expected_version: ExpectedVersion

@@ -1,23 +1,42 @@
-import { defineConfig } from 'vite';
+import { configDefaults, defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+
+const apiTarget = process.env.API_PROXY_TARGET || 'http://localhost:8000';
+
+const nodeTests = ['src/styles/global.css.test.ts'];
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [{ name: 'vendor', test: /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/ }],
+        },
+      },
+    },
+  },
+  test: {
+    projects: [
+      {
+        extends: true,
+        test: { name: 'jsdom', environment: 'jsdom', exclude: [...configDefaults.exclude, ...nodeTests] },
+      },
+      {
+        extends: true,
+        test: { name: 'node', environment: 'node', include: nodeTests },
+      },
+    ],
+  },
   server: {
     port: 3000,
-    host: '0.0.0.0',
-    // WebMCP requires an origin-isolated document (Chrome flag: enable-webmcp-testing).
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'credentialless',
-    },
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: apiTarget,
         changeOrigin: true,
       },
       '/config.js': {
-        target: 'http://localhost:8000',
+        target: apiTarget,
         changeOrigin: true,
       },
     },

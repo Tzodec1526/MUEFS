@@ -1,3 +1,5 @@
+import { CanceledError } from 'axios';
+import { isCurrentSession, sessionSnapshot, type SessionSnapshot } from '../auth/keycloak';
 import { apiClient } from './client';
 
 export interface Court {
@@ -17,9 +19,46 @@ export interface Court {
 
 export type CourtDirectoryEntry = Pick<Court, 'id' | 'name' | 'county'>;
 
-export async function listCourtDirectory(signal?: AbortSignal): Promise<CourtDirectoryEntry[]> {
-  const { data } = await apiClient.get('/courts/directory', { signal });
-  return data;
+interface DirectoryRequest {
+  session: SessionSnapshot;
+  controller: AbortController;
+  callers: number;
+  fulfilled: boolean;
+  entries: Promise<CourtDirectoryEntry[]>;
+}
+
+let directory: DirectoryRequest | undefined;
+
+function requestDirectory(): DirectoryRequest {
+  directory?.controller.abort();
+  const controller = new AbortController();
+  const session = sessionSnapshot();
+  const request: DirectoryRequest = {
+    session, controller, callers: 0, fulfilled: false,
+    entries: apiClient.get<CourtDirectoryEntry[]>('/courts/directory', { signal: controller.signal }).then(({ data }) => data),
+  };
+  request.entries.then(() => { request.fulfilled = true; }, () => { if (directory === request) directory = undefined; });
+  directory = request;
+  return request;
+}
+
+export function listCourtDirectory(signal?: AbortSignal): Promise<CourtDirectoryEntry[]> {
+  if (signal?.aborted) return Promise.reject(new CanceledError());
+  const request = directory && isCurrentSession(directory.session) ? directory : requestDirectory();
+  request.callers += 1;
+  let stopListening = () => {};
+  return new Promise<CourtDirectoryEntry[]>((resolve, reject) => {
+    const leave = () => reject(new CanceledError());
+    signal?.addEventListener('abort', leave, { once: true });
+    stopListening = () => signal?.removeEventListener('abort', leave);
+    request.entries.then(resolve, reject);
+  }).finally(() => {
+    stopListening();
+    request.callers -= 1;
+    if (request.callers > 0 || request.fulfilled) return;
+    request.controller.abort();
+    if (directory === request) directory = undefined;
+  });
 }
 
 export interface CaseType {
@@ -61,9 +100,10 @@ export async function getCourt(courtId: number): Promise<Court> {
   return data;
 }
 
-export async function getCaseTypes(courtId: number, includeInactive = false): Promise<CaseType[]> {
+export async function getCaseTypes(courtId: number, includeInactive = false, signal?: AbortSignal): Promise<CaseType[]> {
   const { data } = await apiClient.get(`/courts/${courtId}/case-types`, {
     params: includeInactive ? { include_inactive: true } : undefined,
+    signal,
   });
   return data;
 }
@@ -71,29 +111,13 @@ export async function getCaseTypes(courtId: number, includeInactive = false): Pr
 export async function getFilingRequirements(
   courtId: number,
   caseTypeId: number,
-  filingType?: string
+  filingType?: string,
+  signal?: AbortSignal,
 ): Promise<FilingRequirement[]> {
   const { data } = await apiClient.get(
     `/courts/${courtId}/case-types/${caseTypeId}/requirements`,
-    filingType ? { params: { filing_type: filingType } } : undefined
+    { params: filingType ? { filing_type: filingType } : undefined, signal },
   );
   return data;
 }
 
-export interface FilingChecklist {
-  id: number;
-  motion_type: string;
-  checklist_items: { items: Array<{ label: string; required: boolean }> };
-  help_text: string | null;
-  mcr_url: string | null;
-}
-
-export async function getFilingChecklists(
-  courtId: number,
-  caseTypeId: number
-): Promise<FilingChecklist[]> {
-  const { data } = await apiClient.get(
-    `/courts/${courtId}/case-types/${caseTypeId}/checklist`
-  );
-  return data;
-}

@@ -1,12 +1,10 @@
-"""Court instructions govern public visibility without rewriting retained documents."""
-
 from copy import deepcopy
 
 import pytest
 from sqlalchemy import func, select
 
 from app.models.audit import AuditLog
-from app.models.case import Case
+from app.models.case import Case, CaseParticipant, ParticipantRole
 from app.models.filing import FilingEnvelope, FilingStatus
 from tests.test_case_participants import participants_case as participants_case
 
@@ -65,8 +63,17 @@ async def test_public_access_changes_search_docket_downloads_and_favorites(
     assert change["details"]["authority_reference"] == restricted["authority_reference"]
     assert change["details"]["reason"] == instruction["reason"]
     api_client.headers.pop("X-Demo-User-Id")
-    assert (await api_client.get(path)).status_code == 403
-    assert (await api_client.get(f"/api/v1/documents/{original.id}/download")).status_code == 403
+    sealed_paths = [
+        path, path + "/filings",
+        f"/api/v1/documents/{original.id}/download", f"/api/v1/documents/{original.id}/verify",
+    ]
+    for sealed_path in sealed_paths:
+        expected = 401 if sealed_path.endswith("/verify") else 403
+        assert (await api_client.get(sealed_path)).status_code == expected, sealed_path
+    api_client.headers["X-Demo-User-Id"] = str(visitor.id)
+    for sealed_path in sealed_paths:
+        assert (await api_client.get(sealed_path)).status_code == 403, sealed_path
+    api_client.headers.pop("X-Demo-User-Id")
     found = await api_client.get("/api/v1/cases/search", params={"case_number": case.case_number})
     assert found.json()["total"] == 0 and instruction["reason"] not in found.text
     api_client.headers["X-Demo-User-Id"] = str(visitor.id)
@@ -136,7 +143,6 @@ async def test_participant_edits_and_public_access_invalidate_each_others_old_re
     proposal.update(expected_version=1, access_enabled=False)
     assert (await api_client.put(path + f"/participants/{participant.json()['id']}",
                                  json=proposal)).status_code == 409
-    # An unchanged instruction does not create another audit event or revision.
     same = deepcopy(instruction)
     same["expected_version"] = 2
     assert (await api_client.put(path + "/public-access", json=same)).status_code == 200
@@ -145,3 +151,19 @@ async def test_participant_edits_and_public_access_invalidate_each_others_old_re
     assert (await api_client.put(path + "/public-access", json=instruction)).status_code == 200
     api_client.headers["X-Demo-User-Id"] = str(users[2].id)
     assert (await api_client.get(path)).status_code == 200, "Explicit participant grant was lost"
+
+
+async def test_staff_cannot_change_access_to_a_case_they_are_party_to(
+    participants_case, instruction, db_session, api_client,
+):
+    users, cases = participants_case
+    staff = users[0]
+    db_session.add(CaseParticipant(
+        case_id=cases[0].id, user_id=staff.id, role=ParticipantRole.PLAINTIFF,
+        party_name="Staff member as a party", access_enabled=True,
+    ))
+    await db_session.flush()
+    response = await api_client.put(f"/api/v1/cases/{cases[0].id}/public-access", json=instruction)
+    assert response.status_code == 403, response.text
+    assert "Another court reviewer" in response.json()["detail"]
+    assert (await db_session.get(Case, cases[0].id)).is_sealed

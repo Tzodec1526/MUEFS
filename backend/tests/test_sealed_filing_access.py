@@ -1,5 +1,3 @@
-"""HTTP: a draft on a sealed case must not unlock the docket."""
-
 from datetime import UTC, datetime
 from uuid import uuid4
 

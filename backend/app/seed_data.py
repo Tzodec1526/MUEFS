@@ -1,22 +1,16 @@
-"""Seed data for Michigan Unified E-Filing System.
-
-Populates the database with all Michigan courts, case types,
-filing requirements, and demo users.
-
-Usage: python -m app.seed_data [--reset]
-
---reset drops and recreates the application tables before seeding (use after
-changing seed data; Keycloak's tables and stored documents are untouched).
-"""
-
-import os
+import asyncio
 from datetime import UTC, datetime
 
-from sqlalchemy import create_engine, func
+from sqlalchemy import Connection, Engine, create_engine, func
+from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import Session
 
+from alembic import command
+from app.config import settings
 from app.database import Base
 from app.demo.documents import sample_document
+from app.demo.schema import alembic_config, prepare_demo_connection
 from app.models.court import (
     CaseCategory,
     CaseType,
@@ -26,19 +20,14 @@ from app.models.court import (
     FilingRequirement,
 )
 from app.models.user import CourtRole, User, UserCourtRole, UserType
+from app.services import document_service
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL_SYNC",
-    "postgresql://muefs:muefs_dev@localhost:5432/muefs",
-)
 
 def _ordinal(n: int) -> str:
-    """1 -> 1st, 2 -> 2nd, 21 -> 21st; but 11/12/13 -> 11th/12th/13th."""
     if n % 100 in (11, 12, 13):
         return f"{n}th"
     return f"{n}{({1: 'st', 2: 'nd', 3: 'rd'}).get(n % 10, 'th')}"
 
-# Michigan Circuit Courts (57 circuits)
 CIRCUIT_COURTS = [
     (1, ["Hillsdale"], "Hillsdale"),
     (2, ["Berrien"], "St. Joseph"),
@@ -99,226 +88,118 @@ CIRCUIT_COURTS = [
     (57, ["Emmet"], "Petoskey"),
 ]
 
-# Michigan District Courts (complete statewide coverage)
 DISTRICT_COURTS = [
-    # 1st District - Monroe County
     ("1st District Court", "Monroe", "Monroe"),
-    # 2nd District - Lenawee & Hillsdale Counties
     ("2A District Court", "Lenawee", "Adrian"),
     ("2B District Court", "Hillsdale", "Hillsdale"),
-    # 3rd District - Branch & St. Joseph Counties
     ("3A District Court", "Branch", "Coldwater"),
     ("3B District Court", "St. Joseph", "Centreville"),
-    # 4th District - Cass & Berrien Counties
     ("4th District Court", "Cass", "Cassopolis"),
-    # 5th District - Berrien County
     ("5th District Court", "Berrien", "St. Joseph"),
-    # 7th District - Van Buren County
     ("7th District Court", "Van Buren", "Paw Paw"),
-    # 8th District - Kalamazoo County
     ("8th District Court", "Kalamazoo", "Kalamazoo"),
-    # 9th District - Kalamazoo County
     ("9th District Court", "Kalamazoo", "Portage"),
-    # 10th District - Calhoun County
     ("10th District Court", "Calhoun", "Battle Creek"),
-    # 12th District - Jackson County
     ("12th District Court", "Jackson", "Jackson"),
-    # 14th District - Washtenaw County
     ("14A District Court", "Washtenaw", "Ann Arbor"),
     ("14B District Court", "Washtenaw", "Ypsilanti"),
-    # 15th District - Washtenaw County
     ("15th District Court", "Washtenaw", "Ann Arbor"),
-    # 16th District - Livonia (Wayne County)
     ("16th District Court", "Wayne", "Livonia"),
-    # 17th District - Redford Township (Wayne County)
     ("17th District Court", "Wayne", "Redford"),
-    # 18th District - City of Westland (Wayne County)
     ("18th District Court", "Wayne", "Westland"),
-    # 19th District - City of Dearborn (Wayne County)
     ("19th District Court", "Wayne", "Dearborn"),
-    # 20th District - Dearborn Heights (Wayne County)
     ("20th District Court", "Wayne", "Dearborn Heights"),
-    # 21st District - Garden City (Wayne County)
     ("21st District Court", "Wayne", "Garden City"),
-    # 22nd District - City of Inkster (Wayne County)
     ("22nd District Court", "Wayne", "Inkster"),
-    # 23rd District - Taylor (Wayne County)
     ("23rd District Court", "Wayne", "Taylor"),
-    # 24th District - Allen Park (Wayne County)
     ("24th District Court", "Wayne", "Allen Park"),
-    # 25th District - Lincoln Park (Wayne County)
     ("25th District Court", "Wayne", "Lincoln Park"),
-    # 27th District - Wyandotte (Wayne County)
     ("27th District Court", "Wayne", "Wyandotte"),
-    # 28th District - Southgate (Wayne County)
     ("28th District Court", "Wayne", "Southgate"),
-    # 29th District - Wayne (Wayne County)
     ("29th District Court", "Wayne", "Wayne"),
-    # 30th District - Highland Park (Wayne County)
     ("30th District Court", "Wayne", "Highland Park"),
-    # 31st District - Hamtramck (Wayne County)
     ("31st District Court", "Wayne", "Hamtramck"),
-    # 32A District - Harper Woods (Wayne County)
     ("32A District Court", "Wayne", "Harper Woods"),
-    # 33rd District - Woodhaven/Flat Rock/Rockwood (Wayne County)
     ("33rd District Court", "Wayne", "Woodhaven"),
-    # 34th District - Romulus (Wayne County)
     ("34th District Court", "Wayne", "Romulus"),
-    # 35th District - Plymouth/Northville/Canton (Wayne County)
     ("35th District Court", "Wayne", "Plymouth"),
-    # 36th District - City of Detroit (Wayne County)
     ("36th District Court", "Wayne", "Detroit"),
-    # 37th District - Warren (Macomb County)
     ("37th District Court", "Macomb", "Warren"),
-    # 38th District - Eastpointe (Macomb County)
     ("38th District Court", "Macomb", "Eastpointe"),
-    # 39th District - Roseville/Fraser (Macomb County)
     ("39th District Court", "Macomb", "Roseville"),
-    # 40th District - St. Clair Shores (Macomb County)
     ("40th District Court", "Macomb", "St. Clair Shores"),
-    # 41A District - Sterling Heights/Utica (Macomb County)
     ("41A District Court", "Macomb", "Sterling Heights"),
-    # 41B District - Clinton Township/Mt. Clemens (Macomb County)
     ("41B District Court", "Macomb", "Clinton Township"),
-    # 42-1 District - Romeo/Washington/Bruce/Armada (Macomb County)
     ("42-1 District Court", "Macomb", "Romeo"),
-    # 42-2 District - New Baltimore/Chesterfield/Lenox (Macomb County)
     ("42-2 District Court", "Macomb", "New Baltimore"),
-    # 43rd District - Hazel Park/Madison Heights/Ferndale (Oakland County)
     ("43rd District Court", "Oakland", "Hazel Park"),
-    # 44th District - Royal Oak (Oakland County)
     ("44th District Court", "Oakland", "Royal Oak"),
-    # 45A District - Berkley/Huntington Woods (Oakland County)
     ("45A District Court", "Oakland", "Berkley"),
-    # 45B District - Oak Park (Oakland County)
     ("45B District Court", "Oakland", "Oak Park"),
-    # 46th District - Southfield/Lathrup Village (Oakland County)
     ("46th District Court", "Oakland", "Southfield"),
-    # 47th District - Farmington/Farmington Hills (Oakland County)
     ("47th District Court", "Oakland", "Farmington Hills"),
-    # 48th District - Bloomfield Hills/Birmingham/Sylvan Lake (Oakland County)
     ("48th District Court", "Oakland", "Bloomfield Hills"),
-    # 50th District - Pontiac (Oakland County)
     ("50th District Court", "Oakland", "Pontiac"),
-    # 51st District - Waterford (Oakland County)
     ("51st District Court", "Oakland", "Waterford"),
-    # 52-1 District - Novi/Walled Lake/Wixom/South Lyon (Oakland County)
     ("52-1 District Court", "Oakland", "Novi"),
-    # 52-2 District - Clarkston/Ortonville (Oakland County)
     ("52-2 District Court", "Oakland", "Clarkston"),
-    # 52-3 District - Rochester/Rochester Hills (Oakland County)
     ("52-3 District Court", "Oakland", "Rochester Hills"),
-    # 52-4 District - Troy (Oakland County)
     ("52-4 District Court", "Oakland", "Troy"),
-    # 53rd District - Howell/Brighton (Livingston County)
     ("53rd District Court", "Livingston", "Howell"),
-    # 54A District - Lansing (Ingham County)
     ("54A District Court", "Ingham", "Lansing"),
-    # 54B District - East Lansing (Ingham County)
     ("54B District Court", "Ingham", "East Lansing"),
-    # 55th District - Mason/Ingham County
     ("55th District Court", "Ingham", "Mason"),
-    # 56A District - Eaton County
     ("56A District Court", "Eaton", "Charlotte"),
-    # 56B District - Barry County
     ("56B District Court", "Barry", "Hastings"),
-    # 57th District - Allegan County
     ("57th District Court", "Allegan", "Allegan"),
-    # 58th District - Ottawa County
     ("58th District Court", "Ottawa", "Grand Haven"),
-    # 59th District - Grandville/Walker (Kent County)
     ("59th District Court", "Kent", "Grandville"),
-    # 60th District - Muskegon County
     ("60th District Court", "Muskegon", "Muskegon"),
-    # 61st District - Grand Rapids (Kent County)
     ("61st District Court", "Kent", "Grand Rapids"),
-    # 62A District - Wyoming/Byron Center (Kent County)
     ("62A District Court", "Kent", "Wyoming"),
-    # 62B District - Kentwood/Lowell (Kent County)
     ("62B District Court", "Kent", "Kentwood"),
-    # 63rd District - Grand Rapids/East Grand Rapids/Cascade (Kent County)
     ("63rd District Court", "Kent", "Grand Rapids"),
-    # 64A District - Ionia County
     ("64A District Court", "Ionia", "Ionia"),
-    # 64B District - Isabella County
     ("64B District Court", "Isabella", "Mount Pleasant"),
-    # 65A District - Clinton County
     ("65A District Court", "Clinton", "St. Johns"),
-    # 65B District - Gratiot County
     ("65B District Court", "Gratiot", "Ithaca"),
-    # 66th District - Shiawassee County
     ("66th District Court", "Shiawassee", "Corunna"),
-    # 67th District - Genesee County
     ("67th District Court", "Genesee", "Flint"),
-    # 68th District - Genesee County
     ("68th District Court", "Genesee", "Flint"),
-    # 69th District - St. Clair County
     ("69th District Court", "St. Clair", "Port Huron"),
-    # 70th District - Saginaw County
     ("70th District Court", "Saginaw", "Saginaw"),
-    # 71A District - Lapeer County
     ("71A District Court", "Lapeer", "Lapeer"),
-    # 71B District - Tuscola County
     ("71B District Court", "Tuscola", "Caro"),
-    # 72nd District - St. Clair County (Marine City/Port Huron area)
     ("72nd District Court", "St. Clair", "Marine City"),
-    # 73rd District - Saginaw County
     ("73rd District Court", "Saginaw", "Saginaw"),
-    # 74th District - Bay County
     ("74th District Court", "Bay", "Bay City"),
-    # 75th District - Midland County
     ("75th District Court", "Midland", "Midland"),
-    # 76th District - Clare & Gladwin Counties
     ("76th District Court", "Clare", "Harrison"),
-    # 77th District - Mecosta & Osceola Counties
     ("77th District Court", "Mecosta", "Big Rapids"),
-    # 78th District - Newaygo County
     ("78th District Court", "Newaygo", "White Cloud"),
-    # 79th District - Mason & Lake Counties
     ("79th District Court", "Mason", "Ludington"),
-    # 80th District - Wexford & Missaukee Counties
     ("80th District Court", "Wexford", "Cadillac"),
-    # 81st District - Alcona, Arenac, Iosco, Oscoda Counties
     ("81st District Court", "Iosco", "Tawas City"),
-    # 82nd District - Ogemaw & Roscommon Counties
     ("82nd District Court", "Ogemaw", "West Branch"),
-    # 83rd District - Huron & Sanilac Counties
     ("83rd District Court", "Huron", "Bad Axe"),
-    # 84th District - Manistee & Benzie Counties
     ("84th District Court", "Manistee", "Manistee"),
-    # 85th District - Leelanau & Grand Traverse Counties
     ("85th District Court", "Grand Traverse", "Traverse City"),
-    # 86th District - Antrim & Grand Traverse Counties
     ("86th District Court", "Grand Traverse", "Traverse City"),
-    # 87th District - Kalkaska, Crawford, Otsego Counties
     ("87th District Court", "Otsego", "Gaylord"),
-    # 88th District - Alpena & Montmorency Counties
     ("88th District Court", "Alpena", "Alpena"),
-    # 89th District - Cheboygan & Presque Isle Counties
     ("89th District Court", "Cheboygan", "Cheboygan"),
-    # 90th District - Emmet & Charlevoix Counties
     ("90th District Court", "Emmet", "Petoskey"),
-    # 91st District - Chippewa County
     ("91st District Court", "Chippewa", "Sault Ste. Marie"),
-    # 92nd District - Luce & Mackinac Counties
     ("92nd District Court", "Luce", "Newberry"),
-    # 93rd District - Alger & Schoolcraft Counties
     ("93rd District Court", "Alger", "Munising"),
-    # 94th District - Delta & Menominee Counties
     ("94th District Court", "Delta", "Escanaba"),
-    # 95A District - Dickinson County
     ("95A District Court", "Dickinson", "Iron Mountain"),
-    # 95B District - Menominee County
     ("95B District Court", "Menominee", "Menominee"),
-    # 96th District - Marquette County
     ("96th District Court", "Marquette", "Marquette"),
-    # 97th District - Baraga, Houghton, Keweenaw Counties
     ("97th District Court", "Houghton", "Houghton"),
-    # 98th District - Iron, Gogebic, Ontonagon Counties
     ("98th District Court", "Gogebic", "Bessemer"),
 ]
 
-# Michigan Probate Courts (all 83 counties)
 PROBATE_COUNTIES = [
     ("Alcona", "Harrisville"),
     ("Alger", "Munising"),
@@ -405,8 +286,6 @@ PROBATE_COUNTIES = [
     ("Wexford", "Cadillac"),
 ]
 
-# Common case types
-# Circuit courts have general jurisdiction (no small claims - those go to district)
 CIRCUIT_CIVIL_CASE_TYPES = [
     ("CIV-GEN", "Civil - General", CaseCategory.CIVIL, 15000),
     ("CIV-TORT", "Civil - Tort", CaseCategory.CIVIL, 15000),
@@ -416,10 +295,9 @@ CIRCUIT_CIVIL_CASE_TYPES = [
     ("CIV-BUS", "Business Court (MCL 600.8031 et seq.)", CaseCategory.CIVIL, 15000),
     ("CIV-GARN", "Garnishment", CaseCategory.CIVIL, 1500),
     ("CIR-APP", "Appeal from District/Probate/Agency", CaseCategory.APPEALS, 15000),
-    ("CIV-SUBP", "Domesticating Subpoena - MI Uniform Depositions Act", CaseCategory.CIVIL, 15000),
+    ("CIV-SUBP", "Domesticating Subpoena - Uniform Interstate Depositions and Discovery Act", CaseCategory.CIVIL, 15000),
 ]
 
-# District courts have limited jurisdiction (includes small claims)
 DISTRICT_CIVIL_CASE_TYPES = [
     ("CIV-GEN", "Civil - General", CaseCategory.CIVIL, 15000),
     ("CIV-TORT", "Civil - Tort", CaseCategory.CIVIL, 15000),
@@ -428,7 +306,7 @@ DISTRICT_CIVIL_CASE_TYPES = [
     ("LT-SP", "Landlord-Tenant / Summary Proceedings", CaseCategory.CIVIL, 4500),
     ("SM-CLM", "Small Claims (up to $7,000)", CaseCategory.SMALL_CLAIMS, 4500),
     ("CIV-GARN", "Garnishment", CaseCategory.CIVIL, 1500),
-    ("CIV-SUBP", "Domesticating Subpoena - MI Uniform Depositions Act", CaseCategory.CIVIL, 15000),
+    ("CIV-SUBP", "Domesticating Subpoena - Uniform Interstate Depositions and Discovery Act", CaseCategory.CIVIL, 15000),
 ]
 
 FAMILY_CASE_TYPES = [
@@ -453,7 +331,6 @@ PROBATE_CASE_TYPES = [
     ("PR-MI", "Probate - Mental Health (Civil Commitment)", CaseCategory.PROBATE, 0),
 ]
 
-# Court of Claims case types (MCL 600.6401 et seq.)
 COURT_OF_CLAIMS_CASE_TYPES = [
     ("COC-TORT", "Tort Claim Against State of Michigan", CaseCategory.CIVIL, 15000),
     ("COC-CONT", "Contract Claim Against State of Michigan", CaseCategory.CIVIL, 15000),
@@ -470,7 +347,6 @@ APPEALS_CASE_TYPES = [
     ("APP-FAM", "Appeal - Family", CaseCategory.APPEALS, 37500),
 ]
 
-# Filing requirements for civil cases (MCR references)
 CIVIL_FILING_REQUIREMENTS = [
     ("COMPLAINT", True, "Complaint", "MCR 2.111", None, None),
     ("SUMMONS", True, "Summons (SCAO Form MC 01)", "MCR 2.102", None, None),
@@ -479,9 +355,8 @@ CIVIL_FILING_REQUIREMENTS = [
     ("JURY_DEMAND", False, "Jury Demand", "MCR 2.508", None, None),
 ]
 
-# Filing requirements for domesticating subpoena (Michigan Uniform Depositions Act, MCL 600.2163a)
 SUBPOENA_FILING_REQUIREMENTS = [
-    ("SUBPOENA", True, "Out-of-State Subpoena (authenticated copy)", "MCL 600.2163a", None,
+    ("SUBPOENA", True, "Out-of-State Subpoena (authenticated copy)", "MCL 600.2201 et seq.", None,
      "Must be issued by court of record in another state"),
     ("COVER_LETTER", True, "Cover Letter / Request to Domesticate", None, None,
      "Letter requesting issuance of Michigan subpoena"),
@@ -491,10 +366,6 @@ SUBPOENA_FILING_REQUIREMENTS = [
     ("FILING_FEE", True, "Filing Fee", None, None, None),
 ]
 
-# Filing requirements for motions (attached alongside the initiating civil list, so one
-# row per document code: EXHIBIT and PROOF_SERVICE already come from that list and are
-# not repeated here). Codes match the frontend document catalog; affidavit/exhibit
-# recommendations per motion type live in the catalog's companion rules.
 MOTION_FILING_REQUIREMENTS = [
     ("MOTION", True, "Motion", "MCR 2.119", 20, "Brief must not exceed 20 pages"),
     ("BRIEF_SUPPORT", False, "Brief in Support", "MCR 2.119(A)(2)", 20, "May be combined with the motion as a single document; a separate brief is not required to file."),
@@ -503,7 +374,6 @@ MOTION_FILING_REQUIREMENTS = [
     ("DISC_CERT_GF", False, "Certification of Good Faith Effort (discovery motions)", "MCR 2.313(A)(5)", None, "Recommended best practice. MCR 2.313(A)(5) makes a good-faith effort to resolve the dispute a factor in awarding motion expenses, not a required filing. A motion to compel a non-party subpoena must include the subpoena and proof of service under MCR 2.313(A)(2)(c)."),
 ]
 
-# District court civil filing requirements
 DISTRICT_CIVIL_REQUIREMENTS = [
     ("COMPLAINT", True, "Complaint", "MCR 2.111", None, None),
     ("SUMMONS", True, "Summons (SCAO Form MC 01)", "MCR 2.102", None, None),
@@ -511,13 +381,11 @@ DISTRICT_CIVIL_REQUIREMENTS = [
     ("EXHIBIT", False, "Exhibits", None, None, "Attach separately; label clearly"),
 ]
 
-# Small claims filing requirements
 SMALL_CLAIMS_REQUIREMENTS = [
     ("SM_AFFIDAVIT", True, "Affidavit and Claim (SCAO Form DC 84)", "MCR 4.302", None, None),
     ("EXHIBIT", False, "Supporting Documents/Evidence", None, None, None),
 ]
 
-# Family law filing requirements (circuit courts)
 FAMILY_FILING_REQUIREMENTS = [
     ("COMPLAINT", True, "Complaint for Divorce", "MCR 3.206", None, None),
     ("SUMMONS", True, "Summons (SCAO Form MC 01)", "MCR 2.102", None, None),
@@ -528,21 +396,18 @@ FAMILY_FILING_REQUIREMENTS = [
     ("EXHIBIT", False, "Exhibits", None, None, None),
 ]
 
-# PPO filing requirements
 PPO_FILING_REQUIREMENTS = [
     ("PPO_PETITION", True, "Petition for PPO (SCAO Form CC 375)", "MCL 600.2950", None, None),
     ("PPO_INFO", True, "PPO Information Sheet", "MCL 600.2950(3)", None, None),
     ("EXHIBIT", False, "Supporting Evidence", None, None, None),
 ]
 
-# Criminal filing requirements (prosecutor-initiated)
 CRIMINAL_FILING_REQUIREMENTS = [
     ("INFORMATION", True, "Information / Complaint", "MCR 6.112", None, None),
     ("WARRANT", True, "Arrest Warrant or Summons", "MCR 6.102", None, None),
     ("PROOF_SERVICE", False, "Proof of Service", "MCR 6.103", None, None),
 ]
 
-# Probate filing requirements
 PROBATE_ESTATE_REQUIREMENTS = [
     ("PETITION", True, "Petition for Probate (SCAO Form PC 558)", "MCL 700.3301", None, None),
     ("DEATH_CERT", True, "Certified Death Certificate", "MCL 700.3301(1)(a)", None, None),
@@ -561,7 +426,6 @@ PROBATE_GUARDIANSHIP_REQUIREMENTS = [
     ("BACKGROUND", False, "Background Check / ICHAT", None, None, None),
 ]
 
-# Appellate filing requirements
 APPEALS_FILING_REQUIREMENTS = [
     ("CLAIM_APPEAL", True, "Claim of Appeal", "MCR 7.204(A)", None, None),
     ("ENTRY_ORDER", True, "Entry of Order Being Appealed", "MCR 7.204(A)(2)", None, None),
@@ -579,33 +443,61 @@ SUPREME_COURT_REQUIREMENTS = [
     ("APPENDIX", False, "Appendix", "MCR 7.305(B)(4)", None, None),
 ]
 
-# Family law motion examples
 FAMILY_MOTION_REQUIREMENTS = [
     ("MOT_MODIFY", True, "Motion to Modify Custody/Support/Parenting Time", "MCR 3.207 / MCL 722.27", None, None),
     ("MOT_CONTEMPT", True, "Motion for Contempt / Show Cause", "MCR 3.207", None, "Requires affidavit of facts"),
     ("MOT_RELOCATION", True, "Motion re: Change of Domicile/Relocation", "MCL 722.31", None, None),
 ]
 
-# Probate / estate specific filings
 PROBATE_MOTION_REQUIREMENTS = [
     ("MOT_REMOVE_PR", True, "Motion to Remove Personal Representative", "MCL 700.3611", None, None),
     ("MOT_APPROVE_ACCT", True, "Motion to Approve Account / Settlement", "MCL 700.3703", None, None),
 ]
 
 
-def seed_database(reset: bool = False):
-    engine = create_engine(DATABASE_URL, echo=False)
+def seed_database(reset: bool = False, url: str | None = None) -> None:
+    url = url or settings.database_url
+    document_service.ensure_bucket()
+    if make_url(url).get_dialect().is_async:
+        asyncio.run(_seed_with_async_driver(url, reset))
+        return
+    engine = create_engine(url, echo=False)
+    try:
+        with engine.connect() as connection:
+            _prepare_schema(connection, reset)
+        _populate(engine)
+    finally:
+        engine.dispose()
+
+
+async def _seed_with_async_driver(url: str, reset: bool) -> None:
+    engine = create_async_engine(url, echo=False)
+    try:
+        async with engine.connect() as connection:
+            await connection.run_sync(_prepare_schema, reset)
+            await connection.run_sync(_populate)
+            await connection.commit()
+    finally:
+        await engine.dispose()
+
+
+def _prepare_schema(connection: Connection, reset: bool) -> None:
     if reset:
         print("Reset: dropping application tables...")
-        Base.metadata.drop_all(engine)
-    if engine.dialect.name == "sqlite":
-        from app.demo.schema import prepare_demo_schema
-        prepare_demo_schema(engine)
+        Base.metadata.drop_all(connection)
+        connection.exec_driver_sql("DROP TABLE IF EXISTS alembic_version")
+        if connection.dialect.name == "postgresql":
+            connection.exec_driver_sql("DROP TYPE IF EXISTS deliverystatus")
+        connection.commit()
+    if connection.dialect.name == "sqlite":
+        prepare_demo_connection(connection)
     else:
-        Base.metadata.create_all(engine)
+        command.upgrade(alembic_config(connection), "head")
+    connection.commit()
 
-    with Session(engine) as session:
-        # Check if already seeded
+
+def _populate(bind: Engine | Connection) -> None:
+    with Session(bind) as session:
         existing = session.query(Court).first()
         if existing:
             print("Database already seeded. Skipping.")
@@ -613,7 +505,6 @@ def seed_database(reset: bool = False):
 
         print("Seeding Michigan courts...")
 
-        # --- Demo Users ---
         users = [
             User(
                 email="attorney@demo.muefs.gov",
@@ -627,8 +518,8 @@ def seed_database(reset: bool = False):
             ),
             User(
                 email="clerk@demo.muefs.gov",
-                first_name="Robert",
-                last_name="Johnson",
+                first_name="Dana",
+                last_name="Whitfield",
                 user_type=UserType.CLERK,
                 phone="313-555-0200",
             ),
@@ -660,7 +551,6 @@ def seed_database(reset: bool = False):
 
         court_count = 0
 
-        # --- Circuit Courts ---
         for circuit_num, counties, city in CIRCUIT_COURTS:
             county = counties[0]
             name = f"{_ordinal(circuit_num)} Circuit Court"
@@ -682,7 +572,6 @@ def seed_database(reset: bool = False):
             session.add(court)
             session.flush()
 
-            # Add case types (circuit courts: no small claims)
             all_types = (
                 CIRCUIT_CIVIL_CASE_TYPES
                 + FAMILY_CASE_TYPES
@@ -700,7 +589,6 @@ def seed_database(reset: bool = False):
 
             session.flush()
 
-            # Add filing requirements for civil cases
             civil_ct = session.query(CaseType).filter_by(
                 court_id=court.id, code="CIV-GEN"
             ).first()
@@ -717,7 +605,6 @@ def seed_database(reset: bool = False):
                         format_notes=notes,
                     ))
 
-                # Add checklist for summary disposition
                 session.add(FilingChecklist(
                     court_id=court.id,
                     case_type_id=civil_ct.id,
@@ -738,12 +625,11 @@ def seed_database(reset: bool = False):
                         " to 20 pages. Response due 21 days"
                         " after service."
                     ),
-                    mcr_url=(  # noqa: E501
+                    mcr_url=(
                         "https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2116-summary-disposition"
                     ),
                 ))
 
-            # Filing requirements for family law cases
             fam_ct = session.query(CaseType).filter_by(
                 court_id=court.id, code="FAM-DIV"
             ).first()
@@ -759,7 +645,6 @@ def seed_database(reset: bool = False):
                         page_limit=page_limit,
                         format_notes=notes,
                     ))
-                # Expanded family motion coverage
                 for doc_code, required, desc, mcr, page_limit, notes in FAMILY_MOTION_REQUIREMENTS:
                     session.add(FilingRequirement(
                         court_id=court.id,
@@ -772,7 +657,6 @@ def seed_database(reset: bool = False):
                         format_notes=notes,
                     ))
 
-            # Filing requirements for PPO
             ppo_ct = session.query(CaseType).filter_by(
                 court_id=court.id, code="FAM-PPO"
             ).first()
@@ -789,7 +673,6 @@ def seed_database(reset: bool = False):
                         format_notes=notes,
                     ))
 
-            # Filing requirements for criminal cases
             crim_ct = session.query(CaseType).filter_by(
                 court_id=court.id, code="CR-FEL"
             ).first()
@@ -807,7 +690,6 @@ def seed_database(reset: bool = False):
                         format_notes=notes,
                     ))
 
-            # Motion filing requirements for civil cases
             if civil_ct:
                 for doc_code, required, desc, mcr, page_limit, notes in MOTION_FILING_REQUIREMENTS:
                     session.add(FilingRequirement(
@@ -820,7 +702,6 @@ def seed_database(reset: bool = False):
                         page_limit=page_limit,
                         format_notes=notes,
                     ))
-                # Additional motion checklists
                 session.add(FilingChecklist(
                     court_id=court.id,
                     case_type_id=civil_ct.id,
@@ -911,7 +792,6 @@ def seed_database(reset: bool = False):
                     ),
                 ))
 
-                # Additional expanded motion checklists for broader coverage
                 session.add(FilingChecklist(
                     court_id=court.id,
                     case_type_id=civil_ct.id,
@@ -962,7 +842,6 @@ def seed_database(reset: bool = False):
                     mcr_url="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-3-special-proceedings-and-actions/subchapter-3300-provisional-and-final-remedies-and-special-proceedings/rule-3310-injunctions",
                 ))
 
-            # Add filing requirements for domesticating subpoena
             subp_ct = session.query(CaseType).filter_by(
                 court_id=court.id, code="CIV-SUBP"
             ).first()
@@ -984,7 +863,6 @@ def seed_database(reset: bool = False):
 
         print(f"  Created {court_count} circuit courts")
 
-        # --- District Courts ---
         dc_count = 0
         for name, county, city in DISTRICT_COURTS:
             court = Court(
@@ -1010,7 +888,6 @@ def seed_database(reset: bool = False):
 
             session.flush()
 
-            # Filing requirements for district civil cases
             dc_civil = session.query(CaseType).filter_by(
                 court_id=court.id, code="CIV-GEN"
             ).first()
@@ -1027,7 +904,6 @@ def seed_database(reset: bool = False):
                         format_notes=notes,
                     ))
 
-            # Filing requirements for small claims
             dc_sm = session.query(CaseType).filter_by(
                 court_id=court.id, code="SM-CLM"
             ).first()
@@ -1044,7 +920,6 @@ def seed_database(reset: bool = False):
                         format_notes=notes,
                     ))
 
-            # Filing requirements for criminal cases
             dc_crim = session.query(CaseType).filter_by(
                 court_id=court.id, code="CR-MISD"
             ).first()
@@ -1066,7 +941,6 @@ def seed_database(reset: bool = False):
 
         print(f"  Created {dc_count} district courts")
 
-        # --- Probate Courts ---
         pc_count = 0
         for county, city in PROBATE_COUNTIES:
             court = Court(
@@ -1092,7 +966,6 @@ def seed_database(reset: bool = False):
 
             session.flush()
 
-            # Filing requirements for estate cases
             pc_estate = session.query(CaseType).filter_by(
                 court_id=court.id, code="PR-EST"
             ).first()
@@ -1108,7 +981,6 @@ def seed_database(reset: bool = False):
                         page_limit=page_limit,
                         format_notes=notes,
                     ))
-                # Expanded probate motion coverage
                 for doc_code, required, desc, mcr, page_limit, notes in PROBATE_MOTION_REQUIREMENTS:
                     session.add(FilingRequirement(
                         court_id=court.id,
@@ -1121,7 +993,6 @@ def seed_database(reset: bool = False):
                         format_notes=notes,
                     ))
 
-            # Filing requirements for guardianship cases
             pc_guard = session.query(CaseType).filter_by(
                 court_id=court.id, code="PR-GRDN"
             ).first()
@@ -1143,10 +1014,6 @@ def seed_database(reset: bool = False):
 
         print(f"  Created {pc_count} probate courts")
 
-        # --- Court of Claims ---
-        # Statewide jurisdiction for claims against State of Michigan
-        # Administratively part of 30th Circuit Court (Ingham County)
-        # Per MCL 600.6401 et seq.
         coc = Court(
             name="Michigan Court of Claims",
             county="Ingham",
@@ -1171,7 +1038,6 @@ def seed_database(reset: bool = False):
 
         print("  Created Michigan Court of Claims")
 
-        # --- Court of Appeals (4 districts) ---
         for district in range(1, 5):
             court = Court(
                 name=f"Michigan Court of Appeals - District {district}",
@@ -1196,7 +1062,6 @@ def seed_database(reset: bool = False):
 
             session.flush()
 
-            # Filing requirements for appeals
             app_civil = session.query(CaseType).filter_by(
                 court_id=court.id, code="APP-CIV"
             ).first()
@@ -1215,7 +1080,6 @@ def seed_database(reset: bool = False):
 
         print("  Created 4 Court of Appeals districts")
 
-        # --- Supreme Court ---
         court = Court(
             name="Michigan Supreme Court",
             county="Statewide",
@@ -1234,12 +1098,11 @@ def seed_database(reset: bool = False):
                 code=code,
                 name=type_name,
                 category=category,
-                filing_fee_cents=fee,  # MCL 600.321: $375 application fee, same as Court of Appeals
+                filing_fee_cents=fee,
             ))
 
         session.flush()
 
-        # Filing requirements for Supreme Court
         sc_civil = session.query(CaseType).filter_by(
             court_id=court.id, code="APP-CIV"
         ).first()
@@ -1258,30 +1121,27 @@ def seed_database(reset: bool = False):
 
         print("  Created Michigan Supreme Court")
 
-        # --- Assign clerk to 3rd Circuit Court ---
         third_circuit = session.query(Court).filter(
             Court.name == "3rd Circuit Court"
         ).first()
         if third_circuit:
             session.add(UserCourtRole(
-                user_id=users[1].id,  # Robert Johnson (clerk)
+                user_id=users[1].id,
                 court_id=third_circuit.id,
                 role=CourtRole.CLERK,
             ))
             session.flush()
             print(f"  Assigned clerk to {third_circuit.name} (court_id={third_circuit.id})")
 
-        # --- Demo Cases & Filings for frontend testing ---
         from app.models.case import Case, CaseParticipant, CaseStatus, ParticipantRole
         from app.models.filing import FilingEnvelope, FilingStatus
         from app.models.user import FavoriteCase, FavoriteCourt
 
         now = datetime.now(UTC)
-        attorney = users[0]  # Jane Doe, P12345
-        clerk_user = users[1]  # Robert Johnson
-        srl_user = users[3]  # Maria Williams — linked to case 2 for access-control demos
+        attorney = users[0]
+        clerk_user = users[1]
+        srl_user = users[3]
 
-        # Get the 3rd Circuit Court (Wayne County - Detroit)
         wayne_circuit = session.query(Court).filter_by(
             name="3rd Circuit Court"
         ).first()
@@ -1299,10 +1159,8 @@ def seed_database(reset: bool = False):
             wayne_subp = session.query(CaseType).filter_by(
                 court_id=wayne_circuit.id, code="CIV-SUBP"
             ).first()
-            # CIV-GEN is seeded for every circuit court above; assert for type narrowing.
             assert wayne_civil is not None
 
-            # --- Case 1: Active civil case (CIV-GEN so MCR requirements/checklists attach) ---
             case1 = Case(
                 court_id=wayne_circuit.id,
                 case_number=f"{now.year:04d}-000001-CZ",
@@ -1326,9 +1184,9 @@ def seed_database(reset: bool = False):
                 case_id=case1.id, user_id=attorney.id,
                 role=ParticipantRole.ATTORNEY_PLAINTIFF,
                 party_name="Jane Doe", attorney_bar_number="P12345",
+                access_enabled=True, reviewed_at=now,
             ))
 
-            # Initial complaint filing (accepted)
             filing1 = FilingEnvelope(
                 court_id=wayne_circuit.id, case_id=case1.id,
                 case_type_id=wayne_civil.id,
@@ -1348,7 +1206,6 @@ def seed_database(reset: bool = False):
                 filing1, "COMPLAINT", "Complaint for Breach of Contract",
             ))
 
-            # Motion filing (submitted, pending review)
             filing1_motion = FilingEnvelope(
                 court_id=wayne_circuit.id, case_id=case1.id,
                 case_type_id=wayne_civil.id,
@@ -1371,7 +1228,6 @@ def seed_database(reset: bool = False):
                 filing1_motion, "BRIEF", "Brief in Support of Motion for Summary Disposition",
             ))
 
-            # --- Case 2: Personal injury tort case ---
             case2 = Case(
                 court_id=wayne_circuit.id,
                 case_number=f"{now.year:04d}-000002-NO",
@@ -1388,6 +1244,7 @@ def seed_database(reset: bool = False):
                 user_id=srl_user.id,
                 role=ParticipantRole.PLAINTIFF,
                 party_name="Maria Williams",
+                access_enabled=True, reviewed_at=now,
             ))
             session.add(CaseParticipant(
                 case_id=case2.id, role=ParticipantRole.DEFENDANT,
@@ -1397,6 +1254,7 @@ def seed_database(reset: bool = False):
                 case_id=case2.id, user_id=attorney.id,
                 role=ParticipantRole.ATTORNEY_PLAINTIFF,
                 party_name="Jane Doe", attorney_bar_number="P12345",
+                access_enabled=True, reviewed_at=now,
             ))
 
             filing2 = FilingEnvelope(
@@ -1417,7 +1275,6 @@ def seed_database(reset: bool = False):
                 filing2, "COMPLAINT", "Complaint for Personal Injury",
             ))
 
-            # --- Case 3: Divorce case ---
             if wayne_divorce:
                 case3 = Case(
                     court_id=wayne_circuit.id,
@@ -1455,7 +1312,6 @@ def seed_database(reset: bool = False):
                     filing3, "COMPLAINT", "Complaint for Divorce",
                 ))
 
-            # --- Case 4: Domesticating subpoena ---
             if wayne_subp:
                 case4 = Case(
                     court_id=wayne_circuit.id,
@@ -1475,8 +1331,8 @@ def seed_database(reset: bool = False):
                     case_title="In re: Subpoena from State of Ohio, Case No. CV-2025-4412",
                     filing_description=(
                         "Domesticating out-of-state subpoena"
-                        " per Michigan Uniform Depositions"
-                        " Act (MCL 600.2163a)"
+                        " per the Uniform Interstate Depositions"
+                        " and Discovery Act (MCL 600.2201 et seq.)"
                     ),
                     status=FilingStatus.SUBMITTED,
                     submitted_at=now,
@@ -1490,7 +1346,6 @@ def seed_database(reset: bool = False):
                     filing4, "PROPOSED_SUBP", "Proposed Michigan Subpoena",
                 ))
 
-            # --- Case 5: Rejected filing (returned for correction) ---
             filing5 = FilingEnvelope(
                 court_id=wayne_circuit.id,
                 case_type_id=wayne_civil.id,
@@ -1512,22 +1367,16 @@ def seed_database(reset: bool = False):
                 filing5, "COMPLAINT", "Complaint for Medical Malpractice",
             ))
 
-            # Auto-favorite case 1 for the demo attorney
             session.add(FavoriteCase(
                 user_id=attorney.id, case_id=case1.id,
                 notes="Key breach of contract case - motion for SD pending",
             ))
 
-            # Auto-favorite some courts for the demo attorney (attorneys practice in multiple)
             if wayne_circuit:
                 session.add(FavoriteCourt(
                     user_id=attorney.id, court_id=wayne_circuit.id,
                     notes="Primary court - Wayne County",
                 ))
-            if wayne_tort:
-                # favor the court of the tort case too
-                pass  # same court
-            # Favorite a couple more common ones for demo
             oakland_court = session.query(Court).filter_by(name="6th Circuit Court", county="Oakland").first()
             if oakland_court:
                 session.add(FavoriteCourt(
@@ -1539,10 +1388,6 @@ def seed_database(reset: bool = False):
             demo_filings = session.query(FilingEnvelope).count()
             print(f"  Created {demo_cases} demo cases with {demo_filings} filings")
 
-        session.commit()
-
-        # Guard: one row per (court, case type, document code). Duplicate rows render
-        # as duplicate checklist cards in the filing UI, so fail loudly at seed time.
         dupes = (
             session.query(
                 FilingRequirement.court_id,
@@ -1561,6 +1406,8 @@ def seed_database(reset: bool = False):
             raise ValueError(
                 f"{len(dupes)} duplicate filing-requirement rows seeded; first: {dupes[:5]}"
             )
+
+        session.commit()
 
         total = session.query(Court).count()
         total_types = session.query(CaseType).count()

@@ -1,0 +1,181 @@
+.case-search h1 {
+  margin-bottom: 0.35rem;
+}
+
+.search-form {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.search-form .form-row {
+  flex-wrap: wrap;
+}
+
+.search-form .form-group {
+  min-width: 12rem;
+  margin-bottom: 0;
+}
+
+.case-search-table {
+  overflow-x: auto;
+}
+
+.case-search-table table {
+  min-width: 50rem;
+}
+
+.search-results {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.search-results h2 {
+  font-size: 1.17rem;
+  margin-bottom: 0.75rem;
+}
+
+.th-fav, .td-fav { width: 40px; text-align: center; }
+
+.fav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+  color: var(--field);
+  padding: 0;
+  line-height: 1;
+}
+
+.fav-btn:hover {
+  color: var(--star);
+}
+.fav-btn.favorited { color: var(--star); }
+.fav-btn:disabled { opacity: 0.5; cursor: wait; }
+
+.favorites-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.favorite-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+}
+
+.favorite-card:hover {
+  border-color: var(--field);
+}
+
+.favorite-card-star {
+  font-size: 1.5rem;
+  color: var(--star);
+  flex-shrink: 0;
+}
+
+.favorite-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.favorite-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.favorite-card-header h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.favorite-card-number {
+  font-size: 0.78rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.favorite-card-notes {
+  font-size: 0.85rem;
+  color: var(--ink);
+  margin: 0.25rem 0;
+}
+
+.favorite-card-date {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.favorite-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+@media (min-width: 600px) and (max-width: 760px) {
+  .search-results table,
+  .queue-list table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 599px) {
+  .case-search-table table,
+  .case-search-table tbody,
+  .case-search-table tr {
+    display: block;
+    min-width: 0;
+  }
+
+  .case-search-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .case-search-table tbody tr {
+    position: relative;
+    padding-block: 0.6rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .case-search-table td {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    gap: 0.5rem;
+    padding: 0.1rem 0;
+    border-bottom: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .case-search-table td[data-label]::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .case-search-table .td-fav {
+    display: block;
+    position: absolute;
+    top: 0.5rem;
+    right: 0;
+    width: auto;
+  }
+}

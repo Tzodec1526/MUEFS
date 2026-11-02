@@ -1,18 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useId, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { deliveryLabels, listNotifications, type NotificationItem } from '../../api/notifications';
-import { getDemoRole } from '../auth/LoginScreen';
+import { CourtContext } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
 
 function NotificationBell() {
-  const role = getDemoRole();
+  const { role } = useContext(CourtContext)!;
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<LoadFailure | null>(null);
   const [attempt, setAttempt] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
 
   useEffect(() => {
     if (!open) return;
@@ -21,8 +24,17 @@ function NotificationBell() {
         setOpen(false);
       }
     };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      toggleRef.current?.focus();
+    };
     document.addEventListener('mousedown', onPointerDown);
-    return () => document.removeEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -30,12 +42,12 @@ function NotificationBell() {
     let active = true;
     const load = async () => {
       setLoading(true);
-      setError(false);
+      setError(null);
       try {
         const data = await listNotifications(1);
         if (active) setItems(data.notifications);
-      } catch {
-        if (active) setError(true);
+      } catch (err) {
+        if (active) setError(loadFailure(err, 'Could not load notifications.'));
       } finally {
         if (active) setLoading(false);
       }
@@ -47,21 +59,30 @@ function NotificationBell() {
   if (!role || role === 'public') return null;
 
   return (
-    <div className="notification-bell" ref={rootRef}>
+    <div
+      className="notification-bell"
+      ref={rootRef}
+      onBlur={(event) => {
+        const next = event.relatedTarget as Node | null;
+        if (open && next && !event.currentTarget.contains(next)) setOpen(false);
+      }}
+    >
       <button
+        ref={toggleRef}
         type="button"
         className="notification-bell-btn"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
         aria-label="Notifications"
       >
         <Bell size={18} aria-hidden="true" />
       </button>
       {open && (
-        <div className="notification-panel" role="dialog" aria-label="Notifications">
-          <h3>Recent notifications</h3>
+        <div className="notification-panel" id={panelId} role="region" aria-labelledby={`${panelId}-title`}>
+          <p className="notification-panel-title" id={`${panelId}-title`}>Recent notifications</p>
           {loading ? <p>Loading notifications...</p> : error ? (
-            <LoadError message="Could not load notifications." onRetry={() => setAttempt(n => n + 1)} />
+            <LoadError failure={error} onRetry={() => setAttempt(n => n + 1)} />
           ) : items.length === 0 ? (
             <p className="notification-empty">No notifications yet.</p>
           ) : (
@@ -76,7 +97,7 @@ function NotificationBell() {
               ))}
             </ul>
           )}
-          <Link to="/notifications" onClick={() => setOpen(false)}>All notices &amp; email status</Link>
+          <Link to="/notifications" onClick={() => setOpen(false)}>All notices and email status</Link>
         </div>
       )}
     </div>

@@ -1,5 +1,3 @@
-"""Service instructions require court authority, current identity and retained history."""
-
 import asyncio
 import os
 from datetime import UTC, datetime
@@ -58,14 +56,12 @@ async def test_electronic_change_and_revocation_preserve_history_and_send_nothin
     assert saved["issues"] == []
     assert (await api_client.put(path, json=data)).status_code == 409
     data["expected_version"] = 1
-    # An unchanged save does not fabricate another review or retained event.
     assert (await api_client.put(path, json=data)).json()["version"] == 1
     users[2].email = "changed@example.com"
     await db_session.flush()
     changed = (await api_client.get(path)).json()
     assert "verified email" in " ".join(changed["issues"])
     assert (await api_client.put(path, json=data)).status_code == 422
-    # A broken address must not prevent staff from deactivating the instructions.
     data.update(is_active=False, reason="Address changed; recipient must update registration")
     response = await api_client.put(path, json=data)
     assert response.status_code == 200, response.text
@@ -77,7 +73,7 @@ async def test_electronic_change_and_revocation_preserve_history_and_send_nothin
     assert change["details"]["after"]["is_active"] is False
     assert change["details"]["actor_name"] == users[0].full_name
     assert change["occurred_at"].endswith("+00:00")
-    assert participant.access_enabled  # Service instructions never grant or revoke case access.
+    assert participant.access_enabled
     assert await db_session.scalar(select(func.count()).select_from(Notification)) == 0
 
 
@@ -244,7 +240,6 @@ async def test_legacy_upgrade_and_simultaneous_court_edits(postgres_sessions):
         )
         db.add_all([party, clerk, second])
         await db.flush()
-        # Seed only columns present in the legacy schema being upgraded.
         court_id = await db.scalar(text(
             "INSERT INTO courts (name, county, court_type, state, is_efiling_enabled) "
             "VALUES ('Service Court', 'Wayne', 'CIRCUIT', 'MI', true) RETURNING id"
@@ -297,7 +292,6 @@ async def test_legacy_upgrade_and_simultaneous_court_edits(postgres_sessions):
     path = f"/api/v1/cases/{case.id}/participants/{participant.id}/service-contact"
     try:
         async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
-            # Different staff accounts contend for both first creation and a later edit.
             for version in [0, 1]:
                 results = await asyncio.wait_for(
                     asyncio.gather(

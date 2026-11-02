@@ -1,5 +1,3 @@
-"""Real, visibly synthetic files for the demo's sample docket and review queue."""
-
 import hashlib
 from io import BytesIO
 from textwrap import wrap
@@ -48,7 +46,6 @@ def sample_document(filing: FilingEnvelope, document_type_code: str, title: str)
     writer.write(output)
     content = output.getvalue()
     digest = hashlib.sha256(content).hexdigest()
-    # A reset or a later seed revision cannot overwrite a prior sample's bytes.
     key = f"demo/{digest}.pdf"
     upload_document(content, key, "application/pdf")
     return FilingDocument(

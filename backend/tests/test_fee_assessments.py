@@ -1,13 +1,14 @@
-"""Court assessments, retained evidence, and balances exercised through the HTTP workflow."""
-
+from copy import deepcopy
 from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+from fastapi import Depends
 from sqlalchemy import func, select
 
-from app.api.auth import get_current_user_id
+from app.api.auth import get_current_user
 from app.config import settings
+from app.database import get_db
 from app.main import app
 from app.models.court import CaseType
 from app.models.filing import FilingEnvelope, FilingStatus
@@ -72,7 +73,7 @@ async def test_review_assessment_payment_and_submission_preserve_the_basis(
     pending = requested.json()
     assert pending["total_cents"] is None and pending["balance_due_cents"] is None
     assert pending["review_reason"] == "Please review the applicable exemption"
-    assert pending["review_requested_at"].endswith("+00:00")
+    assert pending["review_requested_at"].endswith("Z")
     filing = await filing_service.get_filing(db_session, fid)
     assert filing.status == FilingStatus.DRAFT and filing.submitted_at is None
     assert filing.submission_count == 0 and doc.retained_at is not None
@@ -112,7 +113,7 @@ async def test_review_assessment_payment_and_submission_preserve_the_basis(
         )
     ).json()["total"] == 0
     assessed = await db_session.get(FilingTransaction, fees["assessment_id"])
-    retained = assessed.details.copy()
+    retained = deepcopy(assessed.details)
     assert retained["documents"][0]["sha256_hash"] == doc.sha256_hash
     api_client.headers["X-Demo-User-Id"] = str(other)
     assert (await api_client.get(f"/api/v1/filings/{fid}/fees")).status_code == 403
@@ -163,6 +164,7 @@ async def test_review_assessment_payment_and_submission_preserve_the_basis(
     assert receipt["details"]["fee_assessment"]["paid_cents"] == total
     assert receipt["details"]["fee_assessment"]["balance_due_cents"] == 0
     assert len(receipt["details"]["payments"]) == bool(total)
+    await db_session.refresh(assessed)
     assert assessed.details == retained
 
 
@@ -177,7 +179,7 @@ async def test_changed_documents_require_reassessment_and_credit_prior_payments(
         await api_client.post(f"/api/v1/clerk/filings/{fid}/fees", json=assessment(0, 1000))
     ).json()
     first = await db_session.get(FilingTransaction, assessed["assessment_id"])
-    first_details = first.details.copy()
+    first_details = deepcopy(first.details)
     api_client.headers["X-Demo-User-Id"] = str(filer)
     paid = await api_client.post(
         "/api/v1/payments/process",
@@ -246,6 +248,7 @@ async def test_changed_documents_require_reassessment_and_credit_prior_payments(
         )
         == 0
     )
+    await db_session.refresh(first)
     assert first.details == first_details
     api_client.headers["X-Demo-User-Id"] = str(filer)
     assert (await api_client.post(
@@ -289,7 +292,7 @@ async def test_balance_ignores_invalid_credits_and_demo_funds_in_production(
         )
         db_session.add(payment)
     await db_session.flush()
-    filing.payment_id = payment.id  # The legacy pointer is not proof of a paid balance.
+    filing.payment_id = payment.id
     await db_session.flush()
     demo = await fee_state(db_session, filing, filer)
     assert demo.paid_cents == 500 and demo.balance_due_cents == 500 and not demo.obligation_met
@@ -297,7 +300,10 @@ async def test_balance_ignores_invalid_credits_and_demo_funds_in_production(
     production = await fee_state(db_session, filing, filer)
     assert production.paid_cents == 200 and production.balance_due_cents == 800
     assert not production.obligation_met and not production.payments_simulated
-    app.dependency_overrides[get_current_user_id] = lambda: filer
+    async def filer_account(db=Depends(get_db, scope="function")):
+        return await db.get(User, filer)
+
+    app.dependency_overrides[get_current_user] = filer_account
     try:
         unavailable = await api_client.post(
             "/api/v1/payments/process",
@@ -311,8 +317,7 @@ async def test_balance_ignores_invalid_credits_and_demo_funds_in_production(
         assert unavailable.status_code == 503, unavailable.text
         assert await db_session.scalar(select(func.count()).select_from(Payment)) == 9
     finally:
-        app.dependency_overrides.pop(get_current_user_id, None)
-    # A later signed waiver decision controls the balance, not an old manual assessment.
+        app.dependency_overrides.pop(get_current_user, None)
     filing.fee_version += 1
     filing.fee_waiver_requested = True
     filing.fee_waiver_granted = True

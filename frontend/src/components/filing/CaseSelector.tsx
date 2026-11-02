@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { searchCases } from '../../api/cases';
 import { getCaseTypes } from '../../api/courts';
 import LoadError from '../common/LoadError';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
+import { actionErrorMessage } from '../../api/client';
+import { emitToast } from '../../utils/toastBus';
 
 export interface CaseResult {
   id: number;
@@ -16,12 +19,13 @@ interface Props {
   courtName: string;
   selectedCaseId: number | null;
   isNewChosen: boolean;
+  onChooseExisting: () => void;
   onSelectExisting: (c: CaseResult, caseTypeName: string) => void;
   onSelectNew: () => void;
 }
 
 function CaseSelector({
-  courtId, courtName, selectedCaseId, isNewChosen, onSelectExisting, onSelectNew,
+  courtId, courtName, selectedCaseId, isNewChosen, onChooseExisting, onSelectExisting, onSelectNew,
 }: Props) {
   const [mode, setMode] = useState<'existing' | 'new' | null>(
     selectedCaseId ? 'existing' : isNewChosen ? 'new' : null
@@ -31,17 +35,21 @@ function CaseSelector({
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [typeNames, setTypeNames] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadFailure | null>(null);
+  const searchRequest = useRef<AbortController>();
 
-  // Resolve case-type names so an existing-case selection carries a readable
-  // type through to the review screen (existing cases skip the case-type step).
+  useEffect(() => () => searchRequest.current?.abort(), [courtId]);
+
   useEffect(() => {
     let active = true;
-    getCaseTypes(courtId)
+    getCaseTypes(courtId, true)
       .then((types) => {
         if (active) setTypeNames(Object.fromEntries(types.map((t) => [t.id, t.name] as const)));
       })
-      .catch(() => { /* names are a nicety; ignore failures */ });
+      .catch((err: unknown) => {
+        const message = active && actionErrorMessage(err, 'Could not load the case type names.');
+        if (message) emitToast(message, 'error');
+      });
     return () => {
       active = false;
     };
@@ -49,29 +57,33 @@ function CaseSelector({
 
   const runSearch = async () => {
     if (!query.trim()) return;
+    searchRequest.current?.abort();
+    const controller = new AbortController();
+    searchRequest.current = controller;
     setSearching(true);
     setHasSearched(true);
     setError(null);
     try {
-      // Search by case number AND by party name, then merge — one box, either input.
       const [byNum, byParty] = await Promise.all([
-        searchCases({ court_id: courtId, case_number: query.trim() }),
-        searchCases({ court_id: courtId, party_name: query.trim() }),
+        searchCases({ court_id: courtId, case_number: query.trim() }, controller.signal),
+        searchCases({ court_id: courtId, party_name: query.trim() }, controller.signal),
       ]);
+      if (controller.signal.aborted) return;
       const byId = new Map<number, CaseResult>();
       [...(byNum.cases || []), ...(byParty.cases || [])].forEach((c: CaseResult) => byId.set(c.id, c));
       setResults([...byId.values()]);
-    } catch {
-      setError('Case search is unavailable right now. Please try again.');
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      setError(loadFailure(err, 'Case search is unavailable right now. Please try again.'));
       setResults([]);
     } finally {
-      setSearching(false);
+      if (!controller.signal.aborted) setSearching(false);
     }
   };
 
   return (
     <div className="form-section">
-      <h3>Existing case or new case?</h3>
+      <h2>Existing case or new case?</h2>
       <p className="info-text">
         Most filings go into a case that already exists. Search for it below, or start a new case.
       </p>
@@ -80,20 +92,20 @@ function CaseSelector({
         <button
           type="button"
           className={`case-choice-card ${mode === 'existing' ? 'selected' : ''}`}
-          onClick={() => setMode('existing')}
+          onClick={() => { setMode('existing'); onChooseExisting(); }}
+          aria-pressed={mode === 'existing'}
         >
-          <div className="case-choice-icon">&#128269;</div>
-          <h4>File into an existing case</h4>
+          <h3>File in an existing case</h3>
           <p>Search by case number or party name in {courtName || 'this court'}.</p>
         </button>
         <button
           type="button"
           className={`case-choice-card ${mode === 'new' ? 'selected' : ''}`}
-          onClick={() => { setMode('new'); onSelectNew(); }}
+          onClick={() => { setMode('new'); if (!isNewChosen) onSelectNew(); }}
+          aria-pressed={mode === 'new'}
         >
-          <div className="case-choice-icon">+</div>
-          <h4>Start a new case</h4>
-          <p>Initiate a new matter, e.g. a complaint or petition.</p>
+          <h3>Start a new case</h3>
+          <p>Open a new matter, such as a complaint or petition.</p>
         </button>
       </div>
 
@@ -116,12 +128,12 @@ function CaseSelector({
             </button>
           </div>
 
-          {error && <LoadError message={error} onRetry={runSearch} />}
+          {error && <LoadError failure={error} onRetry={runSearch} />}
           {!error && hasSearched && !searching && (
             results.length > 0 ? (
               <table className="review-table case-results">
                 <thead>
-                  <tr><th></th><th>Case Number</th><th>Title</th><th>Status</th></tr>
+                  <tr><th></th><th>Case number</th><th>Title</th><th>Status</th></tr>
                 </thead>
                 <tbody>
                   {results.map((c) => (
@@ -142,7 +154,7 @@ function CaseSelector({
                 </tbody>
               </table>
             ) : (
-              <p className="info-text">No matching cases found. Check the number/name, or start a new case.</p>
+              <p className="info-text">No matching cases found. Check the number or name, or start a new case.</p>
             )
           )}
         </div>

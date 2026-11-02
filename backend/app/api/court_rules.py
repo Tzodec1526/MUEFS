@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.params import RecordId
 from app.database import get_db
 from app.models.court import FilingChecklist, FilingRequirement
 from app.schemas.court import FilingChecklistResponse, FilingRequirementResponse
@@ -15,8 +16,8 @@ router = APIRouter(prefix="/courts", tags=["Court Rules"])
     response_model=list[FilingRequirementResponse],
 )
 async def get_filing_requirements(
-    court_id: int,
-    case_type_id: int,
+    court_id: RecordId,
+    case_type_id: RecordId,
     filing_type: str | None = Query(
         None,
         description=(
@@ -44,8 +45,8 @@ async def get_filing_requirements(
     response_model=list[FilingChecklistResponse],
 )
 async def get_filing_checklist(
-    court_id: int,
-    case_type_id: int,
+    court_id: RecordId,
+    case_type_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(

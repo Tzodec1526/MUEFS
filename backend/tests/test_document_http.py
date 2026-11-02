@@ -1,5 +1,3 @@
-"""Exercise upload limits, stored bytes, and correction workflows through the API."""
-
 import asyncio
 import hashlib
 import threading
@@ -11,8 +9,8 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
 from app.api.auth import (
-    get_current_user_id,
-    get_optional_user_id,
+    get_current_user,
+    get_optional_user,
     require_user_may_manage_efilings,
 )
 from app.config import settings
@@ -42,8 +40,8 @@ async def filing_client(db_session, monkeypatch, tmp_path):
 
     app.dependency_overrides[get_db] = override_db
     app.dependency_overrides[require_user_may_manage_efilings] = lambda: user
-    app.dependency_overrides[get_optional_user_id] = lambda: user.id
-    app.dependency_overrides[get_current_user_id] = lambda: user.id
+    app.dependency_overrides[get_optional_user] = lambda: user
+    app.dependency_overrides[get_current_user] = lambda: user
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             yield client, envelope, tmp_path
@@ -76,6 +74,48 @@ async def test_upload_size_limit_and_stored_document_integrity(filing_client, db
     (storage / stored.file_key).write_bytes(b"tampered")
     verified = await client.get(f"/api/v1/documents/{document['id']}/verify")
     assert verified.json()["is_valid"] is False
+
+
+@pytest.mark.parametrize("filename", ["CON.txt", "document" * 40 + ".txt", "trailing.txt."])
+async def test_original_filename_does_not_control_storage_path(
+    filing_client, db_session, filename,
+):
+    client, envelope, storage = filing_client
+    content = b"Synthetic complaint with a portable stored filename"
+    response = await client.post(
+        f"/api/v1/filings/{envelope.id}/documents",
+        headers={"Idempotency-Key": str(uuid4())},
+        data={"title": "Complaint", "document_type_code": "COMPLAINT"},
+        files={"file": (filename, content, "text/plain")},
+    )
+    assert response.status_code == 200, response.text
+    doc = await db_session.get(FilingDocument, response.json()["id"])
+    assert (storage / doc.file_key).read_bytes() == content
+    assert filename not in doc.file_key
+    downloaded = await client.get(f"/api/v1/documents/{doc.id}/download")
+    assert downloaded.status_code == 200
+    assert downloaded.content == content
+
+
+@pytest.mark.parametrize("fields, content", [
+    ({"title": "Complaint", "document_type_code": "COMPLAINT"}, b""),
+    ({"title": "x" * 501, "document_type_code": "COMPLAINT"}, b"Complaint"),
+    ({"title": "Complaint", "document_type_code": "x" * 51}, b"Complaint"),
+    ({"title": "   ", "document_type_code": "COMPLAINT"}, b"Complaint"),
+    ({"title": "Complaint", "document_type_code": "   "}, b"Complaint"),
+])
+async def test_invalid_uploads_are_rejected_before_storage(
+    filing_client, db_session, fields, content,
+):
+    client, envelope, storage = filing_client
+    response = await client.post(
+        f"/api/v1/filings/{envelope.id}/documents",
+        headers={"Idempotency-Key": str(uuid4())}, data=fields,
+        files={"file": ("record.txt", content, "text/plain")},
+    )
+    assert response.status_code == 422, response.text
+    assert not [path for path in storage.rglob("*") if path.is_file()]
+    assert await db_session.scalar(select(FilingDocument.id)) is None
 
 
 async def test_pdf_processing_does_not_block_unrelated_requests(filing_client, monkeypatch):
@@ -126,7 +166,6 @@ async def test_returned_filing_can_be_corrected_and_resubmitted(filing_client, d
         files={"file": ("complaint.txt", b"Corrected complaint", "text/plain")},
     )
     assert uploaded.status_code == 200, uploaded.text
-    # Production requests get a fresh session; discard this test session's cached list.
     db_session.expire(envelope, ["documents"])
     submitted = await client.post(
         f"/api/v1/filings/{original_id}/submit",

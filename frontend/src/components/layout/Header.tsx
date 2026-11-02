@@ -1,20 +1,20 @@
-import { clearFilingDrafts } from '../../utils/filingDraft';
+import { clearFilingDrafts, hasFilingDrafts } from '../../utils/filingDraft';
 import { useContext } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { isDemoBuild } from '../../config/demoMode';
 import { signOut } from '../../auth/keycloak';
 import { CourtContext } from '../auth/CourtSession';
 import MichiganMark from '../common/MichiganMark';
 import NotificationBell from './NotificationBell';
-import WebMcpHeaderLink from './WebMcpHeaderLink';
 
 function Header() {
   const navigate = useNavigate();
-  const { court, role } = useContext(CourtContext)!;
+  const { role } = useContext(CourtContext)!;
 
   const handleSwitchRole = () => {
+    const action = isDemoBuild() ? 'Switching roles' : 'Signing out';
+    if (hasFilingDrafts() && !window.confirm(`${action} discards the unsaved filing edits kept in this browser. Continue?`)) return;
     clearFilingDrafts();
-    localStorage.removeItem('muefs_filing_draft');
     const logoutUrl = signOut();
     if (logoutUrl) window.location.href = logoutUrl;
     else navigate('/login');
@@ -22,10 +22,10 @@ function Header() {
 
   const roleLabelMap: Record<string, string> = {
     attorney: 'Attorney',
-    clerk: 'Court Clerk',
-    srl: 'Self-Represented Litigant',
+    clerk: 'Court clerk',
+    srl: 'Self-represented litigant',
     public: 'Public',
-    admin: 'System Administrator',
+    admin: 'System administrator',
   };
 
   const roleLabel = role ? roleLabelMap[role] || role : '';
@@ -33,42 +33,30 @@ function Header() {
   return (
     <>
       {isDemoBuild() && (
-        <div className="demo-stakeholder-banner" role="status" aria-live="polite">
-          <span>Demo — not for real filings.</span>
+        <p className="demo-stakeholder-banner">
+          Demo: not for real filings.
           <a href="/login" className="demo-banner-link">
             Roles
           </a>
-        </div>
+        </p>
       )}
     <header className="app-header">
       <div className="header-brand">
         <div className="header-seal">
           <MichiganMark size={24} />
         </div>
-        <div>
-          <h1>Michigan Unified E-Filing System</h1>
-          <span className="header-subtitle">Statewide Electronic Filing Portal</span>
-        </div>
+        <p className="header-title">Michigan Unified E-Filing System</p>
       </div>
-      <nav className="header-nav">
-        <WebMcpHeaderLink />
-        {role && <Link to="/">Dashboard</Link>}
-        {(role === 'attorney' || role === 'srl') && <Link to="/filing/new">New Filing</Link>}
-        <Link to="/cases/search">Case Search</Link>
-        {court && <Link to="/clerk/queue">Review Queue</Link>}
-      </nav>
       <div className="header-user">
         <NotificationBell />
         {role ? (
-          <span className={`user-badge ${role === 'srl' ? 'user-badge-srl' : ''}`}>
-            {roleLabel}
-          </span>
+          <span className="user-badge">{roleLabel}</span>
         ) : (
           <span>Public visitor</span>
         )}
         {role ? (
           <button className="header-switch-role" onClick={handleSwitchRole}>
-            {isDemoBuild() ? 'Switch Role' : 'Sign out'}
+            {isDemoBuild() ? 'Switch role' : 'Sign out'}
           </button>
         ) : (
           <button className="header-switch-role" onClick={() => navigate('/login')}>

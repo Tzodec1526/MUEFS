@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
 from app.api.auth import get_current_user_id
+from app.api.params import Page, RecordId
 from app.config import settings
 from app.database import get_db
 from app.models.filing import FilingEnvelope
@@ -17,6 +18,7 @@ from app.models.notification import (
     NotificationType,
 )
 from app.models.service_delivery import ServiceRecipient
+from app.schemas.common import MAX_RECORD_ID
 from app.services.access_service import user_is_court_staff_for_court
 from app.services.email_delivery_service import queue_email
 
@@ -28,15 +30,15 @@ class RetryRequest(BaseModel):
 
 
 def _timestamp(value: datetime | None) -> str | None:
-    return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat() if value else None
+    return value.isoformat() if value else None
 
 
 @router.get("")
 async def list_notifications(
-    page: int = Query(1, ge=1),
+    page: Page = 1,
     page_size: int = Query(25, ge=1, le=100),
-    court_id: int | None = None,
-    filing_id: int | None = Query(None, ge=1, le=2_147_483_647),
+    court_id: int | None = Query(None, ge=1, le=MAX_RECORD_ID),
+    filing_id: int | None = Query(None, ge=1, le=MAX_RECORD_ID),
     delivery_status: DeliveryStatus | None = None,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
@@ -114,8 +116,8 @@ async def _notice_for_viewer(
 
 @router.get("/{notice_id}/delivery")
 async def delivery_history(
-    notice_id: int,
-    page: int = Query(1, ge=1),
+    notice_id: RecordId,
+    page: Page = 1,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -128,7 +130,6 @@ async def delivery_history(
         )
         or 0
     )
-    # Message bodies are retained in the archive but omitted from list responses.
     rows = await db.execute(
         select(
             NotificationDeliveryEvent.id,
@@ -163,7 +164,7 @@ async def delivery_history(
 
 @router.post("/{notice_id}/retry")
 async def retry_delivery(
-    notice_id: int,
+    notice_id: RecordId,
     data: RetryRequest,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),

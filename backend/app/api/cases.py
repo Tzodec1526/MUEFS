@@ -1,39 +1,45 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import ColumnElement, or_, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.auth import get_optional_user_id
+from app.api.auth import get_optional_user
+from app.api.params import Page, RecordId
 from app.database import get_db
 from app.models.case import Case, CaseStatus
 from app.models.document_public_copy import DocumentPublicCopy
 from app.models.filing import PRIVATE_DOCUMENT_TYPES, FilingDocument, FilingEnvelope
-from app.models.user import CourtRole, UserCourtRole
+from app.models.user import CourtRole, User, UserCourtRole
 from app.schemas.case import (
     CaseDocketResponse,
     CaseSearchResponse,
     CaseSearchResult,
 )
+from app.schemas.common import MAX_RECORD_ID
 from app.schemas.filing import CaseDocumentResponse, CaseFilingResponse
 from app.services import access_service, search_service
 
 router = APIRouter(prefix="/cases", tags=["Cases"])
 
 
-@router.get("/search", response_model=CaseSearchResponse)
+@router.get(
+    "/search",
+    response_model=CaseSearchResponse,
+    description=(
+        "Public court-records search. No account is required. Sealed matters are excluded "
+        "from the index and the listing strips participant contact PII."
+    ),
+)
 async def search_cases(
     case_number: str | None = None,
     party_name: str | None = None,
     attorney_bar_number: str | None = None,
-    court_id: int | None = Query(None, ge=1, le=2_147_483_647),
+    court_id: int | None = Query(None, ge=1, le=MAX_RECORD_ID),
     case_status: CaseStatus | None = Query(None, alias="status"),
-    page: int = Query(1, ge=1),
+    page: Page = 1,
     page_size: int = Query(25, ge=1, le=100),
     db: AsyncSession = Depends(get_db, scope="function"),
-    _user_id: int | None = Depends(get_optional_user_id),
 ):
-    """Public court-records search — no account required. Sealed matters are excluded
-    from the index and the listing strips participant contact PII."""
     cases, total = await search_service.search_cases(
         db,
         case_number=case_number,
@@ -52,51 +58,66 @@ async def search_cases(
     )
 
 
-@router.get("/{case_id}", response_model=CaseDocketResponse)
+@router.get(
+    "/{case_id}",
+    response_model=CaseDocketResponse,
+    description="Public docket for a single case. Non-sealed: open to anyone; sealed: restricted.",
+)
 async def get_case(
-    case_id: int,
+    case_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
-    user_id: int | None = Depends(get_optional_user_id),
+    user: User | None = Depends(get_optional_user),
 ):
-    """Public docket for a single case. Non-sealed: open to anyone; sealed: restricted."""
     result = await db.execute(
         select(Case).options(selectinload(Case.participants)).where(Case.id == case_id)
     )
     case = result.scalar_one_or_none()
     if not case:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Case not found")
-    if not await access_service.user_may_read_case(db, user_id, case_id):
+    if not await access_service.user_may_read_case(db, user, case_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access this case",
         )
     profile = CaseDocketResponse.model_validate(case)
-    return profile.model_copy(update={"can_manage_records":
-        await access_service.user_is_court_staff_for_court(db, user_id, case.court_id)})
+    return profile.model_copy(update={
+        "can_manage_records": await access_service.user_is_court_staff_for_court(
+            db, user.id if user else None, case.court_id,
+        ),
+        "can_file": user is not None and await access_service.user_has_filing_grant(
+            db, user, case_id,
+        ),
+    })
 
 
 @router.get("/{case_id}/filings", response_model=list[CaseFilingResponse])
 async def get_case_filings(
-    case_id: int,
-    page: int = Query(1, ge=1),
+    case_id: RecordId,
+    page: Page = 1,
     page_size: int = Query(25, ge=1, le=100),
     db: AsyncSession = Depends(get_db, scope="function"),
-    user_id: int | None = Depends(get_optional_user_id),
+    user: User | None = Depends(get_optional_user),
 ):
-    if not await access_service.user_may_read_case(db, user_id, case_id):
+    user_id = user.id if user else None
+    case = await db.get(Case, case_id)
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    if not await access_service.user_may_read_case(db, user, case_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to access filings for this case",
         )
-    case = await db.get(Case, case_id)
     query = (
         select(FilingEnvelope)
         .where(FilingEnvelope.case_id == case_id)
-        .order_by(FilingEnvelope.created_at.desc(), FilingEnvelope.id.desc())
+        .order_by(
+            func.coalesce(
+                FilingEnvelope.filing_date, FilingEnvelope.submitted_at,
+                FilingEnvelope.created_at,
+            ).desc(),
+            FilingEnvelope.id.desc(),
+        )
     )
-    # Standing on a case does not expose another filer's drafts or waiver request.
-    if case is None:
-        raise HTTPException(status_code=404, detail="Case not found")
     staff_courts = select(UserCourtRole.court_id).where(
         UserCourtRole.user_id == user_id,
         UserCourtRole.role.in_([CourtRole.CLERK, CourtRole.JUDGE, CourtRole.ADMIN]),
@@ -111,8 +132,6 @@ async def get_case_filings(
     result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
     staff = await access_service.user_is_court_staff_for_court(db, user_id, case.court_id)
     filings = list(result.scalars())
-    # Court orders belong on the docket, but never in the filer's attachment manifest.
-    # Load all current docket documents once, including separately recorded date orders.
     documents: dict[int, list[FilingDocument]] = {}
     if filings:
         for doc in await db.scalars(select(FilingDocument).where(
@@ -137,8 +156,6 @@ async def get_case_filings(
                     continue
                 copy = copies.get(doc.public_copy_id) if doc.public_copy_id else None
                 if copy and copy.document_id == doc.id:
-                    # Never copy the original title, hash, size or private flags into
-                    # the public derivative's response. Only its reviewed metadata is public.
                     visible_documents.append(CaseDocumentResponse(
                         id=doc.id, copy_id=copy.id, document_type_code="PUBLIC_COPY",
                         title=copy.title,

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { decideFeeWaiver, type FeeWaiverState } from '../../api/filings';
 import { processPayment } from '../../api/documents';
 import { formatCents } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage } from '../../utils/errors';
 
 export const waiverActionLabels: Record<string, string> = {
   grant_public_assistance: 'Clerk waiver: means-tested public assistance',
@@ -27,13 +27,14 @@ export default function FeeWaiverPanel({ filingId, waiver, onChange }: {
     const dollars = form.get('amount_dollars');
     form.delete('amount_dollars');
     if (action === 'deny_judicial') form.set('amount_due_cents', String(Math.round(Number(dollars) * 100)));
+    form.set('expected_fee_version', String(waiver.fee_version));
     setBusy(true);
     setError(null);
     try {
       await decideFeeWaiver(filingId, form);
       onChange();
     } catch (err) {
-      setError(getErrorDetail(err) || 'Could not record the fee waiver decision. Refresh history before retrying.');
+      setError(errorMessage(err, 'Could not record the fee waiver decision. Refresh history before retrying.'));
     } finally { setBusy(false); }
   }
 
@@ -45,15 +46,15 @@ export default function FeeWaiverPanel({ filingId, waiver, onChange }: {
       await processPayment(filingId, waiver.balance_due_cents, 'credit_card', waiver.fee_version);
       onChange();
     } catch (err) {
-      setError(getErrorDetail(err) || 'Could not record payment. Refresh history before retrying.');
+      setError(errorMessage(err, 'Could not record payment. Refresh history before retrying.'));
     } finally { setBusy(false); }
   }
 
   return <div className="review-card fee-waiver-panel">
-    <h3>Fee waiver: {state}</h3>
+    <h2 className="card-heading">Fee waiver: {state}</h2>
     <p>The application and signed decision are nonpublic. Filing acceptance is a separate decision.</p>
     {waiver.granted !== null && !waiver.decided_at && <p className="alert alert-warning">
-      This is a legacy waiver state. A separate signed decision was not recorded in this system.
+      This is an older waiver record. A separate signed decision was not recorded in this system.
     </p>}
     {waiver.amount_due_cents != null && <p>
       Amount in the decision: <strong>{formatCents(waiver.amount_due_cents)}</strong>
@@ -67,7 +68,7 @@ export default function FeeWaiverPanel({ filingId, waiver, onChange }: {
       {waiver.payments_simulated ? <>
         <p>Demo payment: no card information is collected and no money is charged.</p>
         <button className="btn btn-primary" disabled={busy} onClick={pay}>
-          {busy ? 'Processing…' : `Record simulated payment — ${formatCents(waiver.balance_due_cents!)}`}
+          {busy ? 'Processing…' : `Record simulated payment of ${formatCents(waiver.balance_due_cents!)}`}
         </button>
       </> : <p>Online payment is unavailable. Contact the court about payment options.</p>}
     </div>}

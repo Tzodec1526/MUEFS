@@ -1,10 +1,10 @@
 import type { FilingEnvelope } from '../api/filings';
 
-// Only unsaved form fields belong here. Documents, fees and saved filing state come from the API.
 export interface FilingDraft {
   courtId: number | null;
   courtName: string;
   caseId: number | null;
+  caseNumber?: string;
   filingType: 'initial' | 'subsequent' | 'service_only';
   caseTypeId: number | null;
   caseTypeName: string;
@@ -32,6 +32,7 @@ export function loadFilingDraft(key: string): FilingDraft | null {
       || !['courtId', 'caseId', 'caseTypeId', 'filingId'].every(field =>
         draft[field] === null || (Number.isSafeInteger(draft[field]) && draft[field] > 0))
       || !['courtName', 'caseTypeName', 'caseTitle', 'filingDescription'].every(field => typeof draft[field] === 'string')
+      || !(draft.caseNumber === undefined || typeof draft.caseNumber === 'string')
       || typeof draft.caseChoiceMade !== 'boolean'
       || !(draft.creationKey === undefined || (typeof draft.creationKey === 'string'
         && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(draft.creationKey)))
@@ -43,7 +44,7 @@ export function loadFilingDraft(key: string): FilingDraft | null {
 export function saveFilingDraft(key: string, data: FilingDraft): boolean {
   try {
     const draft: FilingDraft = {
-      courtId: data.courtId, courtName: data.courtName, caseId: data.caseId,
+      courtId: data.courtId, courtName: data.courtName, caseId: data.caseId, caseNumber: data.caseNumber,
       filingType: data.filingType, caseTypeId: data.caseTypeId, caseTypeName: data.caseTypeName,
       caseTitle: data.caseTitle, filingDescription: data.filingDescription,
       filingId: data.filingId, detailsToken: data.detailsToken,
@@ -56,12 +57,19 @@ export function saveFilingDraft(key: string, data: FilingDraft): boolean {
 }
 
 export function clearFilingDraft(key: string, filingId?: number): void {
-  try { sessionStorage.removeItem(key); } catch { /* Saving through the API still works. */ }
+  try { sessionStorage.removeItem(key); } catch {}
   try {
     if (filingId && JSON.parse(localStorage.getItem('muefs_filing_draft') || 'null')?.filingId === filingId) {
       localStorage.removeItem('muefs_filing_draft');
     }
-  } catch { /* Leave unrecognized legacy recovery data untouched. */ }
+  } catch {}
+}
+
+export function hasFilingDrafts(): boolean {
+  try {
+    return Object.keys(sessionStorage).some(key => key.startsWith(PREFIX))
+      || localStorage.getItem('muefs_filing_draft') !== null;
+  } catch { return false; }
 }
 
 export function clearFilingDrafts(): void {
@@ -69,11 +77,10 @@ export function clearFilingDrafts(): void {
     for (const key of Object.keys(sessionStorage)) {
       if (key.startsWith(PREFIX)) sessionStorage.removeItem(key);
     }
-  } catch { /* Storage may be disabled. */ }
+    localStorage.removeItem('muefs_filing_draft');
+  } catch {}
 }
 
-// An old, unscoped entry is offered only after the server verifies ownership of its saved filing.
-// Its base version is unknown, so the user must compare it before reusing any edits.
 export function loadLegacyFilingDraft(userId: number, filing: Pick<FilingEnvelope, 'id' | 'filer_id'>) {
   if (filing.filer_id !== userId) return null;
   try {

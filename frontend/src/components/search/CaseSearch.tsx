@@ -1,19 +1,26 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Link2 } from 'lucide-react';
-import { CaseSearchResult, searchCases } from '../../api/cases';
+import { actionErrorMessage } from '../../api/client';
+import { CaseSearchResult, participantRoles, searchCases } from '../../api/cases';
 import { CourtDirectoryEntry, listCourtDirectory } from '../../api/courts';
 import { listFavorites, addFavorite, removeFavorite } from '../../api/favorites';
-import { getDemoRole } from '../auth/LoginScreen';
+import { CourtContext } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
 import { useToast } from '../common/Toast';
-import { formatCourtDate, parseServerDate } from '../../utils/format';
-import { logAgentActivity } from '../../webmcp/activity';
+import { formatCourtDate, formatShortDate } from '../../utils/format';
+import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
+
+function searchRequestOf(params: URLSearchParams): string {
+  return JSON.stringify(['case', 'party', 'court'].map(name => params.get(name) || ''));
+}
 
 function CaseSearch() {
+  usePageTitle('Case search');
   const [searchParams, setSearchParams] = useSearchParams();
   const { pushToast } = useToast();
-  const demoRole = getDemoRole();
+  const { role: demoRole } = useContext(CourtContext)!;
   const showFavorites = demoRole === 'attorney' || demoRole === 'srl';
 
   const submittedPartyName = searchParams.get('party') || '';
@@ -28,41 +35,46 @@ function CaseSearch() {
   const [partyName, setPartyName] = useState(submittedPartyName);
   const [courtId, setCourtId] = useState(submittedCourt);
   const [courts, setCourts] = useState<CourtDirectoryEntry[]>([]);
-  const [courtError, setCourtError] = useState(false);
+  const [courtError, setCourtError] = useState<LoadFailure | null>(null);
   const [courtReloadKey, setCourtReloadKey] = useState(0);
   const [results, setResults] = useState<CaseSearchResult[]>([]);
   const [total, setTotal] = useState(0);
+  const [pageCount, setPageCount] = useState(0);
   const [searching, setSearching] = useState(false);
-  const [favoritedIds, setFavoritedIds] = useState<Set<number>>(new Set());
+  const [favoritedIds, setFavoritedIds] = useState<Set<number>>(() => new Set());
   const [togglingFav, setTogglingFav] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadFailure | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const searchRequest = searchRequestOf(searchParams);
 
   useEffect(() => {
     const controller = new AbortController();
     listCourtDirectory(controller.signal).then(data => {
       if (!controller.signal.aborted) {
         setCourts(data);
-        setCourtError(false);
+        setCourtError(null);
       }
-    }).catch(() => {
-      if (!controller.signal.aborted) setCourtError(true);
+    }).catch((err) => {
+      if (!controller.signal.aborted) setCourtError(loadFailure(err, "We couldn't load the court list. Please retry."));
     });
     return () => controller.abort();
   }, [courtReloadKey]);
 
   useEffect(() => {
     if (!showFavorites) return;
+    let active = true;
     async function loadFavorites() {
       try {
         const data = await listFavorites();
-        setFavoritedIds(new Set(data.favorites.map((f) => f.case_id)));
-      } catch {
-        // not authenticated
+        if (active) setFavoritedIds(new Set(data.favorites.map((f) => f.case_id)));
+      } catch (err) {
+        const message = active && actionErrorMessage(err, 'Could not load your favorite cases.');
+        if (message) pushToast(message, 'error');
       }
     }
     loadFavorites();
-  }, [showFavorites]);
+    return () => { active = false; };
+  }, [showFavorites, pushToast]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -73,9 +85,11 @@ function CaseSearch() {
       setPartyName(submittedPartyName);
       setCourtId(submittedCourt && !invalidCourt ? String(Number(submittedCourt)) : submittedCourt);
       if (invalidCourt) {
-        setError('The court filter in this link is invalid. Choose a court and search again.');
+        const message = 'The court filter in this link is invalid. Choose a court and search again.';
+        setError({ message, retry: false });
         setResults([]);
         setTotal(0);
+        setPageCount(0);
         setSearching(false);
         return;
       }
@@ -89,11 +103,13 @@ function CaseSearch() {
         if (controller.signal.aborted) return;
         setResults(data.cases);
         setTotal(data.total);
-      } catch {
+        setPageCount(Math.ceil(data.total / data.page_size));
+      } catch (err) {
         if (controller.signal.aborted) return;
-        setError("We couldn't reach the records system. Please try again.");
+        setError(loadFailure(err, "We couldn't reach the records system. Please try again."));
         setResults([]);
         setTotal(0);
+        setPageCount(0);
       } finally {
         if (!controller.signal.aborted) setSearching(false);
       }
@@ -102,12 +118,18 @@ function CaseSearch() {
     return () => controller.abort();
   }, [submittedCaseNumber, submittedPartyName, submittedCourt, invalidCourt, page, reloadKey]);
 
-  const handleSearch = () => {
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const fields = new FormData(event.currentTarget);
+    const field = (name: string) => String(fields.get(name) ?? '').trim();
+    const input = { case_number: field('case_number'), party_name: field('party_name'), court_id: field('court_id') };
     const next = new URLSearchParams();
-    if (caseNumber.trim()) next.set('case', caseNumber.trim());
-    if (partyName.trim()) next.set('party', partyName.trim());
-    if (courtId) next.set('court', courtId);
-    if (next.toString() === searchParams.toString()) setReloadKey((key) => key + 1);
+    if (input.case_number) next.set('case', input.case_number);
+    if (input.party_name) next.set('party', input.party_name);
+    if (input.court_id) next.set('court', input.court_id);
+    const request = searchRequestOf(next);
+
+    if (request === searchRequest && page === 1) setReloadKey((key) => key + 1);
     else setSearchParams(next);
   };
 
@@ -145,8 +167,9 @@ function CaseSearch() {
         setFavoritedIds((prev) => new Set(prev).add(caseId));
         pushToast('Added to favorites', 'success');
       }
-    } catch {
-      pushToast('Could not update favorite', 'error');
+    } catch (err) {
+      const message = actionErrorMessage(err, 'Could not update favorite');
+      if (message) pushToast(message, 'error');
     } finally {
       setTogglingFav(null);
     }
@@ -154,33 +177,16 @@ function CaseSearch() {
 
   return (
     <div className="case-search">
-      <div className="case-search-hero">
-        <h2>Statewide case search</h2>
-        <p className="info-text">
-          One search across Michigan courts — no account, no vendor portal hopping. Sealed matters
-          stay off the index. Partial names and case numbers work.
-          {showFavorites ? ' Star cases to file motions faster.' : ''}
-        </p>
-      </div>
+      <PageHeading>Case search</PageHeading>
+      <p className="info-text">Partial names and case numbers work. Sealed cases are not listed.</p>
 
       <form
         className="search-form"
-        toolname="search_cases"
-        tooldescription="Search Michigan public court records by party name, case number and court"
-        onSubmit={(e) => {
-          e.preventDefault();
-          logAgentActivity(
-            'search_cases',
-            { case_number: caseNumber, party_name: partyName, court_id: courtId, via: 'declarative_form' },
-            true,
-            0,
-          );
-          handleSearch();
-        }}
+        onSubmit={handleSearch}
       >
         <div className="form-row">
           <div className="form-group">
-            <label htmlFor="caseNum">Case Number</label>
+            <label htmlFor="caseNum">Case number</label>
             <input
               id="caseNum"
               name="case_number"
@@ -188,11 +194,10 @@ function CaseSearch() {
               value={caseNumber}
               onChange={(e) => setCaseNumber(e.target.value)}
               placeholder="e.g., 2026-000001-CZ"
-              toolparamdescription="Case number (partial match)"
             />
           </div>
           <div className="form-group">
-            <label htmlFor="partyName">Party Name</label>
+            <label htmlFor="partyName">Party name</label>
             <input
               id="partyName"
               name="party_name"
@@ -200,20 +205,18 @@ function CaseSearch() {
               value={partyName}
               onChange={(e) => setPartyName(e.target.value)}
               placeholder="e.g., Smith"
-              toolparamdescription="Party or litigant name"
             />
           </div>
           <div className="form-group">
             <label htmlFor="searchCourt">Court</label>
             <select id="searchCourt" name="court_id" value={courtId}
-              onChange={e => setCourtId(e.target.value)}
-              toolparamdescription="Optional court ID; leave blank to search all courts">
+              onChange={e => setCourtId(e.target.value)}>
               <option value="">All courts</option>
               {courtId && !courts.some(court => String(court.id) === courtId) && (
                 <option value={courtId}>Selected court ({courtId})</option>
               )}
               {courts.map(court => (
-                <option key={court.id} value={court.id}>{court.county} — {court.name}</option>
+                <option key={court.id} value={court.id}>{court.county}: {court.name}</option>
               ))}
             </select>
             {courtId && <Link to={`/courts/${courtId}/intake`}>Court intake status and instructions</Link>}
@@ -222,39 +225,30 @@ function CaseSearch() {
             {searching ? 'Searching...' : 'Search'}
           </button>
           {(hasSearched || page > 1) && (
-            <button
-              type="button"
-              className="btn btn-secondary btn-icon"
-              onClick={copyShareLink}
-              title="Copy results link"
-            >
-              <Link2 size={16} aria-hidden="true" />
-              <span className="sr-only">Copy results link</span>
-            </button>
+            <button type="button" className="btn btn-secondary" onClick={copyShareLink}>Copy link</button>
           )}
         </div>
       </form>
 
-      {courtError && <LoadError message="We couldn't load the court list. Please retry."
+      {courtError && <LoadError failure={courtError}
         onRetry={() => setCourtReloadKey(key => key + 1)} />}
 
       {error ? (
-        <LoadError message={error}
-          onRetry={invalidCourt ? undefined : () => setReloadKey((key) => key + 1)} />
+        <LoadError failure={error} onRetry={() => setReloadKey((key) => key + 1)} />
       ) : (
         <div className="search-results">
-          <h3>{hasSearched ? `Results (${total})` : 'Recent public filings'}</h3>
+          <h2>{hasSearched ? `Results (${total})` : 'Recent public filings'}</h2>
           {results.length > 0 ? (
             <div className="case-search-table" role="region" aria-label="Case search results" tabIndex={0}>
               <table>
                 <thead>
                   <tr>
                     {showFavorites && <th className="th-fav"></th>}
-                    <th>Case Number</th>
+                    <th>Case number</th>
                     <th>Court</th>
                     <th>Title</th>
                     <th>Status</th>
-                    <th>Filed Date</th>
+                    <th>Filed date</th>
                     <th>Parties</th>
                   </tr>
                 </thead>
@@ -266,7 +260,7 @@ function CaseSearch() {
                           <button
                             className={`fav-btn ${favoritedIds.has(c.id) ? 'favorited' : ''}`}
                             onClick={() => toggleFavorite(c.id)}
-                            disabled={togglingFav === c.id}
+                            disabled={togglingFav !== null}
                             title={favoritedIds.has(c.id) ? 'Remove from favorites' : 'Add to favorites'}
                             aria-label={favoritedIds.has(c.id) ? 'Remove from favorites' : 'Add to favorites'}
                           >
@@ -274,16 +268,16 @@ function CaseSearch() {
                           </button>
                         </td>
                       )}
-                      <td><Link to={`/cases/${c.id}`}>{c.case_number}</Link></td>
-                      <td>{c.court_name}<br /><small>{c.court_county}</small></td>
-                      <td>{c.title}</td>
-                      <td>
+                      <td data-label="Case number"><Link to={`/cases/${c.id}`}>{c.case_number}</Link></td>
+                      <td data-label="Court"><span>{c.court_name}<br /><small>{c.court_county}</small></span></td>
+                      <td data-label="Title">{c.title}</td>
+                      <td data-label="Status">
                         <span className={`status-badge ${c.status}`}>{c.status}</span>
                       </td>
-                      <td>{c.filing_date ? formatCourtDate(c.filing_date)
-                        : `${parseServerDate(c.filed_date).toLocaleDateString()} (unverified)`}</td>
-                      <td>
-                        {c.participants.map((p) => `${p.party_name} (${p.role})`).join(', ')}
+                      <td data-label="Filed date">{c.filing_date ? formatCourtDate(c.filing_date)
+                        : `${formatShortDate(c.filed_date)} (not yet confirmed by the court)`}</td>
+                      <td data-label="Parties">
+                        {c.participants.map((p) => `${p.party_name}, ${participantRoles[p.role] || p.role}`).join('; ')}
                       </td>
                     </tr>
                   ))}
@@ -295,11 +289,11 @@ function CaseSearch() {
               {searching
                 ? 'Searching…'
                 : hasSearched
-                  ? 'No cases found. Check the number or name — partial matches work.'
+                  ? 'No cases found. Check the number or name. Partial matches work.'
                   : 'No public filings to show yet.'}
             </p>
           )}
-          {results.length > 0 && Math.ceil(total / 25) > 1 && (
+          {results.length > 0 && pageCount > 1 && (
             <div className="pagination">
               <button
                 className="btn btn-secondary btn-small"
@@ -308,10 +302,10 @@ function CaseSearch() {
               >
                 Previous
               </button>
-              <span>Page {page} of {Math.ceil(total / 25)}</span>
+              <span>Page {page} of {pageCount}</span>
               <button
                 className="btn btn-secondary btn-small"
-                disabled={page >= Math.ceil(total / 25) || searching}
+                disabled={page >= pageCount || searching}
                 onClick={() => goToPage(page + 1)}
               >
                 Next

@@ -1,72 +1,94 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useId, useRef, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, FilePlus2, FolderOpen, Search, Star, ClipboardCheck, Bot, Mail, ShieldCheck } from 'lucide-react';
-import { webMcpStatus } from '../../webmcp';
 import { CourtContext } from '../auth/CourtSession';
+import { hasAdministrationAccess } from '../../auth/session';
+
+const MAIN_TASK: Record<string, string> = {
+  attorney: '/filing/new',
+  srl: '/filing/new',
+  clerk: '/clerk/queue',
+  admin: '/admin',
+  public: '/cases/search',
+};
 
 function Sidebar() {
   const location = useLocation();
   const { court, courts, role } = useContext(CourtContext)!;
+  const [open, setOpen] = useState(false);
+  const listId = useId();
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const courtId = court?.court_id;
-  const [webMcpOn, setWebMcpOn] = useState(() => webMcpStatus().available);
-
-  useEffect(() => {
-    const refresh = () => setWebMcpOn(webMcpStatus().available);
-    refresh();
-    window.addEventListener('muefs-webmcp-tools-changed', refresh);
-    return () => window.removeEventListener('muefs-webmcp-tools-changed', refresh);
-  }, []);
-
   const allLinks = [
-    { path: '/agent', label: 'Agent Hub', icon: Bot, roles: ['attorney', 'clerk', 'srl', 'public'], agentOnly: true },
-    { path: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['attorney', 'clerk', 'srl', 'public', 'admin'] },
-    { path: '/admin', label: 'People & access', icon: ShieldCheck, roles: ['attorney', 'clerk', 'srl', 'public', 'admin'], adminOnly: true },
-    { path: '/filing/new', label: 'New Filing', icon: FilePlus2, roles: ['attorney', 'srl'] },
-    { path: '/filings', label: 'My Filings', icon: FolderOpen, roles: ['attorney', 'srl'] },
-    { path: '/notifications', label: 'Notices', icon: Mail, roles: ['attorney', 'srl', 'clerk', 'admin'] },
-    { path: '/service/deliveries', label: 'Document deliveries', icon: FolderOpen, roles: ['attorney', 'srl', 'clerk', 'admin'] },
-    { path: '/cases/search', label: 'Case Search', icon: Search, roles: ['attorney', 'clerk', 'srl', 'public', 'admin'] },
-    { path: '/favorites', label: 'Favorites', icon: Star, roles: ['attorney', 'srl'] },
-    { path: '/clerk/cases', label: 'Court Cases', icon: FolderOpen, roles: ['clerk', 'admin'], courtOnly: true },
-    { path: '/clerk/queue', label: 'Review Queue', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
-    { path: '/clerk/fee-reviews', label: 'Fee Reviews', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
-    { path: '/clerk/payment-register', label: 'Receipt Register', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true, courtAdminOnly: true },
-    { path: `/courts/${courtId}/calendar`, label: 'Court Calendar', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
-    { path: `/courts/${courtId}/intake`, label: 'Filing Intake', icon: ClipboardCheck, roles: ['clerk', 'admin'], courtOnly: true },
+    { path: '/', label: 'Dashboard', roles: ['attorney', 'clerk', 'srl', 'public'] },
+    { path: '/admin', label: 'People and court access', roles: ['attorney', 'clerk', 'srl', 'public', 'admin'], adminOnly: true },
+    { path: '/filing/new', label: 'New filing', roles: ['attorney', 'srl'] },
+    { path: '/filings', label: 'My filings', roles: ['attorney', 'srl'] },
+    { path: '/clerk/queue', label: 'Review queue', roles: ['clerk', 'admin'], courtOnly: true },
+    { path: '/clerk/fee-reviews', label: 'Fee reviews', roles: ['clerk', 'admin'], courtOnly: true },
+    { path: '/clerk/payment-register', label: 'Receipt register', roles: ['clerk', 'admin'], courtOnly: true, courtAdminOnly: true },
+    { path: '/clerk/cases', label: 'Court cases', roles: ['clerk', 'admin'], courtOnly: true },
+    { path: `/courts/${courtId}/calendar`, label: 'Filing calendar', roles: ['clerk', 'admin'], courtOnly: true },
+    { path: `/courts/${courtId}/intake`, label: 'Filing intake', roles: ['clerk', 'admin'], courtOnly: true },
+    { path: '/cases/search', label: 'Case search', roles: ['attorney', 'clerk', 'srl', 'public', 'admin'] },
+    { path: '/favorites', label: 'Favorites', roles: ['attorney', 'srl'] },
+    { path: '/notifications', label: 'Notices', roles: ['attorney', 'srl', 'clerk', 'admin'] },
+    { path: '/service/deliveries', label: 'Document deliveries', roles: ['attorney', 'srl', 'clerk', 'admin'] },
   ];
 
   const links = allLinks.filter((link) => {
-    if (link.agentOnly && !webMcpOn) return false;
     if (link.courtAdminOnly && !courts.some(item => item.court_id === courtId && item.role === 'admin')) return false;
-    if (link.adminOnly && role !== 'admin' && localStorage.getItem('administration_access') !== 'true') return false;
+    if (link.adminOnly && !hasAdministrationAccess()) return false;
     if (link.courtOnly) return courtId != null;
     if (!role) return link.path === '/cases/search';
     return link.roles.includes(role);
   });
+  const mainTask = links.filter(link => link.path === MAIN_TASK[role ?? '']);
+  const ordered = [...mainTask, ...links.filter(link => !mainTask.includes(link))];
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      toggleRef.current?.focus();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open]);
 
   return (
-    <aside className="sidebar">
-      <nav>
-        <ul>
-          {links.map((link) => (
-            <li key={link.path}>
-              <Link
-                to={link.path}
-                className={(link.path === '/' ? location.pathname === '/' : location.pathname.startsWith(link.path)) ? 'active' : ''}
-              >
-                <link.icon size={17} strokeWidth={2} aria-hidden="true" />
-                {link.label}
-              </Link>
-            </li>
-          ))}
+    <aside className={`sidebar${open ? ' open' : ''}`}>
+      {ordered.length > 1 && (
+        <button
+          ref={toggleRef}
+          type="button"
+          className="sidebar-toggle"
+          aria-expanded={open}
+          aria-controls={listId}
+          onClick={() => setOpen(!open)}
+        >
+          {open ? 'Close menu' : 'Menu'}
+        </button>
+      )}
+      <nav aria-label="Main">
+        <ul id={listId}>
+          {ordered.map((link) => {
+            const active = link.path === '/' ? location.pathname === '/' : location.pathname.startsWith(link.path);
+            return (
+              <li key={link.path}>
+                <Link
+                  to={link.path}
+                  className={active ? 'active' : ''}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={() => setOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       </nav>
-      <div className="sidebar-info">
-        <h4>Quick Info</h4>
-        <p>Trial, Appellate &amp; Specialized Courts</p>
-        <p>All 83 Counties</p>
-          <p>MCR 1.109 guidance</p>
-      </div>
     </aside>
   );
 }

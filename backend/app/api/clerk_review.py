@@ -5,9 +5,12 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user_id, lock_current_user
+from app.api.params import Page, RecordId
 from app.database import get_db
-from app.models.filing import FilingStatus
+from app.models.filing import FilingEnvelope, FilingStatus
+from app.schemas.common import MAX_RECORD_ID
 from app.schemas.filing import (
+    BatchReviewItem,
     BatchReviewRequest,
     ClerkQueueResponse,
     ClerkReviewRequest,
@@ -23,7 +26,6 @@ router = APIRouter(prefix="/clerk", tags=["Clerk Review"])
 async def _require_clerk_role(
     db: AsyncSession, user_id: int, court_id: int,
 ) -> None:
-    """Verify user has clerk/judge/admin role for the given court."""
     if not await access_service.user_is_court_staff_for_court(db, user_id, court_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -31,10 +33,35 @@ async def _require_clerk_role(
         )
 
 
+async def _require_independent_reviewer(
+    db: AsyncSession, user_id: int, filing: FilingEnvelope,
+) -> None:
+    await _require_clerk_role(db, user_id, filing.court_id)
+    if filing.filer_id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Another court reviewer must decide your own filing",
+        )
+
+
+def _batch_failure(filing_id: int, exc: Exception) -> str:
+    if isinstance(exc, (
+        filing_service.FilingDestinationError,
+        filing_service.StaleFilingReviewError,
+        filing_service.FilingDateUnavailableError,
+        filing_service.FilingDocumentError,
+    )):
+        return str(exc)
+    if isinstance(exc, HTTPException):
+        return str(exc.detail)
+    logger.exception("Batch acceptance of filing %s failed", filing_id)
+    return "Could not accept this filing. Open it for review."
+
+
 @router.get("/queue", response_model=ClerkQueueResponse)
 async def get_review_queue(
-    court_id: int = Query(...),
-    page: int = Query(1, ge=1),
+    court_id: int = Query(ge=1, le=MAX_RECORD_ID),
+    page: Page = 1,
     page_size: int = Query(25, ge=1, le=100),
     status_filter: FilingStatus | None = Query(None, alias="status"),
     fee_waivers: bool = Query(False),
@@ -46,7 +73,7 @@ async def get_review_queue(
     await _require_clerk_role(db, user_id, court_id)
     if status_filter not in (None, FilingStatus.SUBMITTED, FilingStatus.UNDER_REVIEW):
         raise HTTPException(
-            status_code=400, detail="Queue status must be submitted or under_review"
+            status_code=400, detail="Queue status must be submitted or under review"
         )
     return await filing_service.get_clerk_queue(
         db, court_id, page=page, page_size=page_size, status=status_filter, fee_waivers=fee_waivers,
@@ -57,17 +84,11 @@ async def get_review_queue(
 @router.post("/filings/{filing_id}/review", response_model=FilingEnvelopeResponse)
 async def review_filing(
     request: Request,
-    filing_id: int,
+    filing_id: RecordId,
     data: ClerkReviewRequest,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
-    if data.action not in ("accept", "reject", "return"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Action must be 'accept', 'reject', or 'return'",
-        )
-
     reason = data.reason.strip() if data.reason else None
     if data.action in ("reject", "return") and not reason:
         raise HTTPException(
@@ -75,14 +96,13 @@ async def review_filing(
             detail="Reason is required for reject/return actions",
         )
 
-    # Look up filing to check court authorization
     await lock_current_user(db, user_id)
     filing_check = await filing_service.get_filing(db, filing_id)
     if not filing_check:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Filing not found"
         )
-    await _require_clerk_role(db, user_id, filing_check.court_id)
+    await _require_independent_reviewer(db, user_id, filing_check)
 
     try:
         filing = await filing_service.review_filing(
@@ -103,16 +123,15 @@ async def review_filing(
     if not filing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Filing cannot be reviewed (not in submitted/under_review status)",
+            detail="This filing is not awaiting review",
         )
     if data.action == "accept" and filing.status != FilingStatus.ACCEPTED:
-        # Return 502 without raising so get_db commits cms_error on the envelope.
         return JSONResponse(
             status_code=status.HTTP_502_BAD_GATEWAY,
             content={
                 "detail": (
-                    f"Court CMS rejected the filing: "
-                    f"{filing.cms_error or 'CMS submission failed'}"
+                    "The submission to the case management system failed: "
+                    f"{filing.cms_error or 'no reason was given'}"
                 )
             },
         )
@@ -140,58 +159,60 @@ async def batch_review_filings(
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):
-    """Batch accept filings (UI multi-select).
-    Rejects/returns remain single-file (reasons required per item).
-    """
-    if data.action != "accept":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Batch review currently supports only 'accept' "
-                "(per-item reasons required for reject/return)"
-            ),
-        )
-
     await lock_current_user(db, user_id)
     succeeded: list[int] = []
     failed: list[int] = []
     errors: dict[int, str] = {}
-    # Different reviewers must acquire envelope locks in the same order.
+    verified: list[tuple[BatchReviewItem, filing_service.ReviewEvidence]] = []
     for item in sorted(data.filings, key=lambda item: item.filing_id):
         fid = item.filing_id
         failure = "The filing is no longer awaiting review. Refresh the queue."
         try:
-            # One failure must roll back that filing's case, receipt, and notices,
-            # without poisoning the transaction for the rest of the batch.
             async with db.begin_nested():
                 filing_check = await filing_service.get_filing(db, fid)
-                f = None
+                evidence = None
                 if filing_check:
-                    await _require_clerk_role(db, user_id, filing_check.court_id)
-                    f = await filing_service.review_filing(
-                        db,
-                        fid,
-                        reviewer_id=user_id,
-                        action=data.action,
+                    await _require_independent_reviewer(db, user_id, filing_check)
+                    evidence = await filing_service.verify_review(
+                        db, fid, data.action,
                         expected_submission_count=item.expected_submission_count,
                     )
+            if evidence is not None:
+                verified.append((item, evidence))
+                continue
+        except Exception as exc:
+            failure = _batch_failure(fid, exc)
+        failed.append(fid)
+        errors[fid] = failure
+
+    if verified:
+        await filing_service.lock_filings(db, [item.filing_id for item, _ in verified])
+    for item, evidence in verified:
+        fid = item.filing_id
+        failure = "The filing is no longer awaiting review. Refresh the queue."
+        try:
+            async with db.begin_nested():
+                f = await filing_service.record_review(
+                    db,
+                    fid,
+                    reviewer_id=user_id,
+                    action=data.action,
+                    expected_submission_count=item.expected_submission_count,
+                    evidence=evidence,
+                )
             if f is not None and f.status == FilingStatus.ACCEPTED:
                 succeeded.append(fid)
                 continue
             if f is not None and f.cms_error:
-                failure = "Court CMS submission failed. Open the filing to inspect its history."
-        except (
-            filing_service.FilingDestinationError,
-            filing_service.StaleFilingReviewError,
-            filing_service.FilingDateUnavailableError,
-            filing_service.FilingDocumentError,
-        ) as exc:
-            failure = str(exc)
-        except Exception:
-            logger.exception("Batch acceptance of filing %s failed", fid)
-            failure = "Could not accept this filing. Open it for review."
+                failure = (
+                    "The submission to the case management system failed. "
+                    "Open this filing to see its history."
+                )
+        except Exception as exc:
+            failure = _batch_failure(fid, exc)
         failed.append(fid)
         errors[fid] = failure
+    failed.sort()
 
     await audit_service.log_action(
         db,

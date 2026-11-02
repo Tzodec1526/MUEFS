@@ -1,5 +1,3 @@
-"""Bound receipt-register reads to retained payment activity in the selected period."""
-
 from contextlib import nullcontext
 
 from sqlalchemy import text

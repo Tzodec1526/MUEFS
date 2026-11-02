@@ -1,11 +1,9 @@
-"""Explicit document delivery with retained contents and recipient-scoped access."""
-
 import hashlib
 import json
 from datetime import UTC, datetime
 
 from fastapi import HTTPException
-from sqlalchemy import false, or_, select
+from sqlalchemy import false, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer, raiseload
@@ -16,11 +14,22 @@ from app.models.case import COUNSEL_ROLES, Case, CaseParticipant
 from app.models.court import Court
 from app.models.filing import PRIVATE_DOCUMENT_TYPES, FilingDocument, FilingEnvelope, FilingStatus
 from app.models.filing_transaction import FilingTransaction
-from app.models.notification import DeliveryStatus, Notification, NotificationType, ServiceContact
+from app.models.notification import (
+    DeliveryStatus,
+    Notification,
+    NotificationType,
+    ServiceContact,
+    ServiceMethod,
+)
 from app.models.service_delivery import ServiceEvent, ServicePacket, ServiceRecipient
 from app.models.user import User, UserType
 from app.schemas.filing import FilingDocumentResponse
-from app.schemas.service_delivery import ServicePacketCreate
+from app.schemas.service_delivery import (
+    DeliveryOptions,
+    ReceivedDeliveries,
+    SentDeliveries,
+    ServicePacketCreate,
+)
 from app.services import access_service, document_service
 from app.services.email_delivery_service import queue_email, validate_email_config
 from app.services.service_contact_service import contact_snapshot, routing_issues
@@ -33,6 +42,8 @@ async def require_sender(
     *,
     lock: bool = False,
 ) -> tuple[FilingEnvelope, Case]:
+    if actor.user_type == UserType.PUBLIC:
+        raise HTTPException(403, access_service.PUBLIC_ACCOUNT_REFUSAL)
     query = (
         select(FilingEnvelope)
         .where(FilingEnvelope.id == filing_id)
@@ -87,7 +98,7 @@ async def require_sender(
             )
             .limit(1)
         )
-        if not participation or not await access_service.user_may_read_case(db, actor.id, case.id):
+        if not participation or not await access_service.user_may_read_case(db, actor, case.id):
             raise HTTPException(
                 403, "Court-reviewed case participation is required to send documents"
             )
@@ -243,7 +254,7 @@ async def create_packet(
             digest, size = await run_in_threadpool(
                 document_service.stored_integrity, document.file_key
             )
-        except OSError as exc:
+        except FileNotFoundError as exc:
             raise HTTPException(409, "A selected document could not be read from storage") from exc
         if digest != saved["sha256_hash"] or size != saved["file_size_bytes"]:
             raise HTTPException(409, "A selected document failed its integrity check")
@@ -328,7 +339,10 @@ async def require_delivery_viewer(
     staff = await access_service.user_is_court_staff_for_court(db, actor.id, case.court_id)
     if not actor.is_active:
         raise HTTPException(403, "Account is unavailable")
-    if actor.id != packet.actor_id and not staff:
+    sender = actor.id == packet.actor_id and (staff or await db.scalar(
+        select(FilingEnvelope.filer_id).where(FilingEnvelope.id == packet.filing_id)
+    ) == actor.id)
+    if not sender and not staff:
         if actor.id != recipient.recipient_id:
             raise HTTPException(403, "Delivery recipient, sender or assigned court staff required")
         participant_id = recipient.contact_snapshot.get("participant_id")
@@ -346,11 +360,9 @@ async def require_delivery_viewer(
                 or not actor.bar_number
                 or actor.bar_number != participant.attorney_bar_number
             )
-            or not await access_service.user_may_read_case(db, actor.id, case.id)
+            or not await access_service.user_may_read_case(db, actor, case.id)
         ):
             raise HTTPException(403, "Current case participation and access are required")
-        # The stable account retains past deliveries when its service email changes.
-        # A new address does not redirect an old delivery to another account.
     query = (
         select(Notification)
         .where(Notification.id == recipient.notification_id)
@@ -382,3 +394,124 @@ def record_service_event(
     )
     db.add(event)
     return event
+
+
+async def options(db: AsyncSession, actor: User, filing_id: int, page: int) -> DeliveryOptions:
+    filing, case = await require_sender(db, actor, filing_id)
+    source = await current_source(db, filing)
+    filters = (CaseParticipant.case_id == case.id, CaseParticipant.is_active.is_(True))
+    total = await db.scalar(select(func.count()).select_from(CaseParticipant).where(*filters))
+    rows = await db.execute(
+        select(CaseParticipant, ServiceContact, User)
+        .outerjoin(ServiceContact, ServiceContact.participant_id == CaseParticipant.id)
+        .outerjoin(User, User.id == CaseParticipant.user_id)
+        .where(*filters)
+        .order_by(CaseParticipant.id)
+        .offset((page - 1) * 25)
+        .limit(25)
+    )
+    recipients = []
+    for participant, contact, account in rows:
+        issues = (
+            routing_issues(case, participant, account, contact)
+            if contact
+            else [
+                "The court has not reviewed service instructions for this participant.",
+            ]
+        )
+        if contact and contact.case_id != case.id:
+            issues = ["The contact's case destination needs court review."]
+        if contact and contact.method != ServiceMethod.ELECTRONIC:
+            issues.append("Follow these service instructions outside the portal.")
+        if account and account.id == actor.id:
+            issues.append("This is your own account.")
+        recipients.append(
+            {
+                "participant_id": participant.id,
+                "name": participant.party_name,
+                "role": participant.role,
+                "represented_party_name": participant.represented_party_name,
+                "contact_id": contact.id if contact else None,
+                "version": contact.version if contact else None,
+                "method": contact.method if contact else None,
+                "email": contact.email if contact else None,
+                "address": contact.address if contact else None,
+                "authority": contact.authority if contact else None,
+                "issues": issues,
+            }
+        )
+    return DeliveryOptions.model_validate({
+        "enabled": settings.service_delivery_enabled and settings.email_delivery_enabled,
+        "source_transaction_id": source.id,
+        "case_number": case.case_number,
+        "case_title": case.title,
+        "court_name": await db.scalar(select(Court.name).where(Court.id == case.court_id)),
+        "documents": source_documents(source),
+        "recipients": recipients,
+        "total": total,
+        "page_size": 25,
+    })
+
+
+async def inbox(db: AsyncSession, actor: User, page: int) -> ReceivedDeliveries:
+    filters = (ServiceRecipient.recipient_id == actor.id,)
+    total = await db.scalar(select(func.count()).select_from(ServiceRecipient).where(*filters))
+    rows = await db.execute(
+        select(
+            ServiceRecipient.id,
+            ServicePacket.actor_name,
+            ServicePacket.created_at,
+            Notification.delivery_status,
+        )
+        .join(ServicePacket, ServicePacket.id == ServiceRecipient.packet_id)
+        .join(Notification, Notification.id == ServiceRecipient.notification_id)
+        .where(*filters)
+        .order_by(ServicePacket.created_at.desc(), ServiceRecipient.id.desc())
+        .offset((page - 1) * 25)
+        .limit(25)
+    )
+    return ReceivedDeliveries.model_validate({
+        "deliveries": [dict(row) for row in rows.mappings()],
+        "total": total,
+        "page_size": 25,
+    })
+
+
+async def sent(db: AsyncSession, actor: User, filing_id: int, page: int) -> SentDeliveries:
+    filing = await db.scalar(
+        select(FilingEnvelope)
+        .where(FilingEnvelope.id == filing_id)
+        .options(raiseload(FilingEnvelope.documents))
+    )
+    if filing is None:
+        raise HTTPException(404, "Filing not found")
+    if filing.filer_id != actor.id and not await access_service.user_is_court_staff_for_court(
+        db,
+        actor.id,
+        filing.court_id,
+    ):
+        raise HTTPException(403, "Filer or assigned court staff required")
+    query = (
+        select(
+            ServiceRecipient.id,
+            ServiceRecipient.packet_id,
+            ServiceRecipient.contact_snapshot["name"].as_string().label("name"),
+            ServiceRecipient.contact_snapshot["email"].as_string().label("email"),
+            ServicePacket.created_at,
+            Notification.delivery_status,
+        )
+        .join(ServicePacket, ServicePacket.id == ServiceRecipient.packet_id)
+        .join(Notification, Notification.id == ServiceRecipient.notification_id)
+        .where(ServicePacket.filing_id == filing.id)
+    )
+    total = await db.scalar(select(func.count()).select_from(query.subquery()))
+    rows = await db.execute(
+        query.order_by(ServicePacket.created_at.desc(), ServiceRecipient.id.desc())
+        .offset((page - 1) * 25)
+        .limit(25)
+    )
+    return SentDeliveries.model_validate({
+        "deliveries": [dict(row) for row in rows.mappings()],
+        "total": total,
+        "page_size": 25,
+    })

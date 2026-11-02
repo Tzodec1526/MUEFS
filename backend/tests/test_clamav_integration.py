@@ -1,5 +1,3 @@
-"""Real ClamAV checks use only harmless synthetic files on an opt-in local daemon."""
-
 import io
 import os
 import zipfile
@@ -39,7 +37,7 @@ async def test_real_daemon_requires_complete_scan(monkeypatch, document):
             with zipfile.ZipFile(outer, "w", compression=zipfile.ZIP_DEFLATED) as package:
                 package.writestr("nested.zip", content)
             content = outer.getvalue()
-        assert EICAR_TEST_SIGNATURE not in content  # This verdict must come from the daemon.
+        assert EICAR_TEST_SIGNATURE not in content
     else:
         content = b"Synthetic court document" if document == "text" else b"A" * (100 * 1024 * 1024)
     result = await scan_upload(content)

@@ -1,5 +1,3 @@
-"""Retain court calendar revisions and distinguish filing dates from receipt instants."""
-
 import sqlalchemy as sa
 
 from alembic import op
@@ -29,7 +27,6 @@ def upgrade() -> None:
     op.add_column("filing_envelopes", sa.Column("filing_date", sa.Date()))
     op.add_column("filing_envelopes", sa.Column("filing_date_basis", sa.JSON()))
     op.add_column("cases", sa.Column("filing_date", sa.Date()))
-    # No calendar or filing date is invented for historical cases or submissions.
     if op.get_bind().dialect.name == "postgresql":
         op.execute("""CREATE FUNCTION protect_court_calendars() RETURNS trigger
             LANGUAGE plpgsql AS $$ BEGIN

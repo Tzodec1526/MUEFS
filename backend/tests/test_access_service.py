@@ -1,5 +1,3 @@
-"""Authorization helpers for case and document access."""
-
 from datetime import UTC, datetime
 
 import pytest
@@ -38,7 +36,7 @@ async def test_case_access_court_staff(db_session):
     await db_session.flush()
 
     assert await access_service.user_may_read_case(db_session, None, case.id) is False
-    assert await access_service.user_may_read_case(db_session, clerk.id, case.id) is True
+    assert await access_service.user_may_read_case(db_session, clerk, case.id) is True
 
 
 @pytest.mark.asyncio
@@ -81,8 +79,8 @@ async def test_document_confidential_filer_only(db_session):
     db_session.add(doc)
     await db_session.flush()
 
-    assert await access_service.user_may_read_document(db_session, filer.id, doc) is True
-    assert await access_service.user_may_read_document(db_session, stranger.id, doc) is False
+    assert await access_service.user_may_read_document(db_session, filer, doc) is True
+    assert await access_service.user_may_read_document(db_session, stranger, doc) is False
 
 
 @pytest.mark.asyncio
@@ -118,8 +116,8 @@ async def test_sealed_case_stranger_denied(db_session):
     ))
     await db_session.flush()
 
-    assert await access_service.user_may_read_case(db_session, party.id, case.id) is True
-    assert await access_service.user_may_read_case(db_session, stranger.id, case.id) is False
+    assert await access_service.user_may_read_case(db_session, party, case.id) is True
+    assert await access_service.user_may_read_case(db_session, stranger, case.id) is False
 
 
 @pytest.mark.asyncio
@@ -145,7 +143,7 @@ async def test_public_user_reads_non_sealed_case(db_session):
     )
     db_session.add(case)
     await db_session.flush()
-    assert await access_service.user_may_read_case(db_session, viewer.id, case.id) is True
+    assert await access_service.user_may_read_case(db_session, viewer, case.id) is True
 
 
 @pytest.mark.asyncio
@@ -187,10 +185,10 @@ async def test_non_party_sees_accepted_not_pending_on_public_case(db_session):
     await db_session.flush()
 
     may_draft = await access_service.user_may_read_filing_envelope(
-        db_session, stranger.id, env_draft
+        db_session, stranger, env_draft
     )
     may_sub = await access_service.user_may_read_filing_envelope(
-        db_session, stranger.id, env_sub
+        db_session, stranger, env_sub
     )
     assert may_draft is False
     assert may_sub is False
@@ -202,7 +200,7 @@ async def test_non_party_sees_accepted_not_pending_on_public_case(db_session):
     db_session.add(env_acc)
     await db_session.flush()
     may_acc = await access_service.user_may_read_filing_envelope(
-        db_session, stranger.id, env_acc
+        db_session, stranger, env_acc
     )
     assert may_acc is True
 
@@ -240,7 +238,7 @@ async def test_sealed_submitted_envelope_denied_to_stranger(db_session):
     )
     db_session.add(env)
     await db_session.flush()
-    assert await access_service.user_may_read_filing_envelope(db_session, stranger.id, env) is False
+    assert await access_service.user_may_read_filing_envelope(db_session, stranger, env) is False
 
 
 @pytest.mark.asyncio
@@ -263,25 +261,22 @@ async def test_sealed_counsel_requires_an_explicit_link_and_current_bar_verifica
     )
     db_session.add(record)
     await db_session.flush()
-    # Matching a public bar number never links an account automatically.
-    assert not await access_service.user_may_read_case(db_session, counsel.id, case.id)
+    assert not await access_service.user_may_read_case(db_session, counsel, case.id)
     record.user_id = counsel.id
     await db_session.flush()
-    assert await access_service.user_may_read_case(db_session, counsel.id, case.id)
+    assert await access_service.user_may_read_case(db_session, counsel, case.id)
     counsel.bar_number_verified = False
     await db_session.flush()
-    assert not await access_service.user_may_read_case(db_session, counsel.id, case.id)
+    assert not await access_service.user_may_read_case(db_session, counsel, case.id)
     counsel.bar_number_verified = True
     counsel.bar_number = "P999"
     await db_session.flush()
-    assert not await access_service.user_may_read_case(db_session, counsel.id, case.id)
+    assert not await access_service.user_may_read_case(db_session, counsel, case.id)
     counsel.bar_number = "P888"
     record.is_active = False
     await db_session.flush()
-    assert not await access_service.user_may_read_case(db_session, counsel.id, case.id)
+    assert not await access_service.user_may_read_case(db_session, counsel, case.id)
 
-
-# ========== ANONYMOUS PUBLIC ACCESS (user_id=None) ==========
 
 
 async def _court_and_case_type(db_session):
@@ -299,7 +294,6 @@ async def _court_and_case_type(db_session):
 
 @pytest.mark.asyncio
 async def test_anonymous_reads_non_sealed_case_but_not_sealed(db_session):
-    """A visitor with no account sees open dockets, never sealed ones."""
     court, ct = await _court_and_case_type(db_session)
     open_case = Case(
         court_id=court.id, case_number="ANON-OPEN", case_type_id=ct.id,
@@ -320,7 +314,6 @@ async def test_anonymous_reads_non_sealed_case_but_not_sealed(db_session):
 
 @pytest.mark.asyncio
 async def test_anonymous_document_access_public_yes_confidential_no(db_session):
-    """Anonymous download is allowed for public docs, denied for confidential ones."""
     court, ct = await _court_and_case_type(db_session)
     filer = User(
         email="anon_doc_filer@test.com", first_name="F", last_name="iler",
@@ -361,7 +354,6 @@ async def test_anonymous_document_access_public_yes_confidential_no(db_session):
 
 @pytest.mark.asyncio
 async def test_anonymous_sees_accepted_envelope_not_draft(db_session):
-    """Anonymous docket shows accepted filings, never drafts."""
     court, ct = await _court_and_case_type(db_session)
     filer = User(
         email="anon_env_filer@test.com", first_name="F", last_name="iler",
@@ -447,5 +439,4 @@ async def test_sealed_draft_does_not_grant_stranger_case_access(db_session):
         filer_id=stranger.id, status=FilingStatus.DRAFT,
     ))
     await db_session.flush()
-    assert await access_service.user_may_read_case(db_session, stranger.id, case.id) is False
-
+    assert await access_service.user_may_read_case(db_session, stranger, case.id) is False

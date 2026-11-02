@@ -1,5 +1,3 @@
-"""Court-wide external receipt activity, derived from retained filing transactions."""
-
 import csv
 import io
 from datetime import UTC, date, datetime, time, timedelta
@@ -11,9 +9,11 @@ from sqlalchemy import case, func, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user_id, lock_current_user
+from app.api.params import Page
 from app.database import get_db
 from app.models.filing import FilingEnvelope
 from app.models.filing_transaction import FilingTransaction
+from app.schemas.common import MAX_RECORD_ID
 from app.schemas.payment import PaymentActivity, PaymentRegister, PaymentRegisterTotals
 from app.services.access_service import user_has_court_administrator_assignment
 
@@ -22,12 +22,12 @@ router = APIRouter(tags=["External payment records"])
 
 @router.get("/clerk/payment-register", response_model=PaymentRegister)
 async def payment_register(
-    court_id: int = Query(ge=1),
+    court_id: int = Query(ge=1, le=MAX_RECORD_ID),
     date_from: date = Query(),
     date_to: date = Query(),
     timezone: str = Query(max_length=100),
     include_simulated: bool = False,
-    page: int = Query(1, ge=1),
+    page: Page = 1,
     output_format: Literal["json", "csv"] = Query("json", alias="format"),
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
@@ -75,14 +75,12 @@ async def payment_register(
     totals = select(*aggregates).select_from(activity).cte("totals")
     page_query = select(activity)
     if output_format == "csv":
-        # Refuse oversized exports without fetching receipt text that will be discarded.
         page_query = page_query.join(totals, true()).where(totals.c.total <= 5000)
     page_ids = page_query.order_by(
         activity.c.occurred_at.desc(), activity.c.event_id.desc(),
     ).offset(0 if output_format == "csv" else (page - 1) * 50).limit(
         5000 if output_format == "csv" else 50,
     ).cte("page_ids")
-    # Receipt text and reasons are needed only for the selected page/export rows.
     page_rows = select(
         page_ids, FilingTransaction.event_type, FilingTransaction.actor_id,
         FilingTransaction.actor_name, payment["id"].as_integer().label("payment_id"),
@@ -93,7 +91,6 @@ async def payment_register(
     ).select_from(page_ids.join(
         FilingTransaction, FilingTransaction.id == page_ids.c.event_id,
     )).cte("rows")
-    # One statement gives totals and page rows the same snapshot, including an empty page.
     records = (await db.execute(select(totals, page_rows).select_from(
         totals.outerjoin(page_rows, true()),
     ).order_by(page_rows.c.occurred_at.desc(), page_rows.c.event_id.desc()))).mappings().all()
@@ -124,8 +121,6 @@ async def payment_register(
     for entry in report.entries:
         values = (court_id, start.isoformat(), end.isoformat(), timezone,
                   report.generated_at.isoformat(), "USD", *entry.model_dump(mode="json").values())
-        # Retained text can resemble a spreadsheet formula. Keep its original value in JSON;
-        # CSV quotes delimiters/newlines and prefixes dangerous text with an apostrophe.
         writer.writerow(
             "'" + value if isinstance(value, str) and value.lstrip().startswith(
                 ("=", "+", "-", "@", "＝", "＋", "－", "＠"),

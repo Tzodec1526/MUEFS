@@ -1,5 +1,3 @@
-"""Index literal case-number and party-name substring searches."""
-
 from sqlalchemy import text
 
 from alembic import op
@@ -28,7 +26,6 @@ def concurrent_index(name: str, table: str, column: str, *, trigram: bool) -> No
     if valid is True:
         return
     if valid is False:
-        # A cancelled concurrent build leaves an unusable index behind.
         op.drop_index(name, postgresql_concurrently=True)
     options = (
         {"postgresql_using": "gin", "postgresql_ops": {column: "public.gin_trgm_ops"}}
@@ -68,4 +65,3 @@ def downgrade() -> None:
         for table, column, old, new in INDEXES:
             concurrent_index(old, table, column, trigram=False)
             op.drop_index(new, if_exists=True, postgresql_concurrently=True)
-    # pg_trgm may be shared with other database objects; retain the extension.

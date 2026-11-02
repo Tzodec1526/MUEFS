@@ -6,8 +6,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml .
-RUN pip install --no-cache-dir -e ".[dev]"
+COPY pyproject.toml constraints.txt ./
+RUN pip install --no-cache-dir -e ".[dev]" -c constraints.txt
 
 COPY . .
 

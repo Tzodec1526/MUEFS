@@ -1,12 +1,11 @@
-"""Listing behavior with enough records to expose pagination and query growth bugs."""
-
 from datetime import UTC, datetime
 
 import pytest
+from fastapi import Depends
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event
 
-from app.api.auth import get_current_user_id, get_optional_user_id
+from app.api.auth import get_current_user_id, get_optional_user
 from app.database import get_db
 from app.main import app
 from app.models.case import Case, CaseParticipant, ParticipantRole
@@ -71,7 +70,10 @@ async def test_docket_filters_before_paging_with_bounded_queries(db_session, doc
         yield db_session
 
     app.dependency_overrides[get_db] = override_db
-    app.dependency_overrides[get_optional_user_id] = lambda: user_id
+    async def actor_account(db=Depends(get_db, scope="function")):
+        return await db.get(User, user_id) if user_id is not None else None
+
+    app.dependency_overrides[get_optional_user] = actor_account
     selects = []
     loaded_filings = []
 
@@ -169,7 +171,7 @@ async def test_sealed_access_uses_explicit_grants_not_accepted_filings(db_sessio
             for role in [CourtRole.CLERK, CourtRole.ADMIN]
         ])
     await db_session.flush()
-    assert await access_service.user_may_read_case(db_session, owner.id, case.id) is (
+    assert await access_service.user_may_read_case(db_session, owner, case.id) is (
         grant != "accepted_filings"
     )
 
@@ -178,11 +180,15 @@ async def test_sealed_access_uses_explicit_grants_not_accepted_filings(db_sessio
 async def test_case_search_treats_wildcards_as_literal_text(db_session, docket, literal):
     _, _, _, court, case, _ = docket
     case.case_number = f"LITERAL{literal}CASE"
+    distractor = Case(court_id=court.id, case_type_id=case.case_type_id,
+                      case_number="DISTRACTOR", title="Unrelated", filed_date=case.filed_date)
+    db_session.add(distractor)
+    await db_session.flush()
     db_session.add_all([
         CaseParticipant(case_id=case.id, role=ParticipantRole.PLAINTIFF,
                         party_name=f"Party{literal}Name"),
-        Case(court_id=court.id, case_type_id=case.case_type_id, case_number="DISTRACTOR",
-             title="Unrelated", filed_date=case.filed_date),
+        CaseParticipant(case_id=distractor.id, role=ParticipantRole.PLAINTIFF,
+                        party_name="Unrelated Party"),
     ])
     await db_session.flush()
     for params in [{"case_number": literal}, {"party_name": literal}]:
@@ -212,7 +218,7 @@ async def test_public_copy_docket_loads_only_page_copies_in_one_query(
         doc.public_copy_id = copy.id
         doc.is_confidential = True
     await db_session.flush()
-    app.dependency_overrides[get_optional_user_id] = lambda: None
+    app.dependency_overrides[get_optional_user] = lambda: None
     queries, loaded = [], []
 
     def query(_conn, _cursor, statement, *_args):
@@ -241,7 +247,7 @@ async def test_public_copy_docket_loads_only_page_copies_in_one_query(
     finally:
         event.remove(engine, "before_cursor_execute", query)
         event.remove(db_session.sync_session, "loaded_as_persistent", load)
-        app.dependency_overrides.pop(get_optional_user_id, None)
+        app.dependency_overrides.pop(get_optional_user, None)
 
 
 @pytest.mark.parametrize("view", ["mine", "clerk", "waivers"])
@@ -295,7 +301,6 @@ async def test_summary_counts_current_attachments_without_loading_details(
         assert not {"documents", "fee_waiver_reason", "filing_date_basis"} & summary.keys()
         assert FilingDocument not in loaded and FilingEnvelope not in loaded
         assert len(selects) <= 3
-        # Opening the same filing still supplies its full, authorized current record.
         detail = await api_client.get(f"/api/v1/filings/{fid}")
         assert detail.status_code == 200
         assert len(detail.json()["documents"]) == summary["document_count"]
@@ -304,3 +309,34 @@ async def test_summary_counts_current_attachments_without_loading_details(
         event.remove(engine, "before_cursor_execute", record_query)
         event.remove(db_session.sync_session, "loaded_as_persistent", record_loaded)
         app.dependency_overrides.pop(get_current_user_id, None)
+
+
+async def test_a_party_opening_a_docket_loads_the_account_and_case_access_once(
+    db_session, api_client, docket,
+):
+    owner, _, _, _, case, _ = docket
+    db_session.add(CaseParticipant(
+        case_id=case.id, user_id=owner.id, role=ParticipantRole.PLAINTIFF, party_name="Owner",
+        access_enabled=True, reviewed_at=datetime.now(UTC),
+    ))
+    await db_session.flush()
+    case_id, owner_id = case.id, owner.id
+    db_session.expunge_all()
+    selects = []
+
+    def record_query(_conn, _cursor, statement, *_args):
+        if statement.lstrip().upper().startswith("SELECT"):
+            selects.append(" ".join(statement.split()))
+
+    engine = db_session.bind.sync_engine
+    event.listen(engine, "before_cursor_execute", record_query)
+    try:
+        response = await api_client.get(
+            f"/api/v1/cases/{case_id}", headers={"X-Demo-User-Id": str(owner_id)},
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", record_query)
+    assert response.status_code == 200, response.text
+    assert response.json()["can_file"] is True
+    assert sum(sql.startswith("SELECT users.") for sql in selects) == 1, selects
+    assert sum(sql.startswith("SELECT cases.id FROM cases") for sql in selects) == 1, selects

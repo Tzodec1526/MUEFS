@@ -1,5 +1,3 @@
-"""PostgreSQL arbitrates external receipt conflicts and preserves migrated financial evidence."""
-
 import asyncio
 from pathlib import Path
 from uuid import uuid4

@@ -1,5 +1,3 @@
-"""OIDC user provisioning on first login."""
-
 import pytest
 
 from app.models.user import User, UserType
@@ -35,7 +33,6 @@ async def test_provision_requires_email(db_session):
 
 @pytest.mark.asyncio
 async def test_provision_requires_verified_email(db_session):
-    """An unverified or missing email_verified claim must not auto-provision or link."""
     assert await provision_user_from_oidc(
         db_session,
         sub="unverified-sub",
@@ -50,7 +47,6 @@ async def test_provision_requires_verified_email(db_session):
 
 @pytest.mark.asyncio
 async def test_provision_refuses_privileged_account_autolink(db_session):
-    """A first-login email match must not silently adopt a privileged (admin) account."""
     admin = User(
         email="admin@court.gov", first_name="A", last_name="dmin",
         user_type=UserType.ADMIN,
@@ -70,7 +66,6 @@ async def test_provision_refuses_privileged_account_autolink(db_session):
 
 @pytest.mark.asyncio
 async def test_provision_refuses_bar_account_autolink(db_session):
-    """A bar-holding account is sensitive for sealed-case access; no email auto-link."""
     attorney = User(
         email="counsel@firm.com", first_name="C", last_name="ounsel",
         user_type=UserType.ATTORNEY, bar_number="P12345", bar_number_verified=True,

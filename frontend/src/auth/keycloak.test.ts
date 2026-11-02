@@ -32,7 +32,6 @@ beforeEach(async () => {
   }
   vi.stubGlobal('window', {
     location: { origin: 'https://filing.example.gov', pathname: '/filings/new', search: '?case=42', hash: '#documents', href: '' },
-    dispatchEvent: vi.fn(),
   });
   vi.stubEnv('VITE_KEYCLOAK_URL', 'https://identity.example.gov');
   vi.stubEnv('VITE_ALLOW_DEMO_MODE', 'false');
@@ -100,7 +99,6 @@ it('does not accept an OAuth completion after sign-out', async () => {
 
 it('discards a timed-out OAuth initializer even when it eventually succeeds', async () => {
   await auth.startKeycloakLogin();
-  // The callback is a fresh document; reset only module memory, retaining its login attempt.
   vi.resetModules();
   auth = await import('./keycloak');
   const pending = deferred<boolean>();
@@ -161,6 +159,32 @@ it('discards an old request while a new sign-in is still pending', async () => {
   await auth.handleKeycloakCallback();
   expect(auth.accessToken()).toBe('access-a');
   expect(window.location.href).toBe('');
+});
+
+it.each([
+  ['signs out', { generation: 'other-tab', restore: false }],
+  ['signs in a different account', {
+    generation: 'other-tab', restore: true, issuer: 'https://identity.example.gov/realms/courts', subject: 'account-b',
+  }],
+])('continues anonymously after another tab %s', async (_, otherTabMarker) => {
+  const client = await signIn();
+  const inFlight = pendingRequest();
+  const stale = api.apiClient.get('/filings', { adapter: inFlight.adapter });
+  const discarded = expect(stale).rejects.toMatchObject({ code: 'ERR_CANCELED' });
+  const config = await inFlight.sent;
+
+  localStorage.setItem(auth.SESSION_KEY, JSON.stringify(otherTabMarker));
+  inFlight.response.resolve({ status: 200, statusText: '', headers: {}, config, data: { private: 'account-a' } });
+  await discarded;
+
+  const adapter = vi.fn(async (sent: InternalAxiosRequestConfig) => (
+    { status: 200, statusText: '', headers: {}, config: sent, data: { cases: [] } }));
+  await api.apiClient.get('/cases/search', { adapter });
+  await api.apiClient.get('/cases/search', { adapter });
+  expect(adapter).toHaveBeenCalledTimes(2);
+  expect(adapter.mock.calls.some(([sent]) => sent.headers.has('Authorization'))).toBe(false);
+  expect(auth.accessToken()).toBeNull();
+  expect(client.clearToken).toHaveBeenCalled();
 });
 
 it('stops a mutation when renewal fails and preserves its unsaved filing draft', async () => {

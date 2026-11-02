@@ -1,37 +1,32 @@
-"""Per-visitor isolated SQLite sandboxes for the public hosted demo.
-
-DEMO DEPLOY ONLY. A real court deployment uses one shared database. For the public
-demo we give each browser session its own copy of a seeded template database, so
-visitors never see or affect each other. When the per-session cap is reached (or a
-visitor blocks cookies) they fall back to a shared, restart-reset sandbox.
-
-This is deliberately single-process and disk-based: the demo runs as one Render
-instance, so an in-memory registry plus copied SQLite files is all it needs.
-"""
-
 from __future__ import annotations
 
 import asyncio
 import os
 import secrets
 import shutil
+import threading
 import time
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
 from fastapi import Request
-from sqlalchemy import create_engine
+from sqlalchemy import URL, create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.config import settings
+from app.database import session_scope
+from app.services import document_service
 
 COOKIE_NAME = "muefs_demo_sid"
 SHARED_SID = "_shared"
 _SWEEP_INTERVAL_SEC = 300.0
 
-# sid -> last-access epoch seconds. In-memory, single process by design.
 _last_access: dict[str, float] = {}
 _last_sweep = 0.0
+_session_creation_lock = threading.Lock()
+_engines: dict[str, async_sessionmaker[AsyncSession]] = {}
 
 
 def _data_dir() -> Path:
@@ -50,23 +45,31 @@ def _session_path(sid: str) -> Path:
     return _sessions_dir() / f"{sid}.db"
 
 
+def _uploads_dir() -> Path:
+    return _data_dir() / "uploads"
+
+
+def upload_scope(sid: str) -> document_service.LocalStorageScope:
+    return document_service.LocalStorageScope(
+        root=_uploads_dir() / sid, quota_bytes=settings.demo_storage_quota_mb * 1024 * 1024,
+    )
+
+
 def _is_valid_sid(sid: str) -> bool:
     return len(sid) == 32 and all(c in "0123456789abcdef" for c in sid)
 
 
 def seed_template() -> None:
-    """Create the seeded template database once (full Michigan seed), then (re)create
-    the shared sandbox from it. Idempotent for the template; the shared copy refreshes
-    on each boot."""
     _sessions_dir().mkdir(parents=True, exist_ok=True)
+    _uploads_dir().mkdir(parents=True, exist_ok=True)
     template = _template_db()
     if not template.exists():
-        # seed_database() reads its sync engine URL from the module global DATABASE_URL.
-        os.environ["DATABASE_URL_SYNC"] = f"sqlite:///{template}"
-        import app.seed_data as seed_data
+        from app.seed_data import seed_database
 
-        seed_data.DATABASE_URL = f"sqlite:///{template}"
-        seed_data.seed_database()
+        partial = template.with_suffix(".seeding")
+        partial.unlink(missing_ok=True)
+        seed_database(url=f"sqlite:///{partial}")
+        partial.replace(template)
     else:
         from app.demo.schema import prepare_demo_schema
 
@@ -77,41 +80,52 @@ def seed_template() -> None:
             finally:
                 engine.dispose()
     shutil.copyfile(template, _session_path(SHARED_SID))
+    for folder in _uploads_dir().iterdir():
+        if folder.name == SHARED_SID or not _session_path(folder.name).exists():
+            shutil.rmtree(folder, ignore_errors=True)
 
 
-def ensure_session_db(sid: str) -> Path:
-    """Return this session's SQLite path, copying the seeded template if it's new."""
+def open_sandbox(sid: str) -> Path:
+    with _session_creation_lock:
+        _sweep_idle()
+        path = _ensure(sid)
+        if path.stem != SHARED_SID:
+            touch(path.stem)
+        return path
+
+
+def _ensure(sid: str) -> Path:
     path = _session_path(sid)
     if not path.exists():
-        shutil.copyfile(_template_db(), path)
+        if active_session_count() >= settings.demo_max_sessions:
+            return _session_path(SHARED_SID)
+        temporary = path.with_suffix(".tmp")
+        try:
+            shutil.copyfile(_template_db(), temporary)
+            temporary.replace(path)
+        finally:
+            temporary.unlink(missing_ok=True)
     return path
 
 
 def active_session_count() -> int:
-    """Number of private sandboxes (the shared one doesn't count toward the cap)."""
     return sum(1 for p in _sessions_dir().glob("*.db") if p.stem != SHARED_SID)
 
 
-def resolve_sid(request: Request) -> tuple[str, bool]:
-    """Decide which sandbox this request uses; returns (sid, should_set_cookie).
-
-    Reuse a valid existing cookie; otherwise mint a new private sandbox if under the
-    cap, else fall back to the shared one."""
+def resolve_sid(request: Request, *, allocate: bool = True) -> str:
     cookie = request.cookies.get(COOKIE_NAME)
     if cookie and (cookie == SHARED_SID or _is_valid_sid(cookie)):
-        return cookie, False
-    if active_session_count() < settings.demo_max_sessions:
-        return secrets.token_hex(16), True
-    return SHARED_SID, False
+        return cookie
+    if allocate and active_session_count() < settings.demo_max_sessions:
+        return secrets.token_hex(16)
+    return SHARED_SID
 
 
 def touch(sid: str) -> None:
     _last_access[sid] = time.time()
 
 
-def maybe_sweep() -> None:
-    """Opportunistically delete idle private sandboxes — piggybacks on request traffic
-    so there's no background task to manage."""
+def _sweep_idle() -> None:
     global _last_sweep
     now = time.time()
     if now - _last_sweep < _SWEEP_INTERVAL_SEC:
@@ -121,31 +135,71 @@ def maybe_sweep() -> None:
     for p in _sessions_dir().glob("*.db"):
         if p.stem == SHARED_SID:
             continue
-        last = _last_access.get(p.stem)
-        if last is None or now - last > ttl:
+        try:
+            last = max(_last_access.get(p.stem, 0.0), p.stat().st_mtime)
+        except FileNotFoundError:
+            continue
+        if now - last > ttl:
             try:
                 p.unlink()
             except OSError:
-                pass
+                continue
+            _engines.pop(str(p.resolve()), None)
+            shutil.rmtree(_uploads_dir() / p.stem, ignore_errors=True)
             _last_access.pop(p.stem, None)
 
 
-async def get_demo_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI dependency: a session bound to this visitor's private SQLite sandbox.
+class DemoSessionMiddleware:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
 
-    Replaces the app's normal get_db when demo isolation is on (wired in demo.server).
-    A fresh engine per request keeps the lifecycle trivial — only the files persist."""
-    sid = getattr(request.state, "demo_sid", None) or SHARED_SID
-    path = await asyncio.to_thread(ensure_session_db, sid)
-    engine = create_async_engine(f"sqlite+aiosqlite:///{path}")
-    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    try:
-        async with factory() as session:
-            try:
-                yield session
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                raise
-    finally:
-        await engine.dispose()
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        path = scope.get("path", "").rstrip("/")
+        if (scope["type"] != "http"
+                or path in {"/health", "/ready", "/config.js"}
+                or path.startswith("/assets/")):
+            await self.app(scope, receive, send)
+            return
+        api = path.startswith("/api/")
+        sid = resolve_sid(Request(scope), allocate=not api)
+        token = None
+        if api:
+            database = await asyncio.to_thread(open_sandbox, sid)
+            scope.setdefault("state", {})["demo_database"] = database
+            token = document_service.storage_scope.set(upload_scope(database.stem))
+        try:
+            await self.app(scope, receive, send if sid == SHARED_SID else _renewing(send, sid))
+        finally:
+            if token is not None:
+                document_service.storage_scope.reset(token)
+
+
+def _renewing(send: Send, sid: str) -> Send:
+    ttl = settings.demo_session_ttl_minutes * 60
+    cookie = f"{COOKIE_NAME}={sid}; Max-Age={ttl}; Path=/; HttpOnly; SameSite=Lax".encode()
+
+    async def send_with_cookie(message: Message) -> None:
+        if message["type"] == "http.response.start":
+            message.setdefault("headers", []).append((b"set-cookie", cookie))
+        await send(message)
+
+    return send_with_cookie
+
+
+def _sandbox_sessions(path: Path) -> async_sessionmaker[AsyncSession]:
+    key = str(path.resolve())
+    sessions = _engines.get(key)
+    if sessions is None:
+        engine = create_async_engine(URL.create(
+            "sqlite+aiosqlite", database=path.resolve().as_uri(),
+            query={"mode": "rw", "uri": "true"},
+        ), poolclass=NullPool)
+        sessions = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        _engines[key] = sessions
+    return sessions
+
+
+async def get_demo_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
+    path = getattr(request.state, "demo_database", None) or _session_path(SHARED_SID)
+    async with session_scope(_sandbox_sessions(Path(path)), drain=True) as session:
+        yield session

@@ -1,91 +1,63 @@
-import { useState, useEffect, useCallback, useRef, useContext } from 'react';
-import { Link } from 'react-router-dom';
-import { batchReview, getClerkQueue, getFiling, reviewFiling, FilingEnvelope, FilingSummary, ClerkQueue, ClerkQueueFilters } from '../../api/filings';
+import { useState, useEffect, useRef, useContext } from 'react';
+import { batchReview, getFiling, reviewFiling, FilingEnvelope, FilingSummary, ClerkQueue } from '../../api/filings';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
-import DocumentDownload from '../common/DocumentDownload';
-import { formatBytes, getDocumentLabel, parseServerDate } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { formatDateTime, parseServerDate, plural } from '../../utils/format';
+import { filingStatusLabel } from '../../utils/filingStatus';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
+import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
+import { focusQueueRow, useClerkQueue } from './useClerkQueue';
+import QueueFilters from './QueueFilters';
+import FilingReviewPanel from './FilingReviewPanel';
+
+const ACTION_UNCONFIRMED = 'the request did not complete. Refresh the queue to check its current status before trying again.';
+const BATCH_UNCONFIRMED = 'Could not accept the selected filings. Refresh the queue to check their current status before trying again.';
 
 function ReviewQueue() {
   const { court } = useContext(CourtContext)!;
+  usePageTitle('Review queue', court?.court_name);
   const courtId = court!.court_id;
-  const [queue, setQueue] = useState<ClerkQueue | null>(null);
-  const filings = queue?.filings ?? [];
-  const total = queue?.total ?? 0;
   const [review, setReview] = useState<{
-    id: number; filing?: FilingEnvelope; error?: string;
+    id: number; filing?: FilingEnvelope; error?: LoadFailure;
   } | null>(null);
-  const selectedFiling = review?.filing;
-  const [loading, setLoading] = useState(false);
-  const [reviewReason, setReviewReason] = useState('');
   const [actionInProgress, setActionInProgress] = useState(false);
-  const [selectedSubmissions, setSelectedSubmissions] = useState<Map<number, number>>(new Map());
-  const [filters, setFilters] = useState<ClerkQueueFilters>({ status: 'all', search: '', waiting_48h_only: false });
-  const [filterDraft, setFilterDraft] = useState(filters);
+  const {
+    queue, loading, startLoading, queueError, filters, setFilters, page, setPage,
+    selectedSubmissions, setSelectedSubmissions, fetchQueue,
+  } = useClerkQueue(courtId, Boolean(review) || actionInProgress);
+  const filings = queue?.filings ?? [];
+  const pageCount = queue ? Math.ceil(queue.total / queue.page_size) : 0;
+  const selectedFiling = review?.filing;
+  const [reviewReason, setReviewReason] = useState('');
   const statusFilter = filters.status;
-  const filtersChanged = filterDraft.status !== filters.status || filterDraft.search !== filters.search
-    || filterDraft.waiting_48h_only !== filters.waiting_48h_only;
   const canReview = selectedFiling
     && ['submitted', 'under_review'].includes(selectedFiling.status)
     && statusFilter !== 'waivers';
-  const [page, setPage] = useState(1);
-  const requestRef = useRef<AbortController | null>(null);
   const reviewRequestRef = useRef<AbortController | null>(null);
   const reviewHeading = useRef<HTMLHeadingElement>(null);
+  const queueHeading = useRef<HTMLHeadingElement>(null);
+  const focusAfterRefresh = useRef<{ index: number; queue: ClerkQueue | null } | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
-  const [queueError, setQueueError] = useState<string | null>(null);
-
-  const fetchQueue = useCallback(async () => {
-    requestRef.current?.abort();
-    const controller = new AbortController();
-    requestRef.current = controller;
-    setLoading(true);
-    setQueueError(null);
-    try {
-      const result = await getClerkQueue(courtId, { ...filters, page, signal: controller.signal });
-      if (controller.signal.aborted) return;
-      if (page > 1 && result.filings.length === 0) {
-        setPage(Math.max(1, Math.ceil(result.total / 25)));
-        return;
-      }
-      setQueue(result);
-      setSelectedSubmissions(previous => new Map(result.filings
-        .filter(filing => previous.get(filing.id) === filing.submission_count)
-        .map(filing => [filing.id, filing.submission_count])));
-    } catch {
-      if (controller.signal.aborted) return;
-      setQueueError("We couldn't load the review queue. Please retry.");
-      setQueue(null);
-      setSelectedSubmissions(new Map());
-    } finally {
-      if (!controller.signal.aborted) setLoading(false);
-    }
-  }, [courtId, page, filters]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- existing pattern; fetchQueue performs the setState for loading/data
-    fetchQueue();
-    return () => requestRef.current?.abort();
-  }, [fetchQueue]);
 
   useEffect(() => () => reviewRequestRef.current?.abort(), []);
   useEffect(() => {
     if (review?.filing || review?.error) reviewHeading.current?.focus();
   }, [review]);
 
-  // Auto-refresh every 30 seconds, but never while a filing is open for review or an
-  // action is in flight -- a refresh mid-review would clobber the clerk's work.
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (!document.hidden && !review && !actionInProgress) fetchQueue();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [fetchQueue, review, actionInProgress]);
+    const pending = focusAfterRefresh.current;
+    if (!pending || loading || queue === pending.queue) return;
+    focusAfterRefresh.current = null;
+    const rows = queue?.filings ?? [];
+    const next = rows[Math.min(pending.index, rows.length - 1)];
+    if (next) focusQueueRow(next.id);
+    else queueHeading.current?.focus();
+  }, [queue, loading]);
 
   async function handleReview(filing: FilingEnvelope, action: 'accept' | 'reject' | 'return') {
     if (action === 'reject' && !window.confirm(
-      'Reject is final — the filer cannot resubmit under this envelope. If they should fix and re-file, use "Return for Correction" instead. Reject this filing?'
+      'Reject is final. The filer cannot resubmit this filing. If they should fix it and file again, use "Return for correction" instead. Reject this filing?'
     )) {
       return;
     }
@@ -93,11 +65,12 @@ function ReviewQueue() {
     setReviewError(null);
     try {
       await reviewFiling(filing, action, action !== 'accept' ? reviewReason : undefined);
+      focusAfterRefresh.current = { index: Math.max(0, filings.findIndex(item => item.id === filing.id)), queue };
       closeReview();
       await fetchQueue();
     } catch (err) {
-      const msg = getErrorDetail(err) || (err instanceof Error ? err.message : 'Review failed');
-      setReviewError(`Failed to ${action} filing #${filing.id}: ${msg}`);
+      setReviewError(`Failed to ${action} filing #${filing.id}: ${errorMessage(err, ACTION_UNCONFIRMED)}`);
+      if (!document.activeElement || document.activeElement === document.body) reviewHeading.current?.focus();
     } finally {
       setActionInProgress(false);
     }
@@ -105,6 +78,7 @@ function ReviewQueue() {
 
   async function handleBatchAccept() {
     if (selectedSubmissions.size === 0) return;
+    const firstSelected = Math.max(0, filings.findIndex(item => selectedSubmissions.has(item.id)));
     setActionInProgress(true);
     setReviewError(null);
     try {
@@ -116,9 +90,9 @@ function ReviewQueue() {
         setReviewError(res.failed.map(id => `Filing #${id}: ${res.errors[id]}`).join(' '));
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Batch accept failed';
-      setReviewError(msg);
+      setReviewError(errorMessage(err, BATCH_UNCONFIRMED));
     } finally {
+      focusAfterRefresh.current = { index: firstSelected, queue };
       setSelectedSubmissions(new Map());
       setActionInProgress(false);
       await fetchQueue();
@@ -146,7 +120,7 @@ function ReviewQueue() {
     } catch (err) {
       if (!controller.signal.aborted) setReview({
         id: filingId,
-        error: getErrorDetail(err) || "We couldn't load this filing. Please retry.",
+        error: loadFailure(err, "We couldn't load this filing. Please retry."),
       });
     }
   }
@@ -168,11 +142,6 @@ function ReviewQueue() {
     }
   };
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return 'N/A';
-    return parseServerDate(dateStr).toLocaleString();
-  };
-
   const ageAsOf = queue ? parseServerDate(queue.as_of).getTime() : 0;
   const getAge = (dateStr: string | null): { text: string; level: string } => {
     if (!dateStr) return { text: 'N/A', level: '' };
@@ -184,89 +153,33 @@ function ReviewQueue() {
     };
   };
 
-  // Common rejection reasons for quick selection
-  const COMMON_REASONS = [
-    'Missing required documents',
-    'Document not text-searchable (MCR 1.109)',
-    'Incorrect filing fee',
-    'Filed in wrong court',
-    'Missing proof of service',
-    'Document formatting does not comply with court rules',
-    'Incomplete case information',
-  ];
-
   return (
     <div className="clerk-review">
-      <StaffCourtSelect disabled={!!review || actionInProgress} />
       <div className="clerk-header">
-        <h2>Clerk Review Queue</h2>
-        <div className="clerk-header-stats">
-          <div className="stat-card">
-            <span className="stat-number">{queue ? total : '—'}</span>
-            <span className="stat-label">Matching filings</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-number">{queue?.waiting_48h ?? '—'}</span>
-            <span className="stat-label">Waiting 48+ hours</span>
-          </div>
-        </div>
+        <PageHeading headingRef={queueHeading}>Review queue</PageHeading>
+        <StaffCourtSelect disabled={!!review || actionInProgress} />
       </div>
 
       <div className="queue-controls">
-        <form
-          className="queue-webmcp-filter"
-          toolname="get_clerk_review_queue"
-          tooldescription="Search received filings by case title, case number or #filing number, with status and elapsed-time filters"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (filtersChanged) {
-              setLoading(true);
-              setFilters({ ...filterDraft, search: filterDraft.search?.trim() });
-              setFilterDraft(previous => ({ ...previous, search: previous.search?.trim() }));
-              setPage(1);
-              setSelectedSubmissions(new Map());
-              closeReview();
-            } else void fetchQueue();
+        <QueueFilters
+          filters={filters}
+          loading={loading}
+          actionInProgress={actionInProgress}
+          onApply={(submitted) => {
+            startLoading();
+            setFilters(submitted);
+            setPage(1);
+            setSelectedSubmissions(new Map());
+            closeReview();
           }}
-        >
-          <div className="form-group">
-            <label htmlFor="statusFilter">Filter</label>
-            <select
-              id="statusFilter"
-              name="status"
-              toolparamdescription="Queue status filter: all, submitted, or under_review"
-              value={filterDraft.status}
-              onChange={(e) => setFilterDraft(previous => ({ ...previous, status: e.target.value }))}
-              disabled={actionInProgress}
-            >
-              <option value="all">All Pending</option>
-              <option value="submitted">New Submissions</option>
-              <option value="under_review">Under Review</option>
-              <option value="waivers">Pending Fee Waivers</option>
-            </select>
-          </div>
-          <div className="form-group queue-search">
-            <label htmlFor="queueSearch">Case title, case number or #filing number</label>
-            <input id="queueSearch" name="search" type="search" maxLength={200}
-              placeholder="Example: Smith or #123" value={filterDraft.search}
-              disabled={actionInProgress}
-              onChange={e => setFilterDraft(previous => ({ ...previous, search: e.target.value }))} />
-          </div>
-          <label className="queue-age-filter">
-            <input type="checkbox" name="waiting_48h_only" checked={filterDraft.waiting_48h_only}
-              disabled={actionInProgress}
-              onChange={e => setFilterDraft(previous => ({ ...previous, waiting_48h_only: e.target.checked }))} />
-            Waiting at least 48 hours
-          </label>
-          <button type="submit" className="btn btn-secondary" disabled={loading || actionInProgress}>
-            {loading ? 'Loading...' : filtersChanged ? 'Apply filters' : 'Refresh'}
-          </button>
-        </form>
-        {queue && <span className="queue-meta">
-          Measured: {formatDate(queue.as_of)}. {queue.oldest_submitted_at && <>Oldest matching receipt: {formatDate(queue.oldest_submitted_at)}. </>}
-          Ages are elapsed time since receipt.
-        </span>}
+          onRefresh={() => void fetchQueue()}
+        />
       </div>
+
+      {queue && <p className="queue-meta">
+        {plural(queue.total, 'matching filing')} · {queue.waiting_48h} waiting at least 48 hours
+        {queue.oldest_submitted_at && ` · Oldest received ${formatDateTime(queue.oldest_submitted_at)}`}
+      </p>}
 
       {reviewError && (
         <div className="alert alert-error" role="alert">
@@ -275,48 +188,49 @@ function ReviewQueue() {
         </div>
       )}
 
-      {queueError && <LoadError message={queueError} onRetry={fetchQueue} />}
+      {queueError && <LoadError failure={queueError} onRetry={fetchQueue} />}
 
-      {/* Batch actions */}
       {selectedSubmissions.size > 0 && statusFilter !== 'waivers' && (
         <div className="batch-actions">
-          <span>{selectedSubmissions.size} filing(s) selected</span>
+          <span>{plural(selectedSubmissions.size, 'filing')} selected</span>
           <button
             className="btn btn-success btn-small"
             onClick={handleBatchAccept}
             disabled={loading || actionInProgress}
           >
-            {actionInProgress ? 'Processing...' : `Accept ${selectedSubmissions.size} Filing(s)`}
+            {actionInProgress ? 'Processing...' : `Accept ${plural(selectedSubmissions.size, 'filing')}`}
           </button>
           <button
             className="btn btn-secondary btn-small"
             onClick={() => setSelectedSubmissions(new Map())}
           >
-            Clear Selection
+            Clear selection
           </button>
         </div>
       )}
 
       <div className={`queue-layout${review ? ' review-open' : ''}`} aria-busy={loading}>
-        {/* Filing List */}
         <div className="queue-list">
           <table>
             <thead>
               <tr>
                 <th className="th-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={selectedSubmissions.size === filings.length && filings.length > 0}
-                    onChange={toggleSelectAll}
-                    aria-label="Select all filings"
-                    disabled={loading || actionInProgress || statusFilter === 'waivers'}
-                  />
+                  <label className="queue-select-all">
+                    <input
+                      type="checkbox"
+                      checked={selectedSubmissions.size === filings.length && filings.length > 0}
+                      onChange={toggleSelectAll}
+                      aria-label="Select all filings"
+                      disabled={loading || actionInProgress || statusFilter === 'waivers'}
+                    />
+                    <span aria-hidden="true">Select all</span>
+                  </label>
                 </th>
-                <th>Filing #</th>
-                <th>Case Title</th>
+                <th>Filing</th>
+                <th>Case title</th>
                 <th>Submitted</th>
                 <th>Age</th>
-                <th>Docs</th>
+                <th>Documents</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -329,10 +243,6 @@ function ReviewQueue() {
                     id={`queue-filing-${filing.id}`}
                     className={review?.id === filing.id ? 'selected' : ''}
                     onClick={() => openReview(filing.id)}
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && e.target === e.currentTarget) openReview(filing.id);
-                    }}
                   >
                     <td className="td-checkbox" onClick={(e) => e.stopPropagation()}>
                       <input
@@ -343,16 +253,24 @@ function ReviewQueue() {
                         disabled={loading || actionInProgress || statusFilter === 'waivers'}
                       />
                     </td>
-                    <td className="filing-num">#{filing.id}</td>
-                    <td className="filing-title">{filing.case_title || 'Untitled'}</td>
-                    <td className="filing-date">{formatDate(filing.submitted_at)}</td>
-                    <td>
+                    <td className="filing-num">
+                      <button
+                        type="button"
+                        className="queue-review-button"
+                        onClick={(e) => { e.stopPropagation(); openReview(filing.id); }}
+                      >
+                        Review filing #{filing.id}
+                      </button>
+                    </td>
+                    <td className="filing-title" data-label="Case title">{filing.case_title || 'Untitled'}</td>
+                    <td className="filing-date" data-label="Submitted">{formatDateTime(filing.submitted_at)}</td>
+                    <td data-label="Age">
                       <span className={`age-badge ${age.level}`}>{age.text}</span>
                     </td>
-                    <td>{filing.document_count}</td>
-                    <td>
+                    <td data-label="Documents">{filing.document_count}</td>
+                    <td data-label="Status">
                       <span className={`status-badge ${filing.status}`}>
-                        {filing.status.replace('_', ' ')}
+                        {filingStatusLabel(filing.status)}
                       </span>
                     </td>
                   </tr>
@@ -367,151 +285,34 @@ function ReviewQueue() {
               )}
             </tbody>
           </table>
-          {total > 25 && (
+          {pageCount > 1 && (
             <div className="pagination">
               <button className="btn btn-secondary btn-small" disabled={page <= 1 || loading || actionInProgress}
-                onClick={() => { setLoading(true); setPage((p) => p - 1); setSelectedSubmissions(new Map()); closeReview(); }}>
+                onClick={() => { startLoading(); setPage((p) => p - 1); setSelectedSubmissions(new Map()); closeReview(); }}>
                 Previous
               </button>
-              <span>Page {page} of {Math.ceil(total / 25)}</span>
-              <button className="btn btn-secondary btn-small" disabled={page >= Math.ceil(total / 25) || loading || actionInProgress}
-                onClick={() => { setLoading(true); setPage((p) => p + 1); setSelectedSubmissions(new Map()); closeReview(); }}>
+              <span>Page {page} of {pageCount}</span>
+              <button className="btn btn-secondary btn-small" disabled={page >= pageCount || loading || actionInProgress}
+                onClick={() => { startLoading(); setPage((p) => p + 1); setSelectedSubmissions(new Map()); closeReview(); }}>
                 Next
               </button>
             </div>
           )}
         </div>
 
-        {/* Filing Detail Panel */}
         {review && (
-          <div className="filing-detail-panel">
-            <div className="detail-panel-header">
-              <h3 ref={reviewHeading} tabIndex={-1}>Filing #{review.id}</h3>
-              {selectedFiling && <span className={`status-badge ${selectedFiling.status}`}>
-                {selectedFiling.status.replace('_', ' ')}
-              </span>}
-              <button type="button" className="btn btn-secondary btn-small" disabled={actionInProgress}
-                onClick={() => {
-                  closeReview();
-                  document.getElementById(`queue-filing-${review.id}`)?.focus();
-                }}>
-                Close review
-              </button>
-            </div>
-            {!selectedFiling && !review.error && <p role="status">Loading filing details…</p>}
-            {review.error && <LoadError message={review.error} onRetry={() => openReview(review.id)} />}
-            {selectedFiling && <>
-            {!canReview && statusFilter !== 'waivers' && <p role="status">
-              This filing is no longer awaiting intake review. Refresh the queue for current work.
-            </p>}
-            <div className="detail-section">
-              <h4>Case Information</h4>
-              <p>{selectedFiling.submission_count ? `Reviewing submission ${selectedFiling.submission_count}` : 'Reviewing a legacy submission without a recorded submission number'}</p>
-              <Link to={`/filings/${selectedFiling.id}/history`} className="btn btn-secondary btn-small">Receipts &amp; history</Link>
-              {selectedFiling.fee_waiver_requested && <p>
-                Fee waiver: {selectedFiling.fee_waiver_granted === true ? 'granted'
-                  : selectedFiling.fee_waiver_granted === false ? 'denied'
-                  : selectedFiling.fee_waiver_referred_at ? 'awaiting judicial review' : 'awaiting court review'}.
-                {' '}<Link to={`/filings/${selectedFiling.id}/history`}>Open fee waiver review</Link>
-              </p>}
-              <div className="detail-grid">
-                <div><label>Title</label><span>{selectedFiling.case_title || 'N/A'}</span></div>
-                <div><label>Submitted</label><span>{formatDate(selectedFiling.submitted_at)}</span></div>
-                <div><label>Filer ID</label><span>#{selectedFiling.filer_id}</span></div>
-              </div>
-              {selectedFiling.filing_description && (
-                <div className="detail-description">
-                  <label>Description</label>
-                  <p>{selectedFiling.filing_description}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="detail-section">
-              <h4>Documents ({selectedFiling.documents.length})</h4>
-              <div className="doc-list">
-                {selectedFiling.documents.map((doc) => (
-                  <div key={doc.id} className="doc-item">
-                    <div className="doc-info">
-                      <strong>{doc.title}</strong>
-                      <span className="doc-meta">
-                        {getDocumentLabel(doc.document_type_code)} &middot; {formatBytes(doc.file_size_bytes)}
-                        {doc.page_count && ` \u00b7 ${doc.page_count} pages`}
-                      </span>
-                    </div>
-                    <div className="doc-flags">
-                      {!doc.is_text_searchable && doc.mime_type === 'application/pdf' && (
-                        <span className="flag-badge warning">Not searchable</span>
-                      )}
-                      {doc.is_confidential && (
-                        <span className="flag-badge confidential">Confidential</span>
-                      )}
-                      <DocumentDownload id={doc.id} title={doc.title} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="detail-section">
-              <h4>Review Actions</h4>
-
-              {/* Quick reason selector */}
-              <div className="form-group">
-                <label htmlFor="quickReason">Reason (required for reject/return)</label>
-                <select
-                  id="quickReason"
-                  value={reviewReason}
-                  onChange={(e) => setReviewReason(e.target.value)}
-                >
-                  <option value="">-- Select common reason --</option>
-                  {COMMON_REASONS.map((reason, i) => (
-                    <option key={i} value={reason}>{reason}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <textarea
-                  value={reviewReason}
-                  onChange={(e) => setReviewReason(e.target.value)}
-                  rows={3}
-                  placeholder="Or type a custom reason..."
-                  aria-label="Review reason"
-                />
-              </div>
-
-              <div className="review-buttons">
-                <button
-                  className="btn btn-success"
-                  onClick={() => handleReview(selectedFiling, 'accept')}
-                  disabled={actionInProgress || !canReview}
-                >
-                  {actionInProgress ? 'Processing...' : 'Accept'}
-                </button>
-                <button
-                  className="btn btn-warning"
-                  onClick={() => handleReview(selectedFiling, 'return')}
-                  disabled={actionInProgress || !reviewReason.trim() || !canReview}
-                  title={!reviewReason.trim() ? 'Reason required' : ''}
-                >
-                  Return for Correction
-                </button>
-                <button
-                  className="btn btn-danger"
-                  onClick={() => handleReview(selectedFiling, 'reject')}
-                  disabled={actionInProgress || !reviewReason.trim() || !canReview}
-                  title={!reviewReason.trim() ? 'Reason required' : ''}
-                >
-                  Reject
-                </button>
-              </div>
-              <p className="info-text review-action-note">
-                <strong>Return for Correction</strong> sends it back so the filer can fix and
-                re-file; the earlier submission remains in their history. <strong>Reject</strong> is final.
-              </p>
-            </div>
-            </>}
-          </div>
+          <FilingReviewPanel
+            review={review}
+            canReview={Boolean(canReview)}
+            statusFilter={statusFilter}
+            actionInProgress={actionInProgress}
+            reviewReason={reviewReason}
+            setReviewReason={setReviewReason}
+            reviewHeading={reviewHeading}
+            closeReview={closeReview}
+            openReview={openReview}
+            handleReview={handleReview}
+          />
         )}
 
       </div>

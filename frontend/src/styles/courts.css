@@ -1,0 +1,88 @@
+.court-calendar-page { max-width: 1060px; margin-inline: auto; }
+.notices-page { max-width: 1060px; margin-inline: auto; }
+.notice-card { margin-block: 1.25rem; overflow-wrap: anywhere; }
+.notice-body { white-space: pre-line; }
+.notice-delivery { padding-top: 1rem; }
+.notice-delivery ol { padding-left: 1.25rem; }
+.notice-delivery li { margin-block: .8rem; }
+.court-calendar-page .review-card { margin-block: 1.25rem; }
+.court-calendar-page summary { cursor: pointer; font-weight: 600; }
+.court-calendar-page form > button { margin-top: 1rem; }
+.calendar-range { display: flex; gap: 1rem; flex-wrap: wrap; }
+.calendar-range .form-group { flex: 1; min-width: 12rem; }
+
+.court-cases-page > p, .case-participants-page > p { margin-bottom: 20px; }
+.court-case-filter { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 16px; margin: 24px 0; }
+.court-case-filter .form-group { margin-bottom: 0; }
+.court-case-list { list-style: none; padding: 0; margin: 20px 0; }
+.court-case-list > li { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 0; border-bottom: 1px solid var(--rule); overflow-wrap: anywhere; }
+.court-case-list > li > div { min-width: 0; }
+.court-case-list p { margin: 5px 0 0; }
+.court-case-list .btn { flex-shrink: 0; }
+.court-case-list.admin-account-list { margin: 12px 0; padding-inline: 16px; border-radius: var(--radius); background: var(--white); }
+.participant-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.case-participants-page .admin-account-form { margin-top: 24px; padding: 24px; border-radius: var(--radius); }
+.case-participants-page fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.case-participants-page legend { font-weight: 600; margin-bottom: 1rem; }
+.notice-filing-filter { align-items: flex-end; }
+.notice-filing-filter .form-group { margin-bottom: 0; }
+.participant-list > li { flex-wrap: wrap; }
+.participant-list .admin-account-form { flex-basis: 100%; width: 100%; }
+.case-participants-page .checkbox-label { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0; }
+.case-participants-page .checkbox-label input { flex-shrink: 0; margin-top: 3px; }
+.filing-date-page fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.filing-date-page .checkbox-label { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; }
+.filing-date-page .checkbox-label input { flex-shrink: 0; margin-top: 3px; }
+.filing-date-page code { overflow-wrap: anywhere; }
+.fee-assessment-form, .fee-review-request { margin-block: 20px; }
+.fee-assessment-form fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.fee-assessment-form legend { font-weight: 600; margin-block: 16px; }
+.fee-assessment-item { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 12px; border-bottom: 1px solid var(--rule); padding-block: 12px; }
+.fee-assessment-item > button { justify-self: start; }
+.fee-assessment-form .checkbox-label { display: flex; align-items: flex-start; gap: 8px; margin: 16px 0; }
+.fee-assessment-form .checkbox-label input { flex-shrink: 0; margin-top: 3px; }
+
+@media (max-width: 700px) {
+  .fee-assessment-item { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  .court-case-filter { grid-template-columns: 1fr; }
+  .court-case-list > li { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .case-participants-page .admin-account-form { padding: 16px; }
+}
+.document-publication-page { max-width: 1100px; margin-inline: auto; }
+.document-publication-page .review-card { margin-block: 24px; }
+.document-publication-page .review-card p { margin-block: 12px; }
+.document-publication-page .review-card h2 { margin-bottom: 16px; }
+.document-publication-page code { display: block; overflow-wrap: anywhere; margin-top: 12px; }
+.document-publication-page details > summary { cursor: pointer; }
+.document-publication-page .publication-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.document-publication-page .publication-grid .review-card { margin-bottom: 0; }
+.publication-confirm { display: flex; gap: 12px; align-items: flex-start; margin-block: 24px; }
+.publication-confirm input { flex-shrink: 0; margin-top: 4px; }
+.service-page { max-width: 1100px; margin-inline: auto; overflow-wrap: anywhere; }
+.service-page .review-card { margin-block: 24px; }
+.service-page p, .service-page h2 { margin-block: 12px; }
+.service-page fieldset { border: 0; padding: 0; min-width: 0; }
+.service-page legend { font-size: 1.2rem; font-weight: 600; margin-block: 20px; }
+.service-page .checkbox-label { display: flex; align-items: flex-start; gap: 12px; margin-block: 16px; }
+.service-page .checkbox-label input { flex-shrink: 0; margin-top: 4px; }
+.service-choice { padding-block: 16px; border-bottom: 1px solid var(--rule); }
+.service-issue { color: var(--muted); }
+.service-list { list-style: none; padding: 0; }
+.service-actions { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+.service-page details { margin-top: 12px; }
+.service-page summary { cursor: pointer; }
+.service-page ol { padding-left: 24px; }
+.service-page ol li { margin-block: 16px; }
+
+@media (max-width: 720px) {
+  .document-publication-page .publication-grid { grid-template-columns: 1fr; gap: 0; }
+}
+.register-totals { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0; }
+.register-totals > div { flex: 1 1 12rem; padding: 1rem; border-radius: var(--radius); background: var(--white); }
+.register-totals dd { margin: .5rem 0 0; font-weight: 700; font-size: 1.25rem; }
+.payment-register fieldset { border: 0; padding: 0; min-width: 0; }
+.payment-register .checkbox-label { display: flex; align-items: baseline; gap: .5rem; margin: 1rem 0; }
+.payment-register .payment-record-list p { overflow-wrap: anywhere; }

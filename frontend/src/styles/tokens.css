@@ -1,0 +1,28 @@
+:root {
+  --ink: #182230;
+  --muted: #4c5868;
+  --accent: #1c3f6e;
+  --accent-dark: #122c50;
+  --tint: #eef2f7;
+  --info-tint: #dce8f5;
+  --rule: #dde3ea;
+  --field: #7a8699;
+  --star: #94700f;
+  --white: #ffffff;
+  --on-dark-muted: #d3dce8;
+
+  --success: #1e7e45;
+  --success-ink: #135e34;
+  --success-tint: #e3f3e9;
+  --warning-ink: #6d4a04;
+  --warning-tint: #fcf3da;
+  --danger: #b42331;
+  --danger-ink: #7e1a24;
+  --danger-tint: #fbe9ec;
+
+  --font-sans: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Cascadia Code', Consolas, Menlo, monospace;
+
+  --radius: 6px;
+  --shadow: 0 8px 24px rgba(14, 36, 68, 0.2);
+}

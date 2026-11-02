@@ -8,10 +8,10 @@
     "test:backend": "cd backend && python -m pytest tests/ -v --tb=short",
     "test:frontend": "cd frontend && npm run test -- --run",
     "lint": "npm run lint:backend && npm run lint:frontend",
-    "lint:backend": "cd backend && ruff check app/ tests/",
+    "lint:backend": "cd backend && ruff check app/ tests/ run_demo.py",
     "lint:frontend": "cd frontend && npm run lint",
     "typecheck": "cd backend && mypy app/ && cd ../frontend && npx tsc --noEmit",
     "build": "cd frontend && npm run build",
-    "install:all": "cd backend && python -m pip install -e \".[test]\" && cd ../frontend && npm install"
+    "install:all": "cd backend && python -m pip install -e \".[test]\" -c constraints.txt && cd ../frontend && npm install"
   }
 }

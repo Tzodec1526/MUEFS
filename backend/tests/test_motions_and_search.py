@@ -1,5 +1,3 @@
-"""Tests for filing motions to existing cases and case search functionality."""
-
 from datetime import UTC, datetime
 
 import pytest
@@ -14,7 +12,6 @@ from app.services import filing_service, search_service
 
 
 async def create_court_with_case(db_session):
-    """Create a court, case type, user, and an accepted case for motion testing."""
     user = User(
         email="motion_attorney@test.com",
         first_name="Motion",
@@ -54,7 +51,7 @@ async def create_court_with_case(db_session):
     subp_type = CaseType(
         court_id=court.id,
         code="CIV-SUBP",
-        name="Domesticating Subpoena - MI Uniform Depositions Act",
+        name="Domesticating Subpoena - Uniform Interstate Depositions and Discovery Act",
         category=CaseCategory.CIVIL,
         filing_fee_cents=15000,
     )
@@ -89,18 +86,14 @@ async def create_court_with_case(db_session):
     return user, clerk, court, case_type, subp_type, case
 
 
-# ========== MOTION FILING TESTS ==========
-
 
 @pytest.mark.asyncio
 async def test_file_motion_to_existing_case(db_session, stored_document):
-    """Test filing a motion to an already-existing case."""
     user, clerk, court, case_type, _, case = await create_court_with_case(db_session)
 
-    # Create a motion filing referencing the existing case
     motion_data = FilingEnvelopeCreate(
         court_id=court.id,
-        case_id=case.id,  # Filing to existing case
+        case_id=case.id,
         case_type_id=case_type.id,
         case_title=case.title,
         filing_description="Motion for Summary Disposition under MCR 2.116(C)(10)",
@@ -110,24 +103,20 @@ async def test_file_motion_to_existing_case(db_session, stored_document):
     assert motion_filing.case_id == case.id
     assert motion_filing.status == FilingStatus.DRAFT
 
-    # Add motion document
     motion_doc = stored_document(motion_filing.id, document_type_code="MOTION",
         title="Motion for Summary Disposition")
     db_session.add(motion_doc)
 
-    # Add brief in support
     brief_doc = stored_document(motion_filing.id, document_type_code="BRIEF",
         title="Brief in Support of Motion for Summary Disposition")
     db_session.add(brief_doc)
     await db_session.flush()
 
-    # Submit the motion
     submitted = await filing_service.submit_filing(db_session, motion_filing.id)
     assert submitted is not None
     assert submitted.status == FilingStatus.SUBMITTED
     assert submitted.case_id == case.id
 
-    # Accept the motion
     accepted = await filing_service.review_filing(
         db_session,
         motion_filing.id,
@@ -137,13 +126,11 @@ async def test_file_motion_to_existing_case(db_session, stored_document):
     )
     assert accepted is not None
     assert accepted.status == FilingStatus.ACCEPTED
-    # Should NOT create a new case since case_id was provided
     assert accepted.case_id == case.id
 
 
 @pytest.mark.asyncio
 async def test_file_multiple_motions_to_same_case(db_session):
-    """Test filing multiple motions to the same case."""
     user, clerk, court, case_type, _, case = await create_court_with_case(db_session)
 
     motion_titles = [
@@ -160,7 +147,6 @@ async def test_file_multiple_motions_to_same_case(db_session):
             filing_description=title,
         )
         await filing_service.create_filing(db_session, user.id, data)
-    # Verify all filings are linked to the same case
     filings, total, _ = await filing_service.list_filings(db_session, user.id)
     case_filings = [f for f in filings if f.case_id == case.id]
     assert len(case_filings) == 3
@@ -168,7 +154,6 @@ async def test_file_multiple_motions_to_same_case(db_session):
 
 @pytest.mark.asyncio
 async def test_motion_rejected_and_refiled(db_session, stored_document):
-    """Test motion rejected by clerk, then corrected and resubmitted."""
     user, clerk, court, case_type, _, case = await create_court_with_case(db_session)
 
     data = FilingEnvelopeCreate(
@@ -185,7 +170,6 @@ async def test_motion_rejected_and_refiled(db_session, stored_document):
 
     await filing_service.submit_filing(db_session, filing.id)
 
-    # Clerk returns for correction
     returned = await filing_service.review_filing(
         db_session,
         filing.id,
@@ -200,7 +184,6 @@ async def test_motion_rejected_and_refiled(db_session, stored_document):
 
 @pytest.mark.asyncio
 async def test_domesticating_subpoena_filing(db_session, stored_document):
-    """Test filing a domesticating subpoena under Michigan Uniform Depositions Act."""
     user, clerk, court, _, subp_type, _ = await create_court_with_case(db_session)
 
     data = FilingEnvelopeCreate(
@@ -208,36 +191,30 @@ async def test_domesticating_subpoena_filing(db_session, stored_document):
         court_id=court.id,
         case_type_id=subp_type.id,
         case_title="In re: Subpoena from State of Ohio, Case No. OH-2024-12345",
-        filing_description="Request to domesticate out-of-state subpoena per MCL 600.2163a",
+        filing_description="Request to domesticate out-of-state subpoena per MCL 600.2201 et seq.",
     )
     filing = await filing_service.create_filing(db_session, user.id, data)
 
-    # Upload the out-of-state subpoena
     subpoena_doc = stored_document(filing.id, document_type_code="SUBPOENA",
         title="Ohio Subpoena - Authenticated Copy")
     db_session.add(subpoena_doc)
 
-    # Upload proposed Michigan subpoena
     proposed_doc = stored_document(filing.id, document_type_code="PROPOSED_SUBP",
         title="Proposed Michigan Subpoena")
     db_session.add(proposed_doc)
     await db_session.flush()
 
-    # Submit and accept
     await filing_service.submit_filing(db_session, filing.id)
     accepted = await filing_service.review_filing(
         db_session, filing.id, reviewer_id=clerk.id, action="accept", expected_submission_count=1
     )
     assert accepted.status == FilingStatus.ACCEPTED
-    assert accepted.case_id is not None  # New case created for the subpoena
+    assert accepted.case_id is not None
 
-
-# ========== SERVICE ONLY TESTS ==========
 
 
 @pytest.mark.asyncio
 async def test_service_only_filing(db_session, stored_document):
-    """Test service-only filing that skips clerk review."""
     user, clerk, court, case_type, _, case = await create_court_with_case(db_session)
 
     data = FilingEnvelopeCreate(
@@ -250,13 +227,11 @@ async def test_service_only_filing(db_session, stored_document):
     filing = await filing_service.create_filing(db_session, user.id, data)
     assert filing.filing_type == "service_only"
 
-    # Add discovery document
     doc = stored_document(filing.id, document_type_code="DISC_INTERROG",
         title="Plaintiff's First Set of Interrogatories")
     db_session.add(doc)
     await db_session.flush()
 
-    # Submit - should go straight to SERVED, not SUBMITTED
     submitted = await filing_service.submit_filing(db_session, filing.id)
     assert submitted is not None
     assert submitted.status == FilingStatus.SERVED
@@ -264,50 +239,87 @@ async def test_service_only_filing(db_session, stored_document):
     assert submitted.submitted_at is not None
 
 
-# ========== CASE SEARCH TESTS ==========
+
+async def create_distractor_case(db_session):
+    court = Court(
+        name="6th Circuit Court",
+        county="Oakland",
+        court_type=CourtType.CIRCUIT,
+        city="Pontiac",
+    )
+    db_session.add(court)
+    await db_session.flush()
+    case_type = CaseType(
+        court_id=court.id,
+        code="CIV-GEN",
+        name="Civil - General",
+        category=CaseCategory.CIVIL,
+        filing_fee_cents=15000,
+    )
+    db_session.add(case_type)
+    await db_session.flush()
+    case = Case(
+        court_id=court.id, case_type_id=case_type.id, case_number="DISTRACTOR-CASE-2",
+        title="Doe v. Acme Holdings", filed_date=datetime.now(UTC),
+    )
+    db_session.add(case)
+    await db_session.flush()
+    db_session.add_all([
+        CaseParticipant(
+            case_id=case.id, role=ParticipantRole.ATTORNEY_PLAINTIFF,
+            party_name="Other Counsel", attorney_bar_number="P88888",
+        ),
+        CaseParticipant(case_id=case.id, role=ParticipantRole.PLAINTIFF, party_name="Jane Doe"),
+        CaseParticipant(
+            case_id=case.id, role=ParticipantRole.DEFENDANT, party_name="Acme Holdings",
+        ),
+    ])
+    await db_session.flush()
+    return case
 
 
 @pytest.mark.asyncio
 async def test_search_by_case_number(db_session):
-    """Test searching for a case by case number."""
     user, _, _, _, _, case = await create_court_with_case(db_session)
+    await create_distractor_case(db_session)
 
     cases, total = await search_service.search_cases(
         db_session, case_number=case.case_number
     )
-    assert total >= 1
-    assert any(c.id == case.id for c in cases)
+    assert total == 1
+    assert [c.id for c in cases] == [case.id]
 
 
 @pytest.mark.asyncio
 async def test_search_by_party_name(db_session):
-    """Test searching for a case by party name."""
     user, _, _, _, _, case = await create_court_with_case(db_session)
+    await create_distractor_case(db_session)
 
     cases, total = await search_service.search_cases(
         db_session, party_name="Smith Industries"
     )
-    assert total >= 1
-    found = [c for c in cases if c.id == case.id]
-    assert len(found) == 1
-    assert found[0].title == "Johnson v. Smith Industries LLC"
+    assert total == 1
+    assert [c.id for c in cases] == [case.id]
+    assert cases[0].title == "Johnson v. Smith Industries LLC"
 
 
 @pytest.mark.asyncio
 async def test_search_by_attorney_bar_number(db_session):
-    """Test searching by attorney bar number."""
     user, _, _, _, _, case = await create_court_with_case(db_session)
+    await create_distractor_case(db_session)
 
     cases, total = await search_service.search_cases(
         db_session, attorney_bar_number="P77777"
     )
-    assert total >= 1
-    assert any(c.id == case.id for c in cases)
+    assert total == 1
+    assert [c.id for c in cases] == [case.id]
 
 
 @pytest.mark.asyncio
 async def test_search_no_results(db_session):
-    """Test search with no matching results."""
+    await create_court_with_case(db_session)
+    await create_distractor_case(db_session)
+
     cases, total = await search_service.search_cases(
         db_session, case_number="NONEXISTENT-999"
     )
@@ -317,19 +329,18 @@ async def test_search_no_results(db_session):
 
 @pytest.mark.asyncio
 async def test_search_by_court_id(db_session):
-    """Test filtering search by court ID."""
     user, _, court, _, _, case = await create_court_with_case(db_session)
+    await create_distractor_case(db_session)
 
     cases, total = await search_service.search_cases(
         db_session, court_id=court.id
     )
-    assert total >= 1
-    assert all(c.court_id == court.id for c in cases)
+    assert total == 1
+    assert [c.id for c in cases] == [case.id]
 
 
 @pytest.mark.asyncio
 async def test_search_excludes_sealed_cases(db_session):
-    """Sealed matters are not listed in the public transparency search index."""
     from datetime import UTC, datetime
 
     user = User(
@@ -385,12 +396,9 @@ async def test_search_excludes_sealed_cases(db_session):
     assert cases[0].id == open_case.id
 
 
-# ========== FAVORITE CASES TESTS ==========
-
 
 @pytest.mark.asyncio
 async def test_favorite_case(db_session):
-    """Test adding a case to favorites."""
     user, _, _, _, _, case = await create_court_with_case(db_session)
 
     fav = FavoriteCase(user_id=user.id, case_id=case.id, notes="Key breach of contract case")
@@ -398,18 +406,16 @@ async def test_favorite_case(db_session):
     await db_session.flush()
 
     result = await db_session.execute(
-        select(FavoriteCase).where(
+        select(FavoriteCase.notes).where(
             FavoriteCase.user_id == user.id,
             FavoriteCase.case_id == case.id,
         )
     )
-    saved = result.scalar_one()
-    assert saved.notes == "Key breach of contract case"
+    assert result.scalar_one() == "Key breach of contract case"
 
 
 @pytest.mark.asyncio
 async def test_favorite_case_unique_constraint(db_session):
-    """Test that a user can't favorite the same case twice."""
     user, _, _, _, _, case = await create_court_with_case(db_session)
 
     fav1 = FavoriteCase(user_id=user.id, case_id=case.id)
@@ -424,11 +430,11 @@ async def test_favorite_case_unique_constraint(db_session):
         await db_session.flush()
 
 
-# ========== DISCOVERY-MOTION CERTIFICATION (MCR 2.313(A)) ==========
+
+CERTIFICATION_MISSING = "Certification of Good Faith Effort (discovery motions). See MCR 2.313(A)."
 
 
 async def _seed_motion_requirements(db_session, court, case_type):
-    """Mirror the seeded motion requirements that matter to validation."""
     db_session.add_all([
         FilingRequirement(
             court_id=court.id, case_type_id=case_type.id,
@@ -456,7 +462,6 @@ def _motion_doc(envelope_id: int, code: str, title: str) -> FilingDocument:
 
 @pytest.mark.asyncio
 async def test_general_motion_does_not_require_discovery_certification(db_session):
-    """A non-discovery motion must not be blocked for lacking a meet-and-confer cert."""
     user, clerk, court, case_type, _, case = await create_court_with_case(db_session)
     await _seed_motion_requirements(db_session, court, case_type)
 
@@ -471,13 +476,14 @@ async def test_general_motion_does_not_require_discovery_certification(db_sessio
     db_session.add(_motion_doc(motion.id, "MOT_RECONSIDER", "Motion for Reconsideration"))
     await db_session.flush()
 
-    validation = await filing_service.validate_filing(db_session, motion.id)
+    validation = await filing_service.validate_filing(
+        db_session, await filing_service.get_filing(db_session, motion.id),
+    )
     assert validation.is_valid, validation.missing_required_documents
 
 
 @pytest.mark.asyncio
 async def test_discovery_motion_requires_certification(db_session):
-    """MCR 2.313(A): a motion to compel needs the good-faith certification."""
     user, clerk, court, case_type, _, case = await create_court_with_case(db_session)
     await _seed_motion_requirements(db_session, court, case_type)
 
@@ -492,12 +498,41 @@ async def test_discovery_motion_requires_certification(db_session):
     db_session.add(_motion_doc(motion.id, "MOT_COMPEL", "Motion to Compel Discovery"))
     await db_session.flush()
 
-    validation = await filing_service.validate_filing(db_session, motion.id)
+    validation = await filing_service.validate_filing(
+        db_session, await filing_service.get_filing(db_session, motion.id),
+    )
     assert not validation.is_valid
-    assert any("DISC_CERT_GF" in m for m in validation.missing_required_documents)
+    assert validation.missing_required_documents == [CERTIFICATION_MISSING]
 
     db_session.add(_motion_doc(motion.id, "DISC_CERT_GF", "Certification of Good Faith Effort"))
     await db_session.flush()
     await db_session.refresh(motion, ["documents"])
-    validation = await filing_service.validate_filing(db_session, motion.id)
+    validation = await filing_service.validate_filing(
+        db_session, await filing_service.get_filing(db_session, motion.id),
+    )
     assert validation.is_valid, validation.missing_required_documents
+
+
+@pytest.mark.parametrize("codes, missing", [
+    (["ANSWER"], []),
+    (["MOT_COMPEL"], [CERTIFICATION_MISSING]),
+])
+async def test_subsequent_filing_needs_motion_companions_only_with_a_motion(
+    db_session, codes, missing,
+):
+    user, _, court, case_type, _, case = await create_court_with_case(db_session)
+    await _seed_motion_requirements(db_session, court, case_type)
+    filing = FilingEnvelope(
+        court_id=court.id, case_id=case.id, case_type_id=case_type.id,
+        filer_id=user.id, case_title=case.title, filing_type="subsequent",
+        status=FilingStatus.DRAFT,
+    )
+    db_session.add(filing)
+    await db_session.flush()
+    db_session.add_all([_motion_doc(filing.id, code, code.title()) for code in codes])
+    await db_session.flush()
+
+    validation = await filing_service.validate_filing(
+        db_session, await filing_service.get_filing(db_session, filing.id),
+    )
+    assert validation.missing_required_documents == missing

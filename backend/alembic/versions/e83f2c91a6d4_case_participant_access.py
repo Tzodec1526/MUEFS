@@ -1,5 +1,3 @@
-"""Require explicit court review for participant access; preserve legacy records."""
-
 import sqlalchemy as sa
 
 from alembic import op
@@ -29,9 +27,6 @@ def upgrade() -> None:
     op.add_column("case_participants", sa.Column("reviewed_at", sa.DateTime(timezone=True)))
     op.create_index("ix_cases_court_id_id", "cases", ["court_id", "id"])
     op.create_index("ix_users_email_lower", "users", [sa.text("lower(email)")])
-    # Existing links may have been inferred solely from accepting an envelope. We cannot
-    # recover their authority from those rows. Keep every record and require court review
-    # before it can grant restricted docket access; never fabricate an approval.
     participants = sa.table("case_participants", sa.column("case_id", sa.Integer()))
     audit = sa.table(
         "audit_log",

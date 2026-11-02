@@ -3,9 +3,11 @@ import { isAxiosError } from 'axios';
 import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { participantRoles } from '../../api/cases';
-import { getErrorDetail } from '../../utils/errors';
-import { parseServerDate } from '../../utils/format';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
+import { formatDateTime } from '../../utils/format';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 interface Participant {
   id: number; party_name: string; role: string; account_email: string | null; user_id: number | null;
@@ -22,6 +24,11 @@ interface History {
     before?: Record<string, unknown>; after?: Record<string, unknown>;
   } }[];
 }
+const historyLabels: Record<string, string> = {
+  'case.participant_created': 'Participant added', 'case.participant_changed': 'Participant changed',
+  'case.public_access_changed': 'Public case access changed',
+  'case.participants_review_required': 'Participant records marked for court review',
+};
 const fields: Record<string, string> = {
   party_name: 'Name', role: 'Role', user_id: 'Linked account', attorney_bar_number: 'Bar number',
   represented_party_name: 'Represented party', is_active: 'Active participant', access_enabled: 'Restricted-case access',
@@ -51,12 +58,12 @@ function ParticipantForm({ caseId, record, version, onSaved }: {
       if (record) await apiClient.put(`/cases/${caseId}/participants/${record.id}`, data);
       else await apiClient.post(`/cases/${caseId}/participants`, data);
       onSaved();
-    } catch (err) { setError(getErrorDetail(err) || 'Could not save the participant record.'); }
+    } catch (err) { setError(errorMessage(err, 'Could not save the participant record.')); }
     finally { setBusy(false); }
   }
   return <form className="admin-account-form" onSubmit={save}>
-    <h3>{record ? 'Edit participant' : 'Add participant'}</h3>
-    {record && !record.reviewed_at && <p className="alert alert-info">This legacy record requires court review before it can grant restricted-case access.</p>}
+    <h2 className="card-heading">{record ? 'Edit participant' : 'Add participant'}</h2>
+    {record && !record.reviewed_at && <p className="alert alert-info">Unreviewed record. Court review is required before it can grant restricted-case access.</p>}
     <div className="admin-form-grid">
       <div className="form-group"><label htmlFor="participant-name">Participant name</label>
         <input id="participant-name" name="party_name" required maxLength={255} defaultValue={record?.party_name} /></div>
@@ -79,7 +86,7 @@ function ParticipantForm({ caseId, record, version, onSaved }: {
     }} /> Active participant</label>
     <label className="checkbox-label"><input type="checkbox" checked={access} disabled={!active} onChange={event => setAccess(event.target.checked)} />
       Grant restricted-case access through this record</label>
-    <p>Retire a participant by clearing “Active participant.” Other active grants or court roles can still allow access. Filers keep access to their own envelopes.</p>
+    <p>Retire a participant by clearing “Active participant.” Other active grants or court roles can still allow access. Filers keep access to their own filings.</p>
     <div className="form-group"><label htmlFor="participant-reason">Reason and court authority or record reference</label>
       <textarea id="participant-reason" name="reason" required maxLength={1000} rows={3} /></div>
     {error && <p className="alert alert-error" role="alert">{error}</p>}
@@ -108,7 +115,7 @@ function PublicAccessForm({ caseId, restricted, version, onSaved, onReload }: {
     } catch (err) {
       const status = isAxiosError(err) ? err.response?.status : undefined;
       setMustReload(!status || status >= 500 || [401, 403, 409].includes(status));
-      setError(getErrorDetail(err) || 'The change could not be confirmed. Reload the records and review history before trying again.');
+      setError(errorMessage(err, 'The change could not be confirmed. Reload the records and review history before trying again.'));
     } finally { setBusy(false); }
   }
   return <details className="admin-detail-section">
@@ -141,14 +148,14 @@ function PublicAccessForm({ caseId, restricted, version, onSaved, onReload }: {
 function ParticipantHistory({ caseId }: { caseId: string }) {
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: History; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: History; error?: LoadFailure }>();
   const key = `${caseId}:${page}:${attempt}`;
   const current = result?.key === key ? result : undefined;
   useEffect(() => {
     const controller = new AbortController();
     apiClient.get<History>(`/cases/${caseId}/participants/history`, { params: { page }, signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load case access history.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load case access history.') }); });
     return () => controller.abort();
   }, [caseId, page, key]);
   function display(value: unknown, field: string) {
@@ -158,17 +165,15 @@ function ParticipantHistory({ caseId }: { caseId: string }) {
     return field === 'user_id' ? `Account ${value}` : String(value);
   }
   return <section className="admin-detail-section">
-    <h3>Retained case access history</h3>
+    <h2 className="card-heading">Retained case access history</h2>
     {!current && <p role="status">Loading history…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
       {!current.data.total && <p>No case access changes recorded.</p>}
       <ol className="admin-history">{current.data.events.map(event => <li key={event.id}>
-        <strong>{event.action === 'case.participant_created' ? 'Participant added'
-          : event.action === 'case.participant_changed' ? 'Participant changed'
-          : event.action === 'case.public_access_changed' ? 'Public case access changed' : 'Legacy records require review'}
+        <strong>{historyLabels[event.action] || event.action}
           {event.details.after?.party_name ? ` · ${event.details.after.party_name}` : ''}</strong>
-        <p>{parseServerDate(event.occurred_at).toISOString().replace('T', ' ').replace('Z', ' UTC')} · {event.details.actor_name || 'Database migration'}</p>
+        <p>{formatDateTime(event.occurred_at)} · {event.details.actor_name || 'Database migration'}</p>
         <p>{event.details.reason}</p>
         {event.details.authority_reference && <p>Authority: {event.details.authority_reference}</p>}
         {event.details.after && <details><summary>View recorded changes</summary><dl className="admin-changes">{Object.entries(fields).filter(([field]) =>
@@ -187,13 +192,14 @@ function ParticipantHistory({ caseId }: { caseId: string }) {
 }
 
 export default function CaseParticipantsPage() {
+  usePageTitle('Case access and participants');
   const { caseId = '' } = useParams<{ caseId: string }>();
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
   const [selection, setSelection] = useState<number | 'new' | null>(null);
   const [notice, setNotice] = useState('');
   const [showHistory, setShowHistory] = useState(false);
-  const [result, setResult] = useState<{ key: string; data?: Records; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: Records; error?: LoadFailure }>();
   const key = `${caseId}:${page}:${attempt}`;
   const current = result?.key === key ? result : undefined;
   const selected = current?.data?.participants.find(item => item.id === selection);
@@ -201,7 +207,7 @@ export default function CaseParticipantsPage() {
     const controller = new AbortController();
     apiClient.get<Records>(`/cases/${caseId}/participants`, { params: { page }, signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load participants.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load participants.') }); });
     return () => controller.abort();
   }, [caseId, page, key]);
   const editor = current?.data && (selection === 'new' || selected) && <ParticipantForm
@@ -210,11 +216,11 @@ export default function CaseParticipantsPage() {
       setSelection(null); setNotice('Participant record saved.'); setAttempt(n => n + 1);
     }} />;
   return <section className="case-participants-page">
-    <div className="page-header"><h2>Case access and participants</h2><Link to={`/cases/${caseId}`} className="btn btn-secondary">Back to case</Link></div>
+    <div className="page-header"><PageHeading>Case access and participants</PageHeading><Link to={`/cases/${caseId}`} className="btn btn-secondary">Back to case</Link></div>
     {!current && <p role="status">Loading participant records…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
-      <h3>{current.data.case_number} · {current.data.title}</h3>
+      <h2 className="card-heading">{current.data.case_number} · {current.data.title}</h2>
       <p><strong>{current.data.is_sealed ? 'Public case access is restricted.' : 'Public case access is enabled.'}</strong></p>
       <PublicAccessForm key={`${caseId}:${current.data.participant_version}`} caseId={caseId}
         restricted={current.data.is_sealed} version={current.data.participant_version}
@@ -232,7 +238,7 @@ export default function CaseParticipantsPage() {
           {' · '}{item.access_enabled ? 'Access granted through this record' : 'No access grant'}</p>
           {item.represented_party_name && <p>Represents {item.represented_party_name}</p>}
           {item.account_email && <p>{item.account_email}</p>}
-          {!item.reviewed_at && <p>Legacy record · court review needed</p>}</div>
+          {!item.reviewed_at && <p>Unreviewed record · court review needed</p>}</div>
         {item.user_id === current.data?.actor_id ? <span>Another staff member must edit your record.</span>
           : <button className="btn btn-secondary btn-small" onClick={() => { setSelection(item.id); setNotice(''); }}
             aria-label={`Edit ${item.party_name}`}>Edit</button>}

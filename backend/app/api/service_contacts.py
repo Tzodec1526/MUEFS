@@ -1,26 +1,25 @@
-"""Court-reviewed service instructions. These records do not transmit documents."""
-
 from datetime import UTC, datetime
-from typing import Annotated, Self
+from typing import Self
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user
+from app.api.params import Page, RecordId
 from app.database import get_db
 from app.models.audit import AuditLog
 from app.models.case import Case, CaseParticipant
 from app.models.notification import ServiceContact, ServiceMethod
 from app.models.user import User
+from app.schemas.common import ExpectedVersion
 from app.services import audit_service
 from app.services.case_participant_service import participant_snapshot, require_case_staff
 from app.services.service_contact_service import contact_snapshot, routing_issues
 from app.utils.http_context import client_ip, client_user_agent
 
 router = APIRouter(tags=["Service instructions"])
-RecordId = Annotated[int, Path(ge=1, le=2_147_483_647)]
 
 
 class ContactChange(BaseModel):
@@ -31,8 +30,8 @@ class ContactChange(BaseModel):
     is_active: bool = True
     authority: str = Field(min_length=1, max_length=1000)
     reason: str = Field(min_length=1, max_length=1000)
-    expected_version: int = Field(ge=0)
-    expected_participant_version: int = Field(ge=0)
+    expected_version: ExpectedVersion
+    expected_participant_version: ExpectedVersion
 
     @model_validator(mode="after")
     def destination_matches_method(self) -> Self:
@@ -85,8 +84,6 @@ async def save_service_instructions(
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
-    # Match participant management's actor-before-case lock order. The case lock also
-    # serializes creation of a participant's first contact and participant reassignments.
     actor = await db.scalar(
         select(User)
         .where(User.id == current_user.id)
@@ -125,7 +122,7 @@ async def save_service_instructions(
         raise HTTPException(409, "Another court staff member must manage your service instructions")
     if contact and contact.case_id != case.id:
         raise HTTPException(
-            409, "The legacy contact belongs to another case and needs reconciliation"
+            409, "This older contact belongs to another case and needs reconciliation"
         )
     if (contact.version if contact else 0) != data.expected_version:
         raise HTTPException(409, "The service instructions changed. Refresh before saving")
@@ -140,7 +137,6 @@ async def save_service_instructions(
         "is_active": data.is_active,
         "authority": data.authority,
     }
-    # Validate a proposal before touching the persisted contact or its retained history.
     proposal = ServiceContact(case_id=case.id, participant_id=participant.id, **values)
     account = await db.get(User, participant.user_id) if participant.user_id else None
     if data.is_active:
@@ -182,7 +178,7 @@ async def save_service_instructions(
 async def service_instruction_history(
     case_id: RecordId,
     participant_id: RecordId,
-    page: int = Query(1, ge=1),
+    page: Page = 1,
     db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(get_current_user),
 ):
@@ -207,9 +203,7 @@ async def service_instruction_history(
             {
                 "id": row.id,
                 "details": row.details,
-                "occurred_at": row.timestamp.replace(
-                    tzinfo=row.timestamp.tzinfo or UTC
-                ).isoformat(),
+                "occurred_at": row.timestamp.isoformat(),
             }
             for row in rows
         ],

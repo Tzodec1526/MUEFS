@@ -1,7 +1,10 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { getFilingRequirements } from '../../api/courts';
 import { getFiling, uploadDocument, removeDocument } from '../../api/filings';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
+import { FILING_CATEGORIES, getDocumentLabel } from '../../utils/documentTypes';
 import { formatBytes } from '../../utils/format';
+import LoadError from '../common/LoadError';
 
 interface DocumentInfo {
   id: number;
@@ -13,246 +16,23 @@ interface DocumentInfo {
 
 interface Props {
   filingId: number;
+  courtId: number;
+  caseTypeId: number;
+  filingType: string;
   documents: DocumentInfo[];
   onDocumentsChange: (docs: DocumentInfo[]) => void;
   onBusyChange: (busy: boolean) => void;
 }
 
-// Comprehensive MCR-based filing types organized by category
-const FILING_CATEGORIES = [
-  {
-    label: 'Initiating Documents',
-    types: [
-      { code: 'COMPLAINT', label: 'Complaint', mcr: 'MCR 2.111' },
-      { code: 'PETITION', label: 'Petition', mcr: 'MCR 3.206' },
-      { code: 'COUNTERCLAIM', label: 'Counterclaim', mcr: 'MCR 2.203(A)' },
-      { code: 'CROSSCLAIM', label: 'Cross-Claim', mcr: 'MCR 2.203(B)' },
-      { code: 'THIRD_PARTY', label: 'Third-Party Complaint', mcr: 'MCR 2.204' },
-      { code: 'INTERVENOR', label: 'Complaint in Intervention', mcr: 'MCR 2.209' },
-      { code: 'SUMMONS', label: 'Summons', mcr: 'MCR 2.102' },
-      { code: 'AMENDED_COMP', label: 'Amended Complaint', mcr: 'MCR 2.118' },
-    ],
-  },
-  {
-    label: 'Responsive Pleadings',
-    types: [
-      { code: 'ANSWER', label: 'Answer & Affirmative Defenses', mcr: 'MCR 2.111(F)' },
-      { code: 'REPLY', label: 'Reply to Counterclaim', mcr: 'MCR 2.110(B)' },
-      { code: 'RESPONSE', label: 'Response to Motion', mcr: 'MCR 2.119(A)(2)' },
-      { code: 'REPLY_BRIEF', label: 'Reply Brief', mcr: 'MCR 2.119(A)(2)' },
-      { code: 'OBJECTION', label: 'Objection', mcr: '' },
-    ],
-  },
-  {
-    label: 'Motions',
-    types: [
-      { code: 'MOT_SD', label: 'Motion for Summary Disposition', mcr: 'MCR 2.116' },
-      { code: 'MOT_DISMISS', label: 'Motion to Dismiss', mcr: 'MCR 2.116(C)' },
-      { code: 'MOT_COMPEL', label: 'Motion to Compel Discovery', mcr: 'MCR 2.313(A)' },
-      { code: 'MOT_PROTECTIVE', label: 'Motion for Protective Order', mcr: 'MCR 2.302(C)' },
-      { code: 'MOT_SANCTIONS', label: 'Motion for Sanctions', mcr: 'MCR 1.109(E)' },
-      { code: 'MOT_DEFAULT', label: 'Motion for Default Judgment', mcr: 'MCR 2.603' },
-      { code: 'MOT_SJ', label: 'Motion for Summary Judgment', mcr: 'MCR 2.116(C)(10)' },
-      { code: 'MOT_LIMINE', label: 'Motion in Limine', mcr: 'MRE 103' },
-      { code: 'MOT_RECONSIDER', label: 'Motion for Reconsideration', mcr: 'MCR 2.119(F)' },
-      { code: 'MOT_RELIEF', label: 'Motion for Relief from Judgment', mcr: 'MCR 2.612' },
-      { code: 'MOT_STAY', label: 'Motion to Stay Proceedings', mcr: 'MCR 2.614' },
-      { code: 'MOT_ADJOURN', label: 'Motion to Adjourn', mcr: 'MCR 2.503' },
-      { code: 'MOT_INTERVENE', label: 'Motion to Intervene', mcr: 'MCR 2.209' },
-      { code: 'MOT_AMEND', label: 'Motion to Amend Pleadings', mcr: 'MCR 2.118' },
-      { code: 'MOT_QUASH', label: 'Motion to Quash Subpoena', mcr: 'MCR 2.506(H)' },
-      { code: 'MOT_TRANSFER', label: 'Motion to Transfer Venue', mcr: 'MCR 2.222' },
-      { code: 'MOT_CONSOLIDATE', label: 'Motion to Consolidate', mcr: 'MCR 2.505(A)' },
-      { code: 'MOT_WITHDRAW', label: 'Motion to Withdraw as Attorney', mcr: 'MCR 2.117(C)' },
-      { code: 'MOT_TRO', label: 'Motion for Temporary Restraining Order', mcr: 'MCR 3.310' },
-      { code: 'MOT_PRELIM_INJ', label: 'Motion for Preliminary Injunction', mcr: 'MCR 3.310' },
-      { code: 'MOT_FEES', label: 'Motion for Attorney Fees/Costs', mcr: 'MCR 2.625' },
-      { code: 'MOT_OTHER', label: 'Other Motion', mcr: 'MCR 2.119' },
-    ],
-  },
-  {
-    label: 'Discovery',
-    types: [
-      { code: 'DISC_INTERROG', label: 'Interrogatories', mcr: 'MCR 2.309' },
-      { code: 'DISC_ANSWERS', label: 'Answers to Interrogatories', mcr: 'MCR 2.309(B)' },
-      { code: 'DISC_RFP', label: 'Request for Production of Documents', mcr: 'MCR 2.310' },
-      { code: 'DISC_RFP_RESP', label: 'Response to Request for Production', mcr: 'MCR 2.310(B)' },
-      { code: 'DISC_RFA', label: 'Request for Admissions', mcr: 'MCR 2.312' },
-      { code: 'DISC_RFA_RESP', label: 'Response to Request for Admissions', mcr: 'MCR 2.312(B)' },
-      { code: 'DISC_DEPO_NOT', label: 'Notice of Deposition', mcr: 'MCR 2.306' },
-      { code: 'DISC_DEPO_TR', label: 'Deposition Transcript', mcr: 'MCR 2.306' },
-      { code: 'DISC_SUBPOENA', label: 'Subpoena / Subpoena Duces Tecum', mcr: 'MCR 2.506' },
-      { code: 'DISC_DOM_SUBP', label: 'Domesticating Out-of-State Subpoena', mcr: 'MCL 600.2163a' },
-      { code: 'DISC_IME', label: 'Request for Independent Medical Exam', mcr: 'MCR 2.311' },
-      { code: 'DISC_INITIAL', label: 'Initial Disclosure', mcr: 'MCR 2.302(A)' },
-      { code: 'DISC_SUPPL', label: 'Supplemental Disclosure', mcr: 'MCR 2.302(A)' },
-      { code: 'DISC_PRIVILEGE', label: 'Privilege Log', mcr: 'MCR 2.302(B)(6)' },
-      { code: 'DISC_EXPERT', label: 'Expert Witness Identification & Opinions', mcr: 'MCR 2.302(B)(4)' },
-      { code: 'DISC_CERT_GF', label: 'Certification of Good Faith Discovery Effort', mcr: 'MCR 2.313(A)' },
-    ],
-  },
-  {
-    label: 'Briefs & Memoranda',
-    types: [
-      { code: 'BRIEF_SUPPORT', label: 'Brief in Support of Motion', mcr: 'MCR 2.119(A)(2)' },
-      { code: 'BRIEF_RESPONSE', label: 'Response Brief', mcr: 'MCR 2.119(A)(2)' },
-      { code: 'BRIEF_REPLY', label: 'Reply Brief', mcr: 'MCR 2.119(A)(2)' },
-      { code: 'BRIEF_AMICUS', label: 'Amicus Curiae Brief', mcr: 'MCR 7.212(H)' },
-      { code: 'MEMO_LAW', label: 'Memorandum of Law', mcr: '' },
-      { code: 'TRIAL_BRIEF', label: 'Trial Brief', mcr: '' },
-    ],
-  },
-  {
-    label: 'Orders & Judgments',
-    types: [
-      { code: 'PROPOSED_ORDER', label: 'Proposed Order', mcr: 'MCR 2.602' },
-      { code: 'STIP_ORDER', label: 'Stipulated Order', mcr: 'MCR 2.507' },
-      { code: 'CONSENT_JUDG', label: 'Consent Judgment', mcr: 'MCR 2.507' },
-      { code: 'DEFAULT_JUDG', label: 'Default Judgment', mcr: 'MCR 2.603' },
-      { code: 'PROPOSED_JUDG', label: 'Proposed Judgment', mcr: 'MCR 2.602' },
-      { code: 'SATISFACTION', label: 'Satisfaction of Judgment', mcr: '' },
-    ],
-  },
-  {
-    label: 'Post-Judgment',
-    types: [
-      { code: 'PJ_NEW_TRIAL', label: 'Motion for New Trial', mcr: 'MCR 2.606' },
-      { code: 'PJ_SET_ASIDE', label: 'Motion to Set Aside Default Judgment', mcr: 'MCR 2.603' },
-      { code: 'PJ_GARNISH', label: 'Writ of Garnishment', mcr: 'MCL 600.4011' },
-      { code: 'PJ_EXECUTION', label: 'Writ of Execution', mcr: 'MCR 3.106' },
-      { code: 'PJ_DEBTOR_EXAM', label: 'Order for Judgment Debtor Examination', mcr: 'MCR 2.621' },
-      { code: 'PJ_ABSTRACT', label: 'Abstract of Judgment', mcr: '' },
-    ],
-  },
-  {
-    label: 'ADR / Settlement',
-    types: [
-      { code: 'ADR_CASE_EVAL', label: 'Case Evaluation Summary', mcr: 'MCR 2.403' },
-      { code: 'ADR_ACCEPT_REJ', label: 'Accept/Reject Case Evaluation', mcr: 'MCR 2.403(L)' },
-      { code: 'ADR_MEDIATION', label: 'Mediation Summary', mcr: 'MCR 2.411' },
-      { code: 'ADR_OFFER_JUDG', label: 'Offer of Judgment', mcr: 'MCR 2.405' },
-      { code: 'ADR_ACCEPT_OJ', label: 'Acceptance of Offer of Judgment', mcr: 'MCR 2.405' },
-      { code: 'ADR_SETTLE', label: 'Settlement Agreement', mcr: '' },
-      { code: 'ADR_STIP_DISM', label: 'Stipulation and Order of Dismissal', mcr: 'MCR 2.504' },
-    ],
-  },
-  {
-    label: 'Notices',
-    types: [
-      { code: 'NOT_HEARING', label: 'Notice of Hearing', mcr: 'MCR 2.119(C)' },
-      { code: 'NOT_DEPO', label: 'Notice of Deposition', mcr: 'MCR 2.306(B)' },
-      { code: 'NOT_APPEAR', label: 'Notice of Appearance', mcr: 'MCR 2.117(A)' },
-      { code: 'NOT_APPEN_ISS', label: 'Notice of Appeal', mcr: 'MCR 7.204' },
-      { code: 'NOT_DISMISS', label: 'Notice of Voluntary Dismissal', mcr: 'MCR 2.504(A)' },
-      { code: 'NOT_SETTLEMENT', label: 'Notice of Settlement', mcr: '' },
-      { code: 'NOT_NONPARTY', label: 'Notice to Non-Party', mcr: '' },
-      { code: 'NOT_CHANGE_ADDR', label: 'Notice of Change of Address', mcr: 'MCR 2.107(G)' },
-    ],
-  },
-  {
-    label: 'Affidavits & Declarations',
-    types: [
-      { code: 'AFFIDAVIT', label: 'Affidavit', mcr: '' },
-      { code: 'AFF_MERIT', label: 'Affidavit of Merit (Medical Malpractice)', mcr: 'MCL 600.2912d' },
-      { code: 'AFF_SERVICE', label: 'Affidavit of Service', mcr: 'MCR 2.104' },
-      { code: 'AFF_DEFAULT', label: 'Affidavit of Default', mcr: 'MCR 2.603(A)' },
-      { code: 'AFF_COSTS', label: 'Affidavit of Costs', mcr: '' },
-      { code: 'DECLARATION', label: 'Declaration Under Penalty of Perjury', mcr: 'MCR 1.109(D)(3)' },
-      { code: 'VERIFICATION', label: 'Verification', mcr: 'MCR 1.109(D)(3)' },
-    ],
-  },
-  {
-    label: 'Proof of Service',
-    types: [
-      { code: 'POS_PERSONAL', label: 'Proof of Service - Personal', mcr: 'MCR 2.104' },
-      { code: 'POS_MAIL', label: 'Proof of Service - Mail', mcr: 'MCR 2.107' },
-      { code: 'POS_ELECTRONIC', label: 'Proof of Service - Electronic', mcr: 'MCR 1.109(G)(6)' },
-    ],
-  },
-  {
-    label: 'Family Law',
-    types: [
-      { code: 'FAM_DIVORCE', label: 'Complaint for Divorce', mcr: 'MCR 3.206' },
-      { code: 'FAM_CUSTODY', label: 'Custody Motion/Petition', mcr: 'MCL 722.27' },
-      { code: 'FAM_SUPPORT', label: 'Motion to Modify Child Support', mcr: 'MCL 552.517' },
-      { code: 'FAM_PPO', label: 'Petition for Personal Protection Order', mcr: 'MCR 3.703' },
-      { code: 'FAM_FOC', label: 'Friend of the Court Recommendation', mcr: 'MCL 552.507' },
-      { code: 'FAM_PARENTING', label: 'Proposed Parenting Time Order', mcr: 'MCL 722.27a' },
-      { code: 'FAM_SETTLE', label: 'Marital Settlement Agreement', mcr: '' },
-      { code: 'FAM_UCCJEA', label: 'UCCJEA Affidavit', mcr: 'MCL 722.1209' },
-      { code: 'FAM_FINANCIAL', label: 'Verified Financial Information Form (CC 320)', mcr: 'MCR 3.206' },
-      { code: 'FAM_SEP_MAINT', label: 'Complaint for Separate Maintenance', mcr: 'MCR 3.201' },
-      { code: 'FAM_ANNUL', label: 'Complaint for Annulment', mcr: 'MCR 3.201' },
-      { code: 'FAM_PATERNITY', label: 'Petition for Paternity', mcr: 'MCR 3.201' },
-      { code: 'FAM_QDRO', label: 'Qualified Domestic Relations Order (QDRO)', mcr: '' },
-      { code: 'FAM_SPOUSAL', label: 'Motion to Modify Spousal Support', mcr: '' },
-    ],
-  },
-  {
-    label: 'Appellate',
-    types: [
-      { code: 'APP_NOTICE', label: 'Claim of Appeal', mcr: 'MCR 7.204' },
-      { code: 'APP_LEAVE', label: 'Application for Leave to Appeal', mcr: 'MCR 7.205' },
-      { code: 'APP_BRIEF', label: "Appellant's Brief", mcr: 'MCR 7.212' },
-      { code: 'APP_RESP', label: "Appellee's Brief", mcr: 'MCR 7.212' },
-      { code: 'APP_REPLY', label: 'Reply Brief on Appeal', mcr: 'MCR 7.212' },
-      { code: 'APP_RECORD', label: 'Record on Appeal', mcr: 'MCR 7.210' },
-      { code: 'APP_EMERGENCY', label: 'Emergency Application', mcr: 'MCR 7.211(C)(6)' },
-      { code: 'APP_TRANSCRIPT', label: 'Transcript Order / Filing', mcr: 'MCR 7.210(B)' },
-    ],
-  },
-  {
-    label: 'Case Administration',
-    types: [
-      { code: 'COVER_SHEET', label: 'Civil Case Cover Sheet', mcr: 'MCR 8.119' },
-      { code: 'STIPULATION', label: 'Stipulation', mcr: 'MCR 2.507' },
-      { code: 'CASE_EVAL', label: 'Case Evaluation Summary', mcr: 'MCR 2.403' },
-      { code: 'MEDIATION', label: 'Mediation Summary', mcr: 'MCR 2.411' },
-      { code: 'PRETRIAL_STMT', label: 'Pretrial Statement', mcr: 'MCR 2.401' },
-      { code: 'WITNESS_LIST', label: 'Witness List', mcr: 'MCR 2.401(I)' },
-      { code: 'EXHIBIT_LIST', label: 'Exhibit List', mcr: 'MCR 2.401(I)' },
-      { code: 'JURY_INSTRUCT', label: 'Proposed Jury Instructions', mcr: 'MCR 2.512(D)' },
-      { code: 'VERDICT_FORM', label: 'Proposed Verdict Form', mcr: 'MCR 2.514' },
-      { code: 'FEE_WAIVER', label: 'Fee Waiver Request', mcr: 'MCR 2.002' },
-      { code: 'APPEARANCE', label: 'Notice of Appearance', mcr: 'MCR 2.117(A)' },
-      { code: 'SCHED_ORDER', label: 'Scheduling Order', mcr: 'MCR 2.401' },
-      { code: 'LIS_PENDENS', label: 'Lis Pendens (Notice of Pending Litigation)', mcr: 'MCL 565.25' },
-    ],
-  },
-  {
-    label: 'Exhibits & Supporting Documents',
-    types: [
-      { code: 'EXHIBIT', label: 'Exhibit', mcr: '' },
-      { code: 'ATTACHMENT', label: 'Attachment', mcr: '' },
-      { code: 'CORRESPONDENCE', label: 'Correspondence / Letter', mcr: '' },
-      { code: 'TRANSCRIPT', label: 'Transcript', mcr: '' },
-      { code: 'EXPERT_REPORT', label: 'Expert Report / Opinion', mcr: 'MCR 2.302(B)(4)' },
-    ],
-  },
-  {
-    label: 'Other',
-    types: [
-      { code: 'OTHER', label: 'Other Document', mcr: '' },
-    ],
-  },
-];
-
-// Flatten for quick lookup
 const ALL_TYPES = FILING_CATEGORIES.flatMap(cat => cat.types);
+const COURT_CATEGORY = "Listed in this court's rules";
 
-// MCR 2.119(A)(2): a motion presenting a question of law must be accompanied by a brief
-//   (the brief may be combined with the motion).
-// MCR 2.313(A): discovery motions require a meet-and-confer certification.
-// A proposed order is NOT required at filing (MCR 2.602 governs entry of orders) — it is
-//   recommended best practice, not a prerequisite.
 const COMPANION_RULES: {
   trigger: string[];
   required: { code: string; label: string; rule: string }[];
   recommended: { code: string; label: string; rule: string }[];
 }[] = [
   {
-    // MCR 2.119(A)(2) calls for a brief on motions raising a question of law, but the
-    // brief may be combined with the motion itself -- so it is recommended, not a blocker.
     trigger: [
       'MOT_SD', 'MOT_DISMISS', 'MOT_COMPEL', 'MOT_PROTECTIVE', 'MOT_SANCTIONS',
       'MOT_DEFAULT', 'MOT_SJ', 'MOT_LIMINE', 'MOT_RECONSIDER', 'MOT_RELIEF',
@@ -262,41 +42,34 @@ const COMPANION_RULES: {
     ],
     required: [],
     recommended: [
-      { code: 'BRIEF_SUPPORT', label: 'Brief in Support of Motion', rule: 'MCR 2.119(A)(2)' },
-      { code: 'PROPOSED_ORDER', label: 'Proposed Order', rule: 'MCR 2.602' },
-      { code: 'NOT_HEARING', label: 'Notice of Hearing', rule: 'MCR 2.119(C)' },
-      { code: 'POS_ELECTRONIC', label: 'Proof of Service', rule: 'MCR 1.109(G)(6)' },
+      { code: 'BRIEF_SUPPORT', label: getDocumentLabel('BRIEF_SUPPORT'), rule: 'MCR 2.119(A)(2)' },
+      { code: 'PROPOSED_ORDER', label: getDocumentLabel('PROPOSED_ORDER'), rule: 'MCR 2.602' },
+      { code: 'NOT_HEARING', label: getDocumentLabel('NOT_HEARING'), rule: 'MCR 2.119(C)' },
+      { code: 'POS_ELECTRONIC', label: getDocumentLabel('POS_ELECTRONIC'), rule: 'MCR 1.109(G)(6)' },
     ],
   },
   {
-    // Discovery motions: a good-faith effort to resolve is a factor in awarding motion
-    // expenses (MCR 2.313(A)(5)) -- a certification is recommended best practice, not a
-    // required filing. (A non-party motion to compel must include the subpoena + proof of
-    // service, MCR 2.313(A)(2)(c).)
     trigger: ['MOT_COMPEL', 'MOT_PROTECTIVE', 'MOT_SANCTIONS'],
     required: [],
     recommended: [
-      { code: 'DISC_CERT_GF', label: 'Certification of Good Faith Discovery Effort', rule: 'MCR 2.313(A)(5)' },
+      { code: 'DISC_CERT_GF', label: getDocumentLabel('DISC_CERT_GF'), rule: 'MCR 2.313(A)(5)' },
     ],
   },
   {
-    // Summary disposition motions benefit from affidavits
     trigger: ['MOT_SD', 'MOT_SJ'],
     required: [],
     recommended: [
-      { code: 'AFFIDAVIT', label: 'Supporting Affidavit(s)', rule: 'MCR 2.116(G)(4)' },
+      { code: 'AFFIDAVIT', label: 'Supporting Affidavits', rule: 'MCR 2.116(G)(4)' },
     ],
   },
   {
-    // Default judgment motions
     trigger: ['MOT_DEFAULT'],
     required: [
-      { code: 'AFF_DEFAULT', label: 'Affidavit of Default', rule: 'MCR 2.603(A)' },
+      { code: 'AFF_DEFAULT', label: getDocumentLabel('AFF_DEFAULT'), rule: 'MCR 2.603(A)' },
     ],
     recommended: [],
   },
   {
-    // TRO/Preliminary injunction
     trigger: ['MOT_TRO', 'MOT_PRELIM_INJ'],
     required: [
       { code: 'AFFIDAVIT', label: 'Verified Complaint or Affidavit', rule: 'MCR 3.310(B)' },
@@ -333,6 +106,9 @@ function getCompanionRequirements(uploadedTypeCodes: string[]) {
 
 function DocumentUpload({
   filingId,
+  courtId,
+  caseTypeId,
+  filingType,
   documents,
   onDocumentsChange,
   onBusyChange,
@@ -343,28 +119,50 @@ function DocumentUpload({
   const [selectedCategory, setSelectedCategory] = useState('');
   const [docType, setDocType] = useState('');
   const [docTitle, setDocTitle] = useState('');
+  const autoFilledTitle = useRef('');
   const [isConfidential, setIsConfidential] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { required, recommended } = getCompanionRequirements(documents.map(doc => doc.type));
+  const [courtTypes, setCourtTypes] = useState<typeof ALL_TYPES>([]);
+  const [requirementsFailed, setRequirementsFailed] = useState<LoadFailure | null>(null);
+  const [requirementsAttempt, setRequirementsAttempt] = useState(0);
+  const allTypes = [...courtTypes, ...ALL_TYPES];
+
+  useEffect(() => {
+    if (filingType === 'service_only') return;
+    const controller = new AbortController();
+    getFilingRequirements(courtId, caseTypeId, filingType, controller.signal).then((requirements) => {
+      setRequirementsFailed(null);
+      setCourtTypes(requirements
+        .filter(r => !ALL_TYPES.some(t => t.code === r.document_type_code))
+        .map(r => ({ code: r.document_type_code, label: r.description, mcr: r.mcr_reference ?? '' })));
+    }).catch((err) => {
+      if (!controller.signal.aborted) {
+        setRequirementsFailed(loadFailure(err, "Could not load the document types in this court's rules. Retry before choosing a type."));
+      }
+    });
+    return () => controller.abort();
+  }, [courtId, caseTypeId, filingType, requirementsAttempt]);
 
   function selectCompanion(code: string, label: string) {
     setSelectedCategory('');
     setDocType(code);
+    autoFilledTitle.current = label;
     setDocTitle(label);
     fileInputRef.current?.focus();
   }
 
-  const filteredTypes = selectedCategory
-    ? FILING_CATEGORIES.find(c => c.label === selectedCategory)?.types || []
-    : ALL_TYPES;
+  const filteredTypes = selectedCategory === COURT_CATEGORY
+    ? courtTypes
+    : FILING_CATEGORIES.find(c => c.label === selectedCategory)?.types || [];
 
-  // Auto-fill title when document type is selected
   const handleDocTypeChange = (code: string) => {
     setDocType(code);
-    const typeInfo = ALL_TYPES.find(t => t.code === code);
-    if (typeInfo && !docTitle) {
+    const typeInfo = allTypes.find(t => t.code === code);
+    if (typeInfo && (!docTitle || docTitle === autoFilledTitle.current)) {
+      autoFilledTitle.current = typeInfo.label;
       setDocTitle(typeInfo.label);
     }
   };
@@ -408,15 +206,13 @@ function DocumentUpload({
       await refreshDocuments();
       uploadRequest.current = undefined;
       setWarnings(result.warnings ?? []);
+      autoFilledTitle.current = '';
       setDocTitle('');
       setDocType('');
       setIsConfidential(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: unknown) {
-      // Surface the backend detail (e.g. malware 422 "Rejected: ...", unsupported-type 415).
-      const detail = getErrorDetail(err);
-      const message = detail || 'Could not confirm the upload. Retry with the same file, or refresh this filing to check its saved documents.';
-      setError(message);
+      setError(errorMessage(err, 'Could not confirm the upload. Retry with the same file, or refresh this filing to check its saved documents.'));
     } finally {
       setPendingAction(null);
       onBusyChange(false);
@@ -431,7 +227,7 @@ function DocumentUpload({
       await removeDocument(filingId, docId);
       await refreshDocuments();
     } catch (err) {
-      setError(getErrorDetail(err) || 'Could not confirm removal. Refresh the filing before retrying.');
+      setError(errorMessage(err, 'Could not confirm removal. Refresh the filing before retrying.'));
     } finally {
       setPendingAction(null);
       onBusyChange(false);
@@ -439,33 +235,35 @@ function DocumentUpload({
   };
 
   const getTypeLabel = (code: string) => {
-    return ALL_TYPES.find(t => t.code === code)?.label || code;
+    return courtTypes.find(t => t.code === code)?.label || getDocumentLabel(code);
   };
 
   const getTypeMcr = (code: string) => {
-    return ALL_TYPES.find(t => t.code === code)?.mcr || '';
+    return allTypes.find(t => t.code === code)?.mcr || '';
   };
 
   return (
     <div className="form-section">
-      <h3>Upload Documents</h3>
+      <h2>Upload documents</h2>
       <p className="info-text">
         Select the document type, upload your file, and add it to the filing.
         All PDFs must be text-searchable per MCR 1.109. Maximum file size: 100MB.
       </p>
 
       {error && <div className="alert alert-error" role="alert">{error}</div>}
+      {requirementsFailed && <LoadError
+        failure={requirementsFailed}
+        onRetry={() => setRequirementsAttempt(attempt => attempt + 1)} />}
 
       {warnings.length > 0 && (
         <div className="alert alert-warning" role="status">
-          <strong>Possible PII detected (MCR 1.109)</strong> — review and redact before submitting.
+          <strong>Possible personal information detected (MCR 1.109)</strong>. Review and redact it before submitting.
           <ul className="pii-warning-list">
             {warnings.map((w, i) => <li key={i}>{w}</li>)}
           </ul>
         </div>
       )}
 
-      {/* Upload Form */}
       <div className="upload-form">
         <div className="form-row">
           <div className="form-group">
@@ -476,7 +274,8 @@ function DocumentUpload({
               value={selectedCategory}
               onChange={(e) => { setSelectedCategory(e.target.value); setDocType(''); }}
             >
-              <option value="">All Categories</option>
+              <option value="">All categories</option>
+              {courtTypes.length > 0 && <option value={COURT_CATEGORY}>{COURT_CATEGORY}</option>}
               {FILING_CATEGORIES.map((cat) => (
                 <option key={cat.label} value={cat.label}>{cat.label}</option>
               ))}
@@ -484,7 +283,7 @@ function DocumentUpload({
           </div>
           <div className="form-group">
             <label htmlFor="docType">
-              Document Type <span className="required-marker">*</span>
+              Document type <span className="required-marker">*</span>
             </label>
             <select
               id="docType"
@@ -492,7 +291,7 @@ function DocumentUpload({
               value={docType}
               onChange={(e) => handleDocTypeChange(e.target.value)}
             >
-              <option value="">-- Select document type --</option>
+              <option value="">Select a document type</option>
               {selectedCategory ? (
                 filteredTypes.map((dt) => (
                   <option key={dt.code} value={dt.code}>
@@ -500,7 +299,8 @@ function DocumentUpload({
                   </option>
                 ))
               ) : (
-                FILING_CATEGORIES.map((cat) => (
+                [{ label: COURT_CATEGORY, types: courtTypes }, ...FILING_CATEGORIES]
+                  .filter(cat => cat.types.length > 0).map((cat) => (
                   <optgroup key={cat.label} label={cat.label}>
                     {cat.types.map((dt) => (
                       <option key={dt.code} value={dt.code}>
@@ -516,13 +316,13 @@ function DocumentUpload({
 
         {docType && getTypeMcr(docType) && (
           <div className="doc-type-mcr-hint">
-            Court Rule: <strong>{getTypeMcr(docType)}</strong>
+            Court rule: <strong>{getTypeMcr(docType)}</strong>
           </div>
         )}
 
         <div className="form-group">
           <label htmlFor="docTitle">
-            Document Title <span className="required-marker">*</span>
+            Document title <span className="required-marker">*</span>
           </label>
           <input
             id="docTitle"
@@ -530,7 +330,7 @@ function DocumentUpload({
             type="text"
             value={docTitle}
             onChange={(e) => setDocTitle(e.target.value)}
-            placeholder="e.g., Motion for Summary Disposition"
+            placeholder="e.g., Answer to the complaint"
           />
         </div>
         <div className="form-group">
@@ -554,7 +354,7 @@ function DocumentUpload({
               disabled={busy || docType === 'FEE_WAIVER'}
               onChange={(e) => setIsConfidential(e.target.checked)}
             />
-            {docType === 'FEE_WAIVER' ? 'Fee waiver request — nonpublic' : 'Mark as confidential (not public)'}
+            {docType === 'FEE_WAIVER' ? 'Fee waiver request (nonpublic)' : 'Mark as confidential (not public)'}
           </label>
         </div>
         <button
@@ -562,14 +362,13 @@ function DocumentUpload({
           onClick={handleUpload}
           disabled={busy || !docType}
         >
-          {pendingAction === 'upload' ? 'Uploading...' : 'Upload Document'}
+          {pendingAction === 'upload' ? 'Uploading...' : 'Upload document'}
         </button>
       </div>
 
-      {/* Uploaded Documents List */}
       {documents.length > 0 && (
         <div className="uploaded-documents">
-          <h4>Documents in This Filing ({documents.length})</h4>
+          <h3>Documents in this filing ({documents.length})</h3>
           <table>
             <thead>
               <tr>
@@ -603,7 +402,6 @@ function DocumentUpload({
         </div>
       )}
 
-      {/* MCR Companion Document Requirements */}
       {(required.length > 0 || recommended.length > 0) && (
         <div className="companion-requirements">
           {required.length > 0 && (
@@ -612,7 +410,7 @@ function DocumentUpload({
               <ul>
                 {required.map(r => (
                   <li key={r.code}>
-                    <strong>{r.label}</strong> &mdash; {r.rule}
+                    <strong>{r.label}:</strong> {r.rule}
                     {' '}<button type="button" className="btn btn-small btn-secondary" disabled={busy}
                       onClick={() => selectCompanion(r.code, r.label)}>Add {r.label}</button>
                     {r.code === 'BRIEF_SUPPORT' && (
@@ -629,7 +427,7 @@ function DocumentUpload({
               <ul>
                 {recommended.map(r => (
                   <li key={r.code}>
-                    {r.label} &mdash; {r.rule}
+                    {r.label}: {r.rule}
                     {' '}<button type="button" className="btn btn-small btn-secondary" disabled={busy}
                       onClick={() => selectCompanion(r.code, r.label)}>Add {r.label}</button>
                     {r.code === 'BRIEF_SUPPORT' && (

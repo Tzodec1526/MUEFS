@@ -1,5 +1,3 @@
-"""Bind the first system administrator using an authorized database operator session."""
-
 import argparse
 import asyncio
 
@@ -19,9 +17,7 @@ async def bootstrap(data: AccountChange) -> int:
     if settings.demo_isolated_sessions:
         raise ValueError("Bootstrap operates on the shared database, not isolated demo sessions")
     async with async_session() as db:
-        # There is no existing administrator row to lock on an empty deployment. Serialize
-        # this one-time bootstrap before checking whether someone has already completed it.
-        if db.bind.dialect.name == "postgresql":
+        if db.get_bind().dialect.name == "postgresql":
             await db.execute(text("LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE"))
         else:
             await db.execute(text("BEGIN IMMEDIATE"))
@@ -67,7 +63,12 @@ async def bootstrap(data: AccountChange) -> int:
 
 
 async def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Bind the first system administrator using an authorized database operator "
+            "session."
+        ),
+    )
     for option in ("email", "first-name", "last-name", "subject", "reason"):
         parser.add_argument(f"--{option}", required=True)
     arguments = parser.parse_args()

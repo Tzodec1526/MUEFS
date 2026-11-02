@@ -1,9 +1,10 @@
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from typing import Literal
 
-from pydantic import AwareDatetime, BaseModel, Field, field_serializer, field_validator
+from pydantic import AwareDatetime, BaseModel, Field, field_validator
 
 from app.models.payment import PaymentMethod, PaymentStatus
+from app.schemas.common import ExpectedVersion, RecordId
 from app.schemas.filing import FilingEnvelopeResponse
 
 _SIM_PAYMENT_NOTICE = (
@@ -49,19 +50,13 @@ class FilingFeeState(BaseModel):
     can_manage_external_payments: bool = False
     can_record_external_payment: bool = False
 
-    @field_serializer("review_requested_at")
-    def serialize_review_time(self, value: datetime | None) -> str | None:
-        return (
-            value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat() if value else None
-        )
-
 
 class FilingFeeDetails(FilingFeeState):
     filing: FilingEnvelopeResponse
 
 
 class FeeAssessmentRequest(BaseModel):
-    expected_version: int = Field(ge=0)
+    expected_version: ExpectedVersion
     authority_reference: str = Field(min_length=1, max_length=1000)
     reason: str = Field(min_length=1, max_length=5000)
     items: list[FeeItem] = Field(min_length=1, max_length=50)
@@ -76,13 +71,13 @@ class FeeAssessmentRequest(BaseModel):
 
 
 class FeeReviewRequest(BaseModel):
-    expected_version: int = Field(ge=0)
+    expected_version: ExpectedVersion
     reason: str = Field(min_length=1, max_length=2000)
 
 
 class PaymentProcessRequest(BaseModel):
-    envelope_id: int
-    expected_fee_version: int = Field(ge=0)
+    envelope_id: RecordId
+    expected_fee_version: ExpectedVersion
     payment_method: Literal[PaymentMethod.CREDIT_CARD, PaymentMethod.DEBIT_CARD, PaymentMethod.ACH]
     amount_cents: int = Field(gt=0)
 
@@ -102,8 +97,8 @@ class PaymentResponse(BaseModel):
 
 
 class ExternalPaymentRequest(BaseModel):
-    expected_fee_version: int = Field(ge=0)
-    expected_payment_version: int = Field(ge=0)
+    expected_fee_version: ExpectedVersion
+    expected_payment_version: ExpectedVersion
     amount_cents: int = Field(gt=0, le=100_000_000)
     receipt_system: str = Field(min_length=1, max_length=120)
     receipt_reference: str = Field(min_length=1, max_length=200)
@@ -120,7 +115,7 @@ class ExternalPaymentRequest(BaseModel):
 
 
 class ExternalPaymentReversal(BaseModel):
-    expected_payment_version: int = Field(ge=0)
+    expected_payment_version: ExpectedVersion
     reason: str = Field(min_length=1, max_length=2000)
     reviewed: Literal[True]
 
@@ -142,10 +137,6 @@ class PaymentRecord(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
-
-    @field_serializer("created_at")
-    def serialize_created(self, value: datetime) -> str:
-        return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
 
 
 class PaymentRecords(BaseModel):
@@ -169,10 +160,6 @@ class PaymentActivity(BaseModel):
     receipt_reference: str
     received_at: AwareDatetime
     reason: str
-
-    @field_serializer("occurred_at", "received_at")
-    def serialize_time(self, value: datetime) -> str:
-        return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
 
 
 class PaymentRegisterTotals(BaseModel):

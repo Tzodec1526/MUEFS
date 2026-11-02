@@ -1,5 +1,3 @@
-"""A lost draft-creation response must not create a second filing on retry."""
-
 import asyncio
 import os
 from uuid import uuid4
@@ -105,7 +103,6 @@ async def test_concurrent_creations_commit_once_and_keep_user_keys_separate(
             await asyncio.wait_for(all_read.wait(), 5)
         return await create(db, filer_id, data, **kwargs)
 
-    # Ensure all workers see no existing key before any insert, exercising the index race.
     monkeypatch.setattr(filing_service, "create_filing", synchronized_create)
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

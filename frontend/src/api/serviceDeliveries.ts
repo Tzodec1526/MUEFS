@@ -1,5 +1,9 @@
 import type { FilingDocument } from './filings';
 
+export const serviceMethodLabels = {
+  electronic: 'Electronic through portal', mail: 'Mail', hand_delivery: 'Hand delivery',
+};
+
 export interface DeliveryContact {
   participant_id: number;
   name: string;
@@ -7,7 +11,7 @@ export interface DeliveryContact {
   represented_party_name: string | null;
   contact_id: number | null;
   version: number | null;
-  method: string | null;
+  method: keyof typeof serviceMethodLabels | null;
   email: string | null;
   address: string | null;
   authority: string | null;

@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { getFiling, submitFiling, validateFiling, FilingValidation, FilingEnvelope } from '../../api/filings';
-import { formatBytes, getDocumentLabel } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { getDocumentLabel } from '../../utils/documentTypes';
+import { filingStatusInSentence, filingStatusLabel } from '../../utils/filingStatus';
+import { formatBytes } from '../../utils/format';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
 import PaymentForm from './PaymentForm';
@@ -21,7 +23,7 @@ interface Props {
 function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesChange, onSubmitSuccess, onSubmittingChange, readOnly = false }: Props) {
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{
-    key: string; filing?: FilingEnvelope; validation?: FilingValidation | null; error?: string;
+    key: string; filing?: FilingEnvelope; validation?: FilingValidation | null; error?: LoadFailure;
   }>();
   const [fees, setFees] = useState<{ key: string; token: string; obligationMet: boolean }>();
   const [submitting, setSubmitting] = useState(false);
@@ -46,7 +48,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
     ]).then(([filing, validation]) => {
       if (!controller.signal.aborted) setResult({ key, filing, validation });
     }).catch(err => {
-      if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load the saved filing for review.' });
+      if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load the saved filing for review.') });
     });
     return () => controller.abort();
   }, [filingId, key, readOnly, submission]);
@@ -55,7 +57,6 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
     setFees({ key, token: updated.submission_token, obligationMet });
     setResult(previous => {
       const reviewed = previous?.filing;
-      // Payment changes the submission token, but does not invalidate unchanged filing content.
       if (previous?.key !== key || !reviewed
         || reviewed.details_token !== updated.details_token
         || reviewed.court_id !== updated.court_id
@@ -87,7 +88,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
       onSubmitSuccess?.(result);
     } catch (err: unknown) {
       if ((err as { response?: { status?: number } }).response?.status === 409) setConflict(true);
-      setError(getErrorDetail(err) || 'Submission could not be confirmed. Retry to check the same submission.');
+      setError(errorMessage(err, 'Submission could not be confirmed. Retry to check the same submission.'));
     } finally {
       setSubmitting(false);
       onSubmittingChange?.(false);
@@ -98,8 +99,8 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
     return (
       <div className="form-section success-section">
         <div className="success-icon">&#10003;</div>
-        <h3>{submission.status === 'served' ? 'Service Documents Recorded'
-          : submission.status === 'submitted' ? 'Filing Submitted Successfully' : 'Submission Already Recorded'}</h3>
+        <h2>{submission.status === 'served' ? 'Service documents recorded'
+          : submission.status === 'submitted' ? 'Filing submitted' : 'Submission already recorded'}</h2>
         <p>
           {submission.status === 'served'
             ? 'This service-only filing has been recorded. It does not enter clerk review or deliver documents to other parties.'
@@ -120,28 +121,28 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
           </div>
           <div className="success-detail-row">
             <span>Status</span>
-            <span className={`status-badge ${submission.status}`}>{submission.status.replace('_', ' ')}</span>
+            <span className={`status-badge ${submission.status}`}>{filingStatusLabel(submission.status)}</span>
           </div>
         </div>
         <p className="success-note">
-          You can track the status of your filing from your dashboard under &quot;My Filings.&quot;
+          You can track the status of your filing from your dashboard under &quot;My filings.&quot;
         </p>
         <div className="success-actions">
           <Link to={`/filings/${filingId}/history`} className="btn btn-primary">View submission receipt</Link>
-          <a href="/" className="btn btn-primary">Return to Dashboard</a>
-          <a href="/filing/new" className="btn btn-secondary">File Another</a>
+          <Link to="/" className="btn btn-primary">Return to dashboard</Link>
+          <Link to="/filing/new" className="btn btn-secondary">File another</Link>
         </div>
       </div>
     );
   }
 
   if (!current) return <p role="status">Loading the saved filing for review…</p>;
-  if (current.error) return <LoadError message={current.error} onRetry={refreshReview} />;
+  if (current.error) return <LoadError failure={current.error} onRetry={refreshReview} />;
   if (!filing) return null;
 
   return (
     <div className="form-section">
-      <h3>{canSubmit ? 'Review Your Filing' : 'Filing Details'}</h3>
+      <h2>{canSubmit ? 'Review your filing' : 'Filing details'}</h2>
       {canSubmit && (
         <p className="info-text">
           Review all information carefully before submitting. Submitted filings
@@ -150,23 +151,22 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
       )}
 
       {!canSubmit && !readOnly && <p className="alert alert-warning" role="status">
-        This filing is now {filing.status.replace('_', ' ')}. <Link to={`/filings/${filingId}/history`}>View its receipt and current status</Link>.
+        This filing is now {filingStatusInSentence(filing.status)}. <Link to={`/filings/${filingId}/history`}>View its receipt and current status</Link>.
       </p>}
 
-      {/* Filing Summary */}
-      <div className="review-card">
-        <h4>Court & Case Information</h4>
+      <div className="review-card review-summary">
+        <h3>Court and case information</h3>
         <div className="review-grid">
           <div className="review-item">
             <label>Court</label>
             <span>{courtName || 'Not selected'}</span>
           </div>
           <div className="review-item">
-            <label>Case Type</label>
+            <label>Case type</label>
             <span>{caseTypeName || 'Not selected'}</span>
           </div>
           <div className="review-item">
-            <label>Case Title</label>
+            <label>Case title</label>
             <span>{filing.case_title || 'Not provided'}</span>
           </div>
         </div>
@@ -178,9 +178,8 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
         )}
       </div>
 
-      {/* Documents */}
-      <div className="review-card">
-        <h4>Documents ({filing.documents.length})</h4>
+      <div className="review-card review-summary">
+        <h3>Documents ({filing.documents.length})</h3>
         {filing.documents.length > 0 ? (
           <table className="review-table">
             <thead>
@@ -188,7 +187,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
                 <th>Title</th>
                 <th>Type</th>
                 <th>Size</th>
-                <th>Text Searchable</th>
+                <th>Text searchable</th>
                 <th>Confidential</th>
               </tr>
             </thead>
@@ -220,13 +219,12 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
         />
       )}
 
-      {/* Validation Results */}
       {validation && (
         <div className={`validation-results ${validation.is_valid ? 'valid' : 'invalid'}`} role="alert">
-          <h4>{validation.is_valid ? 'Validation Passed' : 'Issues Found'}</h4>
+          <h3>{validation.is_valid ? 'Checks passed' : 'Issues found'}</h3>
           {validation.errors.length > 0 && (
             <div className="validation-errors">
-              <h5>Errors (must fix before submitting):</h5>
+              <h4>Errors (must fix before submitting):</h4>
               <ul>
                 {validation.errors.map((err, i) => <li key={i}>{err}</li>)}
               </ul>
@@ -234,7 +232,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
           )}
           {validation.missing_required_documents.length > 0 && (
             <div className="validation-missing">
-              <h5>Missing Required Documents:</h5>
+              <h4>Missing required documents:</h4>
               <ul>
                 {validation.missing_required_documents.map((doc, i) => <li key={i}>{doc}</li>)}
               </ul>
@@ -242,7 +240,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
           )}
           {validation.warnings.length > 0 && (
             <div className="validation-warnings">
-              <h5>Warnings:</h5>
+              <h4>Warnings:</h4>
               <ul>
                 {validation.warnings.map((warn, i) => <li key={i}>{warn}</li>)}
               </ul>
@@ -260,7 +258,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
         <>
           <div className="review-actions">
             {needsRefresh && <button className="btn btn-secondary" onClick={refreshReview} disabled={submitting}>
-              Refresh Review
+              Refresh review
             </button>}
             <button
               className="btn btn-primary btn-large"
@@ -276,7 +274,7 @@ function FilingReview({ filingId, courtName, caseTypeName, submission, onFeesCha
                     : undefined
               }
             >
-              {submitting ? 'Submitting...' : 'Submit Filing'}
+              {submitting ? 'Submitting...' : 'Submit filing'}
             </button>
           </div>
 

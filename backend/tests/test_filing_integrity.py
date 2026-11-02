@@ -1,5 +1,3 @@
-"""Receipts and acceptance require the stored attachment bytes, not just database rows."""
-
 import asyncio
 import hashlib
 import threading
@@ -61,7 +59,7 @@ async def test_missing_or_changed_bytes_cannot_be_submitted_or_accepted(
     if damage == "missing":
         path.unlink()
     elif damage == "changed":
-        path.write_bytes(b"X" + content[1:])  # Same length: a size-only check cannot detect this.
+        path.write_bytes(b"X" + content[1:])
     elif damage == "wrong_size":
         doc.file_size_bytes += 1
         await db_session.flush()
@@ -96,7 +94,6 @@ async def test_missing_or_changed_bytes_cannot_be_submitted_or_accepted(
     assert (
         await db_session.scalar(select(func.count()).select_from(FilingTransaction)) == prior_count
     )
-    # Restoring the exact stored file permits submission; acceptance still needs its CMS.
     path.write_bytes(content)
     doc.file_size_bytes = len(content)
     await db_session.flush()

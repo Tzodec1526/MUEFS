@@ -1,0 +1,156 @@
+.fav-btn-large.favorited { border-color: var(--star); background: var(--tint); }
+
+.case-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.case-detail-number {
+  margin-top: 0.25rem;
+  color: var(--muted);
+}
+
+.case-detail-number .status-badge {
+  margin-left: 0.35rem;
+}
+
+.case-detail-header h1 {
+  font-size: 1.45rem;
+}
+
+.case-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.fav-btn-large {
+  background: var(--white);
+  border: 1px solid var(--field);
+  border-radius: var(--radius);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.case-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.case-detail-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.case-detail-card h2 {
+  font-size: 0.95rem;
+  color: var(--ink);
+  margin-bottom: 0.75rem;
+}
+
+.parties-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.party-item {
+  padding: 0.55rem 0.65rem;
+  background: var(--tint);
+  border-radius: var(--radius);
+}
+
+.party-role {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.party-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.party-meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.docket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.docket-entry {
+  border-radius: var(--radius);
+  padding: 0.85rem;
+  background: var(--white);
+}
+
+.docket-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.docket-entry-id {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.docket-entry-date {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+}
+
+.docket-entry-desc {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.docket-entry-reason {
+  background: var(--warning-tint);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.docket-entry-docs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.docket-doc {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--tint);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius);
+  font-size: 0.75rem;
+  color: var(--ink);
+}
+
+@media (max-width: 768px) {
+  .case-detail-grid { grid-template-columns: 1fr; }
+  .case-detail-header { flex-direction: column; }
+  .case-detail-actions { width: 100%; }
+}

@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { deliveryLabels, listNotifications, type NotificationItem } from '../../api/notifications';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
-import { getErrorDetail } from '../../utils/errors';
-import { parseServerDate } from '../../utils/format';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
+import { formatDateTime, plural } from '../../utils/format';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 interface DeliveryHistory {
   events: { id: number; attempt_number: number; outcome: string; occurred_at: string;
@@ -14,7 +16,7 @@ interface DeliveryHistory {
 }
 
 function DeliveryDetails({ notice, onRetry }: { notice: NotificationItem; onRetry: () => void }) {
-  const [result, setResult] = useState<{ key: string; data?: DeliveryHistory; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: DeliveryHistory; error?: LoadFailure }>();
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -22,12 +24,12 @@ function DeliveryDetails({ notice, onRetry }: { notice: NotificationItem; onRetr
   const requestKey = `${notice.id}:${page}:${attempt}`;
   const current = result?.key === requestKey ? result : undefined;
   const history = current?.data;
-  const error = actionError || current?.error;
+  const error = current?.error;
   useEffect(() => {
     const controller = new AbortController();
     apiClient.get<DeliveryHistory>(`/notifications/${notice.id}/delivery`, { params: { page }, signal: controller.signal })
       .then(response => { if (!controller.signal.aborted) setResult({ key: requestKey, data: response.data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key: requestKey, error: getErrorDetail(err) || 'Could not load email history.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key: requestKey, error: loadFailure(err, 'Could not load email history.') }); });
     return () => controller.abort();
   }, [notice.id, page, requestKey]);
 
@@ -38,20 +40,20 @@ function DeliveryDetails({ notice, onRetry }: { notice: NotificationItem; onRetr
     try {
       await apiClient.post(`/notifications/${notice.id}/retry`, { reason: values.get('reason') });
       onRetry();
-    } catch (err) { setActionError(getErrorDetail(err) || 'Could not queue another email.'); }
+    } catch (err) { setActionError(errorMessage(err, 'Could not queue another email.')); }
     finally { setBusy(false); }
   }
 
   return <div className="notice-delivery">
-    <h4>Email history for notice #{notice.id}</h4>
-    {error && <LoadError message={error} onRetry={() => { setActionError(null); setAttempt(n => n + 1); }} />}
+    <h3 className="card-subheading">Email history for notice #{notice.id}</h3>
+    {error && <LoadError failure={error} onRetry={() => setAttempt(n => n + 1)} />}
     {!history && !error && <p role="status">Loading email history…</p>}
     {history && <>
       {history.message_id && <p className="receipt-reference">Message-ID: <code>{history.message_id}</code></p>}
       {history.events.length === 0 && <p>No email attempts have been recorded.</p>}
       <ol>{history.events.map(event => <li key={event.id}>
         <strong>{event.outcome.replace(/_/g, ' ')}</strong> · Attempt {event.attempt_number} ·{' '}
-        <time dateTime={event.occurred_at}>{parseServerDate(event.occurred_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}</time>
+        <time dateTime={event.occurred_at}>{formatDateTime(event.occurred_at)}</time>
         {event.smtp_code != null && <span> · SMTP {event.smtp_code}</span>}
         {event.detail && <p>{event.detail}</p>}
       </li>)}</ol>
@@ -65,6 +67,7 @@ function DeliveryDetails({ notice, onRetry }: { notice: NotificationItem; onRetr
       {history.can_retry && <form onSubmit={retry}>
         <div className="form-group"><label htmlFor={`retry-${notice.id}`}>Reason for requesting another email</label>
           <input id={`retry-${notice.id}`} name="reason" maxLength={1000} required /></div>
+        {actionError && <p className="alert alert-error" role="alert">{actionError}</p>}
         <button className="btn btn-secondary" disabled={busy}>{busy ? 'Queuing…' : 'Queue another email'}</button>
       </form>}
     </>}
@@ -72,6 +75,7 @@ function DeliveryDetails({ notice, onRetry }: { notice: NotificationItem; onRetr
 }
 
 export default function NotificationsPage() {
+  usePageTitle('Notices and email status');
   const { court, loading: assignmentsLoading } = useContext(CourtContext)!;
   const courtId = court?.court_id;
   const staff = courtId != null;
@@ -81,7 +85,7 @@ export default function NotificationsPage() {
   const [filingId, setFilingId] = useState<number>();
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: Awaited<ReturnType<typeof listNotifications>>; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: Awaited<ReturnType<typeof listNotifications>>; error?: LoadFailure }>();
   const [selected, setSelected] = useState<number | null>(null);
   const [message, setMessage] = useState('');
   const requestKey = `${page}:${scope}:${courtId}:${status}:${filingId}:${attempt}`;
@@ -95,7 +99,7 @@ export default function NotificationsPage() {
     listNotifications(page, { court_id: scope === 'court' && courtId ? courtId : undefined,
       delivery_status: status || undefined, filing_id: filingId }, controller.signal)
       .then(data => { if (!controller.signal.aborted) setResult({ key: requestKey, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key: requestKey, error: getErrorDetail(err) || 'Could not load notices.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key: requestKey, error: loadFailure(err, 'Could not load notices.') }); });
     return () => controller.abort();
   }, [page, scope, courtId, status, filingId, requestKey, assignmentsLoading]);
 
@@ -103,7 +107,7 @@ export default function NotificationsPage() {
     {staff && scope === 'court' && <StaffCourtSelect disabled={selected != null} onChange={() => {
       setPage(1); setSelected(null); setMessage('');
     }} />}
-    <div className="page-header"><div><h2>Notices &amp; email status</h2>
+    <div className="page-header"><div><PageHeading>Notices and email status</PageHeading>
       <p>Read filing updates and track email attempts.</p></div>
       <button className="btn btn-secondary" onClick={() => setAttempt(n => n + 1)}>Refresh notices</button></div>
     <p>Updates remain available in the portal even when email fails. Acceptance by an email relay does not confirm inbox delivery or legal service.</p>
@@ -135,18 +139,18 @@ export default function NotificationsPage() {
     {filingId != null && <p role="status">Showing notices for filing #{filingId}.</p>}
     {message && <p role="status" className="alert alert-success">{message}</p>}
     {loading && <p role="status">Loading notices…</p>}
-    {error && <LoadError message={error} onRetry={() => setAttempt(n => n + 1)} />}
+    {error && <LoadError failure={error} onRetry={() => setAttempt(n => n + 1)} />}
     {!loading && !error && data && <>
       {!data.email_enabled && <p className="alert alert-warning">Email delivery is not enabled. These notices are available in the portal.</p>}
-      <p>{data.total} notice{data.total === 1 ? '' : 's'}</p>
+      <p>{plural(data.total, 'notice')}</p>
       {data.notifications.map(notice => <article className="review-card notice-card" key={notice.id}>
-        <h3>{notice.subject}</h3>
+        <h2 className="card-heading">{notice.subject}</h2>
         <p className="notice-body">{notice.body}</p>
-        <p><strong>{deliveryLabels[notice.delivery_status] || notice.delivery_status}</strong> · {notice.attempt_count} email attempt{notice.attempt_count === 1 ? '' : 's'}</p>
+        <p><strong>{deliveryLabels[notice.delivery_status] || notice.delivery_status}</strong> · {plural(notice.attempt_count, 'email attempt')}</p>
         {notice.email_recipient && <p>Recipient: {notice.email_recipient}</p>}
         {notice.last_error && <p className="alert alert-warning">{notice.last_error}</p>}
-        {notice.delivery_status === 'sent' && notice.sent_at && <p>Relay acceptance recorded: {parseServerDate(notice.sent_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}</p>}
-        {notice.next_attempt_at && <p>Next attempt: {parseServerDate(notice.next_attempt_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}</p>}
+        {notice.delivery_status === 'sent' && notice.sent_at && <p>Relay acceptance recorded: {formatDateTime(notice.sent_at)}</p>}
+        {notice.next_attempt_at && <p>Next attempt: {formatDateTime(notice.next_attempt_at)}</p>}
         <div className="history-summary">
           {notice.delivery_id ? <Link to={`/service/deliveries/${notice.delivery_id}`}>Open document delivery</Link>
             : notice.filing_envelope_id && <Link to={`/filings/${notice.filing_envelope_id}/history`}>View filing history</Link>}

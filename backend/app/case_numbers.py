@@ -1,12 +1,3 @@
-"""Case-number suffixes for the demo's filing catalog.
-
-The catalog groups some subjects more broadly than SCAO's case types. These are
-representative demo classifications, not a substitute for a court's CMS assigning
-the official number. Already assigned numbers are never reformatted.
-SCAO source:
-https://courts.mi.gov/siteassets/court-administration/standardsguidelines/casefile/cf_casetypecodes.pdf
-"""
-
 from app.models.court import CourtType
 
 _CASE_CODES = {
@@ -41,8 +32,6 @@ _CASE_CODES = {
     "COC-HWY": "MD",
     "COC-PROP": "MZ",
     "COC-APPREV": "MZ",
-    # Appellate demo entries use representative subject codes, too; live appellate
-    # courts assign their own identifiers through their CMS.
     "APP-CIV": "AV",
     "APP-CR": "AR",
     "APP-FAM": "AV",
@@ -60,7 +49,6 @@ _DISTRICT_CASE_CODES = {
 
 
 def case_number_code(court_type: CourtType, code: str) -> str:
-    """Translate catalog identifiers; preserve an explicitly configured case code."""
     if court_type in (CourtType.DISTRICT, CourtType.MUNICIPAL):
         return _DISTRICT_CASE_CODES.get(code, _CASE_CODES.get(code, code))
     return _CASE_CODES.get(code, code)

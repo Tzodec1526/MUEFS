@@ -1,23 +1,21 @@
-"""Prepare, review, publish and withdraw public copies without rewriting filed originals."""
-
-from datetime import UTC
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
-from app.api.auth import get_current_user, get_optional_user_id
+from app.api.auth import get_current_user, get_optional_user
 from app.api.document_upload import inspect_upload
 from app.api.documents import DocumentResponse
+from app.api.params import Page, RecordId
 from app.database import get_db
 from app.models.audit import AuditLog
 from app.models.document_public_copy import DocumentPublicCopy
 from app.models.user import User
 from app.schemas.document_publication import PublicCopyResponse, PublishCopy, WithholdDocument
 from app.schemas.filing import FilingDocumentResponse
-from app.services import audit_service, document_service
+from app.services import audit_service, document_service, storage_intent
 from app.services import document_publication_service as publication
 from app.utils.http_context import client_ip, client_user_agent
 
@@ -26,8 +24,8 @@ router = APIRouter(tags=["Document publication"])
 
 @router.get("/clerk/documents/{document_id}/publication")
 async def publication_state(
-    document_id: int,
-    page: int = Query(1, ge=1),
+    document_id: RecordId,
+    page: Page = 1,
     db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(get_current_user),
 ):
@@ -61,7 +59,7 @@ async def publication_state(
     status_code=201,
 )
 async def prepare_copy(
-    document_id: int,
+    document_id: RecordId,
     request: Request,
     title: str = Form(..., min_length=1, max_length=500),
     file: UploadFile = File(...),
@@ -71,16 +69,17 @@ async def prepare_copy(
     title = title.strip()
     if not title:
         raise HTTPException(422, "A public title is required")
-    doc, filing = await publication.document_context(db, actor, document_id)
+    doc, filing = await publication.document_context(db, actor, document_id, decision=True)
     if blocked := publication.publication_block(doc, filing):
         raise HTTPException(409, blocked)
     payload, mime, digest, inspection = await inspect_upload(file, require_pdf=True)
     file_key = f"public-copies/{document_id}/{uuid4()}.pdf"
     await run_in_threadpool(document_service.upload_document, payload, file_key, mime)
+    storage_intent.track_upload(db.sync_session, file_key)
     try:
         async with db.begin_nested():
             doc, filing = await publication.document_context(
-                db, actor, document_id, for_update=True
+                db, actor, document_id, for_update=True, decision=True,
             )
             if blocked := publication.publication_block(doc, filing):
                 raise HTTPException(409, blocked)
@@ -114,14 +113,14 @@ async def prepare_copy(
                 user_agent=client_user_agent(request),
             )
     except Exception:
-        await run_in_threadpool(document_service.delete_document, file_key)
+        await run_in_threadpool(storage_intent.purge_keys, {file_key})
         raise
     return copy
 
 
 @router.post("/clerk/documents/{document_id}/publication")
 async def publish_copy(
-    document_id: int,
+    document_id: RecordId,
     data: PublishCopy,
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -140,7 +139,7 @@ async def publish_copy(
 
 @router.post("/clerk/documents/{document_id}/withhold")
 async def withhold_document(
-    document_id: int,
+    document_id: RecordId,
     data: WithholdDocument,
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -159,8 +158,8 @@ async def withhold_document(
 
 @router.get("/clerk/documents/{document_id}/publication/history")
 async def publication_history(
-    document_id: int,
-    page: int = Query(1, ge=1),
+    document_id: RecordId,
+    page: Page = 1,
     db: AsyncSession = Depends(get_db, scope="function"),
     actor: User = Depends(get_current_user),
 ):
@@ -190,9 +189,7 @@ async def publication_history(
                 "action": row.action,
                 "details": row.details,
                 "actor_name": (row.details or {}).get("actor_name"),
-                "occurred_at": row.timestamp.replace(
-                    tzinfo=row.timestamp.tzinfo or UTC
-                ).isoformat(),
+                "occurred_at": row.timestamp.isoformat(),
             }
             for row in rows
         ],
@@ -201,23 +198,23 @@ async def publication_history(
 
 @router.get("/document-public-copies/{copy_id}/download")
 async def download_public_copy(
-    copy_id: int,
+    copy_id: RecordId,
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),
-    user_id: int | None = Depends(get_optional_user_id),
+    user: User | None = Depends(get_optional_user),
 ):
     copy = await db.get(DocumentPublicCopy, copy_id)
     if not copy:
         raise HTTPException(404, "Public copy not found")
-    if not await publication.may_read_public_copy(db, user_id, copy):
+    if not await publication.may_read_public_copy(db, user, copy):
         raise HTTPException(403, "Not authorized to access this copy")
     await audit_service.log_action(
         db,
-        user_id=user_id,
+        user_id=user.id if user else None,
         action="public_copy.downloaded",
         entity_type="document_public_copy",
         entity_id=copy.id,
         ip_address=client_ip(request),
         user_agent=client_user_agent(request),
     )
-    return DocumentResponse(copy)
+    return DocumentResponse(copy, integrity=(copy.sha256_hash, copy.file_size_bytes))

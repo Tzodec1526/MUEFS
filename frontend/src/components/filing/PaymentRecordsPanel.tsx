@@ -3,18 +3,18 @@ import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import type { FilingFees } from '../../api/documents';
 import type { PaymentRecord, PaymentRecords } from '../../api/payments';
-import { formatCents, parseServerDate } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { formatCents, formatDateTime, plural } from '../../utils/format';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
 
 type PendingRequest = { path: string; body: Record<string, unknown>; key?: string };
 
-export default function PaymentRecordsPanel({ fees, onChanged, onBusyChange }: {
-  fees: FilingFees; onChanged: (message: string) => void; onBusyChange: (busy: boolean) => void;
+export default function PaymentRecordsPanel({ fees, Heading, onChanged, onBusyChange }: {
+  fees: FilingFees; Heading: 'h3' | 'h4'; onChanged: (message: string) => void; onBusyChange: (busy: boolean) => void;
 }) {
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; records?: PaymentRecords; error?: string }>();
+  const [result, setResult] = useState<{ key: string; records?: PaymentRecords; error?: LoadFailure }>();
   const [editing, setEditing] = useState<'new' | PaymentRecord | null>(null);
   const [pending, setPending] = useState<PendingRequest | null>(null);
   const [busy, setBusy] = useState(false);
@@ -27,7 +27,7 @@ export default function PaymentRecordsPanel({ fees, onChanged, onBusyChange }: {
     const controller = new AbortController();
     apiClient.get<PaymentRecords>(`${base}/payments`, { params: { page }, signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, records: data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load payment records.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load payment records.') }); });
     return () => controller.abort();
   }, [base, key, page]);
 
@@ -44,7 +44,7 @@ export default function PaymentRecordsPanel({ fees, onChanged, onBusyChange }: {
       const status = (err as { response?: { status?: number } }).response?.status;
       if (status && status >= 400 && status < 500) {
         setPending(null); onBusyChange(false);
-        setError(getErrorDetail(err) || 'The request was rejected. Review the current fee and payment records.');
+        setError(errorMessage(err, 'The request was rejected. Review the current fee and payment records.'));
       } else {
         setError('The outcome is unknown. Retry the same request to confirm whether the credit or reversal was recorded.');
       }
@@ -71,7 +71,7 @@ export default function PaymentRecordsPanel({ fees, onChanged, onBusyChange }: {
   }
 
   return <section className="payment-records" aria-label="Payment records">
-    <div className="page-header"><h4>Payment records for filing #{fees.filing_id}</h4>
+    <div className="page-header"><Heading className="card-subheading">Payment records for filing #{fees.filing_id}</Heading>
       {fees.can_record_external_payment && current?.records && !stale && !editing && <button className="btn btn-secondary" onClick={() => {
         setEditing('new'); setError('');
       }}>Record external receipt</button>}</div>
@@ -109,16 +109,16 @@ export default function PaymentRecordsPanel({ fees, onChanged, onBusyChange }: {
       </fieldset>
     </form>}
     {!current && <p role="status">Loading payment records…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.records && <>
-      <p>{current.records.total} payment records</p>
+      <p>{plural(current.records.total, 'payment record')}</p>
       {current.records.total === 0 && <p>No payments have been recorded for this filing.</p>}
       <ol className="payment-record-list">{current.records.payments.map(payment => <li key={payment.id}>
         <div className="page-header"><strong>{formatCents(payment.amount_cents)}</strong>
           <span>{payment.status === 'reversed' ? 'Credit reversed' : payment.status === 'completed' ? 'Completed' : payment.status}{payment.is_simulated && ' · Simulated'}</span></div>
         {payment.external_receipt ? <>
           <p>{payment.external_receipt.system} · Receipt {payment.external_receipt.reference}</p>
-          <p>Received {parseServerDate(payment.external_receipt.received_at).toLocaleString()} · Recorded by {payment.external_receipt.recorded_by_name}</p>
+          <p>Received {formatDateTime(payment.external_receipt.received_at)} · Recorded by {payment.external_receipt.recorded_by_name}</p>
           <details><summary>Verification</summary><p>{payment.external_receipt.reason}</p></details>
         </> : <p>{payment.transaction_ref || 'No transaction reference retained'}</p>}
         {fees.can_manage_external_payments && !stale && payment.external_receipt && payment.status === 'completed' && !editing &&

@@ -1,5 +1,3 @@
-"""Notification history is scoped to the recipient and paginated stably."""
-
 from datetime import UTC, datetime
 
 import pytest

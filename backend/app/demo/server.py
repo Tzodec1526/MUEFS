@@ -1,102 +1,66 @@
-"""FastAPI app for the public hosted demo.
-
-One container serves the API and the built React SPA from the same origin, and every
-browser session gets its own isolated, seeded SQLite sandbox. Run with:
-
-    uvicorn app.demo.server:app
-
-The core app (app.main) is untouched; this module wraps it.
-"""
-
 from __future__ import annotations
 
-import json
+import mimetypes
+import re
 from pathlib import Path
 
 from fastapi import HTTPException, Request
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse
 from sqlalchemy import URL
 from sqlalchemy.ext.asyncio import create_async_engine
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.config import settings
 from app.database import get_db
 from app.demo import session_db
 from app.main import app
 
-# Seed the template database once, before the server takes traffic.
 session_db.seed_template()
 app.state.readiness_engine = create_async_engine(URL.create(
     "sqlite+aiosqlite", database=session_db._template_db().resolve().as_uri(),
     query={"mode": "ro", "uri": "true"},
 ))
 
-# Every visitor gets their own sandbox instead of the single global database.
 app.dependency_overrides[get_db] = session_db.get_demo_db
+app.add_middleware(session_db.DemoSessionMiddleware)
 
 _STATIC_ROOT = Path(settings.demo_static_dir).resolve()
+mimetypes.add_type("font/woff2", ".woff2")
 
 
-class DemoSessionMiddleware:
-    """Pure-ASGI middleware: pin each request to a sandbox id (written into scope
-    state, where get_demo_db reads it) and set the cookie for new private sandboxes.
-
-    Pure ASGI (not BaseHTTPMiddleware) so scope-state and Set-Cookie propagate reliably."""
-
-    def __init__(self, app: ASGIApp) -> None:
-        self.app = app
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if (scope["type"] != "http"
-                or scope.get("path", "").rstrip("/") in {"/health", "/ready"}):
-            await self.app(scope, receive, send)
-            return
-        sid, set_cookie = session_db.resolve_sid(Request(scope))
-        scope.setdefault("state", {})["demo_sid"] = sid
-        session_db.touch(sid)
-        session_db.maybe_sweep()
-        if not set_cookie:
-            await self.app(scope, receive, send)
-            return
-        ttl = settings.demo_session_ttl_minutes * 60
-        cookie = (
-            f"{session_db.COOKIE_NAME}={sid}; Max-Age={ttl}; Path=/; HttpOnly; SameSite=Lax"
-        ).encode()
-
-        async def send_with_cookie(message: Message) -> None:
-            if message["type"] == "http.response.start":
-                message.setdefault("headers", []).append((b"set-cookie", cookie))
-            await send(message)
-
-        await self.app(scope, receive, send_with_cookie)
-
-
-app.add_middleware(DemoSessionMiddleware)
-
-
-@app.get("/config.js", include_in_schema=False)
-async def runtime_frontend_config() -> Response:
-    """Inject demo auth secret at runtime (hosted demo) without rebaking the SPA."""
-    secret = settings.demo_mode_secret or ""
-    body = f"window.__MUEFS_DEMO_SECRET__={json.dumps(secret)};"
-    return Response(
-        content=body,
-        media_type="application/javascript",
-        headers={"Cache-Control": "no-store"},
-    )
+def _accepts_gzip(accept_encoding: str) -> bool:
+    for coding in accept_encoding.lower().split(","):
+        name, _, parameters = coding.partition(";")
+        if name.strip() == "gzip":
+            return re.fullmatch(r"q=0(\.0*)?", parameters.replace(" ", "")) is None
+    return False
 
 
 @app.get("/{full_path:path}", include_in_schema=False)
-async def spa(full_path: str) -> FileResponse:
-    """Serve the built SPA — a real static file if one exists, else index.html so
-    client-side routes (e.g. /cases/search) survive a refresh. API and docs paths
-    are handled by earlier routes; anything else under them 404s rather than serving HTML."""
+async def spa(request: Request, full_path: str) -> FileResponse:
     if full_path.startswith(("api/", "docs", "redoc", "openapi", "health", "ready", "config.js")):
         raise HTTPException(status_code=404)
     candidate = (_STATIC_ROOT / full_path).resolve()
-    if full_path and candidate.is_file() and candidate.is_relative_to(_STATIC_ROOT):
-        return FileResponse(candidate)
+    if (
+        full_path and candidate.is_file() and candidate.is_relative_to(_STATIC_ROOT)
+        and candidate.suffix != ".gz"
+    ):
+        cache = (
+            "public, max-age=31536000, immutable"
+            if full_path.startswith("assets/") else "no-cache"
+        )
+        if candidate.name == "index.html":
+            cache = "no-store"
+        headers = {"Cache-Control": cache}
+        compressed = candidate.with_name(f"{candidate.name}.gz")
+        if compressed.is_file():
+            headers["Vary"] = "Accept-Encoding"
+            if _accepts_gzip(request.headers.get("accept-encoding", "")):
+                headers["Content-Encoding"] = "gzip"
+                return FileResponse(compressed, headers=headers)
+        return FileResponse(candidate, headers=headers)
+    if full_path.startswith("assets/"):
+        raise HTTPException(status_code=404)
     index = _STATIC_ROOT / "index.html"
     if index.is_file():
-        return FileResponse(index)
+        return FileResponse(index, headers={"Cache-Control": "no-store"})
     raise HTTPException(status_code=404)

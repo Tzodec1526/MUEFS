@@ -1,5 +1,3 @@
-"""Retain document packages and recipients separately from relay outcomes."""
-
 import sqlalchemy as sa
 
 from alembic import op

@@ -1,13 +1,11 @@
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 
-from pydantic import AliasPath, BaseModel, Field, field_serializer
+from pydantic import AliasPath, BaseModel, Field
 
 from app.models.case import CaseStatus, ParticipantRole
 
 
 class CaseSearchParticipantPublic(BaseModel):
-    """Public party/counsel identifiers only — no contact PII (court privacy)."""
-
     id: int
     party_name: str
     role: ParticipantRole
@@ -18,11 +16,7 @@ class CaseSearchParticipantPublic(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class CaseDocketResponse(BaseModel):
-    """Public docket and search fields with participant contact PII (email, phone, address)
-    stripped — the docket is open by default, so litigant contact details are never
-    served on it. Sealed-case access is gated separately."""
-
+class CasePublicRecord(BaseModel):
     id: int
     court_id: int
     case_number: str
@@ -34,17 +28,17 @@ class CaseDocketResponse(BaseModel):
     filing_date: date | None = None
     judge_id: int | None
     participants: list[CaseSearchParticipantPublic] = []
-    can_manage_records: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}
 
-    @field_serializer("filed_date", "created_at")
-    def serialize_timestamp(self, value: datetime) -> str:
-        return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
+
+class CaseDocketResponse(CasePublicRecord):
+    can_manage_records: bool = False
+    can_file: bool = False
 
 
-class CaseSearchResult(CaseDocketResponse):
+class CaseSearchResult(CasePublicRecord):
     court_name: str = Field(validation_alias=AliasPath("court", "name"))
     court_county: str = Field(validation_alias=AliasPath("court", "county"))
 

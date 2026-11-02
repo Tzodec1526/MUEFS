@@ -2,12 +2,15 @@ import { useContext, useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { participantRoles } from '../../api/cases';
-import { getErrorDetail } from '../../utils/errors';
-import { parseServerDate } from '../../utils/format';
+import { serviceMethodLabels } from '../../api/serviceDeliveries';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
+import { formatDateTime } from '../../utils/format';
 import LoadError from '../common/LoadError';
 import { CourtContext } from '../auth/CourtSession';
+import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
-const methods = { electronic: 'Electronic through portal', mail: 'Mail', hand_delivery: 'Hand delivery' };
+const methods = serviceMethodLabels;
 interface Contact {
   id: number; name: string; method: keyof typeof methods; email: string | null;
   address: string | null; is_active: boolean; authority: string; version: number;
@@ -43,11 +46,11 @@ function ContactForm({ path, records, onSaved }: {
         expected_version: contact?.version || 0, expected_participant_version: records.participant_version,
       });
       onSaved();
-    } catch (err) { setError(getErrorDetail(err) || 'Could not save service instructions.'); }
+    } catch (err) { setError(errorMessage(err, 'Could not save service instructions.')); }
     finally { setBusy(false); }
   }
   return <form className="admin-account-form" onSubmit={save}>
-    <h3>{contact ? 'Review service instructions' : 'Record service instructions'}</h3>
+    <h2 className="card-heading">{contact ? 'Review service instructions' : 'Record service instructions'}</h2>
     <div className="form-group"><label htmlFor="service-method">Recorded service method</label>
       <select id="service-method" value={method} onChange={event => setMethod(event.target.value as keyof typeof methods)}>
         {Object.entries(methods).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -75,23 +78,23 @@ function ContactForm({ path, records, onSaved }: {
 function ContactHistory({ path }: { path: string }) {
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: History; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: History; error?: LoadFailure }>();
   const key = `${path}:${page}:${attempt}`;
   const current = result?.key === key ? result : undefined;
   useEffect(() => {
     const controller = new AbortController();
     apiClient.get<History>(`${path}/history`, { params: { page }, signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load history.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load history.') }); });
     return () => controller.abort();
   }, [path, page, key]);
   return <section className="admin-delegations">
     {!current && <p role="status">Loading service history…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
       {!current.data.total && <p>No service instructions have been recorded.</p>}
       <ul className="court-case-list">{current.data.events.map(event => <li key={event.id}>
-        <div><strong>{parseServerDate(event.occurred_at).toLocaleString()} · {event.details.actor_name}</strong>
+        <div><strong>{formatDateTime(event.occurred_at)} · {event.details.actor_name}</strong>
           <p>{event.details.reason}</p>
           {event.details.before && <p>Previous: {methods[event.details.before.method]} · {event.details.before.email || event.details.before.address}
             {' · '}{event.details.before.is_active ? 'Active' : 'Inactive'}</p>}
@@ -109,12 +112,13 @@ function ContactHistory({ path }: { path: string }) {
 }
 
 export default function ServiceContactPage() {
+  usePageTitle('Service instructions');
   const { caseId, participantId } = useParams();
   const { courts } = useContext(CourtContext)!;
   const [attempt, setAttempt] = useState(0);
   const [notice, setNotice] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [result, setResult] = useState<{ key: string; data?: Instructions; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: Instructions; error?: LoadFailure }>();
   const path = `/cases/${caseId}/participants/${participantId}/service-contact`;
   const key = `${path}:${attempt}`;
   const current = result?.key === key ? result : undefined;
@@ -123,16 +127,16 @@ export default function ServiceContactPage() {
     const controller = new AbortController();
     apiClient.get<Instructions>(path, { signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load service instructions.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load service instructions.') }); });
     return () => controller.abort();
   }, [path, key]);
   return <section className="case-participants-page">
-    <div className="page-header"><h2>Service instructions</h2>
+    <div className="page-header"><PageHeading>Service instructions</PageHeading>
       <Link className="btn btn-secondary" to={`/cases/${caseId}/participants`}>Back to participants</Link></div>
     {!current && <p role="status">Loading service instructions…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
-      <h3>{court?.court_name || `Court ${current.data.court_id}`} · {current.data.case_number} · {current.data.title}</h3>
+      <h2 className="card-heading">{court?.court_name || `Court ${current.data.court_id}`} · {current.data.case_number} · {current.data.title}</h2>
       <p><strong>{current.data.participant.party_name}</strong> · {participantRoles[current.data.participant.role] || current.data.participant.role}
         {current.data.participant.represented_party_name && <> · Represents {current.data.participant.represented_party_name}</>}</p>
       <p>Record the court-reviewed destination and method for this participant. These instructions do not send documents or establish that service occurred.</p>

@@ -1,12 +1,10 @@
-"""Retained filing transactions. Submission details are snapshots, not live references."""
-
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, UniqueConstraint, text
+from sqlalchemy import JSON, ForeignKey, Index, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database import Base
+from app.database import Base, UTCDateTime
 from app.models.retention import append_only
 
 
@@ -19,7 +17,7 @@ class FilingTransaction(Base):
     event_type: Mapped[str] = mapped_column(String(30))
     actor_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     actor_name: Mapped[str] = mapped_column(String(255))
-    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    occurred_at: Mapped[datetime] = mapped_column(UTCDateTime())
     details: Mapped[dict] = mapped_column(JSON)
     idempotency_key: Mapped[str | None] = mapped_column(String(36))
 

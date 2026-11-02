@@ -12,18 +12,20 @@ correction history and PostgreSQL concurrency checks now form part of the core w
 ## Known limitations (demo-grade today)
 
 - **CMS integration is not connected.** Demo acceptance records a simulated identifier.
-  Outside demo mode, an unconfigured CMS blocks acceptance. No JIS or Tyler request is
-  made; see the submission boundary in `backend/app/integrations/cms_adapter.py`.
+  Outside demo mode, acceptance is records-only: MUEFS opens the case with its own case
+  number and records no CMS identifier. No JIS or Tyler request is made; see the
+  submission boundary in `backend/app/integrations/cms_adapter.py`.
 - **Online payments are simulated.** No payment processor is integrated
   (`PAYMENTS_ARE_SIMULATED=true`); no card data is handled. An optional court-administered
   workflow credits verified external receipts and retains reversals. It requires court
   approval and reconciliation with the actual accounting records; it does not move funds.
   Assigned court administrators can review a private receipt register and export bounded
   activity periods, with simulated activity separated from external-credit totals.
-- **Demo auth is open by configuration.** The hosted demo enables `ALLOW_DEMO_MODE` and
-  `ALLOW_PUBLIC_REGISTRATION` so anyone can explore it without an identity provider.
+- **Demo auth is open by configuration.** The hosted demo enables `ALLOW_DEMO_MODE` so
+  anyone can explore its seeded roles without an identity provider.
   Production runs Keycloak-only with no self-registration. See [SECURITY.md](../SECURITY.md).
-- **The demo uses built-in heuristic screening.** Strict production startup requires ClamAV.
+- **The demo uses built-in heuristic screening.** Production startup (`DEBUG=false` without
+  demo mode) requires ClamAV.
   Enabled ClamAV screening has a total deadline and rejects incomplete/error responses;
   deployment still requires current signatures, monitored limits and representative load testing.
 - **Document validation is advisory.** MCR 1.109 checks (text-searchability, PII) produce
@@ -33,7 +35,7 @@ correction history and PostgreSQL concurrency checks now form part of the core w
   bytes fail hash/size verification. Deeper processing (server-side OCR / PDF-A conversion)
   is not implemented, and storage retention/recovery still requires operational validation.
 - **Demo persistence is lightweight.** `run_demo.py` and the hosted demo use SQLite + local
-  file storage; production uses PostgreSQL + MinIO/S3.
+  file storage; production uses PostgreSQL + S3-compatible object storage.
 - **Document delivery requires court evaluation and explicit enablement.** Senders select
   retained subsequent documents and reviewed recipients. Protected package links, verified
   downloads, relay outcomes and recipient acknowledgments are retained separately. These
@@ -61,4 +63,4 @@ correction history and PostgreSQL concurrency checks now form part of the core w
   [deployment guide](DEPLOYMENT.md) now exist).
 
 > Courts and evaluators: if a capability matters for your evaluation and isn't listed here,
-> please ask — this list reflects current scope, not a ceiling.
+> please ask. This list reflects current scope, not a ceiling.

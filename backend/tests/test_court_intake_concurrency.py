@@ -1,5 +1,3 @@
-"""Real transactions protect intake publications, authority, and received filings."""
-
 import asyncio
 from copy import deepcopy
 from pathlib import Path
@@ -239,15 +237,15 @@ async def test_administrator_closure_waits_for_a_submission_receipt_to_commit(
     intake_case, postgres_sessions, monkeypatch,
 ):
     fid, filer, administrator, court_id, body = intake_case
-    reached_storage, release, changing = asyncio.Event(), asyncio.Event(), asyncio.Event()
-    verify = filing_service.verify_filing_documents
+    reached_receipt, release, changing = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    assess = filing_service.filing_date_for_receipt
 
-    async def pause_after_intake(filing):
-        await verify(filing)
-        reached_storage.set()
+    async def pause_after_intake(db, court_id, received_at):
+        reached_receipt.set()
         await release.wait()
+        return await assess(db, court_id, received_at)
 
-    monkeypatch.setattr(filing_service, "verify_filing_documents", pause_after_intake)
+    monkeypatch.setattr(filing_service, "filing_date_for_receipt", pause_after_intake)
     closure_pid = None
 
     async def sessions(request: Request):
@@ -267,7 +265,7 @@ async def test_administrator_closure_waits_for_a_submission_receipt_to_commit(
             submission = asyncio.create_task(client.post(f"/api/v1/filings/{fid}/submit",
                 json=review, headers={"Idempotency-Key": str(uuid4())}))
             pending.append(submission)
-            await asyncio.wait_for(reached_storage.wait(), timeout=5)
+            await asyncio.wait_for(reached_receipt.wait(), timeout=5)
             closure = asyncio.create_task(client.put(f"/api/v1/courts/{court_id}/intake",
                 json=body, headers={"X-Demo-User-Id": str(administrator)}))
             pending.append(closure)

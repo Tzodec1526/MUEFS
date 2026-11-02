@@ -7,19 +7,19 @@ real deployment would be hardened.
 
 ## Why demo mode is open
 
-The hosted demo at `demo.tomcedoz.com` is meant to be explored by anyone — attorneys,
-clerks, self-represented litigants, and the public — with **no sign-up and no real
+The hosted demo at `demo.tomcedoz.com` is meant to be explored by anyone (attorneys,
+clerks, self-represented litigants, and the public) with **no sign-up and no real
 identity provider**. To make that possible, the demo intentionally relaxes three things
 that a production court deployment would never relax:
 
 | Setting | Demo value | Why it's open in the demo | Production value |
 | --- | --- | --- | --- |
-| `ALLOW_DEMO_MODE` | `true` | Lets a visitor act as a seeded attorney/clerk/SRL/public user via an `X-Demo-User-Id` header instead of a Keycloak login, so the role-picker works without an IdP. | `false` — Keycloak Bearer JWT only. |
-| `ALLOW_PUBLIC_REGISTRATION` | `true` | Lets visitors self-register to try the filing flow. | `false` — identities come from the court IdP or an admin invite. |
+| `ALLOW_DEMO_MODE` | `true` | Lets a visitor act as a seeded attorney/clerk/SRL/public user via an `X-Demo-User-Id` header instead of a Keycloak login, so the role-picker works without an IdP. | `false`: Keycloak Bearer JWT only. |
+| `ALLOW_PUBLIC_REGISTRATION` | `true` in `run_demo.py` and Compose; off in the hosted demo | Enables `POST /api/v1/auth/register` for trying the API. The portal itself signs in as seeded roles. | `false`: identities come from the court IdP or an admin invite. |
 | `PAYMENTS_ARE_SIMULATED` | `true` | No payment processor is integrated; the fee/waiver flow is demonstrated, not charged. | Integrate a PSP; never simulate. |
 
 These are **configuration choices, not code defects**. The application code defaults to the
-*secure* values (`allow_demo_mode=False`, `allow_public_registration=False`); it is the
+*secure* values (`allow_demo_mode=False`, `allow_public_registration=False`, `debug=False`); it is the
 demo deployment artifacts (`.env.example`, `docker-compose.yml`) that turn them on. A court
 running MUEFS would deploy with the production column above and get IdP-only authentication
 with no self-registration.
@@ -77,7 +77,8 @@ regardless of demo mode:
   transactions, calendar revisions and email delivery events, including bulk SQL. Database
   owners can remove these controls; restrict runtime ownership, DDL and TRUNCATE privileges
   and maintain protected backups and the court's approved retention policy.
-- **Upload safety.** Uploads are size-limited (streamed, 100 MB), restricted to an
+- **Upload safety.** Request bodies are capped before parsing (the 100 MB upload limit plus
+  1 MiB for multipart forms, 1 MiB otherwise); uploads are restricted to an
   allowlisted set of document/image MIME types, stored under server-generated keys
   (path-traversal-guarded), and **malware-screened** (see below).
 - **Stored-file integrity.** Submission, service-only recording and acceptance verify the
@@ -89,18 +90,20 @@ regardless of demo mode:
   results, not exhaustive inspection or proof of redaction.
 - **SQL injection / path traversal.** All database access is parameterized via SQLAlchemy;
   document storage paths are containment-checked.
+- **Browser policy.** The served app's Content-Security-Policy sets `font-src 'self'`, because
+  Public Sans is self-hosted. The app contacts no font host. `connect-src` adds only the
+  configured Keycloak origin.
 
 ## Threat model & responsibility boundaries
 
 MUEFS is a filing *front end* and workflow engine. It deliberately does **not** take over
-identity, payments, or the court's official record — those stay with established systems,
-which is what keeps adoption low-risk and avoids vendor lock-in.
+identity, payments, or the court's official record. Those stay with established systems.
 
 | Concern | Owned by | MUEFS's role |
 | --- | --- | --- |
 | User identity & credentials | The court's IdP (Keycloak / state SSO) | Validates IdP-issued RS256 JWTs; stores no passwords. |
 | Payment / card data | The payment processor (PCI scope) | Records fee/waiver status only; no card data touches MUEFS (simulated in the demo). |
-| System of record (official docket) | The court's existing CMS (JIS, Tyler Odyssey) | Acceptance is blocked outside demo mode until an actual CMS adapter is integrated; the CMS stays authoritative. |
+| System of record (official docket) | The court's existing CMS (JIS, Tyler Odyssey) | Without an integrated CMS adapter, acceptance is records-only and assigns MUEFS case numbers; a connected CMS stays authoritative. |
 | Application authorization (who may read/file what) | **MUEFS** | Sealed/confidential access control, ownership/IDOR checks, audit logging. |
 | Upload safety (type, size, malware, PII) | **MUEFS** | MIME allowlist, size cap, malware screening, MCR 1.109 PII warnings. |
 
@@ -114,13 +117,14 @@ Every uploaded file is screened before it is stored (`backend/app/utils/malware_
 on top of the MIME-type allowlist:
 
 - A **built-in, offline heuristic scan** (always on, no external service) rejects native
-  executables (Windows PE, ELF, Mach-O) and the EICAR antivirus test signature — even if a
+  executables (Windows PE, ELF, Mach-O) and the EICAR antivirus test signature, even if a
   client spoofs the `Content-Type`. This is what keeps the public demo self-contained.
 - An optional **ClamAV** backend (`MALWARE_SCAN_CLAMAV_ENABLED=true`, talking to a `clamd`
   daemon at `CLAMAV_HOST:CLAMAV_PORT` or `CLAMAV_SOCKET`) adds real signature-based
   detection for production. Once enabled, every upload requires a complete clean verdict.
   A timeout, disconnect, malformed reply or daemon error cannot fall back to heuristics.
-  Strict startup requires ClamAV outside demo/debug mode.
+  Startup refuses to run without ClamAV outside demo/debug mode, whether or not strict
+  startup is enabled.
 
 Detected threats return `422`; unavailable or incomplete screening returns `503` with
 `Retry-After`. Neither result stores the document. `CLAMAV_TIMEOUT_SECONDS` bounds the
@@ -147,10 +151,11 @@ Configuration:
 - Enable JWT audience verification (`JWT_VERIFY_AUDIENCE=true`, default outside DEBUG) and
   configure `JWT_AUDIENCES` if multiple Keycloak clients issue tokens.
 - Set `STRICT_MIME_DETECTION=true` so uploads are rejected when libmagic cannot identify type.
-- Set `TRUSTED_PROXY_IPS` to your load balancer so rate limits use the real client IP.
+- Set `TRUSTED_PROXY_IPS` to your load balancer's addresses or network (CIDR) so rate
+  limits and audit records use the real client IP.
 - Set `RATE_LIMIT_FAIL_CLOSED=true` when using Redis-backed rate limiting.
-- Replace every `change-me*` / `*_dev` secret (`SECRET_KEY`, Keycloak client secret, DB and
-  MinIO credentials) with strong, externally-managed values. Generate them with:
+- Replace every demo secret (Keycloak administrator, database and object-storage
+  credentials) with strong, externally-managed values. Generate them with:
   ```bash
   openssl rand -hex 32
   ```
@@ -164,8 +169,10 @@ Configuration:
 Scan before and after changes:
 
 ```bash
-# Python dependency CVEs
-pip install pip-audit && pip-audit
+# Python dependency CVEs, from backend/
+pip install -e . -c constraints.txt
+pip install pip-audit==2.10.1 -c constraints.txt
+pip-audit
 
 # Filesystem / image vulnerability + secret scan
 trivy fs .
@@ -186,23 +193,23 @@ npm --prefix frontend audit --omit=dev
 | | Demo (hosted / `run_demo.py`) | Recommended production |
 | --- | --- | --- |
 | Auth | Role-picker via `X-Demo-User-Id` + `X-Demo-Auth-Secret` (when `DEBUG=false`) | Keycloak (or state SSO) RS256 JWT only |
-| Registration | Open self-registration | IdP / admin invite only |
+| Registration | Seeded roles; API self-registration when enabled | IdP / admin invite only |
 | Database | SQLite | PostgreSQL |
-| Object storage | Local filesystem | MinIO / S3 with restricted credentials |
+| Object storage | Local filesystem | S3-compatible storage with restricted credentials |
 | Malware scanning | Built-in heuristic | Built-in + ClamAV, fail-closed |
 | Payments | Simulated | Real payment processor |
 | Transport | HTTP (localhost) | TLS via reverse proxy |
 
 ## Reporting a vulnerability (responsible disclosure)
 
-Please report security issues **privately** — do not open a public issue with exploit details.
+Please report security issues **privately**. Do not open a public issue with exploit details.
 
-- **Preferred:** GitHub private vulnerability reporting — open a draft advisory at
+- **Preferred:** GitHub private vulnerability reporting. Open a draft advisory at
   <https://github.com/Tzodec1526/MUEFS/security/advisories/new>.
 - **Email:** <tom@tomcedoz.com>.
 
 Include the affected endpoint/file, a description, and reproduction steps. Because the hosted
 demo is intentionally open as described above, please scope reports to issues **beyond** the
-documented demo-mode relaxations — for example: reading a sealed or confidential filing you
+documented demo-mode relaxations. For example: reading a sealed or confidential filing you
 should not be able to, an authentication bypass against the production code paths, injection,
 or a storage escape. We aim to acknowledge reports within a few days.

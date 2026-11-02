@@ -1,5 +1,3 @@
-"""Retention survives SQL that bypasses the ORM."""
-
 import pytest
 from sqlalchemy import select, text
 from sqlalchemy.exc import DBAPIError

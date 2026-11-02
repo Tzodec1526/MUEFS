@@ -1,12 +1,13 @@
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StrictBool, model_validator
 
 from app.models.case import COUNSEL_ROLES, ParticipantRole
+from app.schemas.common import ExpectedVersion
 
 
 class PublicCaseAccessChange(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
-    expected_version: int = Field(ge=0)
+    expected_version: ExpectedVersion
     is_sealed: StrictBool
     confirm_public_release: StrictBool = False
     reason: str = Field(min_length=1, max_length=1000)
@@ -22,7 +23,7 @@ class ParticipantChange(BaseModel):
     represented_party_name: str | None = Field(default=None, min_length=1, max_length=255)
     is_active: bool = True
     access_enabled: bool = False
-    expected_version: int = Field(ge=0)
+    expected_version: ExpectedVersion
     reason: str = Field(min_length=1, max_length=1000)
 
     @model_validator(mode="after")

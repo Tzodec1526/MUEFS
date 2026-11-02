@@ -1,5 +1,3 @@
-"""Smoke tests: FastAPI app mounts and public endpoints respond (no DB required)."""
-
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -12,6 +10,16 @@ async def test_health_returns_ok() -> None:
         r = await client.get("/health")
     assert r.status_code == 200
     assert r.json() == {"status": "healthy", "service": "muefs-api"}
+
+
+def test_the_public_record_rules_stay_in_the_api_description() -> None:
+    paths = app.openapi()["paths"]
+    search = paths["/api/v1/cases/search"]["get"]["description"]
+    docket = paths["/api/v1/cases/{case_id}"]["get"]["description"]
+    assert "No account is required" in search
+    assert "Sealed matters are excluded from the index" in search
+    assert "strips participant contact PII" in search
+    assert "Non-sealed: open to anyone; sealed: restricted." in docket
 
 
 @pytest.mark.asyncio
@@ -43,10 +51,6 @@ async def test_write_preflight_allows_method_and_idempotency_header(method, path
 
 @pytest.mark.asyncio
 async def test_api_v1_filings_create_requires_auth() -> None:
-    """Public docket reads need no account, but creating a filing must fail closed (401).
-
-    Auth is rejected before the DB is touched, so this stays a no-DB smoke test.
-    """
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         r = await client.post("/api/v1/filings", json={})
     assert r.status_code == 401

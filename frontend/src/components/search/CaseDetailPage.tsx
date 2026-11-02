@@ -1,37 +1,19 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Link2 } from 'lucide-react';
-import { apiClient } from '../../api/client';
-import { participantRoles } from '../../api/cases';
+import { actionErrorMessage, apiClient } from '../../api/client';
+import { participantRoles, type CaseDocket } from '../../api/cases';
 import { addFavorite, removeFavorite, listFavorites } from '../../api/favorites';
 import { getCaseTypes } from '../../api/courts';
-import { formatBytes, formatCourtDate, formatShortDate, getDocumentLabel } from '../../utils/format';
-import { getDemoRole } from '../auth/LoginScreen';
+import { getDocumentLabel } from '../../utils/documentTypes';
+import { formatBytes, formatCourtDate, formatShortDate, plural } from '../../utils/format';
+import { filingStatusLabel } from '../../utils/filingStatus';
+import { errorMessage } from '../../utils/errors';
+import { CourtContext } from '../auth/CourtSession';
 import { useToast } from '../common/Toast';
 import DocumentDownload from '../common/DocumentDownload';
-
-interface CaseDetail {
-  id: number;
-  court_id: number;
-  case_number: string;
-  case_type_id: number;
-  title: string;
-  is_sealed?: boolean;
-  can_manage_records: boolean;
-  status: string;
-  filed_date: string;
-  filing_date: string | null;
-  judge_id: number | null;
-  participants: Array<{
-    id: number;
-    party_name: string;
-    role: string;
-    attorney_bar_number: string | null;
-    represented_party_name: string | null;
-    is_active: boolean;
-  }>;
-  created_at: string;
-}
+import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
+import PageLoadError from '../common/PageLoadError';
 
 interface CaseFiling {
   id: number;
@@ -57,14 +39,14 @@ interface CaseFiling {
 function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const { pushToast } = useToast();
-  // Read-only viewers: the signed-in 'public' role and anonymous guests (no role).
-  const role = getDemoRole();
+  const { role } = useContext(CourtContext)!;
   const isPublicViewer = role === 'public' || !role;
   const isFiler = role === 'attorney' || role === 'srl';
-  const [caseData, setCaseData] = useState<CaseDetail | null>(null);
+  const [caseData, setCaseData] = useState<CaseDocket | null>(null);
   const [filings, setFilings] = useState<CaseFiling[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ heading: string; message: string } | null>(null);
+  usePageTitle(error?.heading ?? (caseData?.title || 'Case docket'));
   const [isFavorited, setIsFavorited] = useState(false);
   const [togglingFav, setTogglingFav] = useState(false);
   const [courtName, setCourtName] = useState('');
@@ -91,36 +73,46 @@ function CaseDetailPage() {
           apiClient.get(`/cases/${caseId}/filings`, { signal: controller.signal }),
           !isFiler
             ? Promise.resolve({ favorites: [] as { case_id: number }[] })
-            : listFavorites().catch(() => ({ favorites: [] })),
+            : listFavorites().catch((err: unknown) => {
+              const message = !controller.signal.aborted && actionErrorMessage(err, 'Could not load your favorite cases.');
+              if (message) pushToast(message, 'error');
+              return { favorites: [] };
+            }),
         ]);
         if (controller.signal.aborted) return;
         setCaseData(caseRes.data);
         setFilings(filingsRes.data);
         setHasMoreFilings(filingsRes.data.length === 25);
-        // Fetch court name + case type label for a credible docket header
-        try {
-          const [courtRes, types] = await Promise.all([
-            apiClient.get(`/courts/${caseRes.data.court_id}`, { signal: controller.signal }),
-            getCaseTypes(caseRes.data.court_id),
-          ]);
-          if (controller.signal.aborted) return;
-          setCourtName(courtRes.data.name);
-          const ct = types.find((t) => t.id === caseRes.data.case_type_id);
-          if (ct) setCaseTypeName(ct.name);
-        } catch {
-          if (controller.signal.aborted) return;
-          setCourtName(`Court #${caseRes.data.court_id}`);
-        }
+        const report = (err: unknown, fallback: string) => {
+          const message = !controller.signal.aborted && actionErrorMessage(err, fallback);
+          if (message) pushToast(message, 'error');
+        };
+        const [court, types] = await Promise.all([
+          apiClient.get<{ name: string }>(`/courts/${caseRes.data.court_id}`, { signal: controller.signal })
+            .then(({ data }) => data.name)
+            .catch((err: unknown) => {
+              report(err, "Could not load the court's name.");
+              return `Court #${caseRes.data.court_id}`;
+            }),
+          getCaseTypes(caseRes.data.court_id, true).catch((err: unknown) => {
+            report(err, 'Could not load the case type name.');
+            return [];
+          }),
+        ]);
+        if (controller.signal.aborted) return;
+        setCourtName(court);
+        const ct = types.find((t) => t.id === caseRes.data.case_type_id);
+        if (ct) setCaseTypeName(ct.name);
         setIsFavorited(favsRes.favorites.some((f: { case_id: number }) => f.case_id === Number(caseId)));
       } catch (err: unknown) {
         if (controller.signal.aborted) return;
         const status = (err as { response?: { status?: number } })?.response?.status;
         if (status === 403) {
-          setError('This case is sealed or confidential and is not available for public viewing.');
+          setError({ heading: 'Case not available', message: 'This case is sealed or confidential and is not available for public viewing.' });
         } else if (status === 404) {
-          setError('Case not found.');
+          setError({ heading: 'Case not found', message: 'Case not found.' });
         } else {
-          setError('Failed to load case details.');
+          setError({ heading: 'Case not loaded', message: errorMessage(err, 'Failed to load case details.') });
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -128,7 +120,7 @@ function CaseDetailPage() {
     }
     load();
     return () => controller.abort();
-  }, [caseId, isFiler]);
+  }, [caseId, isFiler, pushToast]);
 
   const loadMoreFilings = async () => {
     const signal = requestRef.current?.signal;
@@ -142,8 +134,8 @@ function CaseDetailPage() {
       setFilings((previous) => [...previous, ...data]);
       setDocketPage((previous) => previous + 1);
       setHasMoreFilings(data.length === 25);
-    } catch {
-      if (!signal?.aborted) setDocketError('Could not load more filings. Please try again.');
+    } catch (err) {
+      if (!signal?.aborted) setDocketError(errorMessage(err, 'Could not load more filings. Please try again.'));
     } finally {
       if (!signal?.aborted) setLoadingMore(false);
     }
@@ -170,14 +162,14 @@ function CaseDetailPage() {
         await addFavorite(caseData.id);
         setIsFavorited(true);
       }
-    } catch { /* ignore */ }
-    finally { setTogglingFav(false); }
+    } catch (err) {
+      const message = actionErrorMessage(err, 'Could not update favorite');
+      if (message) pushToast(message, 'error');
+    } finally { setTogglingFav(false); }
   };
 
-  // Public dockets show register-of-actions language, not the internal e-filing
-  // review pipeline. Filers and court staff see the true status.
   const docketStatus = (status: string): { label: string; cls: string } => {
-    if (!isPublicViewer) return { label: status.replace('_', ' '), cls: status };
+    if (!isPublicViewer) return { label: filingStatusLabel(status), cls: status };
     switch (status) {
       case 'accepted': return { label: 'Filed', cls: 'accepted' };
       case 'served': return { label: 'Service documents recorded', cls: 'pending' };
@@ -188,26 +180,22 @@ function CaseDetailPage() {
   };
 
   if (loading) return <div className="loading">Loading case...</div>;
-  if (error || !caseData) return <div className="alert alert-error">{error || 'Case not found.'}</div>;
+  if (error || !caseData) {
+    const failure = error ?? { heading: 'Case not found', message: 'Case not found.' };
+    return <PageLoadError heading={failure.heading} failure={{ message: failure.message, retry: false }} />;
+  }
 
   return (
     <div className="case-detail-page">
-      {/* Case Header */}
       <div className="case-detail-header">
         <div>
-          <div className="case-detail-number">{caseData.case_number}</div>
-          <h2>{caseData.title}</h2>
+          <PageHeading>{caseData.title}</PageHeading>
+          <p className="case-detail-number">
+            {caseData.case_number} <span className={`status-badge ${caseData.status}`}>{caseData.status}</span>
+          </p>
         </div>
         <div className="case-detail-actions">
-          <button
-            type="button"
-            className="btn btn-secondary btn-icon"
-            onClick={copyShareLink}
-            title="Copy shareable case link"
-          >
-            <Link2 size={16} aria-hidden="true" />
-            <span className="sr-only">Copy shareable case link</span>
-          </button>
+          <button type="button" className="btn btn-secondary" onClick={copyShareLink}>Copy link</button>
           {caseData.can_manage_records && <Link to={`/cases/${caseData.id}/participants`} className="btn btn-secondary">Manage case access</Link>}
           {isFiler && (
             <button
@@ -219,42 +207,43 @@ function CaseDetailPage() {
               {isFavorited ? '\u2605 Favorited' : '\u2606 Favorite'}
             </button>
           )}
-          {isFiler && (
+          {isFiler && caseData.can_file && (
             <>
               <Link
-                to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&case_title=${encodeURIComponent(caseData.title)}`}
+                to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}`}
                 className="btn btn-primary"
               >
-                File with Court
+                File in this case
               </Link>
               <Link
-                to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&case_title=${encodeURIComponent(caseData.title)}&service_only=true`}
+                to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&service_only=true`}
                 className="btn btn-secondary"
               >
-                Serve Documents Only
+                Serve documents only
               </Link>
             </>
           )}
         </div>
       </div>
 
-      {/* Case Info */}
+      {isFiler && !caseData.can_file && <p className="alert alert-info">
+        Court-reviewed case participation is required to file documents in this case.
+        Contact the court to confirm your access.
+      </p>}
+
       <div className="case-detail-grid">
         <div className="case-detail-card">
-          <h3>Case Information</h3>
+          <h2>Case information</h2>
           <div className="detail-grid">
-            <div><label>Case Number</label><span>{caseData.case_number}</span></div>
-            <div><label>Case Type</label><span>{caseTypeName || '--'}</span></div>
-            <div><label>Status</label><span className={`status-badge ${caseData.status}`}>{caseData.status}</span></div>
+            <div><label>Case type</label><span>{caseTypeName || '--'}</span></div>
             <div><label>Court</label><span>{courtName}</span></div>
-            <div><label>Filing Date</label><span>{formatCourtDate(caseData.filing_date)}</span></div>
-            {!caseData.filing_date && <div><label>Stored date (not calendar-verified)</label><span>{formatShortDate(caseData.filed_date)}</span></div>}
+            <div><label>Filing date</label><span>{formatCourtDate(caseData.filing_date)}</span></div>
+            {!caseData.filing_date && <div><label>Date on record (not yet confirmed by the court)</label><span>{formatShortDate(caseData.filed_date)}</span></div>}
           </div>
         </div>
 
-        {/* Parties */}
         <div className="case-detail-card">
-          <h3>Participants ({caseData.participants.length})</h3>
+          <h2>Participants ({caseData.participants.length})</h2>
           <div className="parties-list">
             {caseData.participants.map((p) => (
               <div key={p.id} className="party-item">
@@ -273,19 +262,8 @@ function CaseDetailPage() {
         </div>
       </div>
 
-      {/* Filing History / Docket */}
       <div className="case-detail-card">
-        <div className="docket-header">
-          <h3>Docket / Filing History ({filings.length})</h3>
-          {isFiler && (
-            <Link
-              to={`/filing/new?case_id=${caseData.id}&court_id=${caseData.court_id}&case_type_id=${caseData.case_type_id}&case_title=${encodeURIComponent(caseData.title)}`}
-              className="btn btn-primary btn-small"
-            >
-              + Create New Filing
-            </Link>
-          )}
-        </div>
+        <h2>Docket</h2>
 
         {filings.length > 0 ? (
           <div className="docket-list">
@@ -293,7 +271,7 @@ function CaseDetailPage() {
               <div key={f.id} className="docket-entry">
                 <div className="docket-entry-header">
                   <span className="docket-entry-id">#{f.id}</span>
-                  {caseData.can_manage_records && <Link to={`/filings/${f.id}/history`}>Receipts &amp; history</Link>}
+                  {caseData.can_manage_records && <Link to={`/filings/${f.id}/history`}>Receipts and history</Link>}
                   <span className={`status-badge ${docketStatus(f.status).cls}`}>{docketStatus(f.status).label}</span>
                   <span className="docket-entry-date">{f.filing_date
                     ? `Filing date: ${formatCourtDate(f.filing_date)}`
@@ -314,8 +292,8 @@ function CaseDetailPage() {
                       key={doc.id}
                       className="docket-doc"
                     >
-                      {doc.title} ({getDocumentLabel(doc.document_type_code)}, {formatBytes(doc.file_size_bytes)}
-                      {doc.page_count ? `, ${doc.page_count}p` : ''})
+                      <span>{doc.title} ({getDocumentLabel(doc.document_type_code)}, {formatBytes(doc.file_size_bytes)}
+                        {doc.page_count ? `, ${plural(doc.page_count, 'page')}` : ''})</span>
                       <DocumentDownload id={doc.id} copyId={doc.copy_id ?? undefined} title={doc.title} />
                       {caseData.can_manage_records && <Link to={`/documents/${doc.id}/publication`}>Manage public access</Link>}
                     </div>

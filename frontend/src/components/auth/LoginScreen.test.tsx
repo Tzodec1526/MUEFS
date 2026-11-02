@@ -6,11 +6,10 @@ import {
   getDemoCourtId,
   getDemoRole,
   hasSession,
-} from './LoginScreen';
+} from '../../auth/session';
 
 describe('identity session boundaries', () => {
   beforeEach(() => {
-    // Provide a minimal localStorage mock so tests run in node env without jsdom
     const store: Record<string, string> = {};
     const mock = {
       getItem: (k: string) => (k in store ? store[k] : null),
@@ -19,7 +18,6 @@ describe('identity session boundaries', () => {
       clear: () => { Object.keys(store).forEach(k => delete store[k]); },
     };
     vi.stubGlobal('localStorage', mock);
-    vi.stubGlobal('window', { dispatchEvent: vi.fn() });
     localStorage.clear();
   });
 

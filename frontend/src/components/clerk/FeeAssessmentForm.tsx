@@ -2,8 +2,10 @@ import { useState, type FormEvent } from 'react';
 import { apiClient } from '../../api/client';
 import type { FilingFees } from '../../api/documents';
 import type { FilingEnvelope } from '../../api/filings';
-import { formatBytes, formatCents, getDocumentLabel } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { getDocumentLabel } from '../../utils/documentTypes';
+import { formatBytes, formatCents } from '../../utils/format';
+import { filingStatusLabel, filingTypeLabel } from '../../utils/filingStatus';
+import { errorMessage } from '../../utils/errors';
 import DocumentDownload from '../common/DocumentDownload';
 
 export default function FeeAssessmentForm({ fees, filing, onSaved }: {
@@ -28,12 +30,12 @@ export default function FeeAssessmentForm({ fees, filing, onSaved }: {
       });
       onSaved();
     } catch (err) {
-      setError(getErrorDetail(err) || 'Could not confirm the assessment. Check history before retrying.');
+      setError(errorMessage(err, 'Could not confirm the assessment. Check history before retrying.'));
     } finally { setBusy(false); }
   }
   return <form className="fee-assessment-form" onSubmit={save}>
     <h3>Record a court fee assessment</h3>
-    <p><strong>{filing.case_title || `Filing #${filing.id}`}</strong> · {filing.filing_type.replace('_', ' ')} · {filing.status}</p>
+    <p><strong>{filing.case_title || `Filing #${filing.id}`}</strong> · {filingTypeLabel(filing.filing_type)} · {filingStatusLabel(filing.status)}</p>
     {filing.filing_description && <p>{filing.filing_description}</p>}
     {fees.review_reason && <p className="alert alert-info"><strong>Filer’s reason for review:</strong> {fees.review_reason}</p>}
     <p>Review the current documents and applicable fees and exemptions. Include each charge once.

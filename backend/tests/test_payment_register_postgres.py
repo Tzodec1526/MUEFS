@@ -1,5 +1,3 @@
-"""Exercise the register's real PostgreSQL snapshots, totals and authority locks."""
-
 import asyncio
 from pathlib import Path
 
@@ -20,7 +18,7 @@ pytestmark = pytest.mark.skipif(not POSTGRES_URL, reason="MUEFS_TEST_POSTGRES_UR
 
 
 @pytest.mark.parametrize("postgres_sessions", [False, True], indirect=True)
-async def test_postgres_totals_and_pages_exclude_an_uncommitted_reversal(
+async def test_postgres_totals_and_pages_include_a_reversal_committed_between_reads(
     postgres_sessions, payment_client,
 ):
     fid, _, clerk = await prepare_filing(postgres_sessions)
@@ -30,18 +28,18 @@ async def test_postgres_totals_and_pages_exclude_an_uncommitted_reversal(
         db.add_all(activity(fid, clerk, amount=100_000_000) for _ in range(52))
     params = {"court_id": court_id, **PERIOD}
     headers = {"X-Test-User": str(clerk)}
+    response = await payment_client.get("/api/v1/clerk/payment-register",
+                                        params=params, headers=headers)
+    assert response.status_code == 200, response.text
+    before = response.json()
+    assert before["total"] == 52 and len(before["entries"]) == 50
+    assert before["totals"] == {"credits_cents": 5_200_000_000, "reversals_cents": 0}
+    assert all(row["amount_cents"] == 100_000_000 for row in before["entries"])
     async with postgres_sessions.begin() as writer:
         writer.add(activity(fid, clerk, amount=-500))
-        await writer.flush()
-        response = await payment_client.get("/api/v1/clerk/payment-register",
-                                            params=params, headers=headers)
-        assert response.status_code == 200, response.text
-        before = response.json()
-        assert before["total"] == 52 and len(before["entries"]) == 50
-        assert before["totals"] == {"credits_cents": 5_200_000_000, "reversals_cents": 0}
-        assert all(row["amount_cents"] == 100_000_000 for row in before["entries"])
     response = await payment_client.get("/api/v1/clerk/payment-register",
                                         params={**params, "page": 2}, headers=headers)
+    assert response.status_code == 200, response.text
     after = response.json()
     assert after["total"] == 53 and len(after["entries"]) == 3
     assert after["totals"] == {"credits_cents": 5_200_000_000, "reversals_cents": 500}

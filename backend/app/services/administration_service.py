@@ -1,5 +1,3 @@
-"""Account lifecycle and delegated court grants, committed with their audit records."""
-
 from fastapi import HTTPException
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,9 +55,6 @@ async def require_court_administrator(db: AsyncSession, user: User, court_id: in
 async def _lock_users(
     db: AsyncSession, actor_id: int, target_id: int | None = None
 ) -> dict[int, User]:
-    # Lock only the actor and affected account. Re-read the actor after waiting: another
-    # administrator may have revoked their access. Both sides of a mutual revocation
-    # share these locks; unrelated administrators do not need to serialize their work.
     rows = await db.scalars(
         select(User)
         .where(User.id.in_([actor_id, target_id or actor_id]))
@@ -224,14 +219,14 @@ async def change_court_role(
             UserType.ADMIN,
         ):
             raise HTTPException(
-                422, "Grant court access only to active, provisioned staff accounts"
+                422, "Grant court access only to active staff accounts that are set up"
             )
         if not user.keycloak_id and not settings.allow_demo_mode:
             raise HTTPException(
                 422, "Bind this staff account to its identity provider subject first"
             )
         if data.role == CourtRole.JUDGE and user.user_type != UserType.JUDGE:
-            raise HTTPException(422, "Judicial access requires a provisioned judge account")
+            raise HTTPException(422, "Judicial access requires a judge account that is set up")
     query = select(UserCourtRole).where(
         UserCourtRole.user_id == user.id,
         UserCourtRole.court_id == court_id,

@@ -1,7 +1,9 @@
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.common import ExpectedVersion, RecordId
 
 
 class PublicCopyResponse(BaseModel):
@@ -17,17 +19,13 @@ class PublicCopyResponse(BaseModel):
     pii_warnings: list[str]
     created_at: datetime
 
-    @field_serializer("created_at")
-    def utc_created_at(self, value: datetime) -> str:
-        return value.replace(tzinfo=value.tzinfo or UTC).isoformat()
-
 
 class WithholdDocument(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-    expected_version: int = Field(ge=0)
+    expected_version: ExpectedVersion
     reason: str = Field(min_length=1, max_length=2000)
 
 
 class PublishCopy(WithholdDocument):
-    copy_id: int = Field(ge=1)
+    copy_id: RecordId
     reviewed: Literal[True]

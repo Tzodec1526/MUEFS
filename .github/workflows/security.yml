@@ -1,14 +1,12 @@
 name: Security Scan
 
-# Block merges on HIGH/CRITICAL findings in backend deps and repo filesystem.
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
   schedule:
-    - cron: "0 6 * * 1" # weekly, Mondays 06:00 UTC
+    - cron: "0 6 * * 1"
 
 permissions:
   contents: read
@@ -22,12 +20,14 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v4
-      - name: Install Trivy
-        run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
       - name: Trivy filesystem scan (SARIF)
-        run: trivy fs --scanners vuln --severity HIGH,CRITICAL --format sarif --output trivy-results.sarif --exit-code 1 .
+        run: |
+          docker run --rm --volume "$PWD:/src" --workdir /src \
+            aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
+            fs --scanners vuln --severity HIGH,CRITICAL --format sarif \
+            --output trivy-results.sarif --exit-code 1 .
       - name: Upload Trivy results to the Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         continue-on-error: true
         with:
@@ -45,8 +45,8 @@ jobs:
         run: |
           cd backend
           python -m pip install --upgrade pip
-          pip install -e .
-          pip install pip-audit
+          pip install -e . -c constraints.txt
+          pip install pip-audit==2.10.1 -c constraints.txt
           pip-audit --desc on
 
   npm-audit:
@@ -74,5 +74,5 @@ jobs:
           python-version: "3.12"
       - name: Run Bandit on backend application code
         run: |
-          pip install bandit
+          pip install bandit==1.9.4 -c backend/constraints.txt
           bandit -r backend/app -ll -q

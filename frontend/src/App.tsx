@@ -1,16 +1,21 @@
 import { lazy, Suspense, useState, useEffect, useContext } from 'react';
 import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { FilePlus2, FolderOpen, Search, ClipboardCheck } from 'lucide-react';
 import Header from './components/layout/Header';
 import Sidebar from './components/layout/Sidebar';
 import Footer from './components/layout/Footer';
-import LoginScreen, { hasSession } from './components/auth/LoginScreen';
-import { CourtContext, CourtSession, CourtWorkspace, StaffCourtSelect } from './components/auth/CourtSession';
-import PlatformStats from './components/marketing/PlatformStats';
-import MifileComparison from './components/marketing/MifileComparison';
-import { getFilingStatusCounts, getClerkQueue } from './api/filings';
+import LoginScreen from './components/auth/LoginScreen';
+import { CourtContext, CourtSession, CourtWorkspace } from './components/auth/CourtSession';
 import { oidcSessionExpected, SESSION_KEY } from './auth/keycloak';
+import { isPublicPath } from './auth/publicPath';
+import { hasAdministrationAccess, hasSession } from './auth/session';
+import type { LoadFailure } from './utils/errors';
+import { usePageTitle } from './utils/pageTitle';
+import PageHeading, { HeadingFocusScope } from './components/common/PageHeading';
+import PageLoadError from './components/common/PageLoadError';
 
+const FilerDashboard = lazy(() => import('./components/dashboard/FilerDashboard'));
+const PublicDashboard = lazy(() => import('./components/dashboard/PublicDashboard'));
+const ClerkDashboard = lazy(() => import('./components/dashboard/ClerkDashboard'));
 const FilingWizard = lazy(() => import('./components/filing/FilingWizard'));
 const MyFilings = lazy(() => import('./components/filing/MyFilings'));
 const FilingHistoryPage = lazy(() => import('./components/filing/FilingHistoryPage'));
@@ -34,15 +39,11 @@ const CaseSearch = lazy(() => import('./components/search/CaseSearch'));
 const Favorites = lazy(() => import('./components/search/Favorites'));
 const CaseDetailPage = lazy(() => import('./components/search/CaseDetailPage'));
 const AuthCallback = lazy(() => import('./components/auth/AuthCallback'));
-const WebMcpAgentPage = lazy(() => import('./components/agent/WebMcpAgentPage'));
+const AboutPage = lazy(() => import('./components/about/AboutPage'));
 
 function RequireRole({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  // Preserve private portal destinations while the visitor signs in.
-  const isPublicPath =
-    /^\/cases\/(search|\d+)\/?$/.test(location.pathname) || location.pathname.startsWith('/agent')
-    || location.pathname.startsWith('/courts/');
-  if (!hasSession() && !isPublicPath && location.pathname !== '/login') {
+  if (!hasSession() && !isPublicPath(location.pathname) && location.pathname !== '/login') {
     return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`} replace />;
   }
   return <>{children}</>;
@@ -56,128 +57,28 @@ function RequireFiler({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function FilerDashboard() {
-  const [draftCount, setDraftCount] = useState<number | null>(null);
-  const [returnedCount, setReturnedCount] = useState<number | null>(null);
-  useEffect(() => {
-    getFilingStatusCounts().then((counts) => {
-      setDraftCount(counts.draft);
-      setReturnedCount(counts.returned);
-    }).catch(() => {});
-  }, []);
-
+function AdministrationAccessRequired() {
+  usePageTitle('Administrator access required');
   return (
-    <div className="dashboard">
-      <div className="dashboard-welcome">
-        <h2>Your filings</h2>
-        <p>File court documents electronically with any Michigan court.</p>
-      </div>
-
-      {(draftCount || returnedCount) ? (
-        <div className="dashboard-alert-row">
-          {draftCount ? (
-            <Link to="/filings" className="dashboard-alert">
-              <strong>{draftCount}</strong> draft{draftCount === 1 ? '' : 's'} in progress
-            </Link>
-          ) : null}
-          {returnedCount ? (
-            <Link to="/filings" className="dashboard-alert dashboard-alert-warn">
-              <strong>{returnedCount}</strong> returned for correction
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
-
-      <div className="dashboard-cards">
-        <div className="card card-primary">
-          <div className="card-icon"><FilePlus2 size={22} aria-hidden="true" /></div>
-          <h3>New Filing</h3>
-          <p>File a new document with any Michigan court.</p>
-          <Link to="/filing/new" className="btn btn-primary">Start Filing</Link>
-        </div>
-        <div className="card">
-          <div className="card-icon"><FolderOpen size={22} aria-hidden="true" /></div>
-          <h3>My Filings</h3>
-          <p>View and manage your submitted filings.</p>
-          <Link to="/filings" className="btn btn-secondary">View Filings</Link>
-        </div>
-        <div className="card">
-          <div className="card-icon"><Search size={22} aria-hidden="true" /></div>
-          <h3>Case Search</h3>
-          <p>Search cases across all Michigan courts.</p>
-          <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>
-        </div>
-      </div>
-      <PlatformStats />
-      <MifileComparison variant="dashboard" />
+    <div className="empty-state">
+      <PageHeading>Administrator access required</PageHeading>
+      <p>People and court access is managed by system and court administrators.</p>
+      <Link to="/" className="btn btn-primary">Go to dashboard</Link>
     </div>
   );
 }
 
-function PublicDashboard() {
-  return (
-    <div className="dashboard">
-      <div className="dashboard-welcome">
-        <h2>Public court records</h2>
-        <p>
-          No account needed: search and open non-sealed matters. Draft filings and sealed cases
-          stay restricted to parties, counsel, and court staff.
-        </p>
-      </div>
-      <div className="dashboard-cards">
-        <div className="card card-primary">
-          <div className="card-icon"><Search size={22} aria-hidden="true" /></div>
-          <h3>Case Search</h3>
-          <p>Browse the public docket index (sealed cases are excluded from search).</p>
-          <Link to="/cases/search" className="btn btn-primary">Search Cases</Link>
-        </div>
-      </div>
-      <PlatformStats />
-      <MifileComparison variant="dashboard" />
-    </div>
-  );
+function AdministrationAccessUnchecked({ failure, onRetry }: { failure: LoadFailure; onRetry: () => void }) {
+  usePageTitle('Administrator access not checked');
+  return <PageLoadError heading="Administrator access not checked" failure={failure} onRetry={onRetry} />;
 }
 
-function ClerkDashboard() {
-  const { court } = useContext(CourtContext)!;
-  const courtId = court!.court_id;
-  const [pending, setPending] = useState<number | null>(null);
-  useEffect(() => {
-    const controller = new AbortController();
-    getClerkQueue(courtId, { page_size: 1, signal: controller.signal }).then((r) => {
-      if (!controller.signal.aborted) setPending(r.total);
-    }).catch(() => {});
-    return () => controller.abort();
-  }, [courtId]);
-
-  return (
-    <div className="dashboard">
-      <StaffCourtSelect />
-      <div className="dashboard-welcome">
-        <h2>{court!.court_name || `Court ${courtId}`}</h2>
-        <p>
-          Clerk Review Dashboard
-          {pending !== null ? ` — ${pending} filing${pending === 1 ? '' : 's'} pending review` : ''}
-        </p>
-      </div>
-
-      <div className="dashboard-cards">
-        <div className="card card-primary">
-          <div className="card-icon"><ClipboardCheck size={22} aria-hidden="true" /></div>
-          <h3>Review Queue</h3>
-          <p>Review and process pending filings for your court.</p>
-          <Link to="/clerk/queue" className="btn btn-primary">Open Queue</Link>
-        </div>
-        <div className="card">
-          <div className="card-icon"><Search size={22} aria-hidden="true" /></div>
-          <h3>Case Search</h3>
-          <p>Search cases across all Michigan courts.</p>
-          <Link to="/cases/search" className="btn btn-secondary">Search Cases</Link>
-        </div>
-      </div>
-      <PlatformStats />
-    </div>
-  );
+function RequireAdministration({ children }: { children: React.ReactNode }) {
+  const { loading, error, refresh } = useContext(CourtContext)!;
+  if (loading) return <p className="loading" role="status">Checking administrator access…</p>;
+  if (error) return <AdministrationAccessUnchecked failure={error} onRetry={refresh} />;
+  if (!hasAdministrationAccess()) return <AdministrationAccessRequired />;
+  return <>{children}</>;
 }
 
 function Dashboard() {
@@ -193,9 +94,10 @@ function Dashboard() {
 }
 
 function NotFound() {
+  usePageTitle('Page not found');
   return (
     <div className="empty-state">
-      <h3>Page not found</h3>
+      <PageHeading>Page not found</PageHeading>
       <p>The page you&apos;re looking for doesn&apos;t exist or has moved.</p>
       <Link to="/" className="btn btn-primary">Go to dashboard</Link>
     </div>
@@ -216,12 +118,11 @@ function App() {
     return () => window.removeEventListener('storage', sessionChanged);
   }, []);
   return (
+    <HeadingFocusScope>
     <Suspense fallback={<p className="loading" role="status">Loading page...</p>}>
       <Routes>
         <Route path="/login" element={<LoginScreen />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route path="/agent" element={<WebMcpAgentPage />} />
-        {/* Authenticated routes */}
         <Route
           path="*"
           element={
@@ -241,6 +142,7 @@ function App() {
                         <Route path="/filings/:filingId/history" element={<FilingHistoryPage key={location.pathname} />} />
                         <Route path="/filings/:filingId/fees" element={<FilingFeesPage key={location.pathname} />} />
                         <Route path="/filings/:filingId/filing-date" element={<CourtWorkspace><FilingDateOrderPage key={location.pathname} /></CourtWorkspace>} />
+                        <Route path="/about" element={<AboutPage />} />
                         <Route path="/cases/search" element={<CaseSearch />} />
                         <Route path="/courts/:courtId/calendar" element={<CourtCalendarPage key={location.pathname} />} />
                         <Route path="/courts/:courtId/intake" element={<CourtIntakePage key={location.pathname} />} />
@@ -249,7 +151,7 @@ function App() {
                         <Route path="/service/deliveries/:deliveryId" element={<DeliveryDetailPage key={location.pathname} />} />
                         <Route path="/filings/:filingId/deliveries" element={<DeliveriesPage key={location.pathname} />} />
                         <Route path="/filings/:filingId/deliveries/new" element={<DeliveryComposePage key={location.pathname} />} />
-                        <Route path="/admin" element={<AdministrationPage />} />
+                        <Route path="/admin" element={<RequireAdministration><AdministrationPage /></RequireAdministration>} />
                         <Route path="/cases/:caseId/participants" element={<CourtWorkspace><CaseParticipantsPage /></CourtWorkspace>} />
                         <Route path="/cases/:caseId/participants/:participantId/service-contact" element={<CourtWorkspace><ServiceContactPage /></CourtWorkspace>} />
                         <Route path="/clerk/cases" element={<CourtWorkspace><CourtCaseDirectory /></CourtWorkspace>} />
@@ -272,6 +174,7 @@ function App() {
         />
       </Routes>
     </Suspense>
+    </HeadingFocusScope>
   );
 }
 

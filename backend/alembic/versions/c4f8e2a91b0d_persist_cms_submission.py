@@ -1,9 +1,3 @@
-"""Persist CMS submission identifiers on filing envelopes.
-
-Revision ID: c4f8e2a91b0d
-Revises: baec3dbedabf
-Create Date: 2026-09-01 15:30:00.000000
-"""
 from typing import Sequence, Union
 
 from alembic import op

@@ -1,5 +1,3 @@
-"""Court staff can locate received work and assess age beyond the current page."""
-
 from datetime import UTC, datetime, timedelta
 
 import pytest_asyncio

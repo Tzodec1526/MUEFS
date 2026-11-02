@@ -1,5 +1,3 @@
-"""Court search applies literal filters before stable pagination."""
-
 import pytest
 
 from app.models.court import Court, CourtType
@@ -54,3 +52,14 @@ async def test_court_filters_and_count_share_stable_pages(db_session, api_client
     })
     assert response.json()["total"] == 5
     assert [c["id"] for c in response.json()["courts"]] == [c.id for c in matching[2:4]]
+
+
+async def test_court_text_search_also_matches_the_county(db_session, api_client):
+    wayne = Court(name="3rd Circuit Court", county="Wayne", city="Detroit",
+                  court_type=CourtType.CIRCUIT)
+    kent = Court(name="17th Circuit Court", county="Kent", city="Grand Rapids",
+                 court_type=CourtType.CIRCUIT)
+    db_session.add_all([wayne, kent])
+    await db_session.flush()
+    response = await api_client.get("/api/v1/courts", params={"q": "wayne"})
+    assert [c["id"] for c in response.json()["courts"]] == [wayne.id]

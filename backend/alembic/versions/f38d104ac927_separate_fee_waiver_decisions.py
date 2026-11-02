@@ -1,5 +1,3 @@
-"""Record fee waiver decisions independently of filing acceptance."""
-
 import sqlalchemy as sa
 from alembic import op
 
@@ -16,8 +14,6 @@ def upgrade() -> None:
     op.create_index("ix_filing_court_waiver", "filing_envelopes", [
         "court_id", "fee_waiver_requested", "fee_waiver_granted", "submitted_at",
     ])
-    # Legacy booleans are preserved. A null decided_at distinguishes the earlier
-    # automatic state from a recorded, signed waiver decision; do not invent orders.
 
 
 def downgrade() -> None:

@@ -1,8 +1,7 @@
-"""Opt-in tests against disposable local S3-compatible storage; never a live bucket."""
-
 import asyncio
 import hashlib
 import os
+from contextlib import contextmanager
 from io import BytesIO
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -16,8 +15,27 @@ S3_ENDPOINT = os.getenv("MUEFS_TEST_S3_ENDPOINT")
 pytestmark = pytest.mark.skipif(not S3_ENDPOINT, reason="MUEFS_TEST_S3_ENDPOINT not configured")
 
 
-@pytest.fixture
-def s3_storage(monkeypatch):
+def remove_test_bucket(client, bucket):
+    from botocore.exceptions import ClientError
+
+    assert bucket.startswith("muefs-test-") and len(bucket) == 43
+    try:
+        for page in client.get_paginator("list_objects_v2").paginate(Bucket=bucket):
+            if page.get("Contents"):
+                client.delete_objects(
+                    Bucket=bucket,
+                    Delete={
+                        "Objects": [{"Key": item["Key"]} for item in page["Contents"]],
+                    },
+                )
+        client.delete_bucket(Bucket=bucket)
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") != "NoSuchBucket":
+            raise
+
+
+@contextmanager
+def disposable_bucket(monkeypatch):
     assert urlsplit(S3_ENDPOINT).hostname in {"127.0.0.1", "localhost"}, (
         "Use disposable local storage"
     )
@@ -29,23 +47,21 @@ def s3_storage(monkeypatch):
     monkeypatch.setattr(settings, "s3_bucket_name", bucket)
     document_service.get_s3_client.cache_clear()
     client = document_service.get_s3_client()
-    client.create_bucket(Bucket=bucket)
     try:
         yield client, bucket
     finally:
-        # Only this fixture's unique bucket can be cleaned up.
-        assert bucket.startswith("muefs-test-") and len(bucket) == 43
-        for page in client.get_paginator("list_objects_v2").paginate(Bucket=bucket):
-            if page.get("Contents"):
-                client.delete_objects(
-                    Bucket=bucket,
-                    Delete={
-                        "Objects": [{"Key": item["Key"]} for item in page["Contents"]],
-                    },
-                )
-        client.delete_bucket(Bucket=bucket)
-        client.close()
-        document_service.get_s3_client.cache_clear()
+        try:
+            remove_test_bucket(client, bucket)
+        finally:
+            client.close()
+            document_service.get_s3_client.cache_clear()
+
+
+@pytest.fixture
+def s3_storage(monkeypatch):
+    with disposable_bucket(monkeypatch) as (client, bucket):
+        client.create_bucket(Bucket=bucket)
+        yield client, bucket
 
 
 async def test_s3_parallel_uploads_and_integrity_reuse_the_client(s3_storage, monkeypatch):
@@ -79,7 +95,6 @@ async def test_s3_parallel_uploads_and_integrity_reuse_the_client(s3_storage, mo
 def test_s3_multipart_etag_does_not_replace_content_fingerprints(s3_storage):
     client, bucket = s3_storage
     key = "retained/multipart.pdf"
-    # Boto3's default multipart threshold is 8 MiB; this exercises multipart storage.
     payload = b"Synthetic retained bytes\n" * 400000
     client.upload_fileobj(BytesIO(payload), bucket, key)
     metadata = client.head_object(Bucket=bucket, Key=key)
@@ -88,3 +103,11 @@ def test_s3_multipart_etag_does_not_replace_content_fingerprints(s3_storage):
         hashlib.sha256(payload).hexdigest(),
         len(payload),
     )
+
+
+def test_demo_seeding_creates_the_configured_bucket_once(monkeypatch):
+    with disposable_bucket(monkeypatch):
+        document_service.ensure_bucket()
+        document_service.upload_document(b"kept", "demo/kept.txt", "text/plain")
+        document_service.ensure_bucket()
+        assert document_service.stored_integrity("demo/kept.txt")[1] == len(b"kept")

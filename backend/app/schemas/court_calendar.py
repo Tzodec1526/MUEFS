@@ -1,8 +1,8 @@
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from typing import Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class CourtCalendarCreate(BaseModel):
@@ -48,10 +48,6 @@ class CourtCalendarResponse(CourtCalendarCreate):
     published_at: datetime
 
     model_config = {"from_attributes": True}
-
-    @field_serializer("published_at")
-    def serialize_published_at(self, value: datetime) -> str:
-        return value.replace(tzinfo=value.tzinfo or UTC).astimezone(UTC).isoformat()
 
 
 class CourtCalendarsResponse(BaseModel):

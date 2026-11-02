@@ -1,5 +1,3 @@
-"""Keep advisory upload screening without rereading every PDF during validation."""
-
 import sqlalchemy as sa
 
 from alembic import op
@@ -11,8 +9,6 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Null distinguishes legacy documents without a recorded screening result from
-    # an upload whose sampled scan found no warnings. Do not invent historical scans.
     op.add_column("filing_documents", sa.Column("pii_warnings", sa.JSON(), nullable=True))
 
 

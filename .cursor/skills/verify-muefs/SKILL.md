@@ -1,11 +1,11 @@
 ---
 name: verify-muefs
-description: Drive the MUEFS demo filing portal (web UI at http://127.0.0.1:3000) the way a user does — launch the SQLite demo stack, doctor the instance, and prove login, public case search, the filing wizard, the clerk review queue, and the Agent Hub. Use when verifying MUEFS UI or API user-facing behavior after a change, or when a proof of the real user path is required.
+description: Drive the MUEFS demo filing portal (web UI at http://127.0.0.1:3000) the way a user does. Launch the SQLite demo stack, doctor the instance, and prove login, public case search, the filing wizard, and the clerk review queue. Use when verifying MUEFS UI or API user-facing behavior after a change, or when a proof of the real user path is required.
 ---
 
 # Verify MUEFS
 
-MUEFS is a Michigan e-filing demo. The surface an agent must drive is the **Filing Portal** (React + Vite) at `http://127.0.0.1:3000`, talking to the FastAPI demo API at `http://127.0.0.1:8000`. Secondary surfaces: `/docs` OpenAPI, HTTP `/api/v1/*`, WebMCP tools on `/agent`. Production Docker/Keycloak is out of scope for this skill.
+MUEFS is a Michigan e-filing demo. The surface an agent must drive is the **Filing Portal** (React + Vite) at `http://127.0.0.1:3000`, talking to the FastAPI demo API at `http://127.0.0.1:8000`. Secondary surfaces: `/docs` OpenAPI and HTTP `/api/v1/*`. Production Docker/Keycloak is out of scope for this skill.
 
 Read `features/README.md` before driving, then the matching feature file. A proof that hits one convenient entry point is incomplete when the map lists others.
 
@@ -29,9 +29,9 @@ That runs `backend/run_demo.py` (same as `npm run dev`): SQLite seed, uvicorn on
 
 2. If launch refuses because ports are occupied: stop that demo, or attach read-aware with `MUEFS_VERIFY_ATTACH=1` (cleanup will **not** kill an attached process).
 
-3. Teardown: `node .cursor/skills/verify-muefs/helpers/control-muefs.mjs cleanup` — kills only the PID tree this run started. Proof artifacts stay in `.cursor/skills/verify-muefs/artifacts/`.
+3. Teardown: `node .cursor/skills/verify-muefs/helpers/control-muefs.mjs cleanup` kills only the PID tree this run started. Proof artifacts stay in `.cursor/skills/verify-muefs/artifacts/`.
 
-First-time machine: `pip install -e ".[test]"` in `backend/` and `npm install` in `frontend/` (Playwright lives there). Chromium: `cd frontend && npx playwright install chromium`.
+First-time machine: `pip install -e ".[test]" -c constraints.txt` in `backend/` and `npm install` in `frontend/` (Playwright lives there). Chromium: `cd frontend && npx playwright install chromium`.
 
 ## Doctor
 
@@ -43,21 +43,24 @@ node .cursor/skills/verify-muefs/helpers/control-muefs.mjs doctor
 
 Pass means: API health JSON is `muefs-api` / `healthy`, the portal HTML identifies MUEFS, and either this run owns the demo PID or attach was explicit. Fail means do not drive.
 
+Doctor does not check the browser. If every `browser` command fails with `Target page, context or browser has been closed`, Chromium died while the helper stayed up. Run `cleanup`, then `launch`.
+
 ## Drive
 
-Use Playwright through `control-muefs browser`, not coordinates. Prefer ARIA roles, accessible names, and `label`/`htmlFor` over CSS. Demo auth is `localStorage.demo_role`; the stable way to set it is `/login?role=attorney|clerk|srl|public` (auto-applies and navigates).
+Use Playwright through `control-muefs browser`, not coordinates. Prefer ARIA roles, accessible names, and `label`/`htmlFor` over CSS. Demo auth is `localStorage.demo_role`; the stable way to set it is `/login?role=attorney|clerk|srl|public|admin` (auto-applies and navigates).
 
 ```text
 node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser goto /login?role=attorney
+node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser goto /cases/search
+node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser fill --label "Party name" --value Smith
 node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser click --role button --name "Search"
-node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser fill --label "Party Name" --value Smith
 node .cursor/skills/verify-muefs/helpers/control-muefs.mjs browser wait --role heading --name "Results"
 node .cursor/skills/verify-muefs/helpers/control-muefs.mjs api get /api/v1/cases/search?party_name=Smith --path artifacts/case-search/search.json
 ```
 
 Each `browser` command POSTs to a long-lived Chromium the helper starts on first use (`.run/browser.port`). In-page state survives fill → click → snapshot until `cleanup`. Case search also writes the query to the URL (`?party=Smith`).
 
-Do not call internal setters or test-only endpoints as the user path. `/api/v1/cases/search` is the same public search the UI uses — allowed as a **second view** of stored results, not as a substitute for clicking Search.
+Do not call internal setters or test-only endpoints as the user path. `/api/v1/cases/search` is the same public search the UI uses. It is allowed as a **second view** of stored results, not as a substitute for clicking Search.
 
 ## Evidence
 
@@ -66,7 +69,7 @@ Put proof under `.cursor/skills/verify-muefs/artifacts/<feature-id>/`. Cleanup m
 - Capture the **action and the resulting state**, not only the final screen.
 - UI proof: snapshot (`browser snapshot --path …`, Playwright ARIA yaml with text fallback) and a screenshot that shows the MUEFS header identity (`Michigan Unified E-Filing System`).
 - HTTP second view: response body + status for the matching `/api/v1` read.
-- Mutation proof (favorites, clerk accept/return): a read-only second view of the stored value. Clerk accept/reject **writes `backend/demo.db`** — do not use those as the default proof; they dirty the shared demo database.
+- Mutation proof (favorites, clerk accept/return): a read-only second view of the stored value. Clerk accept/reject **writes `backend/demo.db`**. Do not use those as the default proof; they dirty the shared demo database.
 - Record the feature ID and entry point with every artifact (filename under the feature folder is enough).
 - Mocks only at production boundaries this demo already stubs (CMS, payments). Do not stub the portal or the search API.
 
@@ -88,12 +91,13 @@ Kills the process tree of the PID recorded at launch (`taskkill /T` on Windows).
 | `browser goto <path>` | Open a portal path |
 | `browser click --role <role> --name <name>` | Click by role + accessible name (substring) |
 | `browser fill --label <label> --value <text>` | Fill a labelled field |
-| `browser wait --role --name` | Wait until visible |
+| `browser wait --role --name` | Wait until visible (`--label` works too) |
+| `browser press --key <key>` | Press a key |
 | `browser snapshot --path <file>` | Write ARIA snapshot |
-| `browser screenshot --path <file>` | Viewport screenshot |
+| `browser screenshot --path <file>` | Viewport screenshot (`--fullpage` for the whole page) |
 | `api get <path> --path <file>` | GET the API (second view) |
 
-`--exact` makes role-name matching exact. `MUEFS_VERIFY_HEADED=1` opens a visible browser. `MUEFS_FRONTEND_URL` / `MUEFS_API_URL` override defaults only if you actually launched on those URLs — `run_demo.py` does not remap ports.
+`--exact` makes role-name and label matching exact. Without it, names match as case-insensitive substrings and the first match wins. `--path` must stay inside `artifacts/`. `MUEFS_VERIFY_HEADED=1` opens a visible browser. `MUEFS_FRONTEND_URL` / `MUEFS_API_URL` override defaults only if you actually launched on those URLs. `run_demo.py` does not remap ports.
 
 ## Isolate
 

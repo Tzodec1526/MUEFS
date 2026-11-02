@@ -1,5 +1,3 @@
-"""Redis-backed (or in-memory) rate limiting with stricter tiers for search and documents."""
-
 from __future__ import annotations
 
 import logging
@@ -25,9 +23,9 @@ _redis_client = None
 def _path_bucket(path: str) -> str:
     if path.rstrip("/").endswith("/cases/search"):
         return "search"
-    if "/documents/" in path and path.endswith("/download"):
-        return "document"
-    if "/documents/" in path and path.endswith("/verify"):
+    if path.endswith(("/download", "/verify")) or (
+        "/deliveries/" in path and "/documents/" in path
+    ):
         return "document"
     return "default"
 
@@ -71,9 +69,9 @@ def _memory_check_allow(client_ip: str, bucket: str) -> bool:
     limit = _limit_for_bucket(bucket)
     key = f"{bucket}:{client_ip}"
 
-    if now - _mem_last_cleanup > _MEM_CLEANUP_INTERVAL:
+    if now - _mem_last_cleanup > _MEM_CLEANUP_INTERVAL or len(_mem_store) > _MEM_MAX_KEYS:
         stale = [k for k, ts in _mem_store.items() if not ts or now - ts[-1] > window_sec]
-        for k in stale[:_MEM_MAX_KEYS]:
+        for k in stale:
             del _mem_store[k]
         _mem_last_cleanup = now
 
@@ -92,7 +90,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         path = request.url.path
-        if not path.startswith("/api/"):
+        if not path.startswith("/api/") or request.method == "OPTIONS":
             return await call_next(request)
 
         client_ip_addr = client_ip(request) or "unknown"

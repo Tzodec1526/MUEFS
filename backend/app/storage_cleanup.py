@@ -1,5 +1,3 @@
-"""Delete committed, unreferenced draft objects; --once drains the currently due queue."""
-
 import argparse
 import asyncio
 import logging
@@ -23,7 +21,6 @@ async def cleanup_next(
     sessions: async_sessionmaker[AsyncSession],
 ) -> Literal["deleted", "retry"] | None:
     async with sessions.begin() as db:
-        # SQLite ignores FOR UPDATE; reserve its writer before selecting a job.
         if db.get_bind().dialect.name == "sqlite":
             await db.execute(text("BEGIN IMMEDIATE"))
         job = await db.scalar(
@@ -47,7 +44,6 @@ async def cleanup_next(
             try:
                 await asyncio.to_thread(document_service.delete_document, job.file_key)
             except Exception as exc:
-                # SDK errors may contain storage credentials or private object URLs.
                 error = f"Storage deletion failed ({type(exc).__name__})"
         if error is not None:
             job.attempt_count += 1
@@ -65,8 +61,12 @@ async def cleanup_next(
                      "deletion_id": job.id, "queued_at": job.queued_at.isoformat()},
         )
         await db.delete(job)
-        # If this commit fails or the process stops, a repeat deletion is safe.
         return "deleted"
+
+
+async def drain(sessions: async_sessionmaker[AsyncSession]) -> None:
+    while await cleanup_next(sessions) == "deleted":
+        pass
 
 
 async def run(once: bool = False) -> int:
@@ -91,10 +91,15 @@ async def run(once: bool = False) -> int:
                 await asyncio.sleep(5)
     finally:
         await engine.dispose()
-    return int(failed)
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Delete committed, unreferenced draft objects; --once drains the currently "
+            "due queue."
+        ),
+    )
     parser.add_argument("--once", action="store_true")
     logging.basicConfig(level=logging.INFO)
     raise SystemExit(asyncio.run(run(once=parser.parse_args().once)))

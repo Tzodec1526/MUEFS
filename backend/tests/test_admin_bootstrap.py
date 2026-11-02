@@ -1,5 +1,3 @@
-"""Exercise the operator entry point against a fresh, migrated database."""
-
 import os
 import subprocess
 import sys

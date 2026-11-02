@@ -1,5 +1,3 @@
-"""Court observations must preserve transport evidence and cannot override a newer send."""
-
 import asyncio
 import os
 from datetime import UTC, datetime, timedelta

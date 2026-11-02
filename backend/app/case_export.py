@@ -1,5 +1,3 @@
-"""Export or verify a private case archive. Requires operator database and storage access."""
-
 import argparse
 import asyncio
 import hashlib
@@ -70,13 +68,13 @@ _ACTOR_FIELDS = {
 
 
 class CaseExportError(ValueError):
-    """A safe diagnostic that identifies incomplete or inconsistent evidence."""
+    pass
 
 
 def _json(value: object) -> bytes:
     def encode(item: object) -> str:
         if isinstance(item, datetime):
-            return item.replace(tzinfo=item.tzinfo or UTC).astimezone(UTC).isoformat()
+            return item.astimezone(UTC).isoformat()
         if isinstance(item, date):
             return item.isoformat()
         raise TypeError(f"Unsupported record value: {type(item).__name__}")
@@ -216,7 +214,6 @@ async def export_case(case_id: int, output: Path) -> dict:
                     table = model.__table__
                     query = select(table)
                     if model is User:
-                        # Accounts provide attribution, not credentials or identity-provider state.
                         columns = [
                             User.id,
                             User.first_name,
@@ -277,8 +274,6 @@ async def export_case(case_id: int, output: Path) -> dict:
                 for key, (fingerprint, length) in objects.items():
                     path = f"objects/{fingerprint}"
                     digest, size = hashlib.sha256(), 0
-                    # PDFs and office archives are already compressed. Preserve their bytes
-                    # without spending CPU recompressing them; JSON records remain deflated.
                     object_target = (
                         archive.open(ZipInfo(path), "w", force_zip64=True)
                         if path not in entries
@@ -323,7 +318,6 @@ async def export_case(case_id: int, output: Path) -> dict:
                         "The case exceeds the archive format's manifest size limit"
                     )
                 archive.writestr("manifest.json", manifest)
-            # Publish only a complete archive. A competing exporter cannot overwrite it.
             os.link(temporary, output)
         finally:
             temporary.unlink(missing_ok=True)
@@ -389,7 +383,12 @@ def verify_archive(path: Path, manifest_sha256: str | None = None) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Export or verify a private case archive. Requires operator database and "
+            "storage access."
+        ),
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     export = commands.add_parser(
         "export", help="Create a new archive; never overwrite an existing file"

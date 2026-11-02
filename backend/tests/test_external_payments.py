@@ -1,16 +1,16 @@
-"""External receipt credits preserve balances, source evidence and court boundaries."""
-
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+from fastapi import Depends
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 
-from app.api.auth import get_current_user_id
+from app.api.auth import get_current_user
 from app.config import settings
+from app.database import get_db
 from app.main import app
 from app.models.filing import FilingEnvelope
 from app.models.filing_transaction import FilingTransaction
@@ -42,7 +42,11 @@ async def external_filing(fee_filing, db_session, api_client, monkeypatch):
     db_session.add(UserCourtRole(user_id=clerk, court_id=filing.court_id, role=CourtRole.ADMIN))
     await db_session.flush()
     actor = {"id": clerk}
-    monkeypatch.setitem(app.dependency_overrides, get_current_user_id, lambda: actor["id"])
+
+    async def actor_account(db=Depends(get_db, scope="function")):
+        return await db.get(User, actor["id"])
+
+    monkeypatch.setitem(app.dependency_overrides, get_current_user, actor_account)
     monkeypatch.setattr(settings, "external_payments_enabled", True)
     monkeypatch.setattr(settings, "allow_demo_mode", False)
     response = await api_client.post(f"/api/v1/clerk/filings/{fid}/fees", json=assessment(0, 1000))

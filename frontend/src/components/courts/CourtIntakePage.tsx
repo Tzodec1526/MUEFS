@@ -2,11 +2,14 @@ import { useContext, useEffect, useState, type FormEvent } from 'react';
 import { isAxiosError } from 'axios';
 import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
-import { getErrorDetail } from '../../utils/errors';
-import { parseServerDate } from '../../utils/format';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
+import { formatDateTime } from '../../utils/format';
 import { CourtContext } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
 import '../../styles/intake.css';
+import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
+import PageLoadError from '../common/PageLoadError';
 
 interface IntakeState {
   court_id: number; court_name: string; version: number;
@@ -19,7 +22,7 @@ interface Change {
   before: IntakeState; after: IntakeState;
 }
 interface History { changes: Change[]; total: number }
-interface Remote<T> { key: string; data?: T; error?: string }
+interface Remote<T> { key: string; data?: T; error?: LoadFailure }
 
 function IntakeEditor({ current, onSaved, onReload }: {
   current: Intake; onSaved: (value: Intake) => void; onReload: () => void;
@@ -51,7 +54,7 @@ function IntakeEditor({ current, onSaved, onReload }: {
       const status = isAxiosError(err) ? err.response?.status : undefined;
       const reload = !status || status >= 500 || [401, 403, 409].includes(status);
       setMustReload(reload);
-      setError(getErrorDetail(err) || 'The change could not be confirmed. Reload current settings and review the history before trying again.');
+      setError(errorMessage(err, 'The change could not be confirmed. Reload current settings and review the history before trying again.'));
     } finally { setBusy(false); }
   }
 
@@ -68,7 +71,7 @@ function IntakeEditor({ current, onSaved, onReload }: {
           <input type="checkbox" checked={types[index].is_active} onChange={event => {
             const active = event.target.checked;
             setTypes(items => items.map(entry => entry.id === item.id ? { ...entry, is_active: active } : entry));
-          }} /> {item.name} ({item.code})
+          }} /> {item.name}
         </label>)}
       </fieldset>
       <div className="form-group"><label htmlFor="intake-notice">Public intake notice{needsNotice ? ' (required)' : ' (optional)'}</label>
@@ -105,21 +108,21 @@ function IntakeHistory({ courtId }: { courtId: number }) {
     const controller = new AbortController();
     apiClient.get<History>(`/courts/${courtId}/intake/history`, { params: { page }, signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load intake changes.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load intake changes.') }); });
     return () => controller.abort();
   }, [courtId, page, key]);
   return <section aria-label="Intake change history">
-    <h3>Intake change history</h3>
+    <h2 className="card-heading">Intake change history</h2>
     {!current && <p role="status">Loading intake changes…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
       {current.data.total === 0 && <p>No intake changes have been published through this portal. Existing settings are shown above.</p>}
       {current.data.changes.map(change => {
         const previous = new Map(change.before.case_types.map(item => [item.id, item.is_active]));
         const typeChanges = change.after.case_types.filter(item => previous.get(item.id) !== item.is_active);
         return <article className="review-card" key={change.id}>
-          <h4>Revision {change.after.version} · {change.actor_name}</h4>
-          <p>{parseServerDate(change.timestamp).toLocaleString()}</p>
+          <h3 className="card-subheading">Revision {change.after.version} · {change.actor_name}</h3>
+          <p>{formatDateTime(change.timestamp)}</p>
           <p><strong>Reason:</strong> {change.reason}</p>
           <p><strong>Authority:</strong> {change.authority_reference}</p>
           {change.before.is_efiling_enabled !== change.after.is_efiling_enabled && <p>
@@ -151,32 +154,37 @@ export default function CourtIntakePage() {
   const [showHistory, setShowHistory] = useState(false);
   const key = `${courtId}:${userId ?? 'public'}:${attempt}`;
   const current = result?.key === key ? result : undefined;
+  usePageTitle(current && !current.data ? 'Filing intake not loaded' : 'Filing intake', current?.data?.court_name);
   useEffect(() => {
     if (loading) return;
     const controller = new AbortController();
     apiClient.get<Intake>(`/courts/${courtId}/intake`, { signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load court intake information.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load court intake information.') }); });
     return () => controller.abort();
   }, [courtId, key, loading]);
   if (loading || !current) return <p role="status">Loading court intake…</p>;
-  if (!current.data) return <LoadError message={current.error || 'Could not load intake.'} onRetry={() => setAttempt(n => n + 1)} />;
+  if (!current.data) {
+    return <PageLoadError heading="Filing intake not loaded"
+      failure={current.error ?? { message: 'Could not load intake.', retry: true }} onRetry={() => setAttempt(n => n + 1)} />;
+  }
   const data = current.data;
   return <section className="court-intake-page">
-    <div className="page-header"><div><h2>{data.court_name}: electronic filing intake</h2>
+    <div className="page-header"><div><PageHeading>Filing intake</PageHeading>
+      <p>{data.court_name}</p>
       <p>Current availability and instructions published by the court.</p></div>
-      <Link className="btn btn-secondary" to={`/courts/${data.court_id}/calendar`}>Court calendar</Link></div>
+      <Link className="btn btn-secondary" to={`/courts/${data.court_id}/calendar`}>Filing calendar</Link></div>
     <div className="review-card">
-      <h3>{data.is_efiling_enabled ? 'Court intake enabled' : 'Court intake closed'}</h3>
+      <h2 className="card-heading">{data.is_efiling_enabled ? 'Court intake enabled' : 'Court intake closed'}</h2>
       {!data.is_efiling_enabled && <p>New electronic submissions and corrections are currently unavailable.</p>}
       {(data.public_notice || !data.is_efiling_enabled) && <>
-        <h4>Notice from the court</h4>
+        <h3 className="card-subheading">Notice from the court</h3>
         <p className="intake-notice">{data.public_notice || 'Contact the court for filing options.'}</p>
       </>}
       <p>For deadlines or alternative filing arrangements, follow the court&apos;s instructions.</p>
       <table className="intake-table"><thead><tr><th scope="col">Case type</th><th scope="col">Electronic intake</th></tr></thead>
         <tbody>{data.case_types.map(item => <tr key={item.id}>
-          <td>{item.name} <span className="text-muted">({item.code})</span></td>
+          <td>{item.name}</td>
           <td>{data.is_efiling_enabled && item.is_active ? 'Accepting filings' : 'Not accepting filings'}</td>
         </tr>)}</tbody></table>
       {data.case_types.length === 0 && <p>No case types are available for electronic filing.</p>}

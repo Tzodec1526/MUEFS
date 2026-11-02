@@ -1,5 +1,3 @@
-"""A bounded, read-only check of database reachability and migration compatibility."""
-
 import asyncio
 import logging
 from pathlib import Path
@@ -21,7 +19,6 @@ TIMEOUT_SECONDS = 3
 
 @router.get("/ready", include_in_schema=False)
 async def readiness(request: Request) -> JSONResponse:
-    # The hosted demo checks its seed template without allocating a visitor sandbox.
     engine = getattr(request.app.state, "readiness_engine", database.engine)
     reason = None
     try:
@@ -34,7 +31,6 @@ async def readiness(request: Request) -> JSONResponse:
     except TimeoutError:
         reason = "database_timeout"
     except Exception as exc:
-        # Connection errors may contain credentials and internal server addresses.
         logger.warning("Readiness database check failed (%s)", type(exc).__name__)
         reason = "database_unavailable"
     if reason:

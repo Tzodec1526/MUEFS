@@ -26,7 +26,13 @@ export function accessToken(): string | null {
   return session?.key === sessionKey() ? session.client.token || null : null;
 }
 
+function forgetReplacedSession(): void {
+  if (!session || session.key === sessionKey()) return;
+  forgetLocalSession();
+}
+
 export function sessionSnapshot(): SessionSnapshot {
+  forgetReplacedSession();
   return { key: sessionKey(), token: accessToken(), generation };
 }
 
@@ -40,10 +46,6 @@ export function keycloakConfigured(): boolean {
 
 export function oidcSessionExpected(): boolean {
   return marker()?.restore === true;
-}
-
-export function notifySessionChanged(): void {
-  window.dispatchEvent(new Event('muefs-demo-role-changed'));
 }
 
 function forgetLocalSession(): void {
@@ -66,12 +68,10 @@ export function clearSession(expected?: SessionSnapshot): boolean {
   forgetLocalSession();
   clearProfile();
   localStorage.setItem(SESSION_KEY, JSON.stringify({ generation: crypto.randomUUID(), restore: false }));
-  notifySessionChanged();
   return true;
 }
 
 export function migrateStoredToken(): void {
-  // Older versions persisted access tokens. Keep only a sign-in hint on upgrade.
   if (!localStorage.getItem('auth_token')) return;
   localStorage.removeItem('auth_token');
   if (!localStorage.getItem(SESSION_KEY)) {
@@ -94,9 +94,10 @@ function initialize(): Promise<Keycloak> {
     let canceled = false;
     initialized = withDeadline((async () => {
       const { default: Client } = await import('keycloak-js');
-      if (!keycloakConfigured()) throw new Error('Court identity sign-in is not configured.');
+      const url = import.meta.env.VITE_KEYCLOAK_URL;
+      if (!url) throw new Error('Court identity sign-in is not configured.');
       const client = new Client({
-        url: import.meta.env.VITE_KEYCLOAK_URL,
+        url,
         realm: import.meta.env.VITE_KEYCLOAK_REALM || 'muefs',
         clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'muefs-frontend',
       });
@@ -104,7 +105,6 @@ function initialize(): Promise<Keycloak> {
       if (canceled || started !== generation) { client.clearToken(); throw new SessionChangedError(); }
       return client;
     })()).catch(error => {
-      // A timed-out initializer must never become a usable session later.
       canceled = true;
       if (started !== generation) throw new SessionChangedError();
       throw error;
@@ -163,7 +163,6 @@ export function handleKeycloakCallback(): Promise<string | null> {
     }
     session = { client, key: sessionKey() };
     login = null;
-    notifySessionChanged();
     return safeLoginReturnPath(attempt.path);
   })().catch(error => {
     if (!(error instanceof SessionChangedError) && typeof attempt?.key === 'string') {
@@ -175,9 +174,9 @@ export function handleKeycloakCallback(): Promise<string | null> {
 }
 
 export async function tokenForRequest(): Promise<string | null> {
+  forgetReplacedSession();
   const current = session;
   if (!current) return null;
-  if (current.key !== sessionKey()) throw new SessionChangedError();
   const lifetime = (current.client.tokenParsed?.exp || 0) - (current.client.tokenParsed?.iat || 0);
   await withDeadline(current.client.updateToken(Math.min(30, Math.max(1, Math.floor(lifetime / 3)))));
   if (session !== current || current.key !== sessionKey()) throw new SessionChangedError();

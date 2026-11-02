@@ -1,5 +1,3 @@
-"""A stale editor must not replace another tab's saved filing details."""
-
 import asyncio
 import os
 

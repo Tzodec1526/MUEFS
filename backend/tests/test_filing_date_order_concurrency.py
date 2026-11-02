@@ -1,6 +1,5 @@
-"""Exercise date decision conflicts and authority changes on PostgreSQL."""
-
 import asyncio
+from datetime import UTC, datetime
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -9,6 +8,7 @@ from sqlalchemy import delete, func, select
 from app.api import filing_dates
 from app.database import get_db
 from app.main import app
+from app.models.case import CaseParticipant, ParticipantRole
 from app.models.filing import FilingDocument, FilingEnvelope
 from app.models.filing_transaction import FilingTransaction
 from app.models.user import User, UserCourtRole
@@ -31,6 +31,11 @@ async def test_competing_orders_commit_once(postgres_sessions, stored_document, 
         )
         second_id = fid
         if shared == "case":
+            db.add(CaseParticipant(
+                case_id=first.case_id, user_id=filer, role=ParticipantRole.PLAINTIFF,
+                party_name="Reviewed filer", access_enabled=True,
+                reviewed_at=datetime.now(UTC),
+            ))
             second = FilingEnvelope(
                 court_id=first.court_id,
                 case_id=first.case_id,

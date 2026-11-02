@@ -1,10 +1,9 @@
-"""Publish court intake settings while preserving receipt and administrator authority locks."""
-
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user_id, get_optional_user_id, lock_current_user
+from app.api.params import Page, RecordId
 from app.database import get_db
 from app.models.audit import AuditLog
 from app.models.court import CaseType, Court
@@ -32,11 +31,10 @@ def intake_state(court: Court, case_types: list[CaseType]) -> dict:
 
 @router.get("/{court_id}/intake", response_model=CourtIntakeResponse)
 async def get_intake(
-    court_id: int,
+    court_id: RecordId,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int | None = Depends(get_optional_user_id),
 ):
-    # One statement observes the court and every case-type flag at the same instant.
     rows = (await db.execute(select(Court, CaseType)
         .outerjoin(CaseType, CaseType.court_id == Court.id).where(Court.id == court_id)
         .order_by(CaseType.name, CaseType.id).execution_options(populate_existing=True))).all()
@@ -57,7 +55,7 @@ async def get_intake(
 @router.put("/{court_id}/intake", response_model=CourtIntakeResponse)
 async def publish_intake(
     request: Request,
-    court_id: int,
+    court_id: RecordId,
     data: CourtIntakeChange,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
@@ -84,7 +82,6 @@ async def publish_intake(
     if (not data.is_efiling_enabled or not all(desired.values())) and not data.public_notice:
         raise HTTPException(422, "Publish instructions for filers when closing electronic intake")
 
-    # The comparison also protects SQLite, where FOR UPDATE is not enforced.
     court = await db.scalar(update(Court).where(
         Court.id == court_id, Court.intake_version == data.expected_version,
     ).values(
@@ -109,8 +106,8 @@ async def publish_intake(
 
 @router.get("/{court_id}/intake/history", response_model=CourtIntakeHistory)
 async def intake_history(
-    court_id: int,
-    page: int = Query(1, ge=1),
+    court_id: RecordId,
+    page: Page = 1,
     db: AsyncSession = Depends(get_db, scope="function"),
     user_id: int = Depends(get_current_user_id),
 ):

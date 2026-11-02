@@ -1,5 +1,3 @@
-"""Production accept is records-only until a court CMS is wired; demo simulates IDs."""
-
 from app.config import settings
 from app.integrations.cms_adapter import submit_filing_to_cms
 

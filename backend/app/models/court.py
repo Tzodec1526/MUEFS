@@ -1,10 +1,10 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.database import Base, UTCDateTime
 
 
 class CourtType(enum.StrEnum):
@@ -40,12 +40,12 @@ class Court(Base):
     state: Mapped[str] = mapped_column(String(2), default="MI")
     zip_code: Mapped[str | None] = mapped_column(String(10))
     phone: Mapped[str | None] = mapped_column(String(20))
-    cms_type: Mapped[str | None] = mapped_column(String(50))  # JIS, Tyler, etc.
+    cms_type: Mapped[str | None] = mapped_column(String(50))
     is_efiling_enabled: Mapped[bool] = mapped_column(default=True)
     intake_version: Mapped[int] = mapped_column(default=0, server_default="0")
     intake_notice: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        UTCDateTime(), server_default=func.now()
     )
 
     case_types: Mapped[list["CaseType"]] = relationship(back_populates="court")
@@ -78,7 +78,7 @@ class FeeSchedule(Base):
     fee_type: Mapped[str] = mapped_column(String(100))
     amount_cents: Mapped[int] = mapped_column(Integer)
     description: Mapped[str | None] = mapped_column(Text)
-    effective_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    effective_date: Mapped[datetime] = mapped_column(UTCDateTime())
     is_active: Mapped[bool] = mapped_column(default=True)
 
     court: Mapped["Court"] = relationship(back_populates="fee_schedules")
@@ -93,7 +93,7 @@ class FilingRequirement(Base):
     document_type_code: Mapped[str] = mapped_column(String(50))
     is_required: Mapped[bool] = mapped_column(default=True)
     description: Mapped[str] = mapped_column(Text)
-    mcr_reference: Mapped[str | None] = mapped_column(String(50))  # e.g., "MCR 2.116"
+    mcr_reference: Mapped[str | None] = mapped_column(String(50))
     local_rule_reference: Mapped[str | None] = mapped_column(String(100))
     page_limit: Mapped[int | None] = mapped_column(Integer)
     format_notes: Mapped[str | None] = mapped_column(Text)

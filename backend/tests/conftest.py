@@ -1,26 +1,20 @@
-"""Test configuration and fixtures."""
-
 import hashlib
 import os
+import re
 from uuid import uuid4
 
-# Before any app.settings load: pin the test environment to demo mode (SQLite + local
-# document storage) so tests never reach for Postgres / Redis / S3. This mirrors how the
-# hosted demo actually runs. setdefault leaves an explicit DATABASE_URL (e.g. a CI matrix
-# value) untouched.
-os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
-os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-os.environ.setdefault("DEBUG", "true")
-os.environ.setdefault("ALLOW_DEMO_MODE", "true")
+os.environ["RATE_LIMIT_ENABLED"] = "false"
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+os.environ["DEBUG"] = "true"
+os.environ["ALLOW_DEMO_MODE"] = "true"
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
 
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.database import Base
-from app.models import *  # noqa: F401, F403
+from app.models import User
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -50,7 +44,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(User.metadata.create_all)
 
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
@@ -58,7 +52,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         async with session_factory() as session:
             yield session
     finally:
-        await engine.dispose()  # Disposing the in-memory DB also drops its tables.
+        await engine.dispose()
 
 
 @pytest_asyncio.fixture
@@ -77,3 +71,54 @@ async def api_client(db_session):
             yield client
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+_TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}")
+_UTC_OFFSET = re.compile(r"(?:Z|[+-]\d{2}:\d{2})$")
+_checked_timestamps: list[int] = []
+
+
+def _timestamps(value: object) -> Iterator[str]:
+    if isinstance(value, dict):
+        for item in value.values():
+            yield from _timestamps(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _timestamps(item)
+    elif isinstance(value, str) and _TIMESTAMP.match(value):
+        yield value
+
+
+@pytest.fixture(autouse=True)
+def api_timestamps_carry_a_utc_offset(monkeypatch):
+    from httpx import AsyncClient
+
+    send = AsyncClient.send
+    naive: list[str] = []
+
+    async def checked_send(self, request, **kwargs):
+        response = await send(self, request, **kwargs)
+        if (
+            request.url.path.startswith("/api/")
+            and response.is_success
+            and response.headers.get("content-type", "").startswith("application/json")
+            and await response.aread()
+        ):
+            stamps = list(_timestamps(response.json()))
+            _checked_timestamps.append(len(stamps))
+            naive.extend(
+                f"{request.method} {request.url.path}: {stamp}"
+                for stamp in stamps if not _UTC_OFFSET.search(stamp)
+            )
+        return response
+
+    monkeypatch.setattr(AsyncClient, "send", checked_send)
+    yield
+    assert not naive, naive
+
+
+def pytest_terminal_summary(terminalreporter):
+    terminalreporter.write_line(
+        f"API timestamps checked for a UTC offset: {sum(_checked_timestamps)} "
+        f"in {len(_checked_timestamps)} JSON responses"
+    )

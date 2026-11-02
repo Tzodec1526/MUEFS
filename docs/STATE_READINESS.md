@@ -19,12 +19,12 @@ establish state approval or production readiness.
 | Screen incoming documents | Every upload uses the shared inspected path. Enabled ClamAV scanning requires a complete verdict within one deadline; failures/cancellation cannot store a document. Production startup, private scanner networking, explicit limits and a guard against oversized compressed members are implemented and tested against ClamAV 1.4.6. | Court-approved file/complexity policy, current signature operations, legacy-document review, representative load and independent security validation. A clean verdict does not certify a document safe. |
 | Protect private material | Private envelopes and receipts require filer or court-staff access. Dockets exclude waiver application data, confidential document metadata, superseded documents and other filers' drafts. Fee-waiver documents are nonpublic even if the filer omits the checkbox. | Full classification/retention policy for every case and document type; independent security assessment. |
 | Control case participation and access | Assigned staff record participants, counsel representation and explicit restricted-case grants with retained reasons, before/after history, stale-edit checks and revocation. Filing acceptance no longer assigns party roles or grants case access. | Court-approved access rules, review of legacy records, CMS appearance/withdrawal synchronization, limited-scope representation and service enrollment. |
-| Record the correct legal filing date | Receipt instants and filing dates are separate. Published calendars establish business dates. Assigned staff can record a signed order establishing a different date, with retained before/after evidence and explicit case opening date changes. Acceptance honors the order without rewriting the receipt. | Court verification of calendars and signed orders, motion/adjudication procedures, downstream CMS synchronization and review of closures published after acceptance. Correcting a document does not automatically preserve its legal filing date. |
+| Record the correct legal filing date | Receipt instants and filing dates are separate. Published calendars establish business dates. Assigned staff can record a signed order establishing a different date, with retained before/after evidence and explicit case opening date changes. Acceptance honors the order without rewriting the receipt. A correction keeps the filing date, and an order stays on the filing. | Court verification of calendars and signed orders, motion/adjudication procedures, downstream CMS synchronization and review of closures published after acceptance. |
 | Resolve fee waivers correctly | A completed application accompanies the filing. Clerk waivers, referral and judicial decisions are separate court-scoped actions. Signed decision PDFs and denial amounts remain in private history; a filer can pay after denial without resubmitting. | Actual notice delivery, de novo review and judicial assignment, deadline calculation, case-wide continuation and reinstatement, court verification of signed forms and prisoner-specific procedures. |
 | Establish fees and account for payments | Assigned staff record itemized assessments. Separately assigned court administrators can credit verified external receipts, reverse erroneous credits and retain the source evidence. Balances preserve partial payments and expose overpayments after reassessment. A private court receipt register provides period totals, recorded activity and bounded CSV exports. | Court validation of assessments and source receipts, independent reconciliation and correction review, a hosted payment processor, signed webhooks, refunds and accounting-system mappings. |
 | Deliver electronic service | Staff review service instructions. Senders explicitly select retained subsequent documents and eligible recipients; immutable packages retain contents and addresses. An opt-in SMTP outbox queues protected links, rechecks instructions and records failures/retries. Recipients download only selected, verified bytes and can acknowledge the package. | Court-approved enrollment, consent and confidential-document policy; additional/delegated recipients; bounce feedback and failed-service remedies; non-electronic evidence and certified proof. Relay acceptance and download requests do not establish legally sufficient service. |
 | Send filing alerts reliably | An opt-in SMTP outbox commits with filing changes, checks verified recipients, retains messages and attempts, retries temporary failures and exposes uncertain outcomes to assigned court staff. | A court-approved relay and sender domain, bounce/delivery feedback, operational alerting and court approval of legally sufficient notice content and procedures. Generic email alerts do not establish legal service. |
-| Connect to the court's system of record | Acceptance is explicitly blocked outside demo mode when CMS integration is absent. | A documented court/vendor contract, credentialed sandbox, document/code mapping, idempotent delivery, status callbacks, error recovery and reconciliation. |
+| Connect to the court's system of record | Without CMS integration, acceptance outside demo mode is records-only: MUEFS assigns the case number and records no CMS identifier. | A documented court/vendor contract, credentialed sandbox, document/code mapping, idempotent delivery, status callbacks, error recovery and reconciliation. |
 | Operate statewide | Explicit identity provisioning, delegated court administration, immediate checks on subsequent requests after revocation, retained changes, PostgreSQL migrations and deployment guidance exist. | State federation and lifecycle integration, access recertification, availability targets, incident response, backup restoration drills, disaster recovery and migration from incumbent systems. |
 | Find public records across courts | Anonymous search filters by court and identifies each result's court and county. Shared links preserve filters and pages; courts with closed intake remain searchable. PostgreSQL substring indexes and batched court metadata improve selective searches while excluding sealed cases and participant contact fields. | Representative concurrency, data-distribution and write-load testing; independent accessibility evaluation and court-approved public-index policy. |
 | Transfer a case's retained records | A private case archive includes linked metadata, transaction history, original versions, orders, public copies, payments and notice evidence. A read-only snapshot and file fingerprints protect export consistency; offline verification detects altered or incomplete packages. | Court-controlled custody/signing, source inventory reconciliation, receiving-system mapping, approved retention and an evaluated import/restore procedure. |
@@ -34,7 +34,7 @@ establish state approval or production readiness.
 
 On the details step, **Save draft** saves the title and description to the filer's account.
 **Continue** also saves before advancing. New saves acquire a filing ID; later saves use
-that same filing. **My Filings → Continue Filing** resumes the account's saved record,
+that same filing. **My filings → Continue filing** resumes the account's saved record,
 including from a browser with no local recovery data.
 
 Creation requires a UUID `Idempotency-Key` on `POST /api/v1/filings`. The browser saves
@@ -79,7 +79,7 @@ Recovery is limited to the browser's tab session. Save to the account before clo
 the tab or switching devices. The interface warns about unsaved changes and storage
 refusal; browser recovery cannot guarantee survival of crashes, cleared data or closed
 sessions. Failed saves retain the form text and creation key. If that recovery is gone,
-check My Filings before starting a separate draft; a new request key means a new filing.
+check My filings before starting a separate draft; a new request key means a new filing.
 
 Verification reproduced a stale tab overwriting a newer save before the fix, and a live
 tab retaining the previous account's editor after a cross-tab identity change. API tests
@@ -99,7 +99,7 @@ comparison.
 
 ## Court service instructions
 
-Assigned court staff open **Case participants → Service instructions** to record one
+Assigned court staff open **Manage case access → Service instructions** to record one
 current destination and method for a reviewed participant. An electronic instruction
 requires the linked account's current verified email and active identity. Counsel also
 need a matching verified bar number; restricted cases require the participant's access
@@ -247,11 +247,12 @@ independent accessibility conformance.
    notice together before sending a successful HTTP response. The receipt preserves the
    submitted document metadata and payment reference rather than reading those fields
    from the subsequently edited envelope.
-2. The filer opens **Receipts & history** from My Filings, the submission confirmation or
+2. The filer opens **Receipts and history** from My filings, the submission confirmation or
    a notification. Court staff can open the same history from the review queue.
 3. A returned filing can be corrected. Removing a previously submitted document removes
    it from the next attempt, while keeping its stored bytes and original receipt private.
-4. Resubmission creates another numbered receipt. A clerk decision is recorded separately.
+4. Resubmission creates another numbered receipt and keeps the filing date. A clerk decision
+   is recorded separately.
    CMS failure is retained as a failed attempt and does not become an acceptance.
 5. Receipt history is paginated. Each transaction can be downloaded as JSON; the displayed
    page can be printed. Downloads use the authenticated client, including for retained files.
@@ -273,8 +274,9 @@ selected the filing. `POST /api/v1/clerk/filings/{id}/review` requires
 {"action": "accept", "expected_submission_count": 2}
 ```
 
-The service compares that number with the refreshed envelope while holding its row lock,
-before document verification, CMS submission, or decision records. If another reviewer
+The service compares that number before it reads stored documents, and again with the
+refreshed envelope while holding its row lock, before CMS submission or decision records. An
+invalid `action` returns HTTP 422. If another reviewer
 returned the filing and the filer resubmitted it, the stale decision receives HTTP 409
 even though the envelope is again pending. Close the old review, refresh the queue, and
 inspect the corrected submission before deciding. Accept, return, and reject all use this
@@ -337,7 +339,7 @@ The required free-text hardship question has been removed. A pending request mus
 an application attachment before submission; the system does not verify the form's
 contents or signature. The application and signed decision PDFs are nonpublic.
 
-Court staff can select **Pending Fee Waivers** in the review queue, including waivers on
+Court staff can select **Pending fee waivers** in the review queue, including waivers on
 filings that were already accepted. The private history page exposes only actions allowed
 by the viewer's assignment to that court:
 
@@ -387,7 +389,7 @@ filing as a motion, infers charges from fee labels, sums overlapping schedule ro
 adds a guessed electronic filing charge.
 
 The filer can request fee review from the fee screen. This retains the current document
-manifest and reason, and places the request in the court's **Fee Reviews** queue. It does
+manifest and reason, and places the request in the court's **Fee reviews** queue. It does
 not submit a draft, establish its filing date, or accept a filing. An assigned court clerk,
 judge or court administrator can inspect the private originals and record an itemized
 assessment with an authority reference, reason and explicit review confirmation. They
@@ -411,7 +413,7 @@ records as they existed at submission. Signed waiver decisions remain the basis 
 amounts, and a pending application can accompany a submission for court review.
 
 With `EXTERNAL_PAYMENTS_ENABLED=true`, an administrator explicitly assigned to the filing's
-court can record an external receipt through **Fees & payments → View payment records**.
+court can record an external receipt through **View fees and payments → View payment records**.
 The administrator must be someone other than the filer. A clerk/judge assignment or a
 system-administrator account without that court's administrator grant cannot create or
 reverse credits. The operator records the source system, receipt reference, received time,
@@ -480,7 +482,7 @@ also tests duplicate requests, simultaneous document edits, consistent reads and
 
 ## Court receipt register
 
-**Receipt Register** in the court workspace lets an active administrator assigned to the
+**Receipt register** in the court workspace lets an active administrator assigned to the
 selected court review external credits and reversals across filings. A system-wide role
 without that court's administrator assignment is insufficient. The register remains readable
 when external payment recording is disabled, so disabling new entries does not hide retained
@@ -523,8 +525,8 @@ warmed query-plan measurements, not end-to-end latency or production load certif
 
 API and PostgreSQL checks cover signed totals above 32-bit range, court isolation,
 simulation separation, period boundaries on 23-hour and 25-hour days, pagination, complete
-exports, oversized-export refusal, uncommitted activity, concurrent authority revocation,
-and failed-index recovery. The register supports a court's reconciliation procedure; it
+exports, oversized-export refusal, activity committed between reads, concurrent authority
+revocation, and failed-index recovery. The register supports a court's reconciliation procedure; it
 does not contact the accounting system or record an independent reviewer's approval.
 
 ## Court calendars and filing dates
@@ -543,11 +545,12 @@ coverage or a timezone change before the next business day produces an unresolve
 The calculation loads the relevant revisions in one query, with no database query per day.
 
 Submission preserves the UTC receipt instant and calendar assessment, including revision
-IDs and skipped dates. Unless a court order has established the date for that submission,
-acceptance reassesses the same receipt instant against the published calendar and records
-a separate event if the assessment changed. New cases keep the receipt
-instant in `filed_date` and the civil date in `filing_date`; neither uses the clerk's acceptance
-time. Date-only fields display consistently across viewer timezones. Search and docket
+IDs and skipped dates. The envelope stores the first receipt in `filed_at`, and `submitted_at`
+holds the latest receipt for the queue. A resubmission records its own receipt but keeps the
+filing date. Unless a court order has established the date, acceptance reassesses the first receipt
+against the published calendar and records a separate event if the assessment changed.
+New cases keep the first receipt instant in `filed_date` and the civil date in `filing_date`;
+neither uses the clerk's acceptance time or a later resubmission. Date-only fields display consistently across viewer timezones. Search and docket
 detail share the same public response schema, and timestamp responses include a UTC offset.
 
 If coverage is unresolved, submission still records receipt. Production acceptance returns
@@ -577,7 +580,7 @@ order, its signing date and reference, the ordered filing date, the reason, and 
 attestation that staff reviewed the order. Recording requires a court assignment; being a
 system administrator alone is insufficient. Drafts and service-only records are ineligible.
 An order can be recorded against a pending, accepted, returned or rejected submission;
-this action does not accept or reopen it. Legacy records keep missing receipt times missing.
+this action does not accept or reopen it, and a later resubmission keeps the ordered date. Legacy records keep missing receipt times missing.
 
 This supports recording the outcome of a court procedure. MCR 1.109(G)(7)(a) permits a
 motion for a court order establishing an earlier filing date after a transmission failure,
@@ -598,8 +601,8 @@ filing attachments and preserves the ordered date; the CMS acceptance boundary s
 Staff must explicitly select applying the same order to an existing case's opening date.
 The case's original `filed_date` instant stays unchanged. No relationship to a historical
 initiating filing is guessed. Acceptance of a new case uses its envelope's ordered filing
-date. A later corrected submission receives a fresh calendar assessment; the prior order
-stays attached to its original submission attempt and is not silently carried forward.
+date. A later corrected submission keeps that date: the order stays on the filing, and neither
+the resubmission nor acceptance recomputes it.
 
 Filing and case date versions reject stale decisions, including a form opened before
 acceptance creates a case. Account and court authority are checked again after PDF inspection,
@@ -695,7 +698,7 @@ decision deadline trigger. Those court procedures remain separate implementation
 
 ## Identity administration and court access
 
-**People & access** provides a paginated identity directory, provisioning, identity-subject
+**People and court access** provides a paginated identity directory, provisioning, identity-subject
 binding, account deactivation and court grants. System administrators manage identities
 and delegate administration for named courts. Court administrators see only their courts'
 assignments and change history. An exact-email lookup can find an already provisioned
@@ -736,7 +739,7 @@ Database ownership and TRUNCATE privileges must remain outside the runtime role.
 Directory pages fetch court grants in one batch. System statistics now use one database
 round trip for five counts. The administration page loads only when opened. Production
 login no longer displays demo identities or invents a court assignment for unassigned
-staff; production tool discovery also excludes unavailable demo sign-in tools. The browser
+staff. The browser
 security policy allows token exchange with the configured IdP origin while retaining the
 separate restrictive API policy.
 
@@ -794,7 +797,7 @@ measures response size, not production latency or statewide load capacity.
 
 ## Court-managed participants and restricted-case access
 
-**Court Cases** lists public and sealed matters only for a staff member's assigned court,
+**Court cases** lists public and sealed matters only for a staff member's assigned court,
 with an exact case-number lookup and 25-record pages. The case docket links assigned staff
 to **Manage case access**. Staff can record a party or counsel, identify a represented
 party, link an existing account and explicitly grant restricted-case access. Generic
@@ -946,7 +949,8 @@ bytes and the median of five warmed samples, measured:
 These are synthetic local-filesystem measurements, not production load or S3 latency
 evidence. Integrity reads use 64 KiB chunks in worker threads. A shared actor lock keeps
 authority stable during the transition while allowing unrelated filings and foreign-key
-references; ordered envelope locks avoid reversed batch lock acquisition. Account and
+references; ordered envelope locks avoid reversed batch lock acquisition. The README's
+[row-lock order](../README.md#row-lock-order) lists the order every path follows. Account and
 court-role administration remain serialized with these transitions. PostgreSQL's
 [row-lock conflict rules](https://www.postgresql.org/docs/16/explicit-locking.html#LOCKING-ROWS)
 inform that choice; concurrency tests exercise the actual request behavior.
@@ -1016,7 +1020,7 @@ remain separate requirements.
 
 ## Filing-list scale and detail loading
 
-My Filings and the clerk queue select summary columns and count only current attachments.
+My filings and the clerk queue select summary columns and count only current attachments.
 Removed documents and court-generated waiver/date orders are excluded from that count,
 matching the full envelope. Attachment manifests, waiver explanations and filing-date
 evidence load through the authorized detail endpoint when the user opens a filing.
@@ -1037,8 +1041,8 @@ measurements, not deployment capacity targets.
 
 | First page, 25 rows | Median before | Median after | Response bytes before → after |
 | --- | ---: | ---: | ---: |
-| My Filings, all statuses | 27.92 ms | 6.79 ms | 121,629 → 35,282 |
-| My Filings, returned | 20.15 ms | 6.92 ms | 121,628 → 35,282 |
+| My filings, all statuses | 27.92 ms | 6.79 ms | 121,629 → 35,282 |
+| My filings, returned | 20.15 ms | 6.92 ms | 121,628 → 35,282 |
 | Clerk queue, all pending | 12.00 ms | 8.20 ms | 120,759 → 34,993 |
 | Clerk queue, submitted | 9.46 ms | 4.62 ms | 120,759 → 34,963 |
 | Pending waivers | 11.82 ms | 6.16 ms | 141,518 → 34,948 |
@@ -1080,11 +1084,8 @@ counts. SQLite uses an ordinary partial index.
 A separate PostgreSQL 16 service profile on 2026-09-06 used 50,000 synthetic filings,
 20,000 pending records and 600,000 document rows. The same vacuumed/analyzed dataset
 served both implementations; each run discarded one warm-up and measured nine calls.
-The 25-row queue page improved from 10.59 to 6.29 ms median. The clerk-triage tool improved
-from 6.52 to 5.93 ms, replacing two queue requests with one and four service SELECTs with
-two. It fetches five summaries instead of fifty and uses database receipt ordering,
-removing the client-side merge and sort. The old and new paths returned the same IDs.
-These service timings exclude HTTP/authentication and deployment network costs.
+The 25-row queue page improved from 10.59 to 6.29 ms median. The old and new paths returned
+the same IDs. These service timings exclude HTTP/authentication and deployment network costs.
 
 The first combined implementation regressed because it sorted both pending statuses;
 the replacement index removed that sort. Substring searches, exact counts and deep

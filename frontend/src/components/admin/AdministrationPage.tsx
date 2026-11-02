@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
-import { getErrorDetail } from '../../utils/errors';
-import { parseServerDate } from '../../utils/format';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
+import { formatDateTime, plural } from '../../utils/format';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 interface Access {
   system_admin: boolean; user_id: number; courts: { id: number; name: string }[];
@@ -15,7 +17,7 @@ interface Account {
   court_roles: { court_id: number; court_name: string; role: string }[];
 }
 interface Directory { users: Account[]; total: number; page_size: number }
-type Remote<T> = { key: string; data?: T; error?: string };
+type Remote<T> = { key: string; data?: T; error?: LoadFailure };
 const accountTypes: Record<string, string> = {
   attorney: 'Attorney', clerk: 'Court staff', judge: 'Judge', self_represented: 'Self-represented filer',
   public: 'Public records user', admin: 'System administrator',
@@ -46,12 +48,12 @@ function AccountForm({ user, self, onSaved }: {
       const result = user ? await apiClient.put<Account>(`/admin/users/${user.id}`, data)
         : await apiClient.post<Account>('/admin/users', data);
       onSaved(result.data);
-    } catch (err) { setError(getErrorDetail(err) || 'Could not save the account.'); }
+    } catch (err) { setError(errorMessage(err, 'Could not save the account.')); }
     finally { setBusy(false); }
   }
   return <form onSubmit={save} className="admin-account-form">
-    <h3>{user ? 'Account identity' : 'Provision an account'}</h3>
-    <p>Use the exact subject from the approved identity provider. Provisioning an account does not assign court access.</p>
+    <h3>{user ? 'Account identity' : 'Set up an account'}</h3>
+    <p>Use the exact subject from the approved identity provider. Setting up an account does not assign court access.</p>
     <div className="admin-form-grid">
       <div className="form-group"><label htmlFor="account-first">First name</label>
         <input id="account-first" name="first_name" maxLength={100} required defaultValue={user?.first_name} /></div>
@@ -76,7 +78,7 @@ function AccountForm({ user, self, onSaved }: {
     <div className="form-group"><label htmlFor="account-reason">Reason and authority or reference for this change</label>
       <textarea id="account-reason" name="reason" rows={2} required maxLength={1000} /></div>
     {error && <p className="alert alert-error" role="alert">{error}</p>}
-    <button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : user ? 'Save account' : 'Provision account'}</button>
+    <button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : user ? 'Save account' : 'Set up account'}</button>
   </form>;
 }
 
@@ -98,7 +100,7 @@ function CourtAccess({ user, access, directoryCourt, onSaved }: {
         reason: new FormData(form).get('reason'),
       });
       form.reset(); onSaved(response.data);
-    } catch (err) { setError(getErrorDetail(err) || 'Could not change court access.'); }
+    } catch (err) { setError(errorMessage(err, 'Could not change court access.')); }
     finally { setBusy(false); }
   }
   return <section className="admin-detail-section">
@@ -140,10 +142,10 @@ interface History {
   } }[];
 }
 const historyLabels: Record<string, string> = {
-  'identity.account_created': 'Account provisioned', 'identity.account_updated': 'Account changed',
+  'identity.account_created': 'Account set up', 'identity.account_updated': 'Account changed',
   'identity.role_granted': 'Court role granted', 'identity.role_revoked': 'Court role revoked',
-  'identity.bootstrap': 'Initial administrator provisioned',
-  'identity.duplicate_role_removed': 'Duplicate historical grant archived',
+  'identity.bootstrap': 'First administrator set up',
+  'identity.duplicate_role_removed': 'Duplicate earlier grant archived',
 };
 const fieldLabels: Record<string, string> = {
   first_name: 'First name', last_name: 'Last name', email: 'Email address', user_type: 'Account type',
@@ -160,20 +162,20 @@ function AccountHistory({ userId, courtId, access }: { userId: number; courtId?:
     const controller = new AbortController();
     apiClient.get<History>(`/admin/users/${userId}/history`, { params: { page, court_id: courtId }, signal: controller.signal })
       .then(response => { if (!controller.signal.aborted) setResult({ key, data: response.data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load access history.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load access history.') }); });
     return () => controller.abort();
   }, [userId, courtId, page, key]);
   return <section className="admin-detail-section">
     <h3>Retained change history</h3>
     {!current && <p role="status">Loading change history…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
       {current.data.total === 0 && <p>No administration changes have been recorded in this view.</p>}
       <ol className="admin-history">{current.data.events.map(event => {
         const { before, after } = event.details;
         return <li key={event.id}>
           <strong>{historyLabels[event.action] || event.action}</strong>
-          <p>{parseServerDate(event.occurred_at).toISOString().replace('T', ' ').replace('Z', ' UTC')} · {event.details.actor_name || 'Database operator'}</p>
+          <p>{formatDateTime(event.occurred_at)} · {event.details.actor_name || 'Database operator'}</p>
           {event.details.court_id && <p>{access.courts.find(court => court.id === event.details.court_id)?.name || `Court ${event.details.court_id}`}</p>}
           <p>{event.details.reason}</p>
           {Array.isArray(after) ? <p>Before: {Array.isArray(before) ? before.map(role => courtRoles[role] || role).join(', ') || 'No roles' : 'No roles'}.
@@ -204,6 +206,9 @@ function AccountDirectory({ access }: { access: Access }) {
   const [editor, setEditor] = useState<Account | 'new' | null>(null);
   const [message, setMessage] = useState('');
   const editorRef = useRef<HTMLElement>(null);
+  const directoryRef = useRef<HTMLElement>(null);
+  const setUpRef = useRef<HTMLButtonElement>(null);
+  const closedEditor = useRef<number | 'new' | undefined>(undefined);
   const selectedId = editor === 'new' ? 'new' : editor?.id;
   const key = `${court}:${email}:${page}:${attempt}`;
   const current = result?.key === key ? result : undefined;
@@ -211,19 +216,32 @@ function AccountDirectory({ access }: { access: Access }) {
     const controller = new AbortController();
     apiClient.get<Directory>('/admin/users', { params: { court_id: court || undefined, email: email || undefined, page }, signal: controller.signal })
       .then(response => { if (!controller.signal.aborted) setResult({ key, data: response.data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load accounts.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load accounts.') }); });
     return () => controller.abort();
   }, [court, email, page, key]);
   useEffect(() => { if (selectedId != null) editorRef.current?.focus(); }, [selectedId]);
+  useEffect(() => {
+    const closed = closedEditor.current;
+    if (closed === undefined || !current) return;
+    closedEditor.current = undefined;
+    if (document.activeElement !== document.body) return;
+    const trigger = closed === 'new' ? setUpRef.current : document.getElementById(`manage-account-${closed}`);
+    (trigger ?? directoryRef.current)?.focus();
+  }, [current]);
+  function closeEditor() {
+    closedEditor.current = selectedId;
+    setEditor(null);
+    setAttempt(n => n + 1);
+  }
   function saved(user: Account) {
     setMessage(editor !== 'new' && editor?.administration_version === user.administration_version
       ? 'No changes to record.' : 'Change recorded. Earlier values remain in the change history.');
     setEditor(user); setAttempt(n => n + 1);
   }
   return <>
-    <div className="page-header"><div><h2>People &amp; court access</h2>
-      <p>{access.system_admin ? 'Provision identities and delegate court access.' : 'Manage staff access for your assigned courts.'}</p></div>
-      {access.system_admin && <button className="btn btn-primary" onClick={() => setEditor('new')}>Provision account</button>}</div>
+    <div className="page-header"><div><PageHeading>People and court access</PageHeading>
+      <p>{access.system_admin ? 'Set up accounts and assign court access.' : 'Manage staff access for your assigned courts.'}</p></div>
+      {access.system_admin && <button className="btn btn-primary" ref={setUpRef} onClick={() => setEditor('new')}>Set up account</button>}</div>
     <form className="admin-directory-filter" onSubmit={event => {
       event.preventDefault(); setEmail(String(new FormData(event.currentTarget).get('email') || '').trim()); setPage(1); setEditor(null);
       setAttempt(n => n + 1); setMessage('');
@@ -238,19 +256,24 @@ function AccountDirectory({ access }: { access: Access }) {
       <button className="btn btn-secondary">Find accounts</button>
     </form>
     {court > 0 && <p><Link to={`/courts/${court}/intake`}>Manage this court&apos;s filing intake</Link></p>}
-    {!access.system_admin && <p>Search the exact email of a known staff member to assign access. A system administrator must provision their identity first.</p>}
+    {!access.system_admin && <p>Search the exact email of a known staff member to assign access. A system administrator must set up their account first.</p>}
     {message && <p className="alert alert-success" role="status">{message}</p>}
-    <div className="admin-workspace">
-      <section aria-label="Account directory">
+    <div className={`admin-workspace${editor ? ' editor-open' : ''}`}>
+      <section aria-label="Account directory" ref={directoryRef} tabIndex={-1}>
         {!current && <p role="status">Loading accounts…</p>}
-        {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+        {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
         {current?.data && <>
-          <p>{current.data.total} account{current.data.total === 1 ? '' : 's'}</p>
-          {current.data.users.map(user => <article className="review-card admin-user-card" key={user.id}>
-            <h3>{user.first_name} {user.last_name}</h3><p>{user.email}</p>
-            <p>{accountTypes[user.user_type]} · {user.is_active ? 'Active' : 'Inactive'}</p>
-            <button className="btn btn-secondary btn-small" onClick={() => setEditor(user)}>Manage {user.first_name} {user.last_name}</button>
-          </article>)}
+          <p>{plural(current.data.total, 'account')}</p>
+          <ul className="court-case-list admin-account-list">
+            {current.data.users.map(user => <li key={user.id}>
+              <div>
+                <strong>{user.first_name} {user.last_name}</strong>
+                <p>{user.email}</p>
+                <p>{accountTypes[user.user_type]} · {user.is_active ? 'Active' : 'Inactive'}</p>
+              </div>
+              <button id={`manage-account-${user.id}`} className="btn btn-secondary btn-small" onClick={() => setEditor(user)}>Manage {user.first_name} {user.last_name}</button>
+            </li>)}
+          </ul>
           {current.data.total > 25 && <nav className="pagination" aria-label="Account directory pages">
             <button className="btn btn-secondary" disabled={page === 1} onClick={() => setPage(n => n - 1)}>Previous accounts</button>
             <span>Page {page} of {Math.ceil(current.data.total / 25)}</span>
@@ -260,7 +283,7 @@ function AccountDirectory({ access }: { access: Access }) {
       </section>
       {editor && <section className="review-card admin-editor" ref={editorRef} tabIndex={-1}>
         <div className="history-summary"><h2>{editor === 'new' ? 'New account' : `${editor.first_name} ${editor.last_name}`}</h2>
-          <button className="btn btn-secondary btn-small" onClick={() => { setEditor(null); setAttempt(n => n + 1); }}>Close &amp; refresh list</button></div>
+          <button className="btn btn-secondary btn-small" onClick={closeEditor}>Close &amp; refresh list</button></div>
         {access.system_admin && <AccountForm key={editor === 'new' ? 'new' : `${editor.id}:${editor.administration_version}`}
           user={editor === 'new' ? undefined : editor} self={editor !== 'new' && editor.id === access.user_id} onSaved={saved} />}
         {editor !== 'new' && <>
@@ -273,6 +296,7 @@ function AccountDirectory({ access }: { access: Access }) {
 }
 
 export default function AdministrationPage() {
+  usePageTitle('People and court access');
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<Remote<Access>>();
   const key = String(attempt);
@@ -281,12 +305,12 @@ export default function AdministrationPage() {
     const controller = new AbortController();
     apiClient.get<Access>('/admin/access', { signal: controller.signal })
       .then(response => { if (!controller.signal.aborted) setResult({ key, data: response.data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not verify administrator access.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not verify administrator access.') }); });
     return () => controller.abort();
   }, [key]);
   return <section className="administration-page">
     {!current && <p role="status">Checking administrator access…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <AccountDirectory access={current.data} />}
   </section>;
 }

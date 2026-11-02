@@ -3,9 +3,11 @@ import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { getCourt } from '../../api/courts';
 import type { FilingDateAssessment } from '../../api/filings';
-import { formatCourtDate, parseServerDate } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { formatCourtDate, formatDateTime } from '../../utils/format';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 interface Calendar {
   id: number; timezone: string; valid_from: string; valid_through: string;
@@ -21,10 +23,11 @@ export default function CourtCalendarPage() {
   const [attempt, setAttempt] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadFailure | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [assessment, setAssessment] = useState<FilingDateAssessment>();
+  usePageTitle('Filing calendar', data ? courtName : undefined);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -37,7 +40,7 @@ export default function CourtCalendarPage() {
         ]);
         if (!controller.signal.aborted) { setCourtName(court.name); setData(response.data); }
       } catch (err) {
-        if (!controller.signal.aborted) setError(getErrorDetail(err) || 'Could not load court calendars.');
+        if (!controller.signal.aborted) setError(loadFailure(err, 'Could not load court calendars.'));
       } finally { if (!controller.signal.aborted) setLoading(false); }
     }
     load();
@@ -67,7 +70,7 @@ export default function CourtCalendarPage() {
       });
       form.reset(); setPage(1); setAttempt(n => n + 1);
       setAssessment(undefined); setMessage('Calendar revision published. Earlier revisions and receipts are retained.');
-    } catch (err) { setActionError(getErrorDetail(err) || 'Could not publish the calendar.'); }
+    } catch (err) { setActionError(errorMessage(err, 'Could not publish the calendar.')); }
     finally { setBusy(false); }
   }
 
@@ -80,18 +83,19 @@ export default function CourtCalendarPage() {
         params: { received_at: values.get('received_at') },
       });
       setAssessment(response.data);
-    } catch (err) { setActionError(getErrorDetail(err) || 'Could not assess this receipt timestamp.'); }
+    } catch (err) { setActionError(errorMessage(err, 'Could not assess this receipt timestamp.')); }
     finally { setBusy(false); }
   }
 
   return <section className="court-calendar-page">
-    <div className="page-header"><div><h2>{courtName}: filing calendar</h2>
+    <div className="page-header"><div><PageHeading>Filing calendar</PageHeading>
+      {data && <p>{courtName}</p>}
       <p>Published timezones, legal holidays and court-ordered closures.</p></div>
       <Link className="btn btn-secondary" to={`/courts/${courtId}/intake`}>Electronic intake status</Link></div>
     <p>Electronic submissions can arrive at any time. Under MCR 1.109(G)(5)(b), weekend and closed-day
       submissions are assigned to the next business day. This calendar does not calculate deadlines or decide requests for relief.</p>
     {loading && <p role="status">Loading calendars…</p>}
-    {error && <LoadError message={error} onRetry={() => setAttempt(n => n + 1)} />}
+    {error && <LoadError failure={error} onRetry={() => setAttempt(n => n + 1)} />}
     {message && <p className="alert alert-success" role="status">{message}</p>}
     {actionError && <p className="alert alert-error" role="alert">{actionError}</p>}
     {!loading && !error && data && <>
@@ -119,7 +123,7 @@ export default function CourtCalendarPage() {
         </form>
       </details>}
       <form className="review-card" onSubmit={preview}>
-        <h3>Check a receipt timestamp</h3>
+        <h2 className="card-heading">Check a receipt timestamp</h2>
         <div className="form-group"><label htmlFor="calendar-received">Received timestamp, including UTC offset</label>
           <input id="calendar-received" name="received_at" placeholder="2026-09-05T03:59:00Z" required /></div>
         <button className="btn btn-secondary" disabled={busy}>Check filing date</button>
@@ -133,12 +137,12 @@ export default function CourtCalendarPage() {
       </form>
       {data.calendars.length === 0 && <p className="alert alert-warning">No calendar has been published. Filing dates cannot be established from a calendar yet.</p>}
       {data.calendars.map(calendar => <article className="review-card" key={calendar.id}>
-        <h3>Calendar revision #{calendar.id}</h3>
+        <h2 className="card-heading">Calendar revision #{calendar.id}</h2>
         <p>{formatCourtDate(calendar.valid_from)} – {formatCourtDate(calendar.valid_through)} · {calendar.timezone}</p>
         <p>Authority: {calendar.authority_reference}</p>
-        <p>Published: {parseServerDate(calendar.published_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}</p>
+        <p>Published: {formatDateTime(calendar.published_at)}</p>
         <ul>{Object.entries(calendar.closed_dates).sort(([a], [b]) => a.localeCompare(b)).map(([day, reason]) =>
-          <li key={day}>{formatCourtDate(day)} — {reason}</li>)}</ul>
+          <li key={day}>{formatCourtDate(day)}: {reason}</li>)}</ul>
         {Object.keys(calendar.closed_dates).length === 0 && <p>No additional closed dates in this revision. Weekends remain excluded.</p>}
       </article>)}
       {data.total > 25 && <nav className="pagination" aria-label="Calendar revisions">

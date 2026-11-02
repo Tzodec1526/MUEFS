@@ -1,16 +1,12 @@
-# Render Blueprint for the public hosted demo.
-# In Render: New > Blueprint, point it at this repo, and it provisions the service below.
-# Then add the custom domain demo.tomcedoz.com in the service settings.
 services:
   - type: web
     name: muefs-demo
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: standard        # 2 GB / always-on (~$25/mo). Use "starter" for a cheaper 512 MB box.
+    plan: standard
     region: oregon
     healthCheckPath: /ready
-    autoDeploy: false     # hold deploys until challenge build is ready to go live
-    # Single instance only — the per-session sandboxes live on this box's local disk.
+    autoDeploy: false
     envVars:
       - key: DEMO_ISOLATED_SESSIONS
         value: "true"
@@ -29,11 +25,15 @@ services:
         value: "true"
       - key: RATE_LIMIT_BACKEND
         value: memory
+      - key: TRUSTED_PROXY_IPS
+        value: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,fc00::/7
       - key: PAYMENTS_ARE_SIMULATED
         value: "true"
       - key: DEMO_MAX_SESSIONS
         value: "100"
       - key: DEMO_SESSION_TTL_MINUTES
         value: "60"
+      - key: DEMO_STORAGE_QUOTA_MB
+        value: "200"
       - key: ALLOWED_ORIGINS
-        value: https://demo.tomcedoz.com,https://webmcp.tomcedoz.com,https://muefs.tomcedoz.com,https://muefs-webmcp-live.tom-72b.workers.dev
+        value: https://demo.tomcedoz.com

@@ -1,5 +1,3 @@
-"""Retain a filer's creation request key to recover a lost response safely."""
-
 from contextlib import nullcontext
 
 import sqlalchemy as sa
@@ -13,8 +11,6 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # A concurrent index build commits the column additions first. Permit recovery
-    # after cancellation without requiring an operator to alter existing filing data.
     columns = {
         column["name"] for column in sa.inspect(op.get_bind()).get_columns("filing_envelopes")
     }

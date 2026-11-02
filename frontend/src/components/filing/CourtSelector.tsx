@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { listCourts, Court } from '../../api/courts';
+import { actionErrorMessage } from '../../api/client';
 import { listFavoriteCourts, addFavoriteCourt, removeFavoriteCourt } from '../../api/favorites';
 import LoadError from '../common/LoadError';
+import { courtTypeLabel } from '../../utils/courtTypes';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
+import { useToast } from '../common/Toast';
 
 interface Props {
   selectedCourtId: number | null;
@@ -22,18 +26,10 @@ const MICHIGAN_COUNTIES = [
   'St. Clair', 'St. Joseph', 'Tuscola', 'Van Buren', 'Washtenaw', 'Wayne', 'Wexford',
 ];
 
-const COURT_TYPE_LABEL: Record<string, string> = {
-  circuit: 'Circuit Court',
-  district: 'District Court',
-  probate: 'Probate Court',
-  court_of_claims: 'Court of Claims',
-  court_of_appeals: 'Court of Appeals',
-  supreme_court: 'Supreme Court',
-  municipal: 'Municipal Court',
-};
 const APPELLATE_TYPES = new Set(['court_of_claims', 'court_of_appeals', 'supreme_court']);
 
 function CourtSelector({ selectedCourtId, onSelect }: Props) {
+  const { pushToast } = useToast();
   const [trialCourts, setTrialCourts] = useState<Court[]>([]);
   const [statewideCourts, setStatewideCourts] = useState<Court[]>([]);
   const [search, setSearch] = useState('');
@@ -42,19 +38,23 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadFailure | null>(null);
+  const [statewideFailed, setStatewideFailed] = useState<LoadFailure | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const [favoritedCourtIds, setFavoritedCourtIds] = useState<Set<number>>(new Set());
+  const [favoritedCourtIds, setFavoritedCourtIds] = useState<Set<number>>(() => new Set());
   const [togglingFav, setTogglingFav] = useState<number | null>(null);
 
-  // Statewide/appellate forums (Court of Appeals, Supreme Court, Court of Claims) apply
-  // regardless of county -- load them once and always surface them in their own group so
-  // they are never buried under a county filter.
   useEffect(() => {
-    listCourts({ tier: 'appellate', page_size: 50 })
-      .then((r) => setStatewideCourts(r.courts))
-      .catch(() => setStatewideCourts([]));
-  }, []);
+    const controller = new AbortController();
+    listCourts({ tier: 'appellate', page_size: 50 }, controller.signal)
+      .then((r) => { setStatewideCourts(r.courts); setStatewideFailed(null); })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          setStatewideFailed(loadFailure(err, "We couldn't load the statewide and appellate courts. Please try again."));
+        }
+      });
+    return () => controller.abort();
+  }, [reloadKey]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -72,9 +72,9 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
         }, controller.signal);
         setTrialCourts(result.courts);
         setTotal(result.total);
-      } catch {
+      } catch (err) {
         if (controller.signal.aborted) return;
-        setError("We couldn't load the court list. Please try again.");
+        setError(loadFailure(err, "We couldn't load the court list. Please try again."));
         setTrialCourts([]);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -84,16 +84,21 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
   }, [countyFilter, typeFilter, search, reloadKey, page]);
 
   useEffect(() => {
+    let active = true;
     async function loadFavorites() {
       try {
         const data = await listFavoriteCourts();
-        setFavoritedCourtIds(new Set(data.favorites.map(f => f.court_id)));
-      } catch {
+        if (active) setFavoritedCourtIds(new Set(data.favorites.map(f => f.court_id)));
+      } catch (err) {
+        if (!active) return;
         setFavoritedCourtIds(new Set());
+        const message = actionErrorMessage(err, 'Could not load your favorite courts.');
+        if (message) pushToast(message, 'error');
       }
     }
     loadFavorites();
-  }, []);
+    return () => { active = false; };
+  }, [pushToast]);
 
   const toggleFavoriteCourt = async (courtId: number) => {
     setTogglingFav(courtId);
@@ -109,15 +114,14 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
         await addFavoriteCourt(courtId);
         setFavoritedCourtIds(prev => new Set(prev).add(courtId));
       }
-    } catch {
-      // ignore errors for demo
+    } catch (err) {
+      const message = actionErrorMessage(err, 'Could not update the favorite court. Please try again.');
+      if (message) pushToast(message, 'error');
     } finally {
       setTogglingFav(null);
     }
   };
 
-  // The statewide group is small; filter it client-side by search + type. County filter
-  // does NOT hide it (these courts have statewide jurisdiction).
   const q = search.trim().toLowerCase();
   const visibleStatewide = statewideCourts.filter((c) =>
     (!typeFilter || c.court_type === typeFilter) &&
@@ -134,41 +138,45 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
   const renderCard = (court: Court) => {
     const isFav = favoritedCourtIds.has(court.id);
     const isAppellate = APPELLATE_TYPES.has(court.court_type);
-    const typeLabel = COURT_TYPE_LABEL[court.court_type] || court.court_type;
+    const typeLabel = courtTypeLabel(court.court_type);
+    const detailsId = `court-card-${court.id}-details`;
+    const addressId = `court-card-${court.id}-address`;
     return (
-      <div
-        key={court.id}
-        className={`court-card ${selectedCourtId === court.id ? 'selected' : ''}`}
-        role="button"
-        tabIndex={0}
-        onClick={() => onSelect(court.id, court.name)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(court.id, court.name); }
-        }}
-      >
+      <div key={court.id} className={`court-card ${selectedCourtId === court.id ? 'selected' : ''}`}>
         <div className="court-card-head">
-          <h4>{court.name}</h4>
-          <button
-              className={`fav-star ${isFav ? 'active' : ''}`}
-              onClick={(e) => { e.stopPropagation(); toggleFavoriteCourt(court.id); }}
-              disabled={togglingFav === court.id}
-              title={isFav ? 'Remove from favorites' : 'Add to favorites'}
-              aria-label={isFav ? 'Remove court from favorites' : 'Add court to favorites'}
+          <h4>
+            <button
+              type="button"
+              className="court-card-select"
+              onClick={() => onSelect(court.id, court.name)}
+              aria-pressed={selectedCourtId === court.id}
+              aria-describedby={court.address ? `${detailsId} ${addressId}` : detailsId}
             >
-              {isFav ? '★' : '☆'}
+              {court.name}
+            </button>
+          </h4>
+          <button
+            type="button"
+            className={`fav-star ${isFav ? 'active' : ''}`}
+            onClick={() => toggleFavoriteCourt(court.id)}
+            disabled={togglingFav !== null}
+            title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+            aria-label={isFav ? `Remove ${court.name} from favorites` : `Add ${court.name} to favorites`}
+          >
+            {isFav ? '★' : '☆'}
           </button>
         </div>
-        <p>
+        <p id={detailsId}>
           {isAppellate ? 'Statewide jurisdiction' : `${court.county} County`} &middot; {typeLabel}
         </p>
-        {court.address && <p className="court-address">{court.address}</p>}
+        {court.address && <p id={addressId} className="court-address">{court.address}</p>}
       </div>
     );
   };
 
   return (
     <div className="form-section">
-      <h3>Select Court</h3>
+      <h2>Select a court</h2>
       <p className="info-text">
         Search by court name, or browse by county. Statewide and appellate courts (Court of Appeals,
         Supreme Court, Court of Claims) are listed in their own group below.
@@ -189,16 +197,16 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
         <div className="form-group">
           <label htmlFor="county">County</label>
           <select id="county" value={countyFilter} onChange={(e) => { setCountyFilter(e.target.value); setPage(1); }}>
-            <option value="">All Counties</option>
+            <option value="">All counties</option>
             {MICHIGAN_COUNTIES.map((county) => (
               <option key={county} value={county}>{county}</option>
             ))}
           </select>
         </div>
         <div className="form-group">
-          <label htmlFor="courtType">Court Type</label>
+          <label htmlFor="courtType">Court type</label>
           <select id="courtType" value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}>
-            <option value="">All Types</option>
+            <option value="">All types</option>
             <option value="circuit">Circuit Court</option>
             <option value="district">District Court</option>
             <option value="probate">Probate Court</option>
@@ -209,18 +217,19 @@ function CourtSelector({ selectedCourtId, onSelect }: Props) {
         </div>
       </div>
 
-      {error ? (
-        <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />
+      {error || statewideFailed ? (
+        <LoadError failure={(error || statewideFailed)!}
+          onRetry={() => setReloadKey((k) => k + 1)} />
       ) : (
         <>
           {visibleStatewide.length > 0 && (
             <div className="court-group">
-              <h4 className="court-group-title">Statewide &amp; Appellate Courts</h4>
+              <h3 className="court-group-title">Statewide &amp; appellate courts</h3>
               <div className="court-list">{sortByFav(visibleStatewide).map(renderCard)}</div>
             </div>
           )}
           <div className="court-group">
-            <h4 className="court-group-title">Trial Courts</h4>
+            <h3 className="court-group-title">Trial courts</h3>
             {loading && <p>Loading courts…</p>}
             <div className="court-list">
               {sortByFav(trialCourts).map(renderCard)}

@@ -2,112 +2,72 @@ import { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { CourtContext } from '../auth/CourtSession';
-import {
-  filingDraftKey, loadFilingDraft, saveFilingDraft, clearFilingDraft, loadLegacyFilingDraft,
-  type FilingDraft,
-} from '../../utils/filingDraft';
+import { filingDraftKey, saveFilingDraft, clearFilingDraft, loadLegacyFilingDraft } from '../../utils/filingDraft';
 import CourtSelector from './CourtSelector';
 import CaseSelector, { CaseResult } from './CaseSelector';
 import CaseTypeSelector from './CaseTypeSelector';
 import DocumentUpload from './DocumentUpload';
 import FilingReview from './FilingReview';
+import WizardStepper from './WizardStepper';
+import DraftConflict from './DraftConflict';
+import DetailsStep from './DetailsStep';
+import { defaultFilingData, useFilingDraft, type FilingData } from './useFilingDraft';
+import { useWizardSteps } from './useWizardSteps';
 import { emitToast } from '../../utils/toastBus';
-import { getErrorDetail } from '../../utils/errors';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
+import { filingStatusLabel } from '../../utils/filingStatus';
 import { createFiling, getFiling, updateFiling, type FilingEnvelope } from '../../api/filings';
-import LoadError from '../common/LoadError';
+import { actionErrorMessage } from '../../api/client';
+import { getCase, type CaseDocket } from '../../api/cases';
 import { getCourt, getCaseTypes } from '../../api/courts';
-import { getDemoRole } from '../auth/LoginScreen';
 import {
+  hasPlainLanguagePreference,
   isPlainLanguageMode,
   setPlainLanguageMode,
-  stepLabel,
 } from '../../utils/srlMode';
+import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
+import PageLoadError from '../common/PageLoadError';
 
-type WizardStep = 'court' | 'case' | 'case-type' | 'details' | 'documents' | 'review';
-
-interface FilingData extends FilingDraft {
-  documents: Array<{ id: number; title: string; type: string; size: number; isSearchable: boolean }>;
-  paymentComplete: boolean;
-}
-
-// Steps adapt to the filing: a new case adds Case Type + Case Details; filing into an
-// existing case skips Case Type (it's known from the case).
-function buildSteps(filingType: string): { key: WizardStep; label: string }[] {
-  const isNewCase = filingType === 'initial';
-  return [
-    { key: 'court', label: 'Select Court' },
-    { key: 'case', label: 'Case' },
-    ...(isNewCase
-      ? [{ key: 'case-type' as WizardStep, label: 'Case Type & Rules' }]
-      : []),
-    { key: 'details', label: isNewCase ? 'Case Details' : 'Filing Details' },
-    { key: 'documents', label: 'Documents' },
-    { key: 'review', label: 'Review & Submit' },
-  ];
-}
-
-const defaultFilingData: FilingData = {
-  courtId: null,
-  courtName: '',
-  caseId: null,
-  filingType: 'initial',
-  caseTypeId: null,
-  caseTypeName: '',
-  caseTitle: '',
-  filingDescription: '',
-  filingId: null,
-  detailsToken: null,
-  documents: [],
-  paymentComplete: false,
-  caseChoiceMade: false,
-};
+const CASE_LOOKUP_FAILED = "We couldn't load the court's record for this case, so its title is missing.";
 
 function FilingWizard() {
-  const { userId, loading, error, refresh } = useContext(CourtContext)!;
+  const { userId, role, loading, error, refresh } = useContext(CourtContext)!;
   if (loading) return <p role="status">Loading your filing workspace…</p>;
-  if (!userId) return <LoadError message={error || 'Could not verify your account.'} onRetry={refresh} />;
-  return <FilingForm key={userId} userId={userId} />;
+  if (!userId) {
+    return <FilingWorkspaceUnavailable failure={error ?? { message: 'Could not verify your account.', retry: true }} onRetry={refresh} />;
+  }
+  return <FilingForm key={userId} userId={userId} role={role} />;
 }
 
-function FilingForm({ userId }: { userId: number }) {
+function FilingWorkspaceUnavailable({ failure, onRetry }: { failure: LoadFailure; onRetry: () => void }) {
+  usePageTitle('Filing workspace not loaded');
+  return <PageLoadError heading="Filing workspace not loaded" failure={failure} onRetry={onRetry} />;
+}
+
+function FilingForm({ userId, role }: { userId: number; role: string | null }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedFilingId = searchParams.get('filing_id');
-  const draftKey = filingDraftKey(userId, requestedFilingId || `new:${searchParams.toString()}`);
-  const [draft] = useState(() => loadFilingDraft(draftKey));
-  const [filingData, setFilingData] = useState<FilingData>(() => {
-    if (draft || requestedFilingId) return { ...defaultFilingData, ...draft };
-    const courtId = searchParams.get('court_id');
-    if (!courtId) return defaultFilingData;
-    const caseId = searchParams.get('case_id');
-    const caseTypeId = searchParams.get('case_type_id');
-    if (!caseId || !caseTypeId) return { ...defaultFilingData, courtId: Number(courtId) };
-    const serviceOnly = searchParams.get('service_only') === 'true';
-    return {
-      ...defaultFilingData,
-      courtId: Number(courtId),
-      caseId: Number(caseId),
-      caseTypeId: Number(caseTypeId),
-      caseTitle: searchParams.get('case_title') || '',
-      filingType: serviceOnly ? 'service_only' : 'subsequent',
-      caseChoiceMade: true,
-    };
-  });
-  const [currentStep, setCurrentStep] = useState<WizardStep>(() =>
-    draft?.creationKey ? 'details' : draft ? 'court' : filingData.caseId ? 'details' : filingData.courtId ? 'case' : 'court'
-  );
-  const [showDraftBanner, setShowDraftBanner] = useState(!!draft);
-  const [saving, setSaving] = useState(false);
   const [loadedFiling, setLoadedFiling] = useState<FilingEnvelope | null>(null);
   const readOnly = loadedFiling !== null && !['draft', 'returned'].includes(loadedFiling.status);
   const [loadingExisting, setLoadingExisting] = useState(Boolean(requestedFilingId));
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+  const [loadError, setLoadError] = useState<LoadFailure | null>(null);
   const [submission, setSubmission] = useState<FilingEnvelope>();
-  const [errors, setErrors] = useState<string[]>([]);
+  const {
+    draftKey, draft, filingData, setFilingData, dirty, recoveryAvailable, setRecoveryAvailable,
+  } = useFilingDraft(userId, searchParams, {
+    loadedFiling, submission, paused: loadingExisting || Boolean(loadError) || readOnly || Boolean(submission),
+  });
+  const [showDraftBanner, setShowDraftBanner] = useState(!!draft);
+  const [saving, setSaving] = useState(false);
+  usePageTitle(loadError ? `Filing #${requestedFilingId} not loaded` : requestedFilingId ? `Filing #${requestedFilingId}`
+    : filingData.filingType !== 'initial' ? 'File in an existing case' : 'New filing');
+  const [reloadKey, setReloadKey] = useState(0);
+  const [saveError, setSaveError] = useState('');
+  const saveErrorBox = useRef<HTMLDivElement>(null);
   const conflictHeading = useRef<HTMLHeadingElement>(null);
   const [conflict, setConflict] = useState<FilingEnvelope | null>(null);
   const [saveNotice, setSaveNotice] = useState('');
-  const [recoveryAvailable, setRecoveryAvailable] = useState(true);
   const [creationConflictId, setCreationConflictId] = useState<number | null>(null);
   const destinationLocked = filingData.filingId !== null || Boolean(filingData.creationKey);
   const mounted = useRef(true);
@@ -115,29 +75,32 @@ function FilingForm({ userId }: { userId: number }) {
     mounted.current = true;
     return () => { mounted.current = false; };
   }, []);
-  const dirty = !submission && (filingData.filingId
-    ? loadedFiling !== null && (filingData.caseTitle !== (loadedFiling.case_title ?? '')
-      || filingData.filingDescription !== (loadedFiling.filing_description ?? ''))
-    : filingData.courtId !== null);
-  const handleFeesChange = useCallback((filing: FilingEnvelope, obligationMet: boolean) => {
-    setFilingData(prev => ({ ...prev, paymentComplete: obligationMet,
+  const handleFeesChange = useCallback((filing: FilingEnvelope) => {
+    setFilingData(prev => ({ ...prev,
       detailsToken: prev.caseTitle === (filing.case_title ?? '')
         && prev.filingDescription === (filing.filing_description ?? '')
         ? filing.details_token : prev.detailsToken,
       documents: filing.documents.map(doc => ({ id: doc.id, title: doc.title,
         type: doc.document_type_code, size: doc.file_size_bytes, isSearchable: doc.is_text_searchable })),
     }));
-  }, []);
-  const isMotionMode = filingData.filingType !== 'initial';
-  const [plainLanguage, setPlainLanguage] = useState(() => {
-    if (getDemoRole() === 'srl') {
-      if (!isPlainLanguageMode()) setPlainLanguageMode(true);
-      return true;
-    }
-    return isPlainLanguageMode();
-  });
+  }, [setFilingData]);
+  const existingCase = filingData.filingType !== 'initial';
+  const [plainLanguage, setPlainLanguage] = useState(() =>
+    (role === 'srl' && !hasPlainLanguagePreference()) || isPlainLanguageMode());
+  useEffect(() => {
+    if (role === 'srl' && !hasPlainLanguagePreference()) setPlainLanguageMode(true);
+  }, [role]);
+  const captionMissing = existingCase && !filingData.caseTitle.trim();
+  const {
+    currentStep, setCurrentStep, errors, setErrors, steps, currentStepIndex, detailsStepIndex, goNext, goBack, goToStep,
+  } = useWizardSteps({ draft, filingData, plainLanguage, destinationLocked, captionMissing, saveDetails });
+  const [saveErrorStep, setSaveErrorStep] = useState(currentStep);
+  if (saveErrorStep !== currentStep) {
+    setSaveErrorStep(currentStep);
+    setSaveError('');
+  }
+  const [caseLookupError, setCaseLookupError] = useState<LoadFailure | null>(null);
 
-  // Load the saved envelope, or resolve display labels for a new filing's URL prefill.
   useEffect(() => {
     const filingId = requestedFilingId;
     if (filingId) {
@@ -147,9 +110,14 @@ function FilingForm({ userId }: { userId: number }) {
         setLoadError(null);
         try {
           const envelope = await getFiling(Number(filingId), controller.signal);
-          const [court, types] = await Promise.all([
+          const [court, types, linkedCase] = await Promise.all([
             getCourt(envelope.court_id),
-            getCaseTypes(envelope.court_id, true), // Preserve disabled case-type labels on saved records.
+            getCaseTypes(envelope.court_id, true),
+            envelope.case_id ? getCase(envelope.case_id).catch((err: unknown) => {
+              const message = !controller.signal.aborted && actionErrorMessage(err, 'Could not load the case number.');
+              if (message) emitToast(message, 'error');
+              return null;
+            }) : null,
           ]);
           if (controller.signal.aborted) return;
           const caseType = types.find((type) => type.id === envelope.case_type_id);
@@ -169,15 +137,13 @@ function FilingForm({ userId }: { userId: number }) {
             courtId: envelope.court_id,
             courtName: court.name,
             caseId: envelope.case_id,
+            caseNumber: linkedCase?.case_number ?? '',
             caseTypeId: envelope.case_type_id,
             caseTypeName: caseType?.name || '',
             filingType,
             caseTitle: recoveredDraft?.caseTitle ?? envelope.case_title ?? '',
             filingDescription: recoveredDraft?.filingDescription ?? envelope.filing_description ?? '',
             caseChoiceMade: true,
-            paymentComplete: (envelope.fee_waiver_requested && envelope.fee_waiver_granted === null)
-              || envelope.fee_waiver_amount_due_cents === 0
-              || envelope.fee_waiver_granted === true,
             documents: envelope.documents.map((doc) => ({
               id: doc.id, title: doc.title, type: doc.document_type_code,
               size: doc.file_size_bytes, isSearchable: doc.is_text_searchable,
@@ -187,7 +153,7 @@ function FilingForm({ userId }: { userId: number }) {
           setShowDraftBanner(recoveredDraft !== null);
         } catch (err) {
           if (!controller.signal.aborted) {
-            setLoadError(getErrorDetail(err) || 'Could not load this filing. Please retry.');
+            setLoadError(loadFailure(err, 'Could not load this filing. Please retry.'));
           }
         } finally {
           if (!controller.signal.aborted) setLoadingExisting(false);
@@ -199,56 +165,52 @@ function FilingForm({ userId }: { userId: number }) {
     const courtId = searchParams.get('court_id');
     if (!courtId) return;
     const caseTypeId = searchParams.get('case_type_id');
+    const caseId = searchParams.get('case_id');
     let active = true;
+    const report = (err: unknown, fallback: string) => {
+      const message = active && actionErrorMessage(err, fallback);
+      if (message) emitToast(message, 'error');
+    };
+    type CaseLookup = { docket: CaseDocket | null; failure?: LoadFailure };
     Promise.all([
-      getCourt(Number(courtId)).catch(() => ({ name: `Court #${courtId}` })),
-      caseTypeId ? getCaseTypes(Number(courtId)).catch(() => []) : Promise.resolve([]),
-    ]).then(([court, types]) => {
-      if (active) setFilingData(prev => prev.courtId !== Number(courtId) ? prev : {
+      getCourt(Number(courtId)).catch((err: unknown) => {
+        report(err, "Could not load the court's name.");
+        return { name: `Court #${courtId}` };
+      }),
+      caseTypeId ? getCaseTypes(Number(courtId), true).catch((err: unknown) => {
+        report(err, 'Could not load the case type name.');
+        return [];
+      }) : Promise.resolve([]),
+      caseId
+        ? getCase(Number(caseId)).then(
+          (docket): CaseLookup => ({ docket }),
+          (err: unknown): CaseLookup => ({ docket: null, failure: loadFailure(err, CASE_LOOKUP_FAILED) }))
+        : Promise.resolve<CaseLookup>({ docket: null }),
+    ]).then(([court, types, { docket, failure }]) => {
+      if (!active) return;
+      setFilingData(prev => prev.courtId !== Number(courtId) ? prev : {
         ...prev,
         courtName: court.name,
         caseTypeName: types.find(t => t.id === prev.caseTypeId)?.name || prev.caseTypeName,
+        caseTitle: docket && prev.caseId === docket.id ? docket.title : prev.caseTitle,
+        caseNumber: docket && prev.caseId === docket.id ? docket.case_number : prev.caseNumber,
       });
+      setCaseLookupError(failure ?? null);
     });
     return () => { active = false; };
-  }, [searchParams, requestedFilingId, draft, reloadKey, userId]);
-
-  const steps = buildSteps(filingData.filingType).map((s) => ({
-    ...s,
-    label: plainLanguage ? stepLabel(s.key, s.label) : s.label,
-  }));
-  const currentStepIndex = steps.findIndex((s) => s.key === currentStep);
-  const detailsStepIndex = steps.findIndex((s) => s.key === 'details');
+  }, [searchParams, requestedFilingId, draft, reloadKey, userId, setFilingData, setCurrentStep]);
 
   const updateData = (updates: Partial<FilingData>) => {
     setSaveNotice('');
+    setErrors([]);
     setFilingData((prev) => ({ ...prev, ...updates }));
   };
-
-  useEffect(() => {
-    if (loadingExisting || loadError || readOnly || submission) return;
-    if (dirty) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- expose whether external recovery storage accepted the current edit
-      setRecoveryAvailable(saveFilingDraft(draftKey, filingData));
-    } else {
-      clearFilingDraft(draftKey);
-    }
-  }, [draftKey, filingData, dirty, loadingExisting, loadError, readOnly, submission]);
-
-  useEffect(() => {
-    if (!dirty) return;
-    const warnBeforeClose = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', warnBeforeClose);
-    return () => window.removeEventListener('beforeunload', warnBeforeClose);
-  }, [dirty]);
 
   async function saveDetails(advance = false): Promise<boolean> {
     if (conflict || !filingData.caseTitle.trim()) return false;
     setSaving(true);
     setErrors([]);
+    setSaveError('');
     setSaveNotice('');
     try {
       let creationKey = filingData.creationKey;
@@ -256,7 +218,6 @@ function FilingForm({ userId }: { userId: number }) {
         creationKey ??= crypto.randomUUID();
         const pending = { ...filingData, creationKey };
         setFilingData(pending);
-        // Persist before sending: a response can be lost even when the server commits.
         setRecoveryAvailable(saveFilingDraft(draftKey, pending));
       }
       const filing = filingData.filingId
@@ -269,21 +230,20 @@ function FilingForm({ userId }: { userId: number }) {
           case_type_id: filingData.caseTypeId!, filing_type: filingData.filingType,
           case_title: filingData.caseTitle, filing_description: filingData.filingDescription,
         }, creationKey!);
-      // Leaving the workspace must not clear recovery or navigate a different account.
       if (!mounted.current) return false;
       setLoadedFiling(filing);
       setFilingData(previous => ({ ...previous, filingId: filing.id, detailsToken: filing.details_token }));
       clearFilingDraft(draftKey, filing.id);
       setShowDraftBanner(false);
-      setSaveNotice('Draft saved to your account. You can continue it from My Filings.');
+      setSaveNotice('Draft saved to your account. You can continue it from My filings.');
       if (!filingData.filingId) {
-        emitToast('Draft saved to your account. Continue it from My Filings.', 'success');
+        emitToast('Draft saved to your account. Continue it from My filings.', 'success');
         setSearchParams({ filing_id: String(filing.id), step: advance ? 'documents' : 'details' }, { replace: true });
       }
       return true;
     } catch (err) {
       if (!mounted.current) return false;
-      setErrors([getErrorDetail(err) || 'Could not save your filing. Your edits are still here.']);
+      setSaveError(errorMessage(err, 'Could not save your filing. Your edits are still here.'));
       if (!filingData.filingId && isAxiosError(err) && err.response?.status === 409) {
         const existingId: unknown = err.response.data?.filing_id;
         if (typeof existingId === 'number' && Number.isSafeInteger(existingId) && existingId > 0) {
@@ -300,9 +260,9 @@ function FilingForm({ userId }: { userId: number }) {
       if (filingData.filingId && isAxiosError(err) && err.response?.status === 409) {
         try {
           const latest = await getFiling(filingData.filingId);
-          if (mounted.current) { setConflict(latest); setErrors([]); }
+          if (mounted.current) { setConflict(latest); setSaveError(''); }
         }
-        catch { /* Keep the edits and original precondition if comparison cannot load. */ }
+        catch {}
       }
       return false;
     } finally { if (mounted.current) setSaving(false); }
@@ -321,77 +281,10 @@ function FilingForm({ userId }: { userId: number }) {
     setSaveNotice(keepEdits ? 'Your edits are ready. Save draft or Continue to save them to your account.' : 'Showing the saved details.');
   }
 
-  const canProceed = (): boolean => {
-    switch (currentStep) {
-      case 'court':
-        return filingData.courtId !== null;
-      case 'case':
-        return filingData.caseChoiceMade;
-      case 'case-type':
-        return filingData.caseTypeId !== null;
-      case 'details':
-        return filingData.caseTitle.trim().length > 0;
-      case 'documents':
-        return filingData.documents.length > 0;
-      default:
-        return true;
-    }
-  };
-
-  const goNext = async () => {
+  const retryCaseLookup = () => {
+    setCaseLookupError(null);
     setErrors([]);
-    if (!canProceed()) {
-      setErrors([getStepError()]);
-      return;
-    }
-
-    if (currentStep === 'details' && !await saveDetails(true)) return;
-
-    if (currentStepIndex < steps.length - 1) {
-      setCurrentStep(steps[currentStepIndex + 1].key);
-      window.scrollTo(0, 0);
-      document.getElementById('main-content')?.focus();
-    }
-  };
-
-  const goBack = () => {
-    setErrors([]);
-    if (currentStepIndex > 0) {
-      setCurrentStep(steps[currentStepIndex - 1].key);
-      window.scrollTo(0, 0);
-      document.getElementById('main-content')?.focus();
-    }
-  };
-
-  const goToStep = (step: WizardStep) => {
-    const targetIndex = steps.findIndex((s) => s.key === step);
-    if (destinationLocked && targetIndex < detailsStepIndex) return;
-    // Only allow going back to completed steps
-    if (targetIndex <= currentStepIndex) {
-      setCurrentStep(step);
-      setErrors([]);
-    }
-  };
-
-  const getStepError = (): string => {
-    if (plainLanguage) {
-      switch (currentStep) {
-        case 'court': return 'Choose the court where you want to file.';
-        case 'case': return 'Pick an existing case or start a new one.';
-        case 'case-type': return 'Select what kind of case this is.';
-        case 'details': return 'Add a short title describing your filing.';
-        case 'documents': return 'Upload at least one PDF or document.';
-        default: return 'Finish this step to continue.';
-      }
-    }
-    switch (currentStep) {
-      case 'court': return 'Please select a court to continue.';
-      case 'case': return 'Please choose an existing case or start a new case.';
-      case 'case-type': return 'Please select a case type to continue.';
-      case 'details': return 'Please enter a case title to continue.';
-      case 'documents': return 'Please upload at least one document to continue.';
-      default: return 'Please complete this step to continue.';
-    }
+    setReloadKey((key) => key + 1);
   };
 
   const handleDiscardDraft = () => {
@@ -402,6 +295,7 @@ function FilingForm({ userId }: { userId: number }) {
       setShowDraftBanner(false);
       setConflict(null);
       setErrors([]);
+      setSaveError('');
       return;
     }
     clearFilingDraft(draftKey, filingData.filingId ?? undefined);
@@ -410,6 +304,7 @@ function FilingForm({ userId }: { userId: number }) {
     setShowDraftBanner(false);
     setCurrentStep('court');
     setErrors([]);
+    setSaveError('');
     setSaving(false);
     setConflict(null);
     setSaveNotice('');
@@ -417,31 +312,23 @@ function FilingForm({ userId }: { userId: number }) {
   };
 
   useEffect(() => { conflictHeading.current?.focus(); }, [conflict]);
+  useEffect(() => { if (saveError) saveErrorBox.current?.focus(); }, [saveError]);
 
-  const conflictView = conflict && <section className="review-card draft-conflict" aria-labelledby="draft-conflict-heading">
-        <h3 id="draft-conflict-heading" ref={conflictHeading} tabIndex={-1}>Compare changes before saving</h3>
-        <p>Your changes are still here. Compare them with the saved details before continuing.</p>
-        <div className="draft-comparison">
-          <div><h4>Your edits</h4><strong>{filingData.caseTitle || '(No title)'}</strong><p>{filingData.filingDescription || '(No description)'}</p></div>
-          <div><h4>Saved to your account</h4><strong>{conflict.case_title || '(No title)'}</strong><p>{conflict.filing_description || '(No description)'}</p></div>
-        </div>
-        <div className="draft-actions">
-          <button className="btn btn-secondary" onClick={() => resolveConflict(false)}>Use saved details</button>
-          {['draft', 'returned'].includes(conflict.status)
-            ? <button className="btn btn-primary" onClick={() => resolveConflict(true)}>Keep my edits for next save</button>
-            : <Link to={`/filings/${conflict.id}/history`}>This filing is {conflict.status.replace('_', ' ')}. Open its history.</Link>}
-        </div>
-      </section>;
+  const conflictView = conflict && <DraftConflict conflict={conflict} edits={filingData}
+    headingRef={conflictHeading} onResolve={resolveConflict} />;
 
   if (loadingExisting) return <p className="loading" role="status">Loading filing...</p>;
-  if (loadError) return <LoadError message={loadError} onRetry={() => setReloadKey((key) => key + 1)} />;
+  if (loadError) {
+    return <PageLoadError heading={`Filing #${requestedFilingId} not loaded`} failure={loadError}
+      onRetry={() => setReloadKey((key) => key + 1)} />;
+  }
   if (readOnly) {
     return (
       <div className="filing-wizard">
-        <Link to="/filings">Back to My Filings</Link>
-        <h2>Filing #{loadedFiling.id}</h2>
+        <Link to="/filings">Back to My filings</Link>
+        <PageHeading>Filing #{loadedFiling.id}</PageHeading>
         {conflictView}
-        <p>Status: <span className={`status-badge ${loadedFiling.status}`}>{loadedFiling.status.replace('_', ' ')}</span></p>
+        <p>Status: <span className={`status-badge ${loadedFiling.status}`}>{filingStatusLabel(loadedFiling.status)}</span></p>
         {loadedFiling.rejection_reason && <p role="note">Clerk note: {loadedFiling.rejection_reason}</p>}
         <FilingReview filingId={loadedFiling.id} courtName={filingData.courtName} caseTypeName={filingData.caseTypeName} readOnly />
       </div>
@@ -451,46 +338,40 @@ function FilingForm({ userId }: { userId: number }) {
   return (
     <div className="filing-wizard">
       <div className="wizard-header">
-        <h2>
-          {loadedFiling ? `Continue Filing #${loadedFiling.id}` : isMotionMode
-            ? plainLanguage
-              ? 'File papers in an existing case'
-              : 'File a Motion'
-            : plainLanguage
-              ? 'Start a new court filing'
-              : 'New E-Filing'}
-        </h2>
-        <div className="wizard-header-badges">
-          <label className="srl-plain-toggle">
-            <input
-              type="checkbox"
-              checked={plainLanguage}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                setPlainLanguage(e.target.checked);
-                setPlainLanguageMode(e.target.checked);
-              }}
-            />
-            Plain-language guidance
-          </label>
-          {isMotionMode && filingData.caseId && (
-            <span className="motion-badge">Motion to Case #{filingData.caseId}</span>
-          )}
-          {filingData.filingId && (
-            <span className="filing-id-badge">Filing #{filingData.filingId}</span>
-          )}
+        <div>
+          <PageHeading>
+            {loadedFiling ? `Continue filing #${loadedFiling.id}` : existingCase
+              ? plainLanguage
+                ? 'File papers in an existing case'
+                : 'File in an existing case'
+              : plainLanguage
+                ? 'Start a new court filing'
+                : 'New filing'}
+          </PageHeading>
+          {filingData.caseNumber && <p className="wizard-case-number">Case {filingData.caseNumber}</p>}
         </div>
+        <label className="srl-plain-toggle">
+          <input
+            type="checkbox"
+            checked={plainLanguage}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              setPlainLanguage(e.target.checked);
+              setPlainLanguageMode(e.target.checked);
+            }}
+          />
+          Plain-language guidance
+        </label>
       </div>
 
-      {/* Draft Recovery Banner */}
       {showDraftBanner && !conflict && (
         <div className="draft-banner">
           <span>Recovered unsaved edits from this tab. Save them to your account before closing the tab.</span>
           <div className="draft-actions">
             <button className="btn btn-primary btn-small" onClick={() => setShowDraftBanner(false)}>
-              Continue Editing
+              Continue editing
             </button>
             <button className="btn btn-secondary btn-small" disabled={saving} onClick={handleDiscardDraft}>
-              {loadedFiling ? 'Use Saved Details' : filingData.creationKey ? 'Start a separate filing' : 'Start Fresh'}
+              {loadedFiling ? 'Use saved details' : filingData.creationKey ? 'Start a separate filing' : 'Start fresh'}
             </button>
           </div>
         </div>
@@ -500,7 +381,7 @@ function FilingForm({ userId }: { userId: number }) {
       {filingData.creationKey && !filingData.filingId && <p role="note">
         If the earlier save succeeded, retrying will reopen that filing.
       </p>}
-      {dirty && !conflict && <p role="status">Unsaved changes. Use Save draft or Continue to save them to your account.</p>}
+      {dirty && !conflict && currentStep === 'details' && <p>Unsaved changes. Use Save draft or Continue to save them to your account.</p>}
       {!recoveryAvailable && dirty && <p className="alert alert-warning" role="alert">
         This browser could not keep a recovery copy. Keep this page open and save your draft.
       </p>}
@@ -516,32 +397,14 @@ function FilingForm({ userId }: { userId: number }) {
         </div>
       )}
 
-      {/* Step Progress Bar - clickable for completed steps */}
-      <nav className="wizard-steps" aria-label="Filing progress">
-        {steps.map((step, index) => (
-          <button
-            key={step.key}
-            type="button"
-            className={`wizard-step ${
-              index === currentStepIndex
-                ? 'active'
-                : index < currentStepIndex
-                ? 'completed'
-                : 'upcoming'
-            }`}
-            onClick={() => goToStep(step.key)}
-            disabled={Boolean(submission) || Boolean(conflict) || saving || index > currentStepIndex || (destinationLocked && index < detailsStepIndex)}
-            aria-current={index === currentStepIndex ? 'step' : undefined}
-          >
-            <span className="step-number">
-              {index < currentStepIndex ? '\u2713' : index + 1}
-            </span>
-            <span className="step-label">{step.label}</span>
-          </button>
-        ))}
-      </nav>
+      <WizardStepper
+        steps={steps}
+        currentIndex={currentStepIndex}
+        locked={Boolean(submission) || Boolean(conflict) || saving}
+        earliestIndex={destinationLocked ? detailsStepIndex : 0}
+        onSelect={goToStep}
+      />
 
-      {/* Filing Summary Sidebar */}
       {filingData.courtId && currentStep !== 'review' && (
         <div className="filing-summary-bar">
           <span><strong>Court:</strong> {filingData.courtName}</span>
@@ -551,28 +414,27 @@ function FilingForm({ userId }: { userId: number }) {
           {filingData.caseTitle && (
             <span><strong>Case:</strong> {filingData.caseTitle}</span>
           )}
-          <span><strong>Docs:</strong> {filingData.documents.length}</span>
+          <span><strong>Documents:</strong> {filingData.documents.length}</span>
         </div>
       )}
 
-      {/* Validation Errors */}
-      {errors.length > 0 && (
-        <div className="alert alert-error" role="alert">
+      {(errors.length > 0 || saveError) && (
+        <div className="alert alert-error" role="alert" ref={saveErrorBox} tabIndex={-1}>
           {errors.map((e, i) => <p key={i}>{e}</p>)}
+          {saveError && <p>{saveError}</p>}
         </div>
       )}
 
-      {/* Step Content */}
       <div className="wizard-content">
         {currentStep === 'court' && (
           <CourtSelector
             selectedCourtId={filingData.courtId}
             onSelect={(courtId, courtName) => {
-              // Changing court invalidates any case picked in another court.
+              if (courtId === filingData.courtId) return;
               updateData({
                 courtId, courtName,
                 caseTypeId: null, caseTypeName: '',
-                caseId: null, caseTitle: '', caseChoiceMade: false, filingType: 'initial',
+                caseId: null, caseNumber: '', caseTitle: '', caseChoiceMade: false, filingType: 'initial',
               });
             }}
           />
@@ -584,9 +446,14 @@ function FilingForm({ userId }: { userId: number }) {
             courtName={filingData.courtName}
             selectedCaseId={filingData.caseId}
             isNewChosen={filingData.caseChoiceMade && filingData.caseId === null}
+            onChooseExisting={() => {
+              if (filingData.caseId !== null) return;
+              updateData({ caseChoiceMade: false, caseTypeId: null, caseTypeName: '', caseTitle: '' });
+            }}
             onSelectExisting={(c: CaseResult, caseTypeName: string) => {
               updateData({
                 caseId: c.id,
+                caseNumber: c.case_number,
                 caseTypeId: c.case_type_id,
                 caseTypeName,
                 caseTitle: c.title,
@@ -597,6 +464,7 @@ function FilingForm({ userId }: { userId: number }) {
             onSelectNew={() => {
               updateData({
                 caseId: null,
+                caseNumber: '',
                 caseTitle: '',
                 caseTypeId: null,
                 caseTypeName: '',
@@ -618,108 +486,26 @@ function FilingForm({ userId }: { userId: number }) {
         )}
 
         {currentStep === 'details' && (
-          <div className="form-section">
-            <h3>{isMotionMode ? 'Motion Details' : 'Case Details'}</h3>
-
-            {isMotionMode && filingData.caseTitle && (
-              <div className="motion-case-info">
-                <strong>Filing motion to:</strong> {filingData.caseTitle}
-              </div>
-            )}
-
-            {/* Filing type selector - shown when filing to existing case */}
-            {isMotionMode && (
-              <div className="form-group">
-                <label htmlFor="filingType">Filing Type <span className="required-marker">*</span></label>
-                <div className="filing-type-options">
-                  <label className={`filing-type-option ${filingData.filingType === 'subsequent' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="filingType"
-                      value="subsequent"
-                      checked={filingData.filingType === 'subsequent'}
-                      disabled={destinationLocked || saving}
-                      onChange={() => updateData({ filingType: 'subsequent', paymentComplete: false })}
-                    />
-                    <div>
-                      <strong>File with Court</strong>
-                      <span>Document is filed with the court and reviewed by the clerk. Appears on the docket.</span>
-                    </div>
-                  </label>
-                  <label className={`filing-type-option ${filingData.filingType === 'service_only' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="filingType"
-                      value="service_only"
-                      checked={filingData.filingType === 'service_only'}
-                      disabled={destinationLocked || saving}
-                      onChange={() => updateData({ filingType: 'service_only' })}
-                    />
-                    <div>
-                      <strong>Service Only (No Court Filing)</strong>
-                      <span>Record documents for service outside this app. No court filing, clerk review, or filing fee. This app does not deliver documents to other parties.</span>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            )}
-
-            <p className="info-text">
-              {filingData.filingType === 'service_only'
-                ? 'Describe the documents you are recording. You must arrange delivery to the other parties outside this app.'
-                : isMotionMode
-                ? 'Describe your motion. The case title is pre-filled from the existing case.'
-                : <>Enter the case information. Fields marked with <span className="required-marker">*</span> are required.</>
-              }
-            </p>
-            <div className="form-group">
-              <label htmlFor="caseTitle">
-                Case Title <span className="required-marker">*</span>
-              </label>
-              <input
-                id="caseTitle"
-                disabled={saving}
-                type="text"
-                value={filingData.caseTitle}
-                onChange={(e) => updateData({ caseTitle: e.target.value })}
-                placeholder="e.g., Smith v. Jones"
-                aria-required="true"
-                readOnly={isMotionMode}
-                autoFocus={!isMotionMode}
-              />
-              {!isMotionMode && (
-                <span className="field-hint">
-                  Format: Plaintiff name v. Defendant name (e.g., &quot;Smith v. Jones&quot;)
-                </span>
-              )}
-            </div>
-            <div className="form-group">
-              <label htmlFor="filingDesc">
-                {filingData.filingType === 'service_only' ? 'Service Description' : isMotionMode ? 'Motion Description' : 'Filing Description'} <span className="required-marker">*</span>
-              </label>
-              <textarea
-                id="filingDesc"
-                disabled={saving}
-                value={filingData.filingDescription}
-                onChange={(e) => updateData({ filingDescription: e.target.value })}
-                placeholder={filingData.filingType === 'service_only'
-                  ? "e.g., Plaintiff's First Set of Interrogatories (MCR 2.309)"
-                  : isMotionMode
-                  ? "e.g., Motion for Summary Disposition under MCR 2.116(C)(10)"
-                  : "Brief description of this filing (e.g., Initial complaint for breach of contract)..."
-                }
-                autoFocus={isMotionMode}
-                rows={4}
-              />
-            </div>
-          </div>
+          <DetailsStep
+            filingData={filingData}
+            existingCase={existingCase}
+            captionMissing={captionMissing}
+            caseLookupError={caseLookupError}
+            retryCaseLookup={retryCaseLookup}
+            destinationLocked={destinationLocked}
+            saving={saving}
+            updateData={updateData}
+          />
         )}
 
         {currentStep === 'documents' && filingData.filingId && (
           <DocumentUpload
             filingId={filingData.filingId}
+            courtId={filingData.courtId!}
+            caseTypeId={filingData.caseTypeId!}
+            filingType={filingData.filingType}
             documents={filingData.documents}
-            onDocumentsChange={(docs) => updateData({ documents: docs, paymentComplete: false })}
+            onDocumentsChange={(docs) => updateData({ documents: docs })}
             onBusyChange={setSaving}
           />
         )}
@@ -737,7 +523,6 @@ function FilingForm({ userId }: { userId: number }) {
         )}
       </div>
 
-      {/* Navigation */}
       {!submission && (
         <div className="wizard-nav">
           <button
@@ -757,7 +542,7 @@ function FilingForm({ userId }: { userId: number }) {
                 onClick={goNext}
                 disabled={saving || Boolean(conflict)}
               >
-                {saving ? 'Saving...' : currentStepIndex === steps.length - 2 ? 'Review Filing' : 'Continue'}
+                {saving ? 'Saving...' : currentStepIndex === steps.length - 2 ? 'Review filing' : 'Continue'}
               </button>
             )}
           </div>

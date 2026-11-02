@@ -1,5 +1,3 @@
-"""Read the newest recipient notices without sorting the entire inbox."""
-
 from contextlib import nullcontext
 
 from sqlalchemy import text
@@ -26,7 +24,6 @@ def replace_index(old: str, new: str, columns: list[str]) -> None:
                 op.drop_index(new, postgresql_concurrently=True)
         op.create_index(new, "notifications", columns, if_not_exists=True,
                         postgresql_concurrently=postgres)
-        # Keep the old index until its replacement has finished building.
         op.drop_index(old, if_exists=True, postgresql_concurrently=postgres)
 
 

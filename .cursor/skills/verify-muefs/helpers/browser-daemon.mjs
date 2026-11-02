@@ -1,18 +1,18 @@
-#!/usr/bin/env node
-/**
- * Long-lived Chromium + HTTP command port so fill → click keeps in-page state.
- */
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const helperDir = dirname(fileURLToPath(import.meta.url));
 const skillDir = resolve(helperDir, '..');
 const repoRoot = resolve(skillDir, '../../..');
 const runDir = join(skillDir, '.run');
+const artifactsDir = join(skillDir, 'artifacts');
 mkdirSync(runDir, { recursive: true });
+const token = randomBytes(32).toString('hex');
+writeFileSync(join(runDir, 'browser.token'), token, { encoding: 'utf8', mode: 0o600 });
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(join(repoRoot, 'frontend', 'node_modules', 'playwright'));
@@ -27,12 +27,31 @@ function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function outputPath(out) {
+  if (!out) throw new Error('missing --path');
+  const abs = resolve(skillDir, out);
+  const inside = relative(artifactsDir, abs);
+  if (!inside || isAbsolute(inside) || inside === '..' || inside.startsWith(`..${sep}`)) {
+    throw new Error('--path must be inside the artifacts/ folder of this skill');
+  }
+  mkdirSync(dirname(abs), { recursive: true });
+  return abs;
+}
+
+function authorized(req) {
+  const provided = Buffer.from(String(req.headers['x-verify-token'] || ''));
+  const expected = Buffer.from(token);
+  return req.headers['content-type'] === 'application/json'
+    && provided.length === expected.length && timingSafeEqual(provided, expected);
+}
+
 function locator(flags) {
   if (flags.label) return page.getByLabel(String(flags.label), { exact: Boolean(flags.exact) });
   if (flags.role) {
     const opts = {};
     if (flags.name) {
       opts.name = flags.exact ? String(flags.name) : new RegExp(escapeRegExp(String(flags.name)), 'i');
+      opts.exact = Boolean(flags.exact);
     }
     return page.getByRole(String(flags.role), opts);
   }
@@ -70,10 +89,7 @@ async function run(cmd) {
     return 'visible';
   }
   if (sub === 'snapshot') {
-    const out = flags.path;
-    if (!out) throw new Error('missing --path');
-    const abs = isAbsolute(out) ? out : resolve(skillDir, out);
-    mkdirSync(dirname(abs), { recursive: true });
+    const abs = outputPath(flags.path);
     let text;
     try {
       text = await page.locator('body').ariaSnapshot();
@@ -84,10 +100,7 @@ async function run(cmd) {
     return `wrote ${abs}`;
   }
   if (sub === 'screenshot') {
-    const out = flags.path;
-    if (!out) throw new Error('missing --path');
-    const abs = isAbsolute(out) ? out : resolve(skillDir, out);
-    mkdirSync(dirname(abs), { recursive: true });
+    const abs = outputPath(flags.path);
     await page.screenshot({ path: abs, fullPage: Boolean(flags.fullpage) });
     return `wrote ${abs}`;
   }
@@ -103,6 +116,11 @@ const server = createServer(async (req, res) => {
   if (req.method !== 'POST' || req.url !== '/cmd') {
     res.writeHead(404);
     res.end('not found');
+    return;
+  }
+  if (!authorized(req)) {
+    res.writeHead(403);
+    res.end('forbidden');
     return;
   }
   const chunks = [];

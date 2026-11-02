@@ -1,0 +1,20 @@
+.admin-workspace { display: grid; gap: 24px; align-items: start; }
+.admin-workspace.editor-open { grid-template-columns: minmax(260px, .75fr) minmax(0, 1.35fr); }
+.admin-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.admin-directory-filter { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 16px; align-items: end; margin-bottom: 20px; }
+.admin-directory-filter .form-group { margin-bottom: 0; }
+.admin-editor { min-width: 0; overflow-wrap: anywhere; }
+.admin-editor > .history-summary { margin-bottom: 20px; }
+.admin-detail-section { padding-top: 20px; margin-top: 24px; }
+.admin-account-form > p, .admin-detail-section p { margin-bottom: 12px; }
+.admin-history { padding-left: 22px; }
+.admin-history > li { margin: 20px 0; }
+.admin-changes > div { margin: 10px 0; }
+.admin-changes dt { font-weight: 600; }
+.admin-changes dd { margin-left: 0; }
+
+@media (max-width: 800px) {
+  .admin-workspace.editor-open, .admin-directory-filter, .admin-form-grid { grid-template-columns: 1fr; }
+}
+.admin-account-list > li { flex-wrap: wrap; }
+.admin-account-list > li:last-child { border-bottom: 0; }

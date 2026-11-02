@@ -1,28 +1,19 @@
 const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
-/** Format integer cents as a USD amount, including grouped totals and reversals. */
 export function formatCents(cents: number): string {
   return usd.format(cents / 100);
 }
 
-/** Like formatCents, but renders a zero amount as "No fee". */
 export function formatFee(cents: number): string {
   return cents === 0 ? 'No fee' : formatCents(cents);
 }
 
-/** Format a byte count, e.g. 124000 -> "121 KB". */
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
-/**
- * Parse a server timestamp. The API serializes datetimes in UTC, but the demo
- * (SQLite) emits them without a timezone suffix, which `new Date` would misread
- * as local time. Treat suffix-less datetime strings as UTC; leave date-only
- * strings and offset-carrying strings alone.
- */
 export function parseServerDate(d: string): Date {
   if (d.includes('T') && !/(?:[Zz]|[+-]\d\d:?\d\d)$/.test(d)) {
     return new Date(`${d}Z`);
@@ -30,7 +21,19 @@ export function parseServerDate(d: string): Date {
   return new Date(d);
 }
 
-/** Format an ISO date string as a short US date, e.g. "Jun 7, 2026". */
+const DATE_TIME: Intl.DateTimeFormatOptions = {
+  year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', timeZoneName: 'short',
+};
+
+export function formatDateTime(value: string | null, timeZone?: string): string {
+  if (!value) return 'Not recorded';
+  return parseServerDate(value).toLocaleString('en-US', { ...DATE_TIME, timeZone });
+}
+
+export function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : pluralForm}`;
+}
+
 export function formatShortDate(d: string | null): string {
   if (!d) return '--';
   return parseServerDate(d).toLocaleDateString('en-US', {
@@ -38,42 +41,9 @@ export function formatShortDate(d: string | null): string {
   });
 }
 
-/** A court filing date is a civil date; never shift it to the viewer's timezone. */
 export function formatCourtDate(value: string | null): string {
   if (!value) return 'Not established';
   return new Date(`${value}T00:00:00Z`).toLocaleDateString('en-US', {
     year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC',
   });
-}
-
-const DOCUMENT_LABELS: Record<string, string> = {
-  COMPLAINT: 'Complaint', SUMMONS: 'Summons', PETITION: 'Petition',
-  INFORMATION: 'Information / Complaint', WARRANT: 'Warrant',
-  PROOF_SERVICE: 'Proof of Service', POS_ELECTRONIC: 'Proof of Service',
-  CERT_SERVICE: 'Certificate of Service', MOTION: 'Motion',
-  BRIEF: 'Brief in Support', BRIEF_SUPPORT: 'Brief in Support',
-  RESPONSE_BRIEF: 'Response Brief', REPLY_BRIEF: 'Reply Brief',
-  PROPOSED_ORDER: 'Proposed Order', NOTICE_HEARING: 'Notice of Hearing',
-  NOT_HEARING: 'Notice of Hearing', AFFIDAVIT: 'Affidavit', EXHIBIT: 'Exhibit',
-  ANSWER: 'Answer', REPLY: 'Reply', JURY_DEMAND: 'Jury Demand',
-  FEE_WAIVER: 'Fee Waiver Request', FEE_WAIVER_ORDER: 'Signed Fee Waiver Decision',
-  PUBLIC_COPY: 'Reviewed Public Copy',
-  MOT_SD: 'Motion for Summary Disposition', MOT_DISMISS: 'Motion to Dismiss',
-  MOT_COMPEL: 'Motion to Compel', MOT_PROTECTIVE: 'Motion for Protective Order',
-  MOT_SANCTIONS: 'Motion for Sanctions', MOT_DEFAULT: 'Motion for Default',
-  MOT_SJ: 'Motion for Summary Judgment', MOT_LIMINE: 'Motion in Limine',
-  MOT_RECONSIDER: 'Motion for Reconsideration', MOT_RELIEF: 'Motion for Relief from Judgment',
-  MOT_STAY: 'Motion to Stay', MOT_ADJOURN: 'Motion to Adjourn',
-  MOT_INTERVENE: 'Motion to Intervene', MOT_AMEND: 'Motion to Amend',
-  MOT_QUASH: 'Motion to Quash', MOT_TRANSFER: 'Motion to Transfer Venue',
-  MOT_CONSOLIDATE: 'Motion to Consolidate', MOT_WITHDRAW: 'Motion to Withdraw',
-  MOT_TRO: 'Motion for TRO', MOT_PRELIM_INJ: 'Motion for Preliminary Injunction',
-  MOT_FEES: 'Motion for Attorney Fees', MOT_OTHER: 'Motion',
-  DISC_CERT_GF: 'Good-Faith Discovery Certification', AFF_DEFAULT: 'Affidavit of Default',
-};
-
-/** Human label for a document type code, e.g. "MOT_SD" -> "Motion for Summary Disposition". */
-export function getDocumentLabel(code: string): string {
-  if (DOCUMENT_LABELS[code]) return DOCUMENT_LABELS[code];
-  return code.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
 }

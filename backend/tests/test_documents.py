@@ -1,13 +1,38 @@
-"""Tests for document-related functionality."""
-
-
 import io
+from pathlib import Path
 
+import pytest
 from pypdf import PdfReader, PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
-from app.services.document_service import inspect_pdf, validate_mime_type
+from app.services.document_service import _within, inspect_pdf, validate_mime_type
 from app.utils.pdf import check_pii_patterns
+from tests.test_document_publication import publication_pdf
+
+
+@pytest.fixture
+def extended_path_resolve(monkeypatch, tmp_path):
+    real_resolve = Path.resolve
+    root = real_resolve(tmp_path)
+
+    def resolve(self, strict=False):
+        resolved = real_resolve(self, strict=strict)
+        return resolved if resolved == root else Path(f"\\\\?\\{resolved}")
+
+    monkeypatch.setattr(Path, "resolve", resolve)
+    return root
+
+
+def test_a_stored_key_stays_inside_the_root_when_windows_extends_its_path(
+    extended_path_resolve,
+):
+    root = extended_path_resolve
+    assert _within(root, "filings/1/a.pdf") == root / "filings" / "1" / "a.pdf"
+
+
+def test_an_escaping_key_is_refused_when_windows_extends_its_path(extended_path_resolve):
+    with pytest.raises(ValueError, match="path traversal detected"):
+        _within(extended_path_resolve, "../outside.pdf")
 
 
 def test_validate_mime_type():
@@ -45,7 +70,7 @@ def test_check_pii_financial():
 
 def test_pdf_inspection_samples_text_once_and_deduplicates_pii(monkeypatch):
     writer = PdfWriter()
-    writer.add_blank_page(width=300, height=300)  # A scanned cover must not hide later text.
+    writer.add_blank_page(width=300, height=300)
     for _ in range(2):
         page = writer.add_blank_page(width=300, height=300)
         page[NameObject("/Resources")] = DictionaryObject({
@@ -85,11 +110,10 @@ def test_pdf_inspection_handles_malformed_files_and_limits_sampling():
     assert not broken.is_text_searchable
     assert broken.pii_warnings == []
 
-    writer = PdfWriter()
-    writer.add_blank_page(width=100, height=100)
-    buffer = io.BytesIO()
-    writer.write(buffer)
-    blank = inspect_pdf(buffer.getvalue(), max_pages=0)
-    assert blank.page_count == 1
-    assert not blank.is_text_searchable
-    assert blank.pii_warnings == []
+    record = publication_pdf("SSN 123-45-6789")
+    unsampled = inspect_pdf(record, max_pages=0)
+    assert unsampled.page_count == 1
+    assert not unsampled.is_text_searchable
+    assert unsampled.pii_warnings == []
+    sampled = inspect_pdf(record, max_pages=1)
+    assert sampled.is_text_searchable and sampled.pii_warnings

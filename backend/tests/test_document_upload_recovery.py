@@ -1,5 +1,3 @@
-"""An upload retry must preserve one stored document and one fee-state change."""
-
 from datetime import UTC, datetime
 from unittest.mock import Mock
 from uuid import uuid4
@@ -8,7 +6,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from app.api.auth import get_current_user_id, require_user_may_manage_efilings
+from app.api.auth import get_current_user, require_user_may_manage_efilings
 from app.main import app
 from app.models.audit import AuditLog
 from app.models.filing import DocumentUploadRequest, FilingDocument, FilingEnvelope, FilingStatus
@@ -33,7 +31,7 @@ async def test_lost_upload_response_can_retry_without_duplicate_document(
     first = await client.post(url, headers=headers, data=data, files=file)
     assert first.status_code == 200, first.text
     version = filing.fee_version
-    scanner["reply"] = None  # A recorded success remains recoverable during a scanner outage.
+    scanner["reply"] = None
     retry = await client.post(url, headers=headers, data=data, files=file)
     assert retry.status_code == 200, retry.text
     assert retry.json() == first.json()
@@ -111,7 +109,7 @@ async def test_retry_does_not_resurrect_a_removed_document(filing_client, db_ses
     assert replay.status_code == 409, replay.text
     assert "later removed" in replay.json()["detail"]
     assert filing.fee_version == version
-    assert len(list(storage.rglob("*.txt"))) == 1  # Removal has not yet deleted storage.
+    assert len(list(storage.rglob("*.txt"))) == 1
     assert await db_session.scalar(select(func.count()).select_from(StorageDeletion)) == (
         0 if retained else 1
     )
@@ -154,9 +152,8 @@ async def test_replay_after_submission_and_keys_are_scoped_to_the_filing(filing_
     distinct = await client.post(f"/api/v1/filings/{other.id}/documents",
                                  headers=headers, data=data, files=file)
     assert distinct.status_code == 200 and distinct.json()["id"] != first.json()["id"]
-    # Replay still goes through the current account and filing-ownership checks.
     app.dependency_overrides.pop(require_user_may_manage_efilings, None)
-    app.dependency_overrides.pop(get_current_user_id, None)
+    app.dependency_overrides.pop(get_current_user, None)
     user = await db_session.get(User, filing.filer_id)
     user.is_active = False
     await db_session.flush()

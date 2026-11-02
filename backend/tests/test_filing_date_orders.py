@@ -1,12 +1,10 @@
-"""Court orders change civil dates while preserving receipt and document evidence."""
-
 import hashlib
-from datetime import UTC, date
+from datetime import UTC, date, datetime
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app.api import filing_dates
 from app.integrations.cms_adapter import CMSFilingResult
@@ -14,7 +12,7 @@ from app.models.case import Case
 from app.models.filing import FilingDocument, FilingEnvelope, FilingStatus
 from app.models.filing_transaction import FilingTransaction
 from app.models.notification import Notification
-from app.models.user import User, UserType
+from app.models.user import CourtRole, User, UserCourtRole, UserType
 from app.services import audit_service, document_service, filing_service
 from app.storage_audit import inspect_receipts
 from tests.test_document_publication import prepare_copy, publication_pdf
@@ -93,7 +91,6 @@ async def test_order_preserves_receipt_and_acceptance_honors_it_without_calendar
             db_session, fid, clerk, "accept", expected_submission_count=1
         )
     document_service.upload_document(ORDER, doc.file_key, "application/pdf")
-    # A date order does not turn a failed CMS submission into an acceptance.
     with monkeypatch.context() as cms_failure:
         cms_failure.setattr(filing_service, "submit_filing_to_cms", AsyncMock(
             return_value=CMSFilingResult(success=False, error_message="CMS unavailable"),
@@ -111,6 +108,32 @@ async def test_order_preserves_receipt_and_acceptance_honors_it_without_calendar
     assert case.filed_date.replace(tzinfo=UTC) == accepted.submitted_at.replace(tzinfo=UTC)
     assert doc.id not in [attachment.id for attachment in accepted.documents]
     assert (await api_client.get(history_url)).json()["transactions"][-1] == original_receipt
+
+
+async def test_acceptance_rechecks_a_date_order_recorded_during_verification(
+    date_record, db_session, monkeypatch,
+):
+    fid, _, clerk, _ = date_record
+    verify = filing_service.verify_filing_documents
+
+    async def order_during_verification(filing, court_order=None):
+        await verify(filing, court_order)
+        await db_session.execute(
+            update(FilingEnvelope).where(FilingEnvelope.id == fid).values(
+                filing_date=date(2026, 9, 3),
+                filing_date_basis={"source": "court_order"},
+                filing_date_version=FilingEnvelope.filing_date_version + 1,
+            ).execution_options(synchronize_session=False)
+        )
+
+    monkeypatch.setattr(filing_service, "verify_filing_documents", order_during_verification)
+    with pytest.raises(filing_service.StaleFilingReviewError, match="filing date changed"):
+        await filing_service.review_filing(
+            db_session, fid, clerk, "accept", expected_submission_count=1
+        )
+    filing = await filing_service.get_filing(db_session, fid)
+    assert filing.filing_date == date(2026, 9, 3)
+    assert filing.status == FilingStatus.SUBMITTED
 
 
 async def test_case_date_is_explicit_and_old_orders_remain_publishable(
@@ -198,7 +221,7 @@ async def test_case_date_is_explicit_and_old_orders_remain_publishable(
     ).content == ORDER
 
 
-async def test_return_and_resubmission_reset_date_without_rewriting_prior_order(
+async def test_return_and_resubmission_keep_the_ordered_date(
     date_record,
     db_session,
     api_client,
@@ -229,7 +252,8 @@ async def test_return_and_resubmission_reset_date_without_rewriting_prior_order(
     await filing_service.submit_filing(db_session, fid)
     state = (await api_client.get(url)).json()
     assert state["submission_count"] == 2 and state["version"] == 4
-    assert state["filing_date_basis"].get("source") != "court_order"
+    assert state["filing_date"] == DECISION["filing_date"]
+    assert state["filing_date_basis"] == old_state["filing_date_basis"]
     assert (
         await api_client.post(
             url,
@@ -242,6 +266,70 @@ async def test_return_and_resubmission_reset_date_without_rewriting_prior_order(
     order_event = next(event for event in history if event["event_type"] == "filing_date_ordered")
     assert order_event["submission_number"] == 1
     assert order_event["details"]["filing_date_basis"] == old_state["filing_date_basis"]
+
+
+async def test_a_resubmitted_filing_is_accepted_on_its_ordered_date(
+    date_record,
+    db_session,
+    api_client,
+):
+    fid, _, clerk, _ = date_record
+    url = f"/api/v1/clerk/filings/{fid}/filing-date"
+    assert (
+        await api_client.post(url, data=DECISION, files={"file": ("order.pdf", ORDER)})
+    ).status_code == 201
+    await filing_service.review_filing(
+        db_session, fid, clerk, "return", "Correct attachment", expected_submission_count=1
+    )
+    await filing_service.submit_filing(db_session, fid)
+    accepted = await filing_service.review_filing(
+        db_session, fid, clerk, "accept", expected_submission_count=2
+    )
+    case = await db_session.get(Case, accepted.case_id)
+    assert accepted.status == FilingStatus.ACCEPTED
+    assert case.filing_date == accepted.filing_date == date(2026, 9, 3)
+
+
+async def test_a_filing_returned_before_transaction_history_keeps_its_ordered_date(
+    db_session, monkeypatch, stored_document,
+):
+    fid, _, clerk, _ = await filing_fixture(db_session)
+    received = datetime(2026, 9, 4, 20, tzinfo=UTC)
+    corrected = datetime(2026, 9, 16, 20, tzinfo=UTC)
+    order = stored_document(fid, document_type_code="FILING_DATE_ORDER", title="Order")
+    order.retained_at = received
+    db_session.add_all([stored_document(fid), order])
+    await db_session.flush()
+    filing = await filing_service.get_filing(db_session, fid)
+    filing.status, filing.submitted_at = FilingStatus.RETURNED, received
+    filing.filing_date = date(2026, 9, 3)
+    filing.filing_date_basis = {
+        "source": "court_order", "filing_date": "2026-09-03", "order_document_id": order.id,
+        "order_signed_date": "2026-09-05", "authority_reference": "Synthetic order REF-101",
+        "submission_number": 0,
+    }
+    await db_session.flush()
+    assert filing.submission_count == 0
+    assert await db_session.scalar(select(func.count()).select_from(FilingTransaction)) == 0
+
+    class ReceiptClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return corrected
+
+    monkeypatch.setattr(filing_service, "datetime", ReceiptClock)
+    await filing_service.submit_filing(db_session, fid)
+    monkeypatch.setattr(filing_service, "datetime", datetime)
+    accepted = await filing_service.review_filing(
+        db_session, fid, clerk, "accept", expected_submission_count=1
+    )
+    case = await db_session.get(Case, accepted.case_id)
+    assert accepted.status == FilingStatus.ACCEPTED
+    assert accepted.filing_date == case.filing_date == date(2026, 9, 3)
+    assert accepted.filing_date_basis["source"] == "court_order"
+    assert case.filed_date == received
+    assert accepted.submitted_at == corrected
+    assert accepted.filed_at == received
 
 
 async def test_authority_and_validation_block_unreviewed_or_unreceived_orders(
@@ -382,4 +470,21 @@ async def test_authority_rechecked_after_pdf_inspection_and_legacy_receipt_not_i
     assert state["submitted_at"] is None and state["submission_count"] == 0
     order = await db_session.get(FilingTransaction, recorded.json()["transaction_id"])
     assert order.submission_number == 0
-    assert "legacy filing" in order.details["documents"][0]["title"]
+    assert "older filing" in order.details["documents"][0]["title"]
+
+
+async def test_staff_cannot_date_their_own_filing(date_record, db_session, api_client):
+    fid, filer, clerk, _ = date_record
+    filing = await db_session.get(FilingEnvelope, fid)
+    db_session.add(UserCourtRole(user_id=filer, court_id=filing.court_id, role=CourtRole.CLERK))
+    await db_session.flush()
+    api_client.headers["X-Demo-User-Id"] = str(filer)
+    url = f"/api/v1/clerk/filings/{fid}/filing-date"
+    assert (await api_client.get(url)).status_code == 200
+    response = await api_client.post(url, data=DECISION, files={"file": ("order.pdf", ORDER)})
+    assert response.status_code == 403, response.text
+    assert "Another court reviewer" in response.json()["detail"]
+    assert (await db_session.get(FilingEnvelope, fid)).filing_date_version == 1
+    assert not await db_session.scalar(select(func.count()).select_from(FilingDocument).where(
+        FilingDocument.envelope_id == fid, FilingDocument.document_type_code != "COMPLAINT",
+    ))

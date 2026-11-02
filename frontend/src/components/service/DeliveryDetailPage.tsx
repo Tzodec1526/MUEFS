@@ -3,10 +3,12 @@ import { Link, useParams } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { deliveryLabels } from '../../api/notifications';
 import type { DeliveryDetails } from '../../api/serviceDeliveries';
-import { getErrorDetail } from '../../utils/errors';
-import { formatBytes, parseServerDate } from '../../utils/format';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
+import { formatBytes, formatDateTime } from '../../utils/format';
 import DocumentDownload from '../common/DocumentDownload';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 interface EventList {
   events: { id: number; action: string; occurred_at: string; actor_name?: string; detail?: string;
@@ -19,27 +21,27 @@ function DeliveryHistory({ deliveryId }: { deliveryId: string }) {
   const [kind, setKind] = useState('portal');
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: EventList; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: EventList; error?: LoadFailure }>();
   const key = `${deliveryId}:${kind}:${page}:${attempt}`;
   const current = result?.key === key ? result : undefined;
   useEffect(() => {
     const controller = new AbortController();
     apiClient.get<EventList>(`/service/deliveries/${deliveryId}/events`, { params: { kind, page }, signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load delivery history.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load delivery history.') }); });
     return () => controller.abort();
   }, [deliveryId, kind, page, key]);
-  return <div className="review-card"><h3>Retained delivery history</h3>
+  return <div className="review-card"><h2 className="card-heading">Retained delivery history</h2>
     <label htmlFor="delivery-history-kind">Records to display</label>
     <select id="delivery-history-kind" value={kind} onChange={event => { setKind(event.target.value); setPage(1); }}>
       <option value="portal">Delivery activity</option><option value="email">Email attempts</option>
     </select>
     {!current && <p role="status">Loading history…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {current?.data && <>
       {!current.data.events.length && <p>No events of this type recorded.</p>}
       <ol>{current.data.events.map(event => <li key={event.id}>
-        <strong>{event.action.replace(/_/g, ' ')}</strong> · <time dateTime={event.occurred_at}>{parseServerDate(event.occurred_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}</time>
+        <strong>{event.action.replace(/_/g, ' ')}</strong> · <time dateTime={event.occurred_at}>{formatDateTime(event.occurred_at)}</time>
         {event.actor_name && <span> · {event.actor_name}</span>}
         {event.attempt_number != null && <span> · Attempt {event.attempt_number}</span>}
         {event.smtp_code != null && <span> · SMTP {event.smtp_code}</span>}
@@ -47,7 +49,7 @@ function DeliveryHistory({ deliveryId }: { deliveryId: string }) {
         {(event.detail || event.details?.reason) && <p>{event.detail || event.details?.reason}</p>}
         {event.details?.description && <p>{event.details.description}</p>}
         {event.details?.source_reference && <p>{event.details.source?.replace(/_/g, ' ')} · {event.details.source_reference}</p>}
-        {event.details?.observed_at && <p>Reported observation: {parseServerDate(event.details.observed_at).toLocaleString()}</p>}
+        {event.details?.observed_at && <p>Reported observation: {formatDateTime(event.details.observed_at)}</p>}
       </li>)}</ol>
       {current.data.total > current.data.page_size && <nav className="pagination" aria-label="Delivery history pages">
         <button className="btn btn-secondary" disabled={page === 1} onClick={() => setPage(n => n - 1)}>Previous events</button>
@@ -59,9 +61,10 @@ function DeliveryHistory({ deliveryId }: { deliveryId: string }) {
 }
 
 export default function DeliveryDetailPage() {
+  usePageTitle('Document delivery record');
   const { deliveryId } = useParams();
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: DeliveryDetails; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: DeliveryDetails; error?: LoadFailure }>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [history, setHistory] = useState(false);
@@ -74,7 +77,7 @@ export default function DeliveryDetailPage() {
     const controller = new AbortController();
     apiClient.get<DeliveryDetails>(`/service/deliveries/${deliveryId}`, { signal: controller.signal })
       .then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not open this delivery.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not open this delivery.') }); });
     return () => controller.abort();
   }, [deliveryId, key]);
 
@@ -83,7 +86,7 @@ export default function DeliveryDetailPage() {
     try {
       await apiClient.post(`/service/deliveries/${deliveryId}/${action}`, reason ? { reason } : undefined);
       setAttempt(n => n + 1);
-    } catch (err) { setError(getErrorDetail(err) || 'Could not record this action.'); }
+    } catch (err) { setError(errorMessage(err, 'Could not record this action.')); }
     finally { setBusy(false); }
   }
 
@@ -107,35 +110,35 @@ export default function DeliveryDetailPage() {
         headers: { 'Idempotency-Key': reportRequest.current.key },
       });
       setReportOpen(false); setHistory(true); setAttempt(n => n + 1);
-    } catch (err) { setError(getErrorDetail(err) || 'The report could not be confirmed. Retry the same information to retrieve the original report.'); }
+    } catch (err) { setError(errorMessage(err, 'The report could not be confirmed. Retry the same information to retrieve the original report.')); }
     finally { setBusy(false); }
   }
 
   return <section className="service-page">
-    <div className="page-header"><div><h2>Document delivery record</h2><p>Contents and evidence for this named recipient.</p></div>
+    <div className="page-header"><div><PageHeading>Document delivery record</PageHeading><p>Contents and evidence for this named recipient.</p></div>
       <Link className="btn btn-secondary" to="/service/deliveries">Delivery inbox</Link></div>
     {!current && <p role="status">Loading delivery…</p>}
-    {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+    {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
     {error && <p role="alert" className="alert alert-error">{error}</p>}
     {data && <>
-      <div className="review-card"><h3>{data.court_name}</h3><p>{data.case_number} · {data.case_title}</p>
+      <div className="review-card"><h2 className="card-heading">{data.court_name}</h2><p>{data.case_number} · {data.case_title}</p>
         <p>From {data.sender} to {data.contact.name} · {data.contact.email}</p>
-        <p>Recorded {parseServerDate(data.created_at).toLocaleString()}</p>
+        <p>Recorded {formatDateTime(data.created_at)}</p>
         <p>Service authority: {data.contact.authority}</p>
         <p className="receipt-reference">Delivery reference: <code>{data.id}</code></p>
       </div>
-      <div className="review-card"><h3>Documents in this delivery</h3>
+      <div className="review-card"><h2 className="card-heading">Documents in this delivery</h2>
         <ul className="service-list">{data.documents.map(doc => <li className="service-choice" key={doc.id}>
-          <h4>{doc.title}</h4><p>{formatBytes(doc.file_size_bytes)}{doc.is_confidential && ' · Confidential'}</p>
+          <h3 className="card-subheading">{doc.title}</h3><p>{formatBytes(doc.file_size_bytes)}{doc.is_confidential && ' · Confidential'}</p>
           <DocumentDownload id={doc.id} title={doc.title} deliveryId={data.id} />
           <details><summary>Retained document fingerprint</summary><code>{doc.sha256_hash}</code></details>
         </li>)}</ul>
-        {data.acknowledged_at ? <p className="alert alert-success">Recipient acknowledged this package on {parseServerDate(data.acknowledged_at).toLocaleString()}.</p>
+        {data.acknowledged_at ? <p className="alert alert-success">Recipient acknowledged this package on {formatDateTime(data.acknowledged_at)}.</p>
           : <p>No recipient acknowledgment recorded.</p>}
         {data.can_acknowledge && <button className="btn btn-primary" disabled={busy} onClick={() => void act('acknowledge')}>Acknowledge receipt of this package</button>}
         <p>An acknowledgment records the recipient&apos;s statement. A download request records a request, and does not establish that the transfer completed.</p>
       </div>
-      <div className="review-card"><h3>Email alert</h3><p>{deliveryLabels[data.delivery_status] || data.delivery_status}</p>
+      <div className="review-card"><h2 className="card-heading">Email alert</h2><p>{deliveryLabels[data.delivery_status] || data.delivery_status}</p>
         <p>Current attempt: {data.attempt_count}</p>
         {data.last_error && <p className="alert alert-warning">{data.last_error}</p>}
         <p>Relay acceptance does not confirm inbox delivery or completed legal service. Follow the court&apos;s requirements for proof of service.</p>

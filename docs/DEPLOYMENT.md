@@ -26,12 +26,22 @@ storage outages in the worker. Monitor the pending queue and follow the
 [storage lifecycle and recovery procedure](STORAGE_RECOVERY.md) for retention boundaries,
 operator runs and backups.
 
-This is the operational companion to [SECURITY.md](../SECURITY.md) — how to run MUEFS as a
+This is the operational companion to [SECURITY.md](../SECURITY.md): how to run MUEFS as a
 real (non-demo) deployment. SECURITY.md explains *why* each setting matters; this document
 explains *how* to configure it.
 
 > The hosted demo (`render.yaml`, the root `Dockerfile`, `run_demo.py`) is intentionally
 > open and single-instance. A production court deployment differs in the ways below.
+
+Three API behaviors matter to external clients. None of them needs a migration.
+
+- Every timestamp in an API response carries a UTC offset. Do not treat a timestamp as
+  local time.
+- An invalid review `action` returns HTTP 422, not 400, on
+  `POST /api/v1/clerk/filings/{id}/review` and `POST /api/v1/clerk/queue/batch-review`.
+  The single route takes `accept`, `reject` or `return`. The batch route takes `accept` only.
+- All nine JSON routes under `/api/v1/service/` declare response models, so the OpenAPI schema
+  now describes them. Their JSON did not change.
 
 Deploy the review client and API together. Single review requests now require
 `expected_submission_count`; batch requests require a `filings` list containing each
@@ -98,7 +108,8 @@ and elapsed-age display use those fields. See [clerk queue search and waiting ti
 
 ## 1. Configuration & secrets
 
-Copy `.env.example` to `.env` and change every demo value:
+Copy `.env.example` to `.env` and change every demo value. `.env.example` carries no notes;
+the tables in this section are the reference.
 
 | Variable | Demo | Production |
 | --- | --- | --- |
@@ -106,14 +117,90 @@ Copy `.env.example` to `.env` and change every demo value:
 | `ALLOW_PUBLIC_REGISTRATION` | `true` | `false` |
 | `PAYMENTS_ARE_SIMULATED` | `true` | `false` |
 | `DEBUG` | `true` | `false` |
-| `SECRET_KEY` | `change-this-...` | `openssl rand -hex 32` |
-| `POSTGRES_PASSWORD` / `MINIO_ROOT_PASSWORD` / `S3_SECRET_KEY` | `*_dev` | strong, secrets-managed |
-| `KEYCLOAK_CLIENT_SECRET` / `KEYCLOAK_ADMIN_PASSWORD` | demo | strong, secrets-managed |
+| `POSTGRES_PASSWORD` / `S3_SECRET_KEY` | `*_dev` / `*_secret` | strong, secrets-managed |
+| `KEYCLOAK_ADMIN_PASSWORD` | demo | strong, secrets-managed |
 | `ALLOWED_ORIGINS` | localhost | your real front-end origin(s) |
 | `RATE_LIMIT_BACKEND` | `memory` / `redis` | `redis` |
 
 Generate secrets with `openssl rand -hex 32` and store them in your platform's secret
-manager — never in the repo.
+manager, never in the repo.
+
+### Environment variables
+
+`.env.example` lists these variables in this order, with no notes of its own. This table is
+the reference for what each one does. "(empty)" means the line has no value, which selects
+the default.
+
+| Group | Variable | `.env.example` value | Note |
+| --- | --- | --- | --- |
+| Database | `DATABASE_URL` | `postgresql+asyncpg://muefs:muefs_dev@postgres:5432/muefs` | |
+| Database | `POSTGRES_USER` | `muefs` | |
+| Database | `POSTGRES_PASSWORD` | `muefs_dev` | |
+| Database | `POSTGRES_DB` | `muefs` | |
+| Redis | `REDIS_URL` | `redis://redis:6379/0` | |
+| S3-compatible document storage (the local stack runs Versity Gateway with these keys) | `S3_ENDPOINT_URL` | `http://storage:7070` | |
+| S3-compatible document storage | `S3_ACCESS_KEY` | `muefs_storage` | |
+| S3-compatible document storage | `S3_SECRET_KEY` | `muefs_storage_secret` | |
+| S3-compatible document storage | `S3_BUCKET_NAME` | `muefs-documents` | |
+| Keycloak | `KEYCLOAK_URL` | `http://localhost:8080` | KEYCLOAK_URL is the browser-facing address and the issuer tokens must name. The API fetches signing keys from KEYCLOAK_INTERNAL_URL when that is set. |
+| Keycloak | `KEYCLOAK_INTERNAL_URL` | `http://keycloak:8080` | Optional. Use it when `KEYCLOAK_URL` is not reachable from the API's network, such as inside Docker Compose. |
+| Keycloak | `KEYCLOAK_REALM` | `muefs` | |
+| Keycloak | `KEYCLOAK_CLIENT_ID` | `muefs-api` | |
+| Keycloak | `KEYCLOAK_ADMIN_USER` | `admin` | |
+| Keycloak | `KEYCLOAK_ADMIN_PASSWORD` | `admin` | |
+| Backend | `DEBUG` | `true` | Local tooling sets `DEBUG=true`. An unset value keeps production startup checks on. |
+| Backend | `ALLOW_DEMO_MODE` | `true` | Court systems: set false in production; use Keycloak Bearer JWT only. It allows `X-Demo-User-Id` header authentication. |
+| Backend | `DEMO_MODE_SECRET` | (empty) | Required when ALLOW_DEMO_MODE=true and DEBUG=false. Isolated public sandboxes serve it to browsers through /config.js; other builds need VITE_DEMO_MODE_SECRET. Browsers receive this value, so it deters casual header use but is not authentication. |
+| Backend | `ENABLE_API_DOCS` | (empty) | Hide /docs and /redoc outside DEBUG (default: follows DEBUG). |
+| Backend | `SECURITY_STRICT_STARTUP` | `false` | Fail startup on unsafe production config (court deploys). Missing ClamAV and placeholder secrets always refuse to start outside demo or debug mode; this setting also raises on the advisory findings. |
+| Backend | `TRUSTED_PROXY_IPS` | (empty) | Reverse proxies whose X-Forwarded-For is trusted: comma-separated addresses or networks (CIDR), for example 10.0.0.0/8 for a platform load balancer. |
+| Backend | `ALLOW_PUBLIC_REGISTRATION` | `true` | Local dev: often true. Production: false (use IdP + admin invite). It controls self-serve `POST /auth/register`. |
+| Backend | `PROVISION_USER_ON_FIRST_OIDC_LOGIN` | `true` | First Bearer login creates User from token claims (requires email in token). |
+| Backend | `RATE_LIMIT_BACKEND` | `redis` | Use redis when Redis service is available (docker-compose); memory for laptop-only API. |
+| Backend | `ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5173` | |
+| Frontend | `VITE_API_URL` | `http://localhost:8000` | Same-origin by default: the hosted demo serves the API and UI together, and the Vite dev proxy forwards `/api` to the backend. Set it only for a split deployment with separate frontend and backend hosts. |
+| Frontend | `VITE_ALLOW_DEMO_MODE` | `true` | Must match backend ALLOW_DEMO_MODE for local role-picker demo (sends X-Demo-User-Id). |
+| Frontend | `VITE_DEMO_MODE_SECRET` | (empty) | Only for builds without isolated sessions and with DEBUG=false; must then match DEMO_MODE_SECRET. The hosted demo reads the secret from /config.js instead, so leave this empty there: a build-time value is baked into the JavaScript bundle. |
+| Frontend | `VITE_KEYCLOAK_URL` | `http://localhost:8080` | |
+| Frontend | `VITE_KEYCLOAK_REALM` | `muefs` | |
+| Frontend | `VITE_KEYCLOAK_CLIENT_ID` | `muefs-frontend` | |
+| Document Processing | `MAX_FILE_SIZE_MB` | `100` | |
+| Document Processing | `LOCAL_STORAGE_PATH` | `demo_uploads` | Local document root for SQLite demos and restored local collections; ignored for S3. |
+| Upload malware screening | `MALWARE_SCAN_CLAMAV_ENABLED` | `false` | Upload malware screening. The built-in heuristic scan (native executables + EICAR) is offline and always on. Enable ClamAV for real signature-based scanning in production. |
+| Upload malware screening | `CLAMAV_HOST` | `clamav` | |
+| Upload malware screening | `CLAMAV_PORT` | `3310` | |
+| Upload malware screening | `CLAMAV_TIMEOUT_SECONDS` | `30` | Total seconds for scanner connection, transfer and verdict. Failure always rejects the upload. |
+| Upload malware screening | `STRICT_MIME_DETECTION` | (empty) | Reject uploads when libmagic cannot identify type (default: true when DEBUG=false). |
+| Tokens | `JWT_VERIFY_AUDIENCE` | (empty) | Validate JWT aud claim (default: true when DEBUG=false). It checks `aud` against `KEYCLOAK_CLIENT_ID` and `JWT_AUDIENCES`. Keycloak's generic `account` audience is not accepted unless it is listed. |
+| Tokens | `JWT_AUDIENCES` | (empty) | Optional extra audiences, comma-separated, such as `muefs-frontend,muefs-api`. |
+| Rate limiting | `RATE_LIMIT_FAIL_CLOSED` | (empty) | Reject requests when Redis rate limiter is unreachable (default: true when DEBUG=false). |
+| Payments | `EXTERNAL_PAYMENTS_ENABLED` | `false` | Enable only after the court approves external receipt verification and credit corrections. |
+| Payments | `PAYMENTS_ARE_SIMULATED` | `true` | No payment processor is integrated. false removes the demo payment path; it does not connect one. |
+| Notices | `EMAIL_DELIVERY_ENABLED` | `false` | Filing notice email. Disabled by default; configure both API and notice worker. Notices are queued only when this is enabled, and a separate worker sends them. |
+| Notices | `SERVICE_DELIVERY_ENABLED` | `false` | Separately opt in to selected document delivery after court workflow evaluation. |
+| Notices | `PORTAL_BASE_URL` | (empty) | |
+| Notices | `SMTP_HOST` | (empty) | |
+| Notices | `SMTP_PORT` | `587` | |
+| Notices | `SMTP_TLS` | `starttls` | One of `starttls`, `ssl` or `plain`. |
+| Notices | `SMTP_FROM` | (empty) | |
+| Notices | `SMTP_USERNAME` | (empty) | |
+| Notices | `SMTP_PASSWORD` | (empty) | |
+
+These settings have defaults in `backend/app/config.py` and no `.env.example` line:
+
+| Variable | Default | Note |
+| --- | --- | --- |
+| `DATABASE_ECHO` | `false` | Logs every SQL statement and its parameters. For development diagnostics only. |
+| `CLAMAV_SOCKET` | (empty) | Unix socket path. Preferred over host and port when set. |
+| `RATE_LIMIT_ENABLED` | `true` | |
+| `RATE_LIMIT_DEFAULT_PER_MINUTE` | `120` | |
+| `RATE_LIMIT_SEARCH_PER_MINUTE` | `30` | |
+| `RATE_LIMIT_DOCUMENT_PER_MINUTE` | `60` | Applies to every route that streams or re-hashes stored document bytes. |
+| `DEMO_ISOLATED_SESSIONS` | `false` | Hosted demo only. Each browser session gets its own copy of a seeded template database. A court deployment leaves this false and uses one shared database. |
+| `DEMO_MAX_SESSIONS` | `100` | Private sandboxes before visitors share the common one. |
+| `DEMO_SESSION_TTL_MINUTES` | `60` | |
+| `DEMO_STORAGE_QUOTA_MB` | `200` | Uploads each sandbox may keep. Its folder is deleted with the sandbox. |
+| `DEMO_STATIC_DIR` | `static` | The built frontend the demo server serves. |
 
 `PAYMENTS_ARE_SIMULATED=false` disables the demo payment path. It does not connect a payment
 processor; online collection remains unavailable until that integration exists.
@@ -137,7 +224,7 @@ label. Leave the feature disabled until the court evaluates the workflow. Demo-m
 credits are marked simulated and will not satisfy a production balance. See
 [external receipt behavior and verification](STATE_READINESS.md#court-fee-assessments-and-payment-balances).
 
-The private **Receipt Register** supports period review and CSV export by administrators
+The private **Receipt register** supports period review and CSV export by administrators
 assigned to the selected court. Apply migration `c39f64dbea05` for its payment-activity
 index. PostgreSQL builds the index concurrently; an interrupted invalid build is repaired
 when the migration is retried. Downgrade removes only the index and preserves all records.
@@ -180,6 +267,10 @@ the state's identity policy before enabling production access. Session iframe ch
 are disabled; provider-side revocation is observed when renewal fails, while the API
 continues to validate each access token and the current local account permissions.
 
+If the API cannot reach the browser-facing `KEYCLOAK_URL` (for example, inside a private
+container network), set `KEYCLOAK_INTERNAL_URL` to an address it can reach for the realm's
+signing keys. Tokens must still name `KEYCLOAK_URL` as their issuer.
+
 Tokens must contain `sub`, `exp`, the configured issuer, and an API audience matching
 `KEYCLOAK_CLIENT_ID` or `JWT_AUDIENCES`; set `JWT_VERIFY_AUDIENCE=true`. Configure the
 frontend client's audience mapper to include the API. Keep Keycloak's `basic`, `profile`
@@ -206,7 +297,7 @@ create an IdP identity, password, verified email or court assignment. Protect da
 operator access, including use of this command for recovery when no bound administrator
 remains active.
 
-Sign in and open **People & access** to provision further identities, including a second
+Sign in and open **People and court access** to provision further identities, including a second
 system administrator for access changes and recovery. Only system administrators can
 edit identity bindings, account types, active status and manually verified bar numbers,
 or delegate court administration. Delegated administrators can grant and revoke clerk
@@ -236,12 +327,17 @@ Content-Security-Policy with the exact API and IdP origins in `connect-src`; kee
 verify the deployed callback in a browser. See
 [the browser connection policy](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/connect-src).
 
+The same policy sets `font-src 'self'`, because the build self-hosts Public Sans as WOFF2 and
+contacts no font host. A separately hosted frontend serves those files with the rest of the
+build. Its policy needs to allow them, and its server needs to send them as `font/woff2`.
+
 ## 4. Data & object storage
 
 - **Database:** PostgreSQL (not the demo's SQLite). Back it up regularly (nightly `pg_dump`
   or your provider's managed snapshots) and test restores.
-- **Object storage:** MinIO or S3 with scoped credentials. Enable bucket versioning and a
-  backup/lifecycle policy for filed documents.
+- **Object storage:** an S3-compatible service with scoped credentials. Enable bucket
+  versioning and a backup/lifecycle policy for filed documents. Provision the bucket and
+  its policies yourself; only the demo seeder creates a missing bucket.
 
 The API requires FastAPI **0.121.1 or newer**. Its database dependencies explicitly use
 `Depends(get_db, scope="function")`, including authentication, so the shared transaction
@@ -281,8 +377,8 @@ docker compose --profile security up -d
 ClamAV downloads its signature database on first boot (a few minutes; it persists in the
 `clamav_data` volume). Once enabled, ClamAV failures always reject the upload with a
 retryable `503`; there is no fallback to heuristics. The deadline covers connection,
-transfer and response. Detected threats return `422`. Strict startup requires the scanner
-outside demo/debug mode. Retire the obsolete `MALWARE_SCAN_ENABLED` and
+transfer and response. Detected threats return `422`. Startup requires the scanner
+outside demo/debug mode, with or without `SECURITY_STRICT_STARTUP`. Retire the obsolete `MALWARE_SCAN_ENABLED` and
 `MALWARE_SCAN_FAIL_CLOSED` environment variables.
 
 The scanner's TCP port stays inside the Compose network. The mounted
@@ -406,7 +502,7 @@ decision from a role inferred by filing acceptance. A per-case audit event recor
 review is needed; the migration does not invent approval or delete the old records.
 
 Before opening an upgraded portal to users, assigned court staff must review the affected
-records through **Court Cases → Manage case access**, using the court's authorized source.
+records through **Court cases → Manage case access**, using the court's authorized source.
 Record the reason/reference, correct the role, link the intended existing account and
 explicitly grant access where authorized. Counsel grants also require a matching verified
 bar number. Ambiguous case-insensitive email matches must be resolved by identity
@@ -446,10 +542,55 @@ disable demo mode and isolated sessions, and serve the built frontend with its p
 configuration. Supervise the notice worker as a separate process. Pin base images to a
 digest in the production build pipeline; `render.yaml` is a demo deployment example.
 
+`backend/constraints.txt` pins every Python package CI and the images install; `pyproject.toml`
+keeps the lower bounds. To refresh it, resolve in a Linux Python 3.12 container so that packages
+such as `uvloop` are included, then run the full test suite and `pip-audit` on the result:
+
+```sh
+docker run --rm -v "$PWD/backend:/in" python:3.12-slim sh -c 'cd /tmp && cp /in/pyproject.toml . \
+  && pip install -q -e ".[dev]" aiosqlite && pip freeze --exclude-editable > /in/constraints.txt'
+```
+
+Both frontend builds use `node:22.23.4-alpine`, and CI uses the same Node version. The build
+puts React and the router in a `vendor` chunk, so a deploy that changes only app code keeps
+that file's name. The demo server caches `assets/` as immutable, answers a missing asset with
+404 and sends `index.html` with `no-store`. A court deployment's static server should do the
+same, so that a page from the previous deploy cannot get `index.html` in place of a script.
+
+The root `Dockerfile` writes a `.gz` copy of each built JS and CSS file. The demo server sends
+that copy to a client that accepts gzip, with `Vary: Accept-Encoding`, and nothing else is
+compressed: fonts, `index.html`, `/config.js`, API responses and document downloads go out as
+they are. A build without the `.gz` files still works and sends those assets uncompressed.
+
+Each hosted-demo sandbox keeps its uploads in its own folder under `DEMO_DATA_DIR`, deleted
+together with the sandbox. `DEMO_STORAGE_QUOTA_MB` (default 200) caps each sandbox's
+uploads, and the demo refuses uploads with HTTP 507 while less than 1 GiB of disk is free.
+
+Compose builds `backend/` and `frontend/` directly, so the root `.dockerignore` does not apply
+to those images and each directory keeps its own. They keep local environments, data, caches
+and draft work product out of the images. The frontend image installs its dependencies from
+`package-lock.json`. Inside its container the dev server listens beyond loopback, and Compose
+publishes the port on this computer only.
+
+`docker-compose.yml` is a local evaluation stack. Demo sign-in and development credentials
+are enabled, so every published port listens on this computer only. The `migrate` service
+creates the document bucket, applies migrations and seeds the demo courts and accounts once.
+Services that read the schema wait for it, and a rerun skips a seeded database. Tokens name
+the address browsers use, while the API fetches keys over the internal network and still
+requires that issuer. The ClamAV data mount must allow the official entrypoint to chown its
+database files.
+
+The Trivy image in `.github/workflows/security.yml` is a released scanner pinned by digest:
+update the version and the digest together. The images in `ci.yml` are disposable protocol
+fixtures; production storage and scanner lifecycles are deployment responsibilities. The CI
+scanner uses the image's bundled signatures, because the tests need only EICAR and the
+configured scan limits.
+
 ## Pre-launch checklist
 
 - [ ] `ALLOW_DEMO_MODE=false`, `ALLOW_PUBLIC_REGISTRATION=false`, `PAYMENTS_ARE_SIMULATED=false`, `DEBUG=false`
-- [ ] All `change-me*` / `*_dev` secrets replaced
+- [ ] Every demo credential replaced: `POSTGRES_PASSWORD` (and `DATABASE_URL`),
+      `S3_ACCESS_KEY`/`S3_SECRET_KEY`, and `KEYCLOAK_ADMIN_USER`/`KEYCLOAK_ADMIN_PASSWORD`
 - [ ] Keycloak email verification enforced; privileged accounts bound explicitly
 - [ ] TLS terminated; `ALLOWED_ORIGINS` locked to real origins
 - [ ] PostgreSQL + object-storage backups configured and a restore tested
@@ -549,9 +690,12 @@ for the distinction between generic and parameter-specific plans.
 
 The API enforces `courts.is_efiling_enabled` and `case_types.is_active` for new drafts
 and submissions. Treat changes to these flags as intake changes, with a court-approved
-process and filing alternatives communicated to users. An in-flight PostgreSQL
-submission holds shared locks until its receipt commits; a concurrent configuration
-change waits, then applies to subsequent attempts. Previously committed receipts remain
+process and filing alternatives communicated to users. Submission reads stored documents
+before it takes a lock, so a configuration change during that read does not wait, and the
+recheck under the filing lock then refuses the submission with the same destination error.
+Once submission holds the filing lock, it holds shared court, case-type and case locks until
+its receipt commits, and a concurrent configuration change waits, then applies to subsequent
+attempts. Previously committed receipts remain
 available and idempotent retries remain valid. Closing intake does not block staff from
 finishing valid filings already received.
 
@@ -578,7 +722,7 @@ contact table. Schedule the schema change with normal database migration control
 Legacy contact rows remain intact, inactive and unlinked. Reconcile them against court
 records before entering current instructions; no address is automatically enrolled.
 
-Assigned staff use **Case participants → Service instructions**. Establish procedures
+Assigned staff use **Manage case access → Service instructions**. Establish procedures
 for reviewing registrations, exemptions, agreements, recipient identity and changes.
 The current workflow supports one primary destination per participant. Service contacts
 and their before/after history are included in private case archives; access and retention
@@ -599,8 +743,8 @@ and existing notice worker. This also requires `EMAIL_DELIVERY_ENABLED=true` and
 SMTP/portal configuration in section 7. Compose shares both flags between those services.
 The separate flag defaults to false; ordinary filing alerts do not enable document delivery.
 
-The filer or assigned staff opens **Filing history → Document deliveries → Select documents
-& recipients**. The sender must have a verified account and, for ordinary filers, current
+The filer or assigned staff opens **Receipts and history → Document deliveries → Select
+documents & recipients**. The sender must have a verified account and, for ordinary filers, current
 court-reviewed case participation. This workflow accepts subsequent, motion and service-only
 documents with a retained current receipt on an existing case. Case-initiating service uses
 the applicable procedure outside this workflow. Each request requires explicit contents,
@@ -656,3 +800,40 @@ recognize `failure_reported`. The existing text-backed delivery-status column an
 event tables support this change without another database migration. A report records a
 court-reviewed observation; it does not adjudicate service, extend a deadline or establish
 that an alternative service method has been completed.
+
+## 16. Hosted demo on Render
+
+`render.yaml` is a Blueprint for the public demo. In Render, choose New > Blueprint and point
+it at this repository; it provisions the `muefs-demo` service. Then add the custom domain
+`demo.tomcedoz.com` in the service settings.
+
+- **Plan.** `standard` is 2 GB and always on, about $25 a month. `starter` is a cheaper 512 MB
+  box.
+- **Deploys.** `autoDeploy` is off, so a deploy is deliberate: Manual Deploy or the
+  **Deploy demo** workflow. That workflow only posts to Render's deploy hook and needs no
+  repository access. To set it up, copy the URL from Render > muefs-demo > Settings > Deploy
+  Hook, then run
+  `gh secret set RENDER_DEPLOY_HOOK_URL --body "https://api.render.com/deploy/..."`.
+- **One instance only.** The per-session sandboxes live on the instance's local disk, tracked
+  in one process's memory. Each browser session gets its own copy of a seeded template. When
+  the cap is reached, or a visitor blocks cookies, they fall back to a shared sandbox that
+  resets on restart. Clients without a cookie, such as monitors and scripts, use the shared
+  sandbox too.
+- **Visitor addresses.** Render's load balancers reach the service from private addresses.
+  Trusting them through `TRUSTED_PROXY_IPS` lets rate limits and audit records use the
+  visitor's address from `X-Forwarded-For` instead of one shared proxy address. After
+  deploying, check that the audit log's `ip_address` values differ between visitors.
+
+To run the same image locally from the repository root:
+
+```bash
+docker build -t muefs-demo .
+docker run -p 127.0.0.1:8000:8000 -e DEMO_MODE_SECRET=local-demo-only muefs-demo
+```
+
+Then open `http://localhost:8000`. Hosted deployments supply their own runtime secret. The
+image leaves `VITE_API_URL` empty so the app calls `/api/v1` on its own host, and `/config.js`
+supplies the demo secret at runtime, so the secret is never baked into an image layer.
+`index.html` loads `/config.js` with `defer`, and the app reads the value when it sends a
+request, after that script has run. Render injects `$PORT`; locally it defaults to 8000. The
+health check calls `/ready`, which covers the template database and the migration version.

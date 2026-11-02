@@ -1,9 +1,7 @@
-"""Administrative changes must remain safe with independent PostgreSQL connections."""
-
 import asyncio
 
 import pytest
-from fastapi import Depends
+from fastapi import Depends, Header
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
 
@@ -59,9 +57,14 @@ async def test_concurrent_administration_cannot_remove_every_admin_or_lose_a_rol
     authenticated = asyncio.Event()
     arrivals = 0
 
-    async def concurrent_actor(db=Depends(get_db), user_id=Depends(auth.get_current_user_id)):
+    async def concurrent_actor(
+        db=Depends(get_db, scope="function"),
+        authorization: str | None = Header(None),
+        x_demo_user_id: int | None = Header(None, alias="X-Demo-User-Id"),
+    ):
         nonlocal arrivals
-        actor = await auth.get_current_user(db, user_id)
+        actor = await auth.get_current_user(db, authorization, x_demo_user_id, None)
+        await db.flush()
         arrivals += 1
         if arrivals == 2:
             authenticated.set()

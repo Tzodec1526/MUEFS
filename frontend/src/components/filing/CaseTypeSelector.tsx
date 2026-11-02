@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { getCaseTypes, getFilingRequirements, CaseType, FilingRequirement } from '../../api/courts';
 import { formatFee } from '../../utils/format';
 import LoadError from '../common/LoadError';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
 
-// Maps MCR/MCL references to official Michigan Courts URLs
 function getRuleUrl(ref: string): string | null {
   const base = 'https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702';
   const rules: Record<string, string> = {
@@ -24,20 +24,49 @@ function getRuleUrl(ref: string): string | null {
     'MCR 2.114': `${base}/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2114-signing-of-pleadings-affidavits-and-other-papers-representations-to-court-sanctions`,
   };
 
-  // Direct match
   if (rules[ref]) return rules[ref];
 
-  // Match base rule (e.g., "MCR 2.119(A)(2)" -> "MCR 2.119")
   const baseRef = ref.replace(/\(.*/, '').trim();
   if (rules[baseRef]) return rules[baseRef];
 
-  // MCL references go to legislature
   if (ref.startsWith('MCL ')) {
-    const section = ref.replace('MCL ', '').replace(/\s/g, '');
-    return `http://www.legislature.mi.gov/doc.aspx?mcl-${section}`;
+    const section = baseRef.replace('MCL ', '').replace(/\s*et seq\.?$/, '').replace('.', '-');
+    return `https://www.legislature.mi.gov/Laws/MCL?objectName=mcl-${section}`;
   }
 
   return null;
+}
+
+const RULES = 'https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702';
+const COURT_RULE_LINKS = [
+  [`${RULES}/chapter-1-applicability-and-definitions/rule-1109-court-records-defined-documents`, 'MCR 1.109 - E-Filing & Document Standards'],
+  [`${RULES}/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2111-general-rules-of-pleading`, 'MCR 2.111 - General Rules of Pleading'],
+  [`${RULES}/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2116-summary-disposition`, 'MCR 2.116 - Summary Disposition'],
+  [`${RULES}/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2119-motion-practice`, 'MCR 2.119 - Motion Practice'],
+  [`${RULES}/chapter-2-civil-procedure/subchapter-2500-discovery/rule-2506-subpoena-order-to-attend`, 'MCR 2.506 - Subpoenas'],
+  ['https://www.legislature.mi.gov/Laws/MCL?objectName=mcl-600-2201', 'MCL 600.2201 et seq. - Uniform Interstate Depositions and Discovery Act'],
+  [RULES, 'Full Michigan Court Rules'],
+];
+
+function RequirementList({ requirements }: { requirements: FilingRequirement[] }) {
+  return (
+    <ul className="requirement-list">
+      {requirements.map((req) => {
+        const url = req.mcr_reference && getRuleUrl(req.mcr_reference);
+        return (
+          <li key={req.id}>
+            {req.description}
+            {req.mcr_reference && <> ({url
+              ? <a href={url} target="_blank" rel="noopener noreferrer">{req.mcr_reference}</a>
+              : req.mcr_reference})</>}
+            {req.page_limit && <p className="req-detail">Page limit: {req.page_limit} pages</p>}
+            {req.format_notes && <p className="req-detail">{req.format_notes}</p>}
+            {req.local_rule_reference && <p className="req-detail">Local rule: {req.local_rule_reference}</p>}
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 interface Props {
@@ -48,69 +77,74 @@ interface Props {
 
 function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
   const [caseTypes, setCaseTypes] = useState<CaseType[]>([]);
-  const [requirements, setRequirements] = useState<FilingRequirement[]>([]);
+  const [requirementsResult, setRequirementsResult] = useState<{
+    key: string; requirements?: FilingRequirement[]; error?: LoadFailure;
+  }>();
+  const [requirementsAttempt, setRequirementsAttempt] = useState(0);
+  const requirementsKey = `${courtId}:${selectedCaseTypeId}:${requirementsAttempt}`;
+  const currentRequirements = requirementsResult?.key === requirementsKey ? requirementsResult : undefined;
+  const requirements = currentRequirements?.requirements ?? [];
   const [loading, setLoading] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadFailure | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    const controller = new AbortController();
     async function fetchCaseTypes() {
       setLoading(true);
       setError(null);
       try {
-        const types = await getCaseTypes(courtId);
+        const types = await getCaseTypes(courtId, false, controller.signal);
+        if (controller.signal.aborted) return;
         setCaseTypes(types);
-      } catch {
-        setError("We couldn't load case types for this court. Please retry.");
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        setError(loadFailure(err, "We couldn't load case types for this court. Please retry."));
         setCaseTypes([]);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
     fetchCaseTypes();
+    return () => controller.abort();
   }, [courtId, reloadKey]);
 
   useEffect(() => {
-    if (!selectedCaseTypeId) {
-      setRequirements([]); // eslint-disable-line react-hooks/set-state-in-effect -- sync clear on selection change
-      return;
-    }
+    if (!selectedCaseTypeId) return;
+    const controller = new AbortController();
     async function fetchRequirements() {
       try {
-        const reqs = await getFilingRequirements(courtId, selectedCaseTypeId!, 'initial');
-        setRequirements(reqs);
-      } catch {
-        setRequirements([]);
+        const reqs = await getFilingRequirements(courtId, selectedCaseTypeId!, 'initial', controller.signal);
+        if (!controller.signal.aborted) setRequirementsResult({ key: requirementsKey, requirements: reqs });
+      } catch (err) {
+        if (!controller.signal.aborted) setRequirementsResult({ key: requirementsKey,
+          error: loadFailure(err, 'Could not load requirements for this case type. Please retry before continuing.') });
       }
     }
     fetchRequirements();
-  }, [courtId, selectedCaseTypeId]);
+    return () => controller.abort();
+  }, [courtId, selectedCaseTypeId, requirementsKey]);
 
   const categories = [...new Set(caseTypes.map(ct => ct.category))];
 
-  const filtered = caseTypes.filter(ct => {
-    if (categoryFilter && ct.category !== categoryFilter) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return ct.name.toLowerCase().includes(q) || ct.code.toLowerCase().includes(q);
-    }
-    return true;
-  });
+  const matchesFilters = (ct: CaseType) => (!categoryFilter || ct.category === categoryFilter)
+    && (!searchQuery || ct.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const noMatches = !caseTypes.some(matchesFilters);
+  const listed = caseTypes.filter(ct => matchesFilters(ct) || ct.id === selectedCaseTypeId);
 
   const requiredDocs = requirements.filter(r => r.is_required);
   const optionalDocs = requirements.filter(r => !r.is_required);
 
   return (
     <div className="form-section">
-      <h3>Select Case Type & Review Requirements</h3>
+      <h2>Choose a case type and review its requirements</h2>
       <p className="info-text">
         Choose the type of case for your filing. After selecting, review the filing
         requirements below to ensure you have all necessary documents.
       </p>
 
-      {/* Filters */}
       <div className="filter-row">
         <div className="form-group">
           <label htmlFor="categoryFilter">Category</label>
@@ -119,7 +153,7 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
           >
-            <option value="">All Categories</option>
+            <option value="">All categories</option>
             {categories.map(c => (
               <option key={c} value={c}>{c.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())}</option>
             ))}
@@ -138,138 +172,56 @@ function CaseTypeSelector({ courtId, selectedCaseTypeId, onSelect }: Props) {
       </div>
 
       {loading && <p>Loading case types…</p>}
-      {error && <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />}
+      {error && <LoadError failure={error} onRetry={() => setReloadKey((k) => k + 1)} />}
 
-      <div className="case-type-list">
-        {filtered.map((ct) => (
-          <div
-            key={ct.id}
-            className={`case-type-card ${selectedCaseTypeId === ct.id ? 'selected' : ''}`}
-            onClick={() => onSelect(ct.id, ct.name)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelect(ct.id, ct.name); }}
-            aria-selected={selectedCaseTypeId === ct.id}
-          >
-            <div className="case-type-header">
-              <h4>{ct.name}</h4>
-              <span className={`case-type-fee ${ct.filing_fee_cents === 0 ? 'fee-free' : ''}`}>
-                {formatFee(ct.filing_fee_cents)}
-              </span>
-            </div>
-            <div className="case-type-meta">
-              <span className="case-type-category">{ct.category}</span>
-              <span className="case-type-code">{ct.code}</span>
-            </div>
-            {ct.description && <p className="case-type-desc">{ct.description}</p>}
-          </div>
+      <fieldset className="case-type-list">
+        <legend className="sr-only">Case type</legend>
+        {listed.map((ct) => (
+          <label key={ct.id} className={`case-type-option ${selectedCaseTypeId === ct.id ? 'selected' : ''}`}>
+            <input
+              type="radio"
+              name="caseType"
+              checked={selectedCaseTypeId === ct.id}
+              onChange={() => onSelect(ct.id, ct.name)}
+            />
+            <span>{ct.name}</span>
+            <span className={`case-type-fee ${ct.filing_fee_cents === 0 ? 'fee-free' : ''}`}>
+              {formatFee(ct.filing_fee_cents)}
+            </span>
+            {ct.description && <span className="case-type-desc">{ct.description}</span>}
+          </label>
         ))}
-        {!loading && !error && filtered.length === 0 && (
-          <p className="no-results">No case types match your filters.</p>
-        )}
-      </div>
+      </fieldset>
+      {!loading && !error && noMatches && (
+        <p className="no-results">{listed.length > 0 ? 'No other case types match your filters.' : 'No case types match your filters.'}</p>
+      )}
 
-      {/* Filing Requirements - shown after selecting a case type */}
+      {selectedCaseTypeId && !currentRequirements && <p role="status">Loading filing requirements…</p>}
+      {currentRequirements?.error && <LoadError failure={currentRequirements.error}
+        onRetry={() => setRequirementsAttempt(attempt => attempt + 1)} />}
       {selectedCaseTypeId && requirements.length > 0 && (
         <div className="requirements-section">
-          <h4>Filing Requirements & Court Rules</h4>
+          <h3>Filing requirements and court rules</h3>
           <p className="info-text">
             Review these requirements carefully. Missing required documents may cause the
             clerk to return your filing for correction.
           </p>
 
-          {requiredDocs.length > 0 && (
-            <div className="requirements-group">
-              <h5 className="req-group-header req-required">Required Documents ({requiredDocs.length})</h5>
-              <div className="requirements-cards">
-                {requiredDocs.map((req) => (
-                  <div key={req.id} className="requirement-card required">
-                    <div className="req-card-header">
-                      <span className="req-badge required">Required</span>
-                      {req.mcr_reference && (() => {
-                        const url = getRuleUrl(req.mcr_reference);
-                        return url ? (
-                          <a href={url} target="_blank" rel="noopener noreferrer" className="mcr-ref mcr-link">
-                            {req.mcr_reference}
-                          </a>
-                        ) : (
-                          <span className="mcr-ref">{req.mcr_reference}</span>
-                        );
-                      })()}
-                    </div>
-                    <h5>{req.description}</h5>
-                    <code className="req-code">{req.document_type_code}</code>
-                    {req.page_limit && (
-                      <p className="req-detail">Page limit: {req.page_limit} pages</p>
-                    )}
-                    {req.format_notes && (
-                      <p className="req-detail">{req.format_notes}</p>
-                    )}
-                    {req.local_rule_reference && (
-                      <p className="req-detail">Local Rule: {req.local_rule_reference}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {requiredDocs.length > 0 && <>
+            <h4>Required documents ({requiredDocs.length})</h4>
+            <RequirementList requirements={requiredDocs} />
+          </>}
+          {optionalDocs.length > 0 && <>
+            <h4>Optional documents ({optionalDocs.length})</h4>
+            <RequirementList requirements={optionalDocs} />
+          </>}
 
-          {optionalDocs.length > 0 && (
-            <div className="requirements-group">
-              <h5 className="req-group-header req-optional">Optional Documents ({optionalDocs.length})</h5>
-              <div className="requirements-cards">
-                {optionalDocs.map((req) => (
-                  <div key={req.id} className="requirement-card optional">
-                    <div className="req-card-header">
-                      <span className="req-badge optional">Optional</span>
-                      {req.mcr_reference && (() => {
-                        const url = getRuleUrl(req.mcr_reference);
-                        return url ? (
-                          <a href={url} target="_blank" rel="noopener noreferrer" className="mcr-ref mcr-link">
-                            {req.mcr_reference}
-                          </a>
-                        ) : (
-                          <span className="mcr-ref">{req.mcr_reference}</span>
-                        );
-                      })()}
-                    </div>
-                    <h5>{req.description}</h5>
-                    <code className="req-code">{req.document_type_code}</code>
-                    {req.format_notes && (
-                      <p className="req-detail">{req.format_notes}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {/* Court Rules Quick Reference */}
-          <div className="court-rules-reference">
-            <h5>Michigan Court Rules - Quick Reference</h5>
-            <div className="rules-links">
-              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-1-applicability-and-definitions/rule-1109-court-records-defined-documents" target="_blank" rel="noopener noreferrer">
-                MCR 1.109 - E-Filing & Document Standards
-              </a>
-              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2111-general-rules-of-pleading" target="_blank" rel="noopener noreferrer">
-                MCR 2.111 - General Rules of Pleading
-              </a>
-              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2116-summary-disposition" target="_blank" rel="noopener noreferrer">
-                MCR 2.116 - Summary Disposition
-              </a>
-              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2100-pleadings-and-motions/rule-2119-motion-practice" target="_blank" rel="noopener noreferrer">
-                MCR 2.119 - Motion Practice
-              </a>
-              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702/chapter-2-civil-procedure/subchapter-2500-discovery/rule-2506-subpoena-order-to-attend" target="_blank" rel="noopener noreferrer">
-                MCR 2.506 - Subpoenas
-              </a>
-              <a href="http://www.legislature.mi.gov/doc.aspx?mcl-600-2163a" target="_blank" rel="noopener noreferrer">
-                MCL 600.2163a - Uniform Interstate Depositions Act
-              </a>
-              <a href="https://courts.michigan.gov/courts/michigansupremecourt/rules/court-rules-702" target="_blank" rel="noopener noreferrer">
-                Full Michigan Court Rules
-              </a>
-            </div>
-          </div>
+          <h4>Michigan Court Rules</h4>
+          <ul className="requirement-list">
+            {COURT_RULE_LINKS.map(([href, label]) => (
+              <li key={href}><a href={href} target="_blank" rel="noopener noreferrer">{label}</a></li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

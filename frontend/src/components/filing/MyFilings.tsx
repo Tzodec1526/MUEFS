@@ -1,35 +1,34 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { listFilings, FilingSummary } from '../../api/filings';
 import LoadError from '../common/LoadError';
-import { parseServerDate } from '../../utils/format';
+import { loadFailure, type LoadFailure } from '../../utils/errors';
+import { FILING_STATUS_LABELS, filingStatusLabel } from '../../utils/filingStatus';
+import { formatDateTime, plural } from '../../utils/format';
+import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
-  { value: 'draft', label: 'Drafts' },
-  { value: 'submitted', label: 'Submitted' },
-  { value: 'under_review', label: 'Under Review' },
-  { value: 'accepted', label: 'Accepted' },
-  { value: 'rejected', label: 'Rejected' },
-  { value: 'returned', label: 'Returned' },
-  { value: 'served', label: 'Service documents recorded' },
-];
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Draft', submitted: 'Submitted', under_review: 'Under Review',
-  accepted: 'Accepted', rejected: 'Rejected', returned: 'Returned', served: 'Service documents recorded',
-};
+const STATUSES = Object.keys(FILING_STATUS_LABELS);
 
 function MyFilings() {
+  usePageTitle('My filings');
   const navigate = useNavigate();
   const [filings, setFilings] = useState<FilingSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedStatus = searchParams.get('status') ?? '';
+  const statusFilter = STATUSES.includes(requestedStatus) ? requestedStatus : '';
+  const setStatusFilter = (status: string) => setSearchParams(status ? { status } : {});
   const [page, setPage] = useState(1);
+  const [pageStatus, setPageStatus] = useState(statusFilter);
+  if (pageStatus !== statusFilter) {
+    setPageStatus(statusFilter);
+    setPage(1);
+  }
   const [courtNames, setCourtNames] = useState<Record<number, string>>({});
-  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
-  const [error, setError] = useState<string | null>(null);
+  const [statusCounts, setStatusCounts] = useState<Record<string, number> | null>(null);
+  const [error, setError] = useState<LoadFailure | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -47,9 +46,9 @@ function MyFilings() {
         setTotal(result.total);
         setCourtNames(result.court_names);
         setStatusCounts(result.status_counts);
-      } catch {
+      } catch (err) {
         if (controller.signal.aborted) return;
-        setError("We couldn't load your filings. Please retry.");
+        setError(loadFailure(err, "We couldn't load your filings. Please retry."));
         setFilings([]);
         setTotal(0);
       } finally {
@@ -60,68 +59,41 @@ function MyFilings() {
     return () => controller.abort();
   }, [statusFilter, page, reloadKey]);
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '--';
-    return parseServerDate(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const countOf = (status: string) => statusCounts ? ` (${statusCounts[status] ?? 0})` : '';
+  const allCount = statusCounts ? ` (${Object.values(statusCounts).reduce((sum, count) => sum + count, 0)})` : '';
 
   return (
     <div className="my-filings">
       <div className="page-header">
-        <h2>My Filings</h2>
-        <Link to="/filing/new" className="btn btn-primary">New Filing</Link>
+        <PageHeading>My filings</PageHeading>
+        <Link to="/filing/new" className="btn btn-primary">New filing</Link>
       </div>
 
-      {/* Status summary cards */}
-      <div className="status-summary">
-        {Object.entries(STATUS_LABELS).map(([s, label]) => {
-          return (
-            <button
-              key={s}
-              className={`status-card ${statusFilter === s ? 'active' : ''}`}
-              onClick={() => { setStatusFilter(statusFilter === s ? '' : s); setPage(1); }}
-            >
-              <span className="status-card-count">{statusCounts[s] || 0}</span>
-              <span className={`status-badge ${s}`}>{label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Filters */}
       <div className="filings-controls">
         <div className="form-group">
-          <select
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            aria-label="Filter by status"
-          >
-            {STATUS_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
+          <label htmlFor="filingStatus">Filter by status</label>
+          <select id="filingStatus" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">All statuses{allCount}</option>
+            {STATUSES.map(status => (
+              <option key={status} value={status}>{FILING_STATUS_LABELS[status]}{countOf(status)}</option>
             ))}
           </select>
         </div>
-        <span className="results-count">{total} filing(s)</span>
+        {!error && <span className="results-count">{plural(total, 'filing')}</span>}
       </div>
 
       {loading && <p className="loading">Loading filings...</p>}
-      {error && <LoadError message={error} onRetry={() => setReloadKey((k) => k + 1)} />}
+      {error && <LoadError failure={error} onRetry={() => setReloadKey((k) => k + 1)} />}
 
       {!loading && !error && filings.length === 0 && (
         <div className="empty-state">
-          <h3>No filings found</h3>
+          <h2>No filings found</h2>
           <p>
             {statusFilter
               ? 'No filings match the selected filter.'
               : 'You haven\'t filed anything yet.'}
           </p>
-          <Link to="/filing/new" className="btn btn-primary">Create Your First Filing</Link>
+          <Link to="/filing/new" className="btn btn-primary">Create your first filing</Link>
         </div>
       )}
 
@@ -132,13 +104,13 @@ function MyFilings() {
               <div key={filing.id} className="filing-card">
                 <div className="filing-card-header">
                   <span className="filing-card-id">#{filing.id}</span>
-                  <span className={`status-badge ${filing.status}`}>{STATUS_LABELS[filing.status] || filing.status}</span>
+                  <span className={`status-badge ${filing.status}`}>{filingStatusLabel(filing.status)}</span>
                 </div>
-                <h4 className="filing-card-title">{filing.case_title || 'Untitled Filing'}</h4>
+                <h2 className="filing-card-title">{filing.case_title || 'Untitled filing'}</h2>
                 <div className="filing-card-meta">
                   <span>{courtNames[filing.court_id] || `Court #${filing.court_id}`}</span>
-                  <span>{filing.document_count} document(s)</span>
-                  <span>{formatDate(filing.submitted_at || filing.created_at)}</span>
+                  <span>{plural(filing.document_count, 'document')}</span>
+                  <span>{formatDateTime(filing.submitted_at || filing.created_at)}</span>
                 </div>
                 {filing.rejection_reason && (
                   <div className="filing-card-reason">
@@ -147,17 +119,17 @@ function MyFilings() {
                 )}
                 <div className="filing-card-actions">
                   {filing.status === 'draft' && (
-                    <button className="btn btn-primary btn-small" onClick={() => navigate(`/filing/new?filing_id=${filing.id}`)}>Continue Filing</button>
+                    <button className="btn btn-primary btn-small" onClick={() => navigate(`/filing/new?filing_id=${filing.id}`)}>Continue filing</button>
                   )}
                   {filing.status === 'returned' && (
-                    <button className="btn btn-warning btn-small" onClick={() => navigate(`/filing/new?filing_id=${filing.id}`)}>Resubmit</button>
+                    <button className="btn btn-primary btn-small" onClick={() => navigate(`/filing/new?filing_id=${filing.id}`)}>Resubmit</button>
                   )}
                   {filing.case_id ? (
-                    <button className="btn btn-secondary btn-small" onClick={() => navigate(`/cases/${filing.case_id}`)}>View Case</button>
+                    <button className="btn btn-secondary btn-small" onClick={() => navigate(`/cases/${filing.case_id}`)}>View case</button>
                   ) : (
-                    <button className="btn btn-secondary btn-small" onClick={() => navigate(`/filing/new?filing_id=${filing.id}`)}>View Filing</button>
+                    <button className="btn btn-secondary btn-small" onClick={() => navigate(`/filing/new?filing_id=${filing.id}`)}>View filing</button>
                   )}
-                  {filing.submitted_at && <Link className="btn btn-secondary btn-small" to={`/filings/${filing.id}/history`}>Receipts &amp; history</Link>}
+                  {filing.submitted_at && <Link className="btn btn-secondary btn-small" to={`/filings/${filing.id}/history`}>Receipts and history</Link>}
                 </div>
               </div>
             );
@@ -165,13 +137,12 @@ function MyFilings() {
         </div>
       )}
 
-      {/* Pagination */}
       {total > 25 && (
         <div className="pagination">
           <button
             className="btn btn-secondary btn-small"
             disabled={page <= 1 || loading}
-            onClick={() => setPage(p => p - 1)}
+            onClick={() => setPage(page - 1)}
           >
             Previous
           </button>
@@ -179,7 +150,7 @@ function MyFilings() {
           <button
             className="btn btn-secondary btn-small"
             disabled={page >= Math.ceil(total / 25) || loading}
-            onClick={() => setPage(p => p + 1)}
+            onClick={() => setPage(page + 1)}
           >
             Next
           </button>

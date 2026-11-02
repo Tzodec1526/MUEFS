@@ -1,5 +1,3 @@
-"""Consistent, read-only snapshots for records export and recovery verification."""
-
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -9,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
 
 
 class ReadOnlyDatabaseError(ValueError):
-    """Operator guidance that does not disclose connection credentials."""
+    pass
 
 
 @asynccontextmanager
@@ -33,7 +31,6 @@ async def read_only_connection(database_url: str) -> AsyncIterator[AsyncConnecti
                 await connection.exec_driver_sql("SET TRANSACTION READ ONLY")
             else:
                 await connection.exec_driver_sql("PRAGMA query_only=ON")
-                # sqlite3's legacy transaction mode does not begin on SELECT alone.
                 await connection.exec_driver_sql("BEGIN")
             yield connection
     finally:

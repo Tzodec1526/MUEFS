@@ -1,5 +1,3 @@
-"""Interrupted index replacement preserves notices and their retained email attempts."""
-
 from datetime import UTC, datetime
 from pathlib import Path
 

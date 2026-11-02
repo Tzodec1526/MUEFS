@@ -1,5 +1,3 @@
-"""Restored delivery selections must agree before an audit or export can succeed."""
-
 import asyncio
 import json
 import os
@@ -79,7 +77,6 @@ async def service_records(case_records, stored_document, smtp_sink, monkeypatch)
 
 @asynccontextmanager
 async def damaged_restore(db, model, operation="update"):
-    """Only the owner of this disposable restored fixture disables a retention guard."""
     table = model.__tablename__
     postgres = db.bind.dialect.name == "postgresql"
     if postgres:
@@ -195,7 +192,6 @@ async def test_corrupt_delivery_cannot_be_reported_or_exported_as_complete(
         await case_export.export_case(data["case"].id, target)
     assert not target.exists() and not list(tmp_path.glob(".case-export-*"))
     if damage in ("source", "case", "notice_case", "contact_case"):
-        # Cross-case corruption must also block the other case's export.
         with pytest.raises(case_export.CaseExportError, match="retained"):
             await case_export.export_case(data["other_case"].id, target)
 
@@ -229,7 +225,6 @@ async def test_missing_packet_or_source_is_detected_in_an_incomplete_sqlite_rest
 ):
     data = service_records
     async with data["sessions"].begin() as db:
-        # SQLite restores can retain dangling references when foreign-key checking was off.
         async with damaged_restore(db, FilingTransaction, "delete"):
             await db.execute(delete(FilingTransaction).where(
                 FilingTransaction.id == data["packet"].source_transaction_id,

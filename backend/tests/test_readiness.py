@@ -1,19 +1,20 @@
-"""A running process must not report readiness with an incompatible database."""
-
 import asyncio
+import logging
 import os
-import socket
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from alembic.config import Config
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, make_url, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from alembic import command
 from app import database
+from app.config import settings
 from app.demo.schema import prepare_demo_schema
 from app.main import app
 from tests.test_filing_concurrency import POSTGRES_URL
@@ -82,32 +83,37 @@ async def test_an_incompatible_revision_is_not_changed_by_a_probe(current_databa
 async def test_connection_failure_is_sanitized_and_does_not_affect_liveness(
     monkeypatch, tmp_path, caplog, dialect,
 ):
+    secret = "private-connection-detail"
     if dialect == "sqlite":
-        url = f"sqlite+aiosqlite:///{tmp_path / 'private-connection-detail' / 'absent.db'}"
+        url = f"sqlite+aiosqlite:///{tmp_path / secret / 'absent.db'}"
     else:
-        # Hold a non-listening socket so no other local service can take this port.
-        unavailable = socket.socket()
-        unavailable.bind(("127.0.0.1", 0))
-        port = unavailable.getsockname()[1]
-        url = f"postgresql+asyncpg://probe:private-connection-detail@127.0.0.1:{port}/absent"
+        url = f"postgresql+asyncpg://probe:{secret}@db.internal:5432/absent"
     engine = create_async_engine(url)
+
+    @event.listens_for(engine.sync_engine, "do_connect")
+    def refuse(driver_dialect, _record, _args, _params):
+        raise driver_dialect.loaded_dbapi.OperationalError(f"could not connect to {url}")
+
     monkeypatch.setattr(database, "engine", engine)
+    caplog.set_level(logging.DEBUG, logger="app.readiness")
     try:
         async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
             response = await asyncio.wait_for(client.get("/ready"), timeout=5)
             assert response.status_code == 503
             assert response.json()["reason"] == "database_unavailable"
-            assert "private-connection-detail" not in response.text + caplog.text
             assert (await client.get("/health")).status_code == 200
+        logged = [record.getMessage() for record in caplog.records
+                  if record.name == "app.readiness"]
+        assert len(logged) == 1 and "OperationalError" in logged[0]
+        assert secret not in response.text
+        assert secret not in caplog.text
     finally:
         await engine.dispose()
-        if dialect == "postgres":
-            unavailable.close()
 
 
 async def test_pool_wait_is_bounded_and_recovers(current_database):
     async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
-        async with current_database.connect():  # The single pool slot is occupied.
+        async with current_database.connect():
             check = asyncio.create_task(client.get("/ready"))
             assert (await asyncio.wait_for(client.get("/health"), timeout=1)).status_code == 200
             response = await asyncio.wait_for(check, timeout=5)
@@ -137,7 +143,7 @@ async def test_postgres_probe_times_out_on_a_schema_lock_and_recovers(
 
 @pytest.mark.skipif(not POSTGRES_URL, reason="MUEFS_TEST_POSTGRES_URL not configured")
 @pytest.mark.parametrize("postgres_sessions", ["d84a19f2c6b0"], indirect=True)
-async def test_postgres_readiness_observes_only_committed_schema_revisions(
+async def test_postgres_readiness_follows_each_committed_schema_revision(
     postgres_sessions, monkeypatch,
 ):
     from alembic.config import Config
@@ -156,27 +162,39 @@ async def test_postgres_readiness_observes_only_committed_schema_revisions(
         command.upgrade(config, "head")
 
     async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
-        assert (await client.get("/ready")).status_code == 503
-        # Alembic must own transactions for concurrent index builds.
+
+        async def probe():
+            response = await client.get("/ready")
+            return response.status_code, response.json().get("reason")
+
+        assert await probe() == (503, "schema_mismatch")
         async with engine.connect() as connection:
             await connection.run_sync(migrate)
             head = await connection.scalar(text("SELECT version_num FROM alembic_version"))
-        assert (await client.get("/ready")).status_code == 200
+        assert await probe() == (200, None)
         async with engine.begin() as connection:
             await connection.execute(text(
                 "UPDATE alembic_version SET version_num = 'd84a19f2c6b0'",
             ))
-        assert (await client.get("/ready")).status_code == 503
+        assert await probe() == (503, "schema_mismatch")
         async with engine.begin() as connection:
             await connection.execute(text("UPDATE alembic_version SET version_num = :head"),
                                      {"head": head})
-            assert (await client.get("/ready")).status_code == 503
-        response = await client.get("/ready")
-        assert response.status_code == 200, response.text
+        assert await probe() == (200, None)
+
+
+def test_migrations_accept_a_url_encoded_database_address(tmp_path, monkeypatch):
+    address = f"sqlite:///{(tmp_path / 'p%40ss.db').as_posix()}"
+    monkeypatch.setattr(settings, "database_url", address)
+    config = Config()
+    config.set_main_option(
+        "script_location", str(Path(__file__).resolve().parents[1] / "alembic"),
+    )
+    command.current(config)
+    assert Path(make_url(address).database).exists()
 
 
 def test_hosted_demo_probes_do_not_allocate_sessions_or_recreate_missing_storage(tmp_path):
-    # Importing this entry point mutates the global app; exercise it in its own process.
     code = r'''
 import asyncio
 from pathlib import Path
@@ -204,6 +222,11 @@ async def exercise():
                 assert "set-cookie" not in result.headers
             assert not session_db._last_access
             assert set(directory.rglob("*.db")) == original_files
+            probe = await client.get("/api/v1/courts")
+            assert probe.status_code == 200, probe.text
+            assert "set-cookie" not in probe.headers
+            assert set(directory.rglob("*.db")) == original_files
+            assert "set-cookie" in (await client.get("/")).headers
             visitor = await client.get("/api/v1/courts")
             assert visitor.status_code == 200, visitor.text
             assert "set-cookie" in visitor.headers

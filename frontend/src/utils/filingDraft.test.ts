@@ -23,6 +23,24 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('unsaved filing recovery', () => {
+  it('keeps the case number of an existing case', () => {
+    const key = filingDraftKey(1, '7');
+    saveFilingDraft(key, { ...draft, caseId: 42, caseNumber: '2026-000042-CZ' });
+    expect(loadFilingDraft(key)?.caseNumber).toBe('2026-000042-CZ');
+  });
+
+  it('still reads a draft saved before case numbers were kept', () => {
+    const key = filingDraftKey(1, '7');
+    sessionStorage.setItem(key, JSON.stringify(draft));
+    expect(loadFilingDraft(key)?.caseTitle).toBe('Unsaved title');
+  });
+
+  it('refuses a draft whose case number is not text', () => {
+    const key = filingDraftKey(1, '7');
+    sessionStorage.setItem(key, JSON.stringify({ ...draft, caseNumber: 42 }));
+    expect(loadFilingDraft(key)).toBeNull();
+  });
+
   it('keeps separate account/filing edits and excludes document and payment state', () => {
     const first = filingDraftKey(1, '7'), second = filingDraftKey(1, '8');
     const otherAccount = filingDraftKey(2, '7');

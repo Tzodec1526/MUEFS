@@ -1,18 +1,17 @@
-"""Filing dates depend on the court calendar, not clerk acceptance or viewer timezone."""
-
 from datetime import UTC, date, datetime
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
 from app.models.case import Case
 from app.models.court_calendar import CourtCalendar
+from app.models.filing import FilingStatus
 from app.models.filing_transaction import FilingTransaction
 from app.models.user import CourtRole, UserCourtRole
 from app.services import filing_service
-from app.services.court_calendar_service import assess_date
+from app.services.court_calendar_service import assess_date, filing_date_for_receipt
 from tests.test_filing_history import filing_fixture
 
 
@@ -182,6 +181,187 @@ async def test_acceptance_uses_receipt_date_and_preserves_old_calendar_evidence(
     )
     assert reassessment.details["previous_filing_date"] == "2026-09-04"
     assert reassessment.details["filing_date_basis"]["calendar_ids"] == [2]
+
+
+async def returned_and_resubmitted(
+    db_session, monkeypatch, stored_document, *, publish_first=True,
+):
+    fid, filer, clerk, _ = await filing_fixture(db_session)
+    db_session.add(stored_document(fid))
+    await db_session.flush()
+    filing = await filing_service.get_filing(db_session, fid)
+
+    async def publish():
+        published = calendar()
+        published.court_id, published.published_by = filing.court_id, clerk
+        db_session.add(published)
+        await db_session.flush()
+
+    if publish_first:
+        await publish()
+    received = datetime(2026, 9, 4, 20, tzinfo=UTC)
+    corrected = datetime(2026, 9, 16, 20, tzinfo=UTC)
+    clock = {"now": received}
+
+    class ReceiptClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return clock["now"]
+
+    monkeypatch.setattr(filing_service, "datetime", ReceiptClock)
+    await filing_service.submit_filing(db_session, fid)
+    await filing_service.review_filing(
+        db_session, fid, clerk, "return", "Correct attachment", expected_submission_count=1
+    )
+    if not publish_first:
+        await publish()
+    clock["now"] = corrected
+    await filing_service.submit_filing(db_session, fid)
+    monkeypatch.setattr(filing_service, "datetime", datetime)
+    return fid, clerk, received, corrected
+
+
+async def test_a_resubmission_keeps_the_date_the_filing_was_filed(
+    db_session, monkeypatch, stored_document,
+):
+    fid, clerk, received, corrected = await returned_and_resubmitted(
+        db_session, monkeypatch, stored_document,
+    )
+    filing = await filing_service.get_filing(db_session, fid)
+    assert filing.filing_date == date(2026, 9, 4)
+    assert filing.filing_date_basis["local_received_date"] == "2026-09-04"
+    assert filing.submitted_at.replace(tzinfo=UTC) == corrected
+    receipts = list(await db_session.scalars(
+        select(FilingTransaction).where(FilingTransaction.event_type == "submitted")
+        .order_by(FilingTransaction.submission_number)
+    ))
+    assert [item.submission_number for item in receipts] == [1, 2]
+    assert [item.occurred_at.replace(tzinfo=UTC) for item in receipts] == [received, corrected]
+    assert receipts[1].details["filing_date_basis"]["filing_date"] == "2026-09-04"
+
+    accepted = await filing_service.review_filing(
+        db_session, fid, clerk, "accept", expected_submission_count=2
+    )
+    case = await db_session.get(Case, accepted.case_id)
+    assert accepted.filing_date == case.filing_date == date(2026, 9, 4)
+    assert case.filed_date.replace(tzinfo=UTC) == received
+
+
+async def test_a_resubmission_resolves_an_unset_date_from_the_first_receipt(
+    db_session, monkeypatch, stored_document,
+):
+    fid, *_ = await returned_and_resubmitted(
+        db_session, monkeypatch, stored_document, publish_first=False,
+    )
+    filing = await filing_service.get_filing(db_session, fid)
+    assert filing.filing_date == date(2026, 9, 4)
+    assert filing.filing_date_basis["local_received_date"] == "2026-09-04"
+
+
+async def test_acceptance_reassesses_the_first_receipt_after_a_resubmission(
+    db_session, monkeypatch, stored_document,
+):
+    fid, clerk, received, _ = await returned_and_resubmitted(
+        db_session, monkeypatch, stored_document,
+    )
+    filing = await filing_service.get_filing(db_session, fid)
+    newer = calendar(id=2, closed={"2026-09-04": "Emergency closure", "2026-09-07": "Labor Day"})
+    newer.court_id, newer.published_by = filing.court_id, clerk
+    db_session.add(newer)
+    await db_session.flush()
+    accepted = await filing_service.review_filing(
+        db_session, fid, clerk, "accept", expected_submission_count=2
+    )
+    case = await db_session.get(Case, accepted.case_id)
+    assert accepted.filing_date == case.filing_date == date(2026, 9, 8)
+    assert case.filed_date.replace(tzinfo=UTC) == received
+
+
+@pytest.mark.parametrize("assessed", [False, True])
+async def test_a_filing_returned_before_transaction_history_keeps_its_first_receipt(
+    db_session, monkeypatch, stored_document, assessed,
+):
+    fid, _filer, clerk, _ = await filing_fixture(db_session)
+    db_session.add(stored_document(fid))
+    await db_session.flush()
+    filing = await filing_service.get_filing(db_session, fid)
+    published = calendar()
+    published.court_id, published.published_by = filing.court_id, clerk
+    db_session.add(published)
+    await db_session.flush()
+    received = datetime(2026, 9, 4, 20, tzinfo=UTC)
+    corrected = datetime(2026, 9, 16, 20, tzinfo=UTC)
+    filing.status, filing.submitted_at = FilingStatus.RETURNED, received
+    if assessed:
+        assessment = await filing_date_for_receipt(db_session, filing.court_id, received)
+        filing.filing_date = assessment.filing_date
+        filing.filing_date_basis = assessment.model_dump(mode="json")
+    await db_session.flush()
+    assert filing.submission_count == 0
+    assert await db_session.scalar(select(func.count()).select_from(FilingTransaction)) == 0
+
+    class ReceiptClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return corrected
+
+    monkeypatch.setattr(filing_service, "datetime", ReceiptClock)
+    resubmitted = await filing_service.submit_filing(db_session, fid)
+    monkeypatch.setattr(filing_service, "datetime", datetime)
+    assert resubmitted.filing_date == date(2026, 9, 4)
+    assert resubmitted.filing_date_basis["local_received_date"] == "2026-09-04"
+    assert resubmitted.submitted_at == corrected
+
+    accepted = await filing_service.review_filing(
+        db_session, fid, clerk, "accept", expected_submission_count=1
+    )
+    case = await db_session.get(Case, accepted.case_id)
+    assert accepted.filing_date == case.filing_date == date(2026, 9, 4)
+    assert accepted.filing_date_basis["local_received_date"] == "2026-09-04"
+    assert case.filed_date == received
+    assert case.case_number.startswith("2026-")
+    assert accepted.submitted_at == corrected
+    assert accepted.filed_at == received
+
+
+async def test_acceptance_falls_back_to_the_receipt_of_a_filing_without_a_stored_one(
+    db_session, api_client, stored_document,
+):
+    fid, _filer, clerk, _ = await filing_fixture(db_session)
+    db_session.add(stored_document(fid))
+    await db_session.flush()
+    filing = await filing_service.get_filing(db_session, fid)
+    published = calendar()
+    published.court_id, published.published_by = filing.court_id, clerk
+    db_session.add(published)
+    received = datetime(2026, 9, 4, 20, tzinfo=UTC)
+    filing.status, filing.submitted_at = FilingStatus.SUBMITTED, received
+    await db_session.flush()
+    assert filing.filed_at is None
+
+    api_client.headers["X-Demo-User-Id"] = str(clerk)
+    accepted = await api_client.post(
+        f"/api/v1/clerk/filings/{fid}/review",
+        json={"expected_submission_count": 0, "action": "accept"},
+    )
+    assert accepted.status_code == 200, accepted.text
+    case = await db_session.get(Case, accepted.json()["case_id"])
+    assert case.filing_date == date(2026, 9, 4)
+    assert case.filed_date == received
+
+
+async def test_a_second_resubmission_keeps_the_stored_first_receipt(
+    db_session, monkeypatch, stored_document,
+):
+    fid, clerk, received, corrected = await returned_and_resubmitted(
+        db_session, monkeypatch, stored_document,
+    )
+    await filing_service.review_filing(
+        db_session, fid, clerk, "return", "Correct again", expected_submission_count=2
+    )
+    again = await filing_service.submit_filing(db_session, fid)
+    assert again.filed_at == received
+    assert again.submitted_at not in (received, corrected)
 
 
 async def test_production_acceptance_requires_calendar_coverage(

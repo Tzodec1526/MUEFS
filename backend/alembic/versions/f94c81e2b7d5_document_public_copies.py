@@ -1,5 +1,3 @@
-"""Retain reviewed public copies independently of their original filing documents."""
-
 import sqlalchemy as sa
 
 from alembic import op
@@ -53,7 +51,6 @@ def upgrade() -> None:
             ON document_public_copies FOR EACH ROW
             EXECUTE FUNCTION protect_document_public_copies()""")
     else:
-        # SQLite supports a nullable REFERENCES column without rebuilding the original table.
         op.execute(
             "ALTER TABLE filing_documents ADD COLUMN public_copy_id INTEGER "
             "REFERENCES document_public_copies(id)"

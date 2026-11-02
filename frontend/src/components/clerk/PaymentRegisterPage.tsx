@@ -2,13 +2,16 @@ import { useContext, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import type { PaymentRegister } from '../../api/payments';
-import { formatCents, parseServerDate } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { formatCents, formatDateTime, plural } from '../../utils/format';
+import { getBlobErrorDetail, loadFailure, type LoadFailure } from '../../utils/errors';
 import { CourtContext, StaffCourtSelect } from '../auth/CourtSession';
 import LoadError from '../common/LoadError';
+import { usePageTitle } from '../../utils/pageTitle';
+import PageHeading from '../common/PageHeading';
 
 export default function PaymentRegisterPage() {
   const { court, courts } = useContext(CourtContext)!;
+  usePageTitle('Receipt register', court?.court_name);
   const courtId = court!.court_id;
   const administrator = courts.some(item => item.court_id === courtId && item.role === 'admin');
   const [filters, setFilters] = useState(() => {
@@ -19,7 +22,7 @@ export default function PaymentRegisterPage() {
   const [dirty, setDirty] = useState(false);
   const [page, setPage] = useState(1);
   const [attempt, setAttempt] = useState(0);
-  const [result, setResult] = useState<{ key: string; data?: PaymentRegister; error?: string }>();
+  const [result, setResult] = useState<{ key: string; data?: PaymentRegister; error?: LoadFailure }>();
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const exportRequest = useRef<AbortController | null>(null);
@@ -32,7 +35,7 @@ export default function PaymentRegisterPage() {
     apiClient.get<PaymentRegister>('/clerk/payment-register', {
       params: { court_id: courtId, ...filters, page }, signal: controller.signal,
     }).then(({ data }) => { if (!controller.signal.aborted) setResult({ key, data }); })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load the receipt register.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load the receipt register.') }); });
     return () => controller.abort();
   }, [courtId, administrator, filters, page, key]);
   useEffect(() => () => exportRequest.current?.abort(), []);
@@ -70,18 +73,14 @@ export default function PaymentRegisterPage() {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
       if (controller.signal.aborted) return;
-      const body = (err as { response?: { data?: unknown } }).response?.data;
-      let detail = getErrorDetail(err);
-      if (body instanceof Blob) {
-        try { detail = getErrorDetail({ response: { data: JSON.parse(await body.text()) } }); } catch { /* Use the readable fallback. */ }
-      }
+      const detail = await getBlobErrorDetail(err);
       if (!controller.signal.aborted) setExportError(detail || 'Could not export the receipt register.');
     } finally { if (!controller.signal.aborted) setExporting(false); }
   }
 
   return <section className="payment-register">
     <StaffCourtSelect disabled={exporting} />
-    <div className="page-header"><h2>External receipt register</h2>
+    <div className="page-header"><PageHeading>Receipt register</PageHeading>
       <Link to="/clerk/fee-reviews" className="btn btn-secondary">Fee reviews</Link></div>
     {!administrator ? <p className="alert alert-warning">An administrator assignment to this court is required to view its receipt register.</p> : <>
       <p>Reconcile credits and reversals by the date the portal recorded them. Compare these entries with the court’s external receipt records.</p>
@@ -105,10 +104,10 @@ export default function PaymentRegisterPage() {
         </fieldset>
       </form>
       {!current && <p role="status">Loading receipt activity…</p>}
-      {current?.error && <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />}
+      {current?.error && <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />}
       {report && <>
-        <h3>{report.date_from} through {report.date_to} · {report.timezone}</h3>
-        <p>{report.total} recorded {report.total === 1 ? 'entry' : 'entries'} · Generated {parseServerDate(report.generated_at).toLocaleString(undefined, { timeZone: report.timezone })} ({report.timezone})</p>
+        <h2 className="card-heading">{report.date_from} through {report.date_to} · {report.timezone}</h2>
+        <p>{plural(report.total, 'recorded entry', 'recorded entries')} · Generated {formatDateTime(report.generated_at, report.timezone)} ({report.timezone})</p>
         <dl className="register-totals">
           <div><dt>External credits</dt><dd>{formatCents(report.totals.credits_cents)}</dd></div>
           <div><dt>Reversals</dt><dd>{formatCents(report.totals.reversals_cents)}</dd></div>
@@ -125,8 +124,8 @@ export default function PaymentRegisterPage() {
             {entry.is_simulated && <span>Simulated</span>}</div>
           <p><Link to={`/filings/${entry.filing_id}/fees`}>Filing #{entry.filing_id}</Link> · Payment #{entry.payment_id}</p>
           <p>{entry.receipt_system} · Receipt {entry.receipt_reference}</p>
-          <p>Recorded {parseServerDate(entry.occurred_at).toLocaleString(undefined, { timeZone: report.timezone })} ({report.timezone}) by {entry.actor_name}</p>
-          <p>Source received {parseServerDate(entry.received_at).toLocaleString(undefined, { timeZone: report.timezone })}</p>
+          <p>Recorded {formatDateTime(entry.occurred_at, report.timezone)} ({report.timezone}) by {entry.actor_name}</p>
+          <p>Source received {formatDateTime(entry.received_at, report.timezone)}</p>
           <details><summary>Reason and retained event</summary><p>{entry.reason}</p><p>Event {entry.event_id}</p>
             <Link to={`/filings/${entry.filing_id}/history`}>View filing history</Link></details>
         </li>)}</ol>

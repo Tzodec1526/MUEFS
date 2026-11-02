@@ -1,5 +1,3 @@
-"""OWASP-aligned HTTP security headers for API and SPA responses."""
-
 from __future__ import annotations
 
 from fastapi import Request, Response
@@ -16,13 +14,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
         identity = HttpUrl(settings.keycloak_url)
-        # PKCE exchanges the authorization code from the browser. Permit the configured
-        # provider origin without opening script loading or unrelated connections.
         self.spa_csp = (
             "default-src 'self'; "
             "script-src 'self'; "
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            "font-src 'self' https://fonts.gstatic.com; "
+            "style-src 'self' 'unsafe-inline'; "
+            "font-src 'self'; "
             "img-src 'self' data:; "
             f"connect-src 'self' {identity.scheme}://{identity.host}:{identity.port}; "
             "frame-ancestors 'none'; "
@@ -51,6 +47,4 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         )
         if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "private, no-store"
-        if not request.url.path.startswith("/api/"):
-            response.headers["Cross-Origin-Embedder-Policy"] = "credentialless"
         return response

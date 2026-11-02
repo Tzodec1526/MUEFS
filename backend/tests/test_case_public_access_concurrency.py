@@ -1,5 +1,3 @@
-"""Real commits serialize court access instructions with grants and revocation."""
-
 import asyncio
 
 import pytest

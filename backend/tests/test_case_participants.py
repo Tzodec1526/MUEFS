@@ -1,5 +1,3 @@
-"""Court-reviewed participation, restricted access, retained history and court scoping."""
-
 from datetime import UTC, datetime
 
 import pytest
@@ -132,7 +130,6 @@ async def test_grant_retirement_preserves_own_filing_and_records_authority(
     assert event["details"]["after"]["access_enabled"] is False
     assert event["details"]["actor_name"] == staff.full_name
     assert event["details"]["reason"] == data["reason"]
-    # Re-saving an unchanged reviewed row should not create fake history or version churn.
     data["expected_version"] = 2
     assert (await api_client.put(f"{path}/{pid}", json=data)).status_code == 200
     assert (await api_client.get(f"{path}/history")).json()["total"] == 2
@@ -142,7 +139,7 @@ async def test_grant_retirement_preserves_own_filing_and_records_authority(
 async def test_private_management_requires_this_courts_assignment(participants_case, api_client):
     users, cases = participants_case
     path = f"/api/v1/cases/{cases[0].id}/participants"
-    for user in users[1:]:  # Other court, filer, counsel, even an unassigned system admin.
+    for user in users[1:]:
         headers = {"X-Demo-User-Id": str(user.id)}
         for suffix in ["", "/history"]:
             assert (await api_client.get(path + suffix, headers=headers)).status_code == 403
@@ -231,7 +228,7 @@ async def test_independent_grants_and_public_records_do_not_expose_private_field
     await db_session.flush()
     headers = {"X-Demo-User-Id": str(party.id)}
     response = await api_client.get(f"/api/v1/cases/{case.id}", headers=headers)
-    assert response.status_code == 200  # The other grant still applies.
+    assert response.status_code == 200
     rows[1].access_enabled = False
     case.is_sealed = False
     await db_session.flush()

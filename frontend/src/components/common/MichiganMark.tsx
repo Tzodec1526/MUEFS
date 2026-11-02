@@ -1,4 +1,3 @@
-/** Outline of the State of Michigan (both peninsulas), drawn in currentColor. */
 function MichiganMark({ size = 26 }: { size?: number }) {
   return (
     <svg

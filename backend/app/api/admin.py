@@ -1,6 +1,5 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
@@ -8,6 +7,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user
+from app.api.params import Page, RecordId
 from app.database import get_db
 from app.models.audit import AuditLog
 from app.models.case import Case
@@ -15,6 +15,7 @@ from app.models.court import Court
 from app.models.filing import FilingEnvelope, FilingStatus
 from app.models.user import CourtRole, User, UserCourtRole, UserType
 from app.schemas.administration import AccountChange, AccountUpdate, CourtRoleChange
+from app.schemas.common import MAX_RECORD_ID
 from app.services import administration_service as administration
 from app.utils.http_context import client_ip, client_user_agent
 
@@ -31,9 +32,6 @@ async def _administration_transaction(db: AsyncSession) -> AsyncIterator[None]:
             409, "This email address, identity subject or court grant is already assigned"
         ) from exc
     except DBAPIError as exc:
-        # Authentication may have updated the actor's verified email before we take
-        # ordered access locks. Let the operator refresh after an overlapping change;
-        # never automatically replay an authority change or expose a database failure.
         if getattr(exc.orig, "sqlstate", None) == "40P01":
             raise HTTPException(
                 409, "Another administration change overlapped this one. Refresh before retrying"
@@ -78,8 +76,8 @@ async def get_system_stats(
 async def get_audit_log(
     action: str | None = None,
     entity_type: str | None = None,
-    user_id: int | None = None,
-    page: int = Query(1, ge=1),
+    user_id: int | None = Query(None, ge=1, le=MAX_RECORD_ID),
+    page: Page = 1,
     page_size: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db, scope="function"),
     _admin: User = Depends(_require_admin),
@@ -198,9 +196,9 @@ async def _user_records(
 
 @router.get("/users")
 async def list_accounts(
-    court_id: int | None = None,
+    court_id: int | None = Query(None, ge=1, le=MAX_RECORD_ID),
     email: str | None = Query(default=None, max_length=255),
-    page: int = Query(1, ge=1),
+    page: Page = 1,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
@@ -210,8 +208,6 @@ async def list_accounts(
         await administration.require_court_administrator(db, current_user, court_id)
     query = select(User)
     if email and email.strip():
-        # Exact lookup lets court administrators add known staff without exposing a
-        # statewide identity directory or other courts' assignments.
         query = query.where(func.lower(User.email) == email.strip().lower())
         if current_user.user_type != UserType.ADMIN:
             query = query.where(User.user_type.in_([UserType.CLERK, UserType.JUDGE]))
@@ -260,7 +256,7 @@ async def provision_account(
 
 @router.put("/users/{user_id}")
 async def change_account(
-    user_id: int,
+    user_id: RecordId,
     data: AccountUpdate,
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -282,8 +278,8 @@ async def change_account(
 
 @router.post("/courts/{court_id}/users/{user_id}/roles")
 async def change_role(
-    court_id: int,
-    user_id: int,
+    court_id: RecordId,
+    user_id: RecordId,
     data: CourtRoleChange,
     request: Request,
     db: AsyncSession = Depends(get_db, scope="function"),
@@ -310,9 +306,9 @@ async def change_role(
 
 @router.get("/users/{user_id}/history")
 async def account_history(
-    user_id: int,
-    court_id: int | None = None,
-    page: int = Query(1, ge=1),
+    user_id: RecordId,
+    court_id: int | None = Query(None, ge=1, le=MAX_RECORD_ID),
+    page: Page = 1,
     db: AsyncSession = Depends(get_db, scope="function"),
     current_user: User = Depends(get_current_user),
 ):
@@ -336,9 +332,7 @@ async def account_history(
                 "actor_id": entry.user_id,
                 "action": entry.action,
                 "details": entry.details,
-                "occurred_at": entry.timestamp.replace(tzinfo=entry.timestamp.tzinfo or UTC)
-                .astimezone(UTC)
-                .isoformat(),
+                "occurred_at": entry.timestamp.isoformat(),
             }
             for entry in rows
         ],

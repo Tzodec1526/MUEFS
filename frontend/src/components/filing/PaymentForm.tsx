@@ -3,17 +3,19 @@ import { Link } from 'react-router-dom';
 import { apiClient } from '../../api/client';
 import { getFilingFees, processPayment, type FilingFees } from '../../api/documents';
 import { updateFiling, uploadDocument, type FilingEnvelope } from '../../api/filings';
-import { formatCents, parseServerDate } from '../../utils/format';
-import { getErrorDetail } from '../../utils/errors';
+import { formatCents, formatDateTime } from '../../utils/format';
+import { errorMessage, loadFailure, type LoadFailure } from '../../utils/errors';
 import LoadError from '../common/LoadError';
 
 const FeeAssessmentForm = lazy(() => import('../clerk/FeeAssessmentForm'));
 const PaymentRecordsPanel = lazy(() => import('./PaymentRecordsPanel'));
 
-export default function PaymentForm({ filingId, onFeesChange }: {
-  filingId: number; onFeesChange?: (filing: FilingEnvelope, obligationMet: boolean) => void;
+export default function PaymentForm({ filingId, headingLevel = 3, onFeesChange }: {
+  filingId: number; headingLevel?: 2 | 3; onFeesChange?: (filing: FilingEnvelope, obligationMet: boolean) => void;
 }) {
-  const [result, setResult] = useState<{ key: string; fees?: FilingFees; filing?: FilingEnvelope; error?: string }>();
+  const Heading = `h${headingLevel}` as const;
+  const Subheading = headingLevel === 2 ? 'h3' : 'h4';
+  const [result, setResult] = useState<{ key: string; fees?: FilingFees; filing?: FilingEnvelope; error?: LoadFailure }>();
   const [attempt, setAttempt] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('credit_card');
   const [waiverFile, setWaiverFile] = useState<File | null>(null);
@@ -36,7 +38,7 @@ export default function PaymentForm({ filingId, onFeesChange }: {
         setResult({ key, fees, filing });
         onFeesChange?.(filing, fees.obligation_met);
       })
-      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: getErrorDetail(err) || 'Could not load filing fees.' }); });
+      .catch(err => { if (!controller.signal.aborted) setResult({ key, error: loadFailure(err, 'Could not load filing fees.') }); });
     return () => controller.abort();
   }, [filingId, key, onFeesChange]);
 
@@ -49,7 +51,7 @@ export default function PaymentForm({ filingId, onFeesChange }: {
       await apiClient.post(`/filings/${filingId}/fee-review`, { expected_version: fees.version, reason: form.get('reason') });
       setNotice('Fee review requested. The court can now review the documents and amount due.');
       setAttempt(n => n + 1);
-    } catch (err) { setError(getErrorDetail(err) || 'Could not request fee review.'); }
+    } catch (err) { setError(errorMessage(err, 'Could not request fee review.')); }
     finally { setBusy(false); }
   }
 
@@ -78,18 +80,18 @@ export default function PaymentForm({ filingId, onFeesChange }: {
         setNotice('Simulated payment recorded. No money was charged.');
       }
       setAttempt(n => n + 1);
-    } catch (err) { setError(getErrorDetail(err) || 'Could not record payment or the fee waiver request. Refresh before retrying.'); }
+    } catch (err) { setError(errorMessage(err, 'Could not record payment or the fee waiver request. Refresh before retrying.')); }
     finally { setBusy(false); }
   }
 
   if (!current) return <p role="status">Loading filing fees…</p>;
-  if (current.error) return <LoadError message={current.error} onRetry={() => setAttempt(n => n + 1)} />;
+  if (current.error) return <LoadError failure={current.error} onRetry={() => setAttempt(n => n + 1)} />;
   if (!fees || !filing) return null;
   const canChoosePayment = !fees.obligation_met && (
     (fees.can_pay && fees.payments_simulated) || fees.can_request_waiver
   );
   return <div className="review-card filing-fees">
-    <div className="page-header"><h3>Filing fees &amp; payments</h3>
+    <div className="page-header"><Heading className="card-heading">Filing fees and payments</Heading>
       <button className="btn btn-secondary btn-small" disabled={busy} onClick={() => { setError(''); setAttempt(n => n + 1); }}>Refresh fees</button></div>
     {notice && <p className="alert alert-success" role="status">{notice}</p>}
     {error && <p className="alert alert-error" role="alert">{error}</p>}
@@ -97,7 +99,7 @@ export default function PaymentForm({ filingId, onFeesChange }: {
     {fees.assessment_stale && <p className="alert alert-warning">The documents or fee-review request changed after the last assessment. A current court assessment is required.</p>}
     {fees.source === 'court' && <p>Court assessment #{fees.assessment_id} · {fees.authority_reference}</p>}
     {fees.source === 'waiver' && <p>The fee waiver decision controls the amount due. Read the signed decision in filing history.</p>}
-    {fees.review_requested_at && <p className="alert alert-info" role="status">Awaiting court fee review, requested {parseServerDate(fees.review_requested_at).toISOString().replace('T', ' ').replace('Z', ' UTC')}.</p>}
+    {fees.review_requested_at && <p className="alert alert-info" role="status">Awaiting court fee review, requested {formatDateTime(fees.review_requested_at)}.</p>}
     {fees.total_cents === null ? <p>A fee has not been established for the current documents.</p>
       : <div className="fee-summary">
         {fees.items.map((item, index) => <div className="fee-item" key={index}><span>{item.description}</span><span>{formatCents(item.amount_cents)}</span></div>)}
@@ -112,7 +114,7 @@ export default function PaymentForm({ filingId, onFeesChange }: {
     <button className="btn btn-secondary" aria-expanded={paymentsOpen} disabled={busy}
       onClick={() => setPaymentsOpen(value => !value)}>{paymentsOpen ? 'Hide payment records' : 'View payment records'}</button>
     {paymentsOpen && <Suspense fallback={<p role="status">Loading payment records…</p>}>
-      <PaymentRecordsPanel key={filingId} fees={fees} onBusyChange={setBusy}
+      <PaymentRecordsPanel key={filingId} fees={fees} Heading={Subheading} onBusyChange={setBusy}
         onChanged={message => { setNotice(message); setAttempt(n => n + 1); }} />
     </Suspense>}
     {fees.can_request_review && <form onSubmit={requestReview} className="fee-review-request">
@@ -122,7 +124,7 @@ export default function PaymentForm({ filingId, onFeesChange }: {
     </form>}
     {fees.can_pay && !fees.payments_simulated && <p className="info-text">Online payment is unavailable. Contact the court about payment options.</p>}
     {canChoosePayment && <>
-      <div className="payment-methods"><h4>Payment or waiver</h4><div className="payment-option-list">
+      <div className="payment-methods"><Subheading className="card-subheading">Payment or waiver</Subheading><div className="payment-option-list">
         {[
           { value: 'credit_card', label: 'Credit card' }, { value: 'debit_card', label: 'Debit card' },
           { value: 'ach', label: 'ACH / eCheck' }, { value: 'waiver', label: 'Fee waiver request' },
@@ -141,7 +143,7 @@ export default function PaymentForm({ filingId, onFeesChange }: {
       </div>}
       {fees.can_pay && fees.payments_simulated && <p className="info-text">Payment records are simulated. No card or bank information is collected and no money is charged.</p>}
       <button className="btn btn-primary" disabled={busy || (selectedMethod === 'waiver' ? !fees.can_request_waiver : !fees.can_pay)} onClick={pay}>
-        {busy ? 'Recording…' : selectedMethod === 'waiver' ? 'Attach waiver request to filing' : `Record simulated payment — ${formatCents(fees.balance_due_cents ?? 0)}`}
+        {busy ? 'Recording…' : selectedMethod === 'waiver' ? 'Attach waiver request to filing' : `Record simulated payment of ${formatCents(fees.balance_due_cents ?? 0)}`}
       </button>
     </>}
     {fees.can_assess && <>
