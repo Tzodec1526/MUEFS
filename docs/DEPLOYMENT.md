@@ -822,8 +822,11 @@ it at this repository; it provisions the `muefs-demo` service. Then add the cust
   `/ready`. The rate limit runs before a sandbox is created.
 - **Visitor addresses.** Render's load balancers reach the service from private addresses.
   Trusting them through `TRUSTED_PROXY_IPS` lets rate limits and audit records use the
-  visitor's address from `X-Forwarded-For` instead of one shared proxy address. After
-  deploying, check that the audit log's `ip_address` values differ between visitors.
+  visitor's address from `X-Forwarded-For` instead of one shared proxy address. The image sets
+  the private ranges by default, so the service works even if the Blueprint's variables were
+  never applied. After deploying, download a document and check the address the audit log
+  records for it. If it is a Cloudflare address rather than yours, add Cloudflare's published
+  ranges to `TRUSTED_PROXY_IPS`.
 
 To run the same image locally from the repository root:
 

@@ -31,6 +31,7 @@ ENV DEMO_ISOLATED_SESSIONS=true \
     DATABASE_URL=sqlite+aiosqlite:///./demo_data/unused.db \
     RATE_LIMIT_ENABLED=true \
     RATE_LIMIT_BACKEND=memory \
+    TRUSTED_PROXY_IPS=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,fc00::/7 \
     PAYMENTS_ARE_SIMULATED=true \
     PORT=8000
 
