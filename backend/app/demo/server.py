@@ -8,11 +8,13 @@ from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse
 from sqlalchemy import URL
 from sqlalchemy.ext.asyncio import create_async_engine
+from starlette.middleware import Middleware
 
 from app.config import settings
 from app.database import get_db
 from app.demo import session_db
 from app.main import app
+from app.middleware.rate_limit import RateLimitMiddleware
 
 session_db.seed_template()
 app.state.readiness_engine = create_async_engine(URL.create(
@@ -21,7 +23,10 @@ app.state.readiness_engine = create_async_engine(URL.create(
 ))
 
 app.dependency_overrides[get_db] = session_db.get_demo_db
-app.add_middleware(session_db.DemoSessionMiddleware)
+_rate_limit = next(
+    index for index, entry in enumerate(app.user_middleware) if entry.cls is RateLimitMiddleware
+)
+app.user_middleware.insert(_rate_limit + 1, Middleware(session_db.DemoSessionMiddleware))
 
 _STATIC_ROOT = Path(settings.demo_static_dir).resolve()
 mimetypes.add_type("font/woff2", ".woff2")

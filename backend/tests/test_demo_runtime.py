@@ -214,14 +214,47 @@ asyncio.run(exercise())
     _run_hosted(code, tmp_path)
 
 
-def _run_hosted(code, tmp_path):
+def test_the_rate_limit_runs_before_a_sandbox_is_allocated(tmp_path):
+    code = r'''
+import asyncio
+import os
+from pathlib import Path
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import URL, create_engine
+from app.demo.schema import prepare_demo_schema
+
+async def exercise():
+    directory = Path(os.environ["DEMO_DATA_DIR"])
+    directory.mkdir()
+    setup = create_engine(URL.create("sqlite", database=str(directory / "template.db")))
+    prepare_demo_schema(setup)
+    setup.dispose()
+    from app.demo.server import app as hosted
+    from app.demo import session_db
+
+    statuses = []
+    for index in range(4):
+        async with AsyncClient(
+            transport=ASGITransport(hosted), base_url="http://test",
+            cookies={session_db.COOKIE_NAME: f"{index:032x}"},
+        ) as client:
+            statuses.append((await client.get("/api/v1/public/stats")).status_code)
+    assert statuses == [200, 200, 429, 429], statuses
+    assert session_db.active_session_count() == 2, session_db.active_session_count()
+
+asyncio.run(exercise())
+'''
+    _run_hosted(code, tmp_path, RATE_LIMIT_ENABLED="true", RATE_LIMIT_DEFAULT_PER_MINUTE="2")
+
+
+def _run_hosted(code, tmp_path, **overrides):
     result = subprocess.run(
         [sys.executable, "-c", code], cwd=Path(__file__).resolve().parents[1],
         env={**os.environ, "DEMO_DATA_DIR": str(tmp_path / "data"),
              "DEMO_STATIC_DIR": str(tmp_path / "static"),
              "DATABASE_URL": "sqlite+aiosqlite:///:memory:", "DEMO_ISOLATED_SESSIONS": "true",
              "DEBUG": "true", "ALLOW_DEMO_MODE": "true", "RATE_LIMIT_ENABLED": "false",
-             "DEMO_MODE_SECRET": "browser-demo-secret"},
+             "DEMO_MODE_SECRET": "browser-demo-secret", **overrides},
         capture_output=True, text=True, encoding="utf-8", timeout=30,
     )
     assert result.returncode == 0, result.stdout + result.stderr

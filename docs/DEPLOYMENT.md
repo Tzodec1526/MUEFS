@@ -819,7 +819,7 @@ it at this repository; it provisions the `muefs-demo` service. Then add the cust
   visitors never share one. When the cap is reached, new visitors get a 503 that asks them to
   try again later. An API request without a session cookie gets a 401 that asks the visitor to
   reload the page, so monitors and scripts should load a page first or use `/health` and
-  `/ready`.
+  `/ready`. The rate limit runs before a sandbox is created.
 - **Visitor addresses.** Render's load balancers reach the service from private addresses.
   Trusting them through `TRUSTED_PROXY_IPS` lets rate limits and audit records use the
   visitor's address from `X-Forwarded-For` instead of one shared proxy address. After
