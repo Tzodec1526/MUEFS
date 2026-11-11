@@ -62,55 +62,68 @@ function LoginScreen() {
   };
 
   return (
-    <main className="login-screen">
-      <p className="login-product">
-        <MichiganMark size={30} />
-        Michigan Unified E-Filing System
-      </p>
-      <PageHeading>Sign in</PageHeading>
-      {demo && <p className="login-demo-note">Demo: not for real filings.</p>}
+    <div className="login-screen">
+      <div className="login-brand">
+        <p className="login-product">
+          <MichiganMark size={96} />
+          Michigan Unified E-Filing System
+        </p>
+        <p className="login-pitch">
+          One portal for filing, clerk review, public case search and document delivery in Michigan courts.
+        </p>
+        {demo && (
+          <p className="login-disclaimer">
+            Open-source demo, not for real filings. Not affiliated with SCAO or the Michigan Supreme Court.
+          </p>
+        )}
+      </div>
 
-      {demo && <ul className="login-roles">
-        {roles.map((option) => (
-          <li key={option.role}>
-            <div>
-              <strong>{option.label}</strong>
-              <span>{option.description}</span>
-            </div>
+      <main className="login-main">
+        <PageHeading>Sign in</PageHeading>
+        {demo && <p className="login-demo-note">Choose a role to explore the demo.</p>}
+
+        {demo && <ul className="login-roles">
+          {roles.map((option) => (
+            <li key={option.role}>
+              <div>
+                <strong>{option.label}</strong>
+                <span>{option.description}</span>
+              </div>
+              <button
+                className="btn btn-primary btn-small"
+                onClick={() => handleSignIn(option)}
+                aria-label={option.role === 'public' ? undefined : `Sign in as ${option.label}`}
+              >
+                {option.role === 'public' ? 'Browse records' : 'Sign in'}
+              </button>
+            </li>
+          ))}
+        </ul>}
+
+        {keycloakConfigured() && (
+          <div className="login-keycloak">
+            {searchParams.get('reason') === 'expired' && <p role="status" className="alert alert-warning">Your court sign-in expired. Sign in again to continue. Unsaved filing drafts are still on this device.</p>}
+            {signInError && <p role="alert" className="alert alert-error">{signInError}</p>}
             <button
-              className="btn btn-primary btn-small"
-              onClick={() => handleSignIn(option)}
-              aria-label={option.role === 'public' ? undefined : `Sign in as ${option.label}`}
+              type="button"
+              className="btn btn-primary"
+              onClick={() => void signIn()}
+              disabled={signingIn}
             >
-              {option.role === 'public' ? 'Browse records' : 'Sign in'}
+              {signingIn ? 'Connecting to court sign-in…' : 'Sign in with your court account'}
             </button>
-          </li>
-        ))}
-      </ul>}
+            <p className="login-help">Use the identity account approved by your court or state.</p>
+          </div>
+        )}
 
-      {keycloakConfigured() && (
-        <div className="login-keycloak">
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => void signIn()}
-            disabled={signingIn}
-          >
-            {signingIn ? 'Connecting to court sign-in…' : 'Sign in with your court account'}
-          </button>
-          {signInError && <p role="alert">{signInError}</p>}
-          {searchParams.get('reason') === 'expired' && <p role="status">Your court sign-in expired. Sign in again to continue. Unsaved filing drafts are still on this device.</p>}
-          <p>Use the identity account approved by your court or state.</p>
-        </div>
-      )}
+        {!demo && <div className="login-keycloak">
+          {!keycloakConfigured() && <p role="alert" className="alert alert-error">Sign-in is not configured for this deployment. Contact the court&apos;s support team.</p>}
+          <Link className="btn btn-secondary" to="/cases/search">Browse public records</Link>
+        </div>}
 
-      {!demo && <div className="login-keycloak">
-        {!keycloakConfigured() && <p role="alert">Sign-in is not configured for this deployment. Contact the court&apos;s support team.</p>}
-        <Link className="btn btn-secondary" to="/cases/search">Browse public records</Link>
-      </div>}
-
-      <p className="login-about"><Link to="/about">About MUEFS</Link></p>
-    </main>
+        <p className="login-about"><Link to="/about">About MUEFS</Link></p>
+      </main>
+    </div>
   );
 }
 

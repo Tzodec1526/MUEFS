@@ -1,22 +1,59 @@
 .login-screen {
-  max-width: 40rem;
+  display: grid;
+  grid-template-columns: minmax(20rem, 2fr) 3fr;
   min-height: 100vh;
-  margin-inline: auto;
-  padding: 3rem 1.5rem;
+}
+
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem clamp(2rem, 5vw, 4rem);
+  background: var(--accent-dark);
+  color: var(--white);
 }
 
 .login-product {
   display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  margin-bottom: 2rem;
-  color: var(--accent);
-  font-size: 1.1rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.5rem;
+  max-width: 12em;
+  font-size: 1.75rem;
   font-weight: 700;
+  line-height: 1.2;
+  text-wrap: balance;
 }
 
-.login-screen h1 {
-  font-size: 1.5rem;
+.login-product .michigan-outline {
+  color: var(--on-dark-muted);
+}
+
+.login-pitch {
+  max-width: 28rem;
+  color: var(--on-dark-muted);
+}
+
+.login-disclaimer {
+  max-width: 28rem;
+  margin-top: 1rem;
+  color: var(--on-dark-muted);
+  font-size: 0.875rem;
+}
+
+.login-main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  justify-self: center;
+  width: 100%;
+  max-width: 38rem;
+  padding: 3rem clamp(1.5rem, 5vw, 4rem);
+}
+
+.login-main h1 {
+  font-size: 1.75rem;
 }
 
 .login-demo-note {
@@ -26,16 +63,25 @@
 
 .login-roles {
   display: grid;
-  gap: 1.25rem;
+  gap: 0.5rem;
   margin-top: 1.5rem;
   list-style: none;
 }
 
 .login-roles li {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius);
+  background: var(--white);
+}
+
+.login-roles li:hover,
+.login-roles li:has(.btn:focus-visible) {
+  box-shadow: inset 4px 0 0 var(--accent);
 }
 
 .login-roles strong,
@@ -52,11 +98,18 @@
   flex-shrink: 0;
 }
 
+.login-roles .btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+}
+
 .login-keycloak {
   margin-top: 2rem;
 }
 
-.login-keycloak p {
+.login-help {
   margin-top: 0.5rem;
   color: var(--muted);
   font-size: 0.875rem;
@@ -64,4 +117,38 @@
 
 .login-about {
   margin-top: 2rem;
+}
+
+@media (max-width: 768px) {
+  .login-screen {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .login-brand {
+    gap: 0.75rem;
+    padding: 1.5rem 1rem;
+  }
+
+  .login-product {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+    max-width: none;
+    font-size: 1.25rem;
+  }
+
+  .login-product .michigan-outline {
+    width: 2.5rem;
+    height: auto;
+  }
+
+  .login-disclaimer {
+    margin-top: 0;
+  }
+
+  .login-main {
+    justify-content: flex-start;
+    padding: 2rem 1rem 3rem;
+  }
 }
