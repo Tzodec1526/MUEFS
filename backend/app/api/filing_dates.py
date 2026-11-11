@@ -61,6 +61,7 @@ async def filing_date_state(
         "court_id": filing.court_id,
         "status": filing.status,
         "submission_count": filing.submission_count,
+        "filed_at": filing.filed_at,
         "submitted_at": filing.submitted_at,
         "filing_date": filing.filing_date,
         "filing_date_basis": filing.filing_date_basis,

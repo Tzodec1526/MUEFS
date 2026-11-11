@@ -13,7 +13,8 @@ import PageHeading from '../common/PageHeading';
 
 interface DateState {
   filing_id: number; court_id: number; status: string; submission_count: number;
-  submitted_at: string | null; filing_date: string | null; filing_date_basis: FilingDateBasis | null;
+  filed_at: string | null; submitted_at: string | null;
+  filing_date: string | null; filing_date_basis: FilingDateBasis | null;
   version: number; case_id: number | null; case_number: string | null;
   case_filing_date: string | null; case_date_version: number | null; order_block: string | null;
 }
@@ -72,7 +73,10 @@ export default function FilingDateOrderPage() {
       <div className="review-card">
         <h2 className="card-heading">Current record</h2>
         <p>Submission {data.submission_count || 'not recorded'} · {filingStatusLabel(data.status)}</p>
-        <p>Receipt time: {formatDateTime(data.submitted_at)}</p>
+        {data.filed_at && data.submitted_at && data.filed_at !== data.submitted_at ? <>
+          <p>First received: {formatDateTime(data.filed_at)}</p>
+          <p>Latest submission: {formatDateTime(data.submitted_at)}</p>
+        </> : <p>Received: {formatDateTime(data.filed_at ?? data.submitted_at)}</p>}
         <p>Filing date: <strong>{formatCourtDate(data.filing_date)}</strong></p>
         {data.filing_date_basis && <FilingDateEvidence basis={data.filing_date_basis} />}
         {data.case_id && <p>Case {data.case_number}: opening date <strong>{formatCourtDate(data.case_filing_date)}</strong></p>}

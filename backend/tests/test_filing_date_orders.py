@@ -252,6 +252,8 @@ async def test_return_and_resubmission_keep_the_ordered_date(
     await filing_service.submit_filing(db_session, fid)
     state = (await api_client.get(url)).json()
     assert state["submission_count"] == 2 and state["version"] == 4
+    assert state["filed_at"] == old_state["filed_at"] == old_state["submitted_at"]
+    assert state["submitted_at"] != state["filed_at"]
     assert state["filing_date"] == DECISION["filing_date"]
     assert state["filing_date_basis"] == old_state["filing_date_basis"]
     assert (
