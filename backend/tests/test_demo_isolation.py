@@ -71,22 +71,34 @@ async def test_demo_api_commits_to_the_visitors_copy_of_the_template(demo, monke
     engine.dispose()
 
 
-def test_capacity_falls_back_to_shared(demo, monkeypatch):
+async def test_a_full_demo_refuses_new_visitors_instead_of_sharing_a_sandbox(demo, monkeypatch):
+    monkeypatch.setitem(app.dependency_overrides, get_db, demo.get_demo_db)
     monkeypatch.setattr("app.config.settings.demo_max_sessions", 1)
-    demo.open_sandbox("d" * 32)
+    async with _visitor(demo, "a" * 32) as first, _visitor(demo, "b" * 32) as second:
+        assert (await first.get("/api/v1/filings")).status_code == 200
+        refused = await second.get("/api/v1/filings")
+    assert refused.status_code == 503, refused.text
+    assert refused.json()["detail"] == "The demo is at capacity. Try again in a few minutes."
+    assert refused.headers["retry-after"] == "300"
+    assert "set-cookie" not in refused.headers
+    assert demo.active_session_count() == 1
+
+
+async def test_an_api_request_without_a_session_cookie_is_refused(demo, monkeypatch):
+    monkeypatch.setitem(app.dependency_overrides, get_db, demo.get_demo_db)
+    for cookie in (None, "_shared", "not-a-session-id"):
+        async with _visitor(demo, cookie) as client:
+            refused = await client.get("/api/v1/filings")
+        assert refused.status_code == 401, (cookie, refused.text)
+        assert "Reload the page" in refused.json()["detail"]
+        assert "set-cookie" not in refused.headers
+    assert demo.active_session_count() == 0
 
     class _Req:
         cookies: dict = {}
 
-    assert demo.resolve_sid(_Req()) == demo.SHARED_SID
-
-
-def test_cookieless_api_clients_share_one_sandbox(demo):
-    class _Req:
-        cookies: dict = {}
-
-    assert demo.resolve_sid(_Req(), allocate=False) == demo.SHARED_SID
     assert demo._is_valid_sid(demo.resolve_sid(_Req()))
+    assert demo.resolve_sid(_Req(), allocate=False) is None
 
 
 def test_parallel_first_requests_publish_one_complete_database(demo, monkeypatch):
@@ -140,12 +152,9 @@ def test_failed_session_copy_can_be_retried(demo, monkeypatch):
 def test_client_chosen_ids_cannot_allocate_sandboxes_beyond_the_cap(demo, monkeypatch):
     monkeypatch.setattr("app.config.settings.demo_max_sessions", 2)
     issued = [demo.open_sandbox(sid) for sid in ("1" * 32, "2" * 32)]
-
-    class _Req:
-        cookies = {demo.COOKIE_NAME: "3" * 32}
-
-    assert demo.resolve_sid(_Req()) == "3" * 32
-    assert demo.open_sandbox("3" * 32) == demo._session_path(demo.SHARED_SID)
+    with pytest.raises(demo.DemoCapacityError):
+        demo.open_sandbox("3" * 32)
+    assert not demo._session_path("3" * 32).exists()
     assert demo.active_session_count() == 2
     assert [demo.open_sandbox(sid) for sid in ("1" * 32, "2" * 32)] == issued
 
@@ -164,7 +173,7 @@ def test_sweep_keeps_recent_sandboxes_after_restart(demo, monkeypatch):
 def _visitor(demo, sid):
     return AsyncClient(
         transport=ASGITransport(demo.DemoSessionMiddleware(app)), base_url="http://test",
-        headers={"X-Demo-User-Id": "1"}, cookies={demo.COOKIE_NAME: sid},
+        headers={"X-Demo-User-Id": "1"}, cookies={demo.COOKIE_NAME: sid} if sid else {},
     )
 
 
@@ -274,7 +283,7 @@ def test_boot_removes_uploads_that_belong_to_no_current_sandbox(demo, monkeypatc
     live = "6" * 32
     demo.open_sandbox(live)
     uploads = demo._uploads_dir()
-    for sid in (live, "7" * 32, demo.SHARED_SID):
+    for sid in (live, "7" * 32, "_shared"):
         (uploads / sid / "filings").mkdir(parents=True)
         (uploads / sid / "filings" / "record.txt").write_bytes(b"record")
     demo.seed_template()

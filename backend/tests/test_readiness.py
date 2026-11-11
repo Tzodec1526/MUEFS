@@ -223,7 +223,7 @@ async def exercise():
             assert not session_db._last_access
             assert set(directory.rglob("*.db")) == original_files
             probe = await client.get("/api/v1/courts")
-            assert probe.status_code == 200, probe.text
+            assert probe.status_code == 401, probe.text
             assert "set-cookie" not in probe.headers
             assert set(directory.rglob("*.db")) == original_files
             assert "set-cookie" in (await client.get("/")).headers

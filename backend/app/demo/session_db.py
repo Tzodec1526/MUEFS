@@ -10,6 +10,7 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 
 from fastapi import Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import URL, create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
@@ -20,8 +21,13 @@ from app.database import session_scope
 from app.services import document_service
 
 COOKIE_NAME = "muefs_demo_sid"
-SHARED_SID = "_shared"
 _SWEEP_INTERVAL_SEC = 300.0
+_NO_SESSION = "This demo needs a session cookie. Reload the page to start a new demo session."
+_AT_CAPACITY = "The demo is at capacity. Try again in a few minutes."
+
+
+class DemoCapacityError(Exception):
+    pass
 
 _last_access: dict[str, float] = {}
 _last_sweep = 0.0
@@ -79,9 +85,8 @@ def seed_template() -> None:
                 prepare_demo_schema(engine)
             finally:
                 engine.dispose()
-    shutil.copyfile(template, _session_path(SHARED_SID))
     for folder in _uploads_dir().iterdir():
-        if folder.name == SHARED_SID or not _session_path(folder.name).exists():
+        if not _session_path(folder.name).exists():
             shutil.rmtree(folder, ignore_errors=True)
 
 
@@ -89,8 +94,7 @@ def open_sandbox(sid: str) -> Path:
     with _session_creation_lock:
         _sweep_idle()
         path = _ensure(sid)
-        if path.stem != SHARED_SID:
-            touch(path.stem)
+        touch(sid)
         return path
 
 
@@ -98,7 +102,7 @@ def _ensure(sid: str) -> Path:
     path = _session_path(sid)
     if not path.exists():
         if active_session_count() >= settings.demo_max_sessions:
-            return _session_path(SHARED_SID)
+            raise DemoCapacityError(_AT_CAPACITY)
         temporary = path.with_suffix(".tmp")
         try:
             shutil.copyfile(_template_db(), temporary)
@@ -109,16 +113,14 @@ def _ensure(sid: str) -> Path:
 
 
 def active_session_count() -> int:
-    return sum(1 for p in _sessions_dir().glob("*.db") if p.stem != SHARED_SID)
+    return sum(1 for _ in _sessions_dir().glob("*.db"))
 
 
-def resolve_sid(request: Request, *, allocate: bool = True) -> str:
+def resolve_sid(request: Request, *, allocate: bool = True) -> str | None:
     cookie = request.cookies.get(COOKIE_NAME)
-    if cookie and (cookie == SHARED_SID or _is_valid_sid(cookie)):
+    if cookie and _is_valid_sid(cookie):
         return cookie
-    if allocate and active_session_count() < settings.demo_max_sessions:
-        return secrets.token_hex(16)
-    return SHARED_SID
+    return secrets.token_hex(16) if allocate else None
 
 
 def touch(sid: str) -> None:
@@ -133,8 +135,6 @@ def _sweep_idle() -> None:
     _last_sweep = now
     ttl = settings.demo_session_ttl_minutes * 60
     for p in _sessions_dir().glob("*.db"):
-        if p.stem == SHARED_SID:
-            continue
         try:
             last = max(_last_access.get(p.stem, 0.0), p.stat().st_mtime)
         except FileNotFoundError:
@@ -160,15 +160,26 @@ class DemoSessionMiddleware:
                 or path.startswith("/assets/")):
             await self.app(scope, receive, send)
             return
+        request = Request(scope)
         api = path.startswith("/api/")
-        sid = resolve_sid(Request(scope), allocate=not api)
+        sid = resolve_sid(request, allocate=not api)
+        if sid is None:
+            await JSONResponse({"detail": _NO_SESSION}, status_code=401)(scope, receive, send)
+            return
         token = None
         if api:
-            database = await asyncio.to_thread(open_sandbox, sid)
+            try:
+                database = await asyncio.to_thread(open_sandbox, sid)
+            except DemoCapacityError:
+                refusal = JSONResponse(
+                    {"detail": _AT_CAPACITY}, status_code=503, headers={"Retry-After": "300"},
+                )
+                await refusal(scope, receive, send)
+                return
             scope.setdefault("state", {})["demo_database"] = database
-            token = document_service.storage_scope.set(upload_scope(database.stem))
+            token = document_service.storage_scope.set(upload_scope(sid))
         try:
-            await self.app(scope, receive, send if sid == SHARED_SID else _renewing(send, sid))
+            await self.app(scope, receive, _renewing(send, sid))
         finally:
             if token is not None:
                 document_service.storage_scope.reset(token)
@@ -200,6 +211,8 @@ def _sandbox_sessions(path: Path) -> async_sessionmaker[AsyncSession]:
 
 
 async def get_demo_db(request: Request) -> AsyncGenerator[AsyncSession, None]:
-    path = getattr(request.state, "demo_database", None) or _session_path(SHARED_SID)
+    path = getattr(request.state, "demo_database", None)
+    if path is None:
+        raise RuntimeError("Demo API request reached the database without a sandbox")
     async with session_scope(_sandbox_sessions(Path(path)), drain=True) as session:
         yield session

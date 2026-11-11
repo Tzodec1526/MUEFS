@@ -197,7 +197,7 @@ These settings have defaults in `backend/app/config.py` and no `.env.example` li
 | `RATE_LIMIT_SEARCH_PER_MINUTE` | `30` | |
 | `RATE_LIMIT_DOCUMENT_PER_MINUTE` | `60` | Applies to every route that streams or re-hashes stored document bytes. |
 | `DEMO_ISOLATED_SESSIONS` | `false` | Hosted demo only. Each browser session gets its own copy of a seeded template database. A court deployment leaves this false and uses one shared database. |
-| `DEMO_MAX_SESSIONS` | `100` | Private sandboxes before visitors share the common one. |
+| `DEMO_MAX_SESSIONS` | `100` | Private sandboxes at once. Further visitors are refused until one expires. |
 | `DEMO_SESSION_TTL_MINUTES` | `60` | |
 | `DEMO_STORAGE_QUOTA_MB` | `200` | Uploads each sandbox may keep. Its folder is deleted with the sandbox. |
 | `DEMO_STATIC_DIR` | `static` | The built frontend the demo server serves. |
@@ -815,10 +815,11 @@ it at this repository; it provisions the `muefs-demo` service. Then add the cust
   Hook, then run
   `gh secret set RENDER_DEPLOY_HOOK_URL --body "https://api.render.com/deploy/..."`.
 - **One instance only.** The per-session sandboxes live on the instance's local disk, tracked
-  in one process's memory. Each browser session gets its own copy of a seeded template. When
-  the cap is reached, or a visitor blocks cookies, they fall back to a shared sandbox that
-  resets on restart. Clients without a cookie, such as monitors and scripts, use the shared
-  sandbox too.
+  in one process's memory. Each browser session gets its own copy of a seeded template, and
+  visitors never share one. When the cap is reached, new visitors get a 503 that asks them to
+  try again later. An API request without a session cookie gets a 401 that asks the visitor to
+  reload the page, so monitors and scripts should load a page first or use `/health` and
+  `/ready`.
 - **Visitor addresses.** Render's load balancers reach the service from private addresses.
   Trusting them through `TRUSTED_PROXY_IPS` lets rate limits and audit records use the
   visitor's address from `X-Forwarded-For` instead of one shared proxy address. After
