@@ -179,15 +179,21 @@ class DemoSessionMiddleware:
             scope.setdefault("state", {})["demo_database"] = database
             token = document_service.storage_scope.set(upload_scope(sid))
         try:
-            await self.app(scope, receive, _renewing(send, sid))
+            await self.app(scope, receive, _renewing(send, sid, secure=_over_https(request)))
         finally:
             if token is not None:
                 document_service.storage_scope.reset(token)
 
 
-def _renewing(send: Send, sid: str) -> Send:
+def _over_https(request: Request) -> bool:
+    forwarded = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+    return request.url.scheme == "https" or forwarded == "https"
+
+
+def _renewing(send: Send, sid: str, *, secure: bool) -> Send:
     ttl = settings.demo_session_ttl_minutes * 60
-    cookie = f"{COOKIE_NAME}={sid}; Max-Age={ttl}; Path=/; HttpOnly; SameSite=Lax".encode()
+    attributes = f"Max-Age={ttl}; Path=/; HttpOnly; SameSite=Lax{'; Secure' if secure else ''}"
+    cookie = f"{COOKIE_NAME}={sid}; {attributes}".encode()
 
     async def send_with_cookie(message: Message) -> None:
         if message["type"] == "http.response.start":

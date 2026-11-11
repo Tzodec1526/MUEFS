@@ -101,6 +101,15 @@ async def test_an_api_request_without_a_session_cookie_is_refused(demo, monkeypa
     assert demo.resolve_sid(_Req(), allocate=False) is None
 
 
+async def test_the_session_cookie_is_secure_behind_an_https_proxy(demo, monkeypatch):
+    monkeypatch.setitem(app.dependency_overrides, get_db, demo.get_demo_db)
+    async with _visitor(demo, "c" * 32) as client:
+        plain = await client.get("/api/v1/filings")
+        proxied = await client.get("/api/v1/filings", headers={"X-Forwarded-Proto": "https"})
+    assert "Secure" not in plain.headers["set-cookie"]
+    assert proxied.headers["set-cookie"].endswith("; SameSite=Lax; Secure")
+
+
 def test_parallel_first_requests_publish_one_complete_database(demo, monkeypatch):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Event
